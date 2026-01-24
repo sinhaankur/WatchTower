@@ -128,30 +128,60 @@ class PodmanManager:
             Tuple of (update_available, new_digest)
         """
         try:
-            # Get current local image digest
-            local_digest = self.get_image_digest(image_name)
-            
-            # Pull the latest image metadata (without downloading the full image)
+            # Get current local image ID
             result = subprocess.run(
-                ["podman", "pull", "--quiet", image_name],
+                ["podman", "inspect", "--format", "{{.Id}}", image_name],
                 capture_output=True,
                 text=True,
-                timeout=120
+                timeout=30
             )
             
             if result.returncode != 0:
-                self.logger.warning(f"Failed to check updates for {image_name}: {result.stderr}")
-                return False, None
+                self.logger.warning(f"Image {image_name} not found locally")
+                return True, None  # Image doesn't exist locally, update needed
             
-            # Get the new digest
-            new_digest = self.get_image_digest(image_name)
+            local_id = result.stdout.strip()
             
-            # Compare digests
-            if local_digest and new_digest and local_digest != new_digest:
-                self.logger.info(f"Update available for {image_name}")
-                return True, new_digest
+            # Check registry for updates using manifest inspect
+            # This is lightweight and doesn't download the full image
+            result = subprocess.run(
+                ["podman", "manifest", "inspect", image_name],
+                capture_output=True,
+                text=True,
+                timeout=60
+            )
             
-            return False, new_digest
+            if result.returncode != 0:
+                # If manifest inspect fails, fall back to pull for update check
+                self.logger.debug(f"Manifest inspect failed for {image_name}, using pull to check")
+                result = subprocess.run(
+                    ["podman", "pull", "--quiet", image_name],
+                    capture_output=True,
+                    text=True,
+                    timeout=120
+                )
+                
+                if result.returncode != 0:
+                    self.logger.warning(f"Failed to check updates for {image_name}: {result.stderr}")
+                    return False, None
+            
+            # Get the new image ID after checking
+            result = subprocess.run(
+                ["podman", "inspect", "--format", "{{.Id}}", image_name],
+                capture_output=True,
+                text=True,
+                timeout=30
+            )
+            
+            if result.returncode == 0:
+                new_id = result.stdout.strip()
+                
+                # Compare image IDs
+                if local_id != new_id:
+                    self.logger.info(f"Update available for {image_name}")
+                    return True, new_id
+            
+            return False, local_id
         except Exception as e:
             self.logger.error(f"Error checking for updates for {image_name}: {e}")
             return False, None
