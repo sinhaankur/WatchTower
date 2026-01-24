@@ -5,6 +5,7 @@ Scheduling functionality for WatchTower
 import logging
 import signal
 import sys
+import time
 from typing import Callable, Optional
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.interval import IntervalTrigger
@@ -76,7 +77,6 @@ class Scheduler:
         self.start()
         try:
             # Keep the main thread alive
-            import time
             while self.running:
                 time.sleep(1)
         except (KeyboardInterrupt, SystemExit):
