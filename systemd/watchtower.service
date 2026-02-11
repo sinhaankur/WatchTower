@@ -2,16 +2,18 @@
 Description=WatchTower - Podman Container Management Service
 After=network.target podman.service
 Wants=podman.service
+Documentation=https://github.com/sinhaankur/WatchTower
 
 [Service]
 Type=simple
 User=root
 WorkingDirectory=/opt/watchtower
-ExecStart=/usr/bin/python3 -m watchtower start
+ExecStart=/usr/local/bin/watchtower start
 Restart=on-failure
 RestartSec=10
 StandardOutput=journal
 StandardError=journal
+Environment="PYTHONUNBUFFERED=1"
 
 # Security settings
 NoNewPrivileges=true
