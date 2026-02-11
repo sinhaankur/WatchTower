@@ -1,0 +1,57 @@
+watchtower:
+  # Check interval in seconds (300 = 5 minutes)
+  interval: 300
+  
+  # Remove old images after successful update
+  cleanup: true
+  
+  # Monitor only mode - check for updates but don't apply them
+  monitor_only: false
+
+containers:
+  # Include specific containers (empty list means all containers)
+  # Supports wildcard patterns with *
+  include: []
+    # - "my-app"
+    # - "web-*"
+  
+  # Exclude specific containers from auto-update
+  # Supports wildcard patterns with *
+  exclude: []
+    # - "database-*"
+    # - "postgres"
+    # - "mysql"
+
+notifications:
+  # Enable notifications
+  enabled: true
+  
+  # Notification type: log, email, webhook
+  type: "log"
+  
+  # Email configuration (when type is "email")
+  # email:
+  #   smtp_host: "smtp.example.com"
+  #   smtp_port: 587
+  #   from: "watchtower@example.com"
+  #   to: ["admin@example.com"]
+  #   username: "your-username"
+  #   password: "your-password"
+  
+  # Webhook configuration (when type is "webhook")
+  # webhook:
+  #   url: "https://hooks.example.com/watchtower"
+  #   method: "POST"
+
+logging:
+  # Log level: DEBUG, INFO, WARNING, ERROR, CRITICAL
+  level: "INFO"
+  
+  # Log file path
+  file: "/var/log/watchtower/watchtower.log"
+  
+  # Maximum log file size before rotation
+  max_size: "10MB"
+  
+  # Number of backup files to keep
+  backup_count: 5
