@@ -7,3 +7,7 @@ include nodes.json
 include deploy.sh
 include apps.json
 include install_app_center.sh
+include install_windows.ps1
+include run_app_center_windows.ps1
+include install_macos.sh
+include run_app_center_macos.sh
