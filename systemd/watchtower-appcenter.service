@@ -1,0 +1,16 @@
+[Unit]
+Description=WatchTower App Center Deployment API
+After=network.target
+
+[Service]
+Type=simple
+User=watchtower
+Group=watchtower
+WorkingDirectory=/opt/watchtower
+EnvironmentFile=-/etc/watchtower/appcenter.env
+ExecStart=/opt/watchtower/.venv/bin/watchtower-deploy serve --host 0.0.0.0 --port 8000
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
