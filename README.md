@@ -435,6 +435,49 @@ podman pull <image-name>
 - **Secure Updates**: Uses Podman's built-in security features
 - **Graceful Handling**: Errors don't expose sensitive information
 
+### Website Security Baseline (Recommended)
+
+Use this checklist when running WatchTower as a website deployment App Center.
+
+1. **Protect the Deploy API**
+  - Set a strong `WATCHTOWER_TRIGGER_TOKEN` in `/etc/watchtower/appcenter.env`
+  - Keep the API private to your LAN or VPN whenever possible
+  - Restrict access with firewall rules (allow only trusted admin/dev IPs)
+
+2. **Use Least Privilege on Nodes**
+  - Use a dedicated non-root user (for example `deploy`)
+  - In `sudoers`, allow only specific restart commands with `NOPASSWD`
+  - Avoid broad rules like `ALL=(ALL) NOPASSWD:ALL`
+
+3. **Harden SSH Access**
+  - Use key-based authentication only
+  - Disable password authentication on target nodes
+  - Rotate SSH keys periodically and remove unused keys
+
+4. **Secure Reverse Proxy / Web Stack**
+  - Enforce HTTPS and modern TLS ciphers
+  - Add security headers: `HSTS`, `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, and a suitable `Content-Security-Policy`
+  - Run regular dependency and OS patch updates
+
+5. **Audit and Recovery**
+  - Store deployment logs centrally and rotate logs
+  - Keep database and website backups before deployment
+  - Test rollback procedure for each app
+
+### Minimal Safe Deployment Example
+
+```bash
+# Restrict App Center service variables
+sudo nano /etc/watchtower/appcenter.env
+
+# Verify service and health endpoint from trusted host
+sudo systemctl status watchtower-appcenter
+curl http://<server-ip>:8000/health
+```
+
+For internet-facing deployments, place the App Center API behind an authenticated
+gateway or VPN and do not expose it directly to the public internet.
+
 ## Development
 
 ### Project Structure
@@ -483,6 +526,33 @@ pytest --cov=watchtower tests/
 4. Add tests for new functionality
 5. Ensure tests pass
 6. Submit a pull request
+
+For full contribution guidance, see [CONTRIBUTING.md](CONTRIBUTING.md).
+
+### Extending WatchTower (For Contributors)
+
+WatchTower is intended to be extended by the community. Common extension areas:
+
+1. **New Deployment Integrations**
+  - Add additional build/deploy workflows in `watchtower/deploy_server.py`
+  - Add new API endpoints for deployment strategies (blue/green, canary)
+
+2. **Notification and Observability**
+  - Extend notifications beyond logs (email, webhook, Slack, Teams)
+  - Add metrics export and health dashboards
+
+3. **Safety Features**
+  - Add pre-deploy checks (disk space, service availability, config validation)
+  - Add automated rollback on failed health checks
+
+4. **Packaging and Platform Support**
+  - Improve `watchtower/package_builder.py` targets and artifact signing
+  - Add optional installers for additional Linux distributions
+
+If you add new functionality, please include:
+- Tests for success and failure paths
+- README updates for new commands/config
+- Security implications and safe defaults
 
 ## Future Roadmap
 
