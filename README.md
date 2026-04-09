@@ -1,6 +1,13 @@
-# WatchTower - Podman Container Management Service
+# WatchTower - App Center and Podman Management
 
-WatchTower is an automated container management service for Podman that monitors your running containers and automatically updates them when new images are available. It's designed to keep your containerized applications up-to-date with minimal manual intervention.
+WatchTower can run as:
+- A Podman auto-update service for containers
+- A lightweight App Center for Linux servers that deploys websites/APIs to multiple nodes over SSH
+
+The App Center mode is designed to feel simple like hosted deployment platforms:
+- Register apps in a single apps.json file
+- Deploy by app name from your dev machine
+- Push code, run optional build, sync artifacts to nodes, and reload services
 
 ## Features
 
@@ -15,7 +22,8 @@ WatchTower is an automated container management service for Podman that monitors
 - **Comprehensive Logging**: Detailed logging with rotation support
 - **CLI Interface**: Command-line tools for manual operations and status checks
 - **Systemd Integration**: Run as a system service with automatic startup
-- **Cross-Platform Ready**: Designed with future Windows and macOS support in mind
+- **App Center API**: Trigger deploys through app-specific endpoints
+- **Portable Packaging**: Build tar.gz/zip bundles for Linux, Windows, macOS, or any target
 
 ## Requirements
 
@@ -25,6 +33,24 @@ WatchTower is an automated container management service for Podman that monitors
 - **Permissions**: Root or appropriate Podman socket access
 
 ## Installation
+
+### One-Command App Center Install (Linux)
+
+```bash
+sudo ./install_app_center.sh
+```
+
+This installer:
+- Installs runtime dependencies (python3, venv, git, rsync, ssh client)
+- Installs WatchTower into /opt/watchtower/.venv
+- Sets up /etc/watchtower/nodes.json and /etc/watchtower/apps.json
+- Creates and starts systemd service: watchtower-appcenter
+
+After install:
+```bash
+sudo systemctl status watchtower-appcenter
+curl http://<server-ip>:8000/health
+```
 
 ### Ubuntu/Linux Installation
 
@@ -186,6 +212,63 @@ Check if your configuration file is valid:
 ```bash
 watchtower validate-config
 ```
+
+### Deployment Orchestrator Mode
+
+WatchTower also provides a deployment API/server mode for website rollouts to
+multiple Linux nodes over SSH.
+
+#### Start Deployment Listener
+```bash
+watchtower-deploy serve --host 0.0.0.0 --port 8000
+```
+
+Required environment variables:
+
+```bash
+export WATCHTOWER_REPO_DIR=/opt/website
+export WATCHTOWER_NODES_FILE=/opt/watchtower/nodes.json
+export WATCHTOWER_APPS_FILE=/opt/watchtower/apps.json
+export WATCHTOWER_TRIGGER_TOKEN=change-me
+```
+
+#### Deploy by App Name (Recommended)
+```bash
+WATCHTOWER_BASE_URL=http://server:8000 WATCHTOWER_TOKEN=change-me ./deploy.sh --app website-main main
+```
+
+#### List Registered Apps
+```bash
+curl -H "X-Watchtower-Token: change-me" http://server:8000/apps
+```
+
+#### Trigger Deployment from Dev PC
+```bash
+WATCHTOWER_URL=http://server:8000/deploy WATCHTOWER_TOKEN=change-me ./deploy.sh main
+```
+
+#### Run One-Off Deployment on Server
+```bash
+watchtower-deploy deploy-now --branch main
+```
+
+#### Run One-Off App Deployment on Server
+```bash
+watchtower-deploy deploy-app --app website-main --branch main
+```
+
+### Create Device-Compatible App Packages
+
+Build portable deployment bundles for multiple targets:
+
+```bash
+watchtower-package --name website-main --source ./dist --target linux --format tar.gz
+watchtower-package --name desktop-client --source ./build --target windows --format zip
+```
+
+Generated output includes:
+- Archive bundle (.tar.gz or .zip)
+- Manifest JSON with target metadata
 
 ### Running as a Service
 
