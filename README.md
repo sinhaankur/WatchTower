@@ -1,5 +1,8 @@
 # WatchTower - App Center and Podman Management
 
+Project site (GitHub Pages):
+- https://sinhaankur.github.io/WatchTower/
+
 WatchTower can run as:
 - A Podman auto-update service for containers
 - A lightweight App Center for Linux servers that deploys websites/APIs to multiple nodes over SSH
@@ -53,6 +56,18 @@ One-time setup needed:
 - In GitHub repo settings, allow workflow permissions to write packages.
 - In PyPI, configure Trusted Publishing for this repository and the `pypi` environment.
 - Use release tags (for example `v1.1.1`) to produce versioned artifacts.
+
+### GitHub Pages Documentation Site
+
+- Source files are in `docs/`
+- Deployment workflow: `.github/workflows/deploy-pages.yml`
+- URL: `https://sinhaankur.github.io/WatchTower/`
+
+If Pages has never been enabled on this repository:
+
+1. Open repository settings -> Pages
+2. Under Build and deployment, select Source: `GitHub Actions`
+3. Run the `Deploy Docs Site` workflow once (or push docs changes)
 
 ### One-Command App Center Install (Linux)
 
