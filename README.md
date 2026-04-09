@@ -533,6 +533,17 @@ curl http://<server-ip>:8000/health
 For internet-facing deployments, place the App Center API behind an authenticated
 gateway or VPN and do not expose it directly to the public internet.
 
+### Security CI (Automated)
+
+This repository includes automated Trivy scanning in
+`.github/workflows/security-scan.yml`.
+
+- Runs on pull requests and pushes to `main`
+- Scans both filesystem dependencies and the built container image
+- Fails the workflow on `CRITICAL` or `HIGH` vulnerabilities (excluding unfixed CVEs)
+
+Use this as a merge gate for safer releases.
+
 ## Development
 
 ### Project Structure
