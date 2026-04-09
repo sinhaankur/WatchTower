@@ -15,12 +15,15 @@ import json
 import logging
 import os
 import subprocess
+from collections import deque
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 from fabric import Connection
 from fastapi import FastAPI, Header, HTTPException
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 
 logging.basicConfig(
@@ -28,6 +31,9 @@ logging.basicConfig(
     format="%(asctime)s %(levelname)s %(message)s",
 )
 logger = logging.getLogger("watchtower")
+
+
+DEPLOY_HISTORY: deque[dict[str, Any]] = deque(maxlen=200)
 
 
 @dataclass
@@ -47,6 +53,26 @@ class DeployRequest(BaseModel):
 
 class AppDeployRequest(BaseModel):
     branch: str | None = None
+
+
+def append_history(
+    *,
+    deployment_type: str,
+    app_name: str,
+    branch: str,
+    status: str,
+    message: str,
+) -> None:
+    DEPLOY_HISTORY.appendleft(
+        {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "type": deployment_type,
+            "app": app_name,
+            "branch": branch,
+            "status": status,
+            "message": message,
+        }
+    )
 
 
 def run_cmd(
@@ -262,9 +288,323 @@ def deploy_registered_app(
 app = FastAPI(title="Watchtower Deployment API", version="1.0.0")
 
 
+DASHBOARD_HTML = """
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>WatchTower Control Center</title>
+    <style>
+        :root {
+            --bg: #070b14;
+            --panel: #0f1628;
+            --panel-2: #0c1323;
+            --line: #223452;
+            --text: #e6ecff;
+            --muted: #9dafcd;
+            --good: #31d0a2;
+            --warn: #ffb84d;
+            --bad: #ff7f8e;
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            font-family: "Segoe UI", "Helvetica Neue", sans-serif;
+            background: radial-gradient(circle at 15% 8%, #15264a 0%, var(--bg) 38%);
+            color: var(--text);
+        }
+        .app { display: grid; grid-template-columns: 240px 1fr; min-height: 100vh; }
+        .sidebar {
+            border-right: 1px solid var(--line);
+            background: rgba(6, 10, 18, 0.8);
+            padding: 18px;
+        }
+        .brand { font-weight: 700; margin-bottom: 18px; }
+        .nav a {
+            display: block;
+            text-decoration: none;
+            color: var(--muted);
+            padding: 10px;
+            margin-bottom: 7px;
+            border-radius: 10px;
+            border: 1px solid transparent;
+        }
+        .nav a.active, .nav a:hover {
+            color: var(--text);
+            border-color: var(--line);
+            background: var(--panel-2);
+        }
+        .main { padding: 24px; }
+        .toolbar {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+        .toolbar input {
+            width: 320px;
+            max-width: 50vw;
+            background: var(--panel-2);
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            color: var(--text);
+            padding: 8px 10px;
+        }
+        .toolbar button {
+            border: 1px solid var(--line);
+            background: var(--panel);
+            color: var(--text);
+            border-radius: 10px;
+            padding: 8px 12px;
+            cursor: pointer;
+        }
+        .kpis { display: grid; gap: 12px; grid-template-columns: repeat(3, 1fr); }
+        .card {
+            border: 1px solid var(--line);
+            border-radius: 12px;
+            background: var(--panel);
+            padding: 14px;
+        }
+        .label { color: var(--muted); font-size: 0.85rem; }
+        .value { margin-top: 8px; font-size: 1.5rem; font-weight: 700; }
+        .sections {
+            margin-top: 14px;
+            display: grid;
+            gap: 12px;
+            grid-template-columns: 1.35fr 1fr;
+        }
+        .project-grid { display: grid; gap: 10px; grid-template-columns: repeat(2, 1fr); }
+        .project {
+            border: 1px solid var(--line);
+            border-radius: 12px;
+            background: var(--panel-2);
+            padding: 12px;
+        }
+        .project-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+            gap: 8px;
+        }
+        .status-ok { color: var(--good); }
+        .status-failed { color: var(--bad); }
+        .muted { color: var(--muted); }
+        .small { font-size: 0.82rem; }
+        .project button {
+            margin-top: 10px;
+            border: 1px solid var(--line);
+            background: #13223d;
+            color: var(--text);
+            border-radius: 10px;
+            padding: 7px 10px;
+            cursor: pointer;
+        }
+        .list { margin: 0; padding-left: 18px; }
+        .list li { margin-bottom: 8px; }
+        @media (max-width: 980px) {
+            .app { grid-template-columns: 1fr; }
+            .sidebar { display: none; }
+            .kpis { grid-template-columns: 1fr; }
+            .sections { grid-template-columns: 1fr; }
+            .project-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="app">
+        <aside class="sidebar">
+            <div class="brand">WatchTower Control</div>
+            <div class="nav">
+                <a class="active" href="#">Overview</a>
+                <a href="#">Projects</a>
+                <a href="#">Deployments</a>
+                <a href="#">Security</a>
+                <a href="#">Domains</a>
+                <a href="#">Settings</a>
+            </div>
+        </aside>
+        <main class="main">
+            <div class="toolbar">
+                <input id="token" type="password" placeholder="X-Watchtower-Token" />
+                <button onclick="refreshData()">Refresh</button>
+            </div>
+
+            <section class="kpis">
+                <div class="card"><div class="label">Projects</div><div class="value" id="kpi-projects">0</div></div>
+                <div class="card"><div class="label">Nodes</div><div class="value" id="kpi-nodes">0</div></div>
+                <div class="card"><div class="label">Deployments (24h)</div><div class="value" id="kpi-deploys">0</div></div>
+            </section>
+
+            <section class="sections">
+                <div class="card">
+                    <h3>Projects</h3>
+                    <div id="projects" class="project-grid"></div>
+                </div>
+
+                <div class="card">
+                    <h3>Recent Deployments</h3>
+                    <ul id="recent" class="list"></ul>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script>
+        function statusClass(status) {
+            return status === "success" ? "status-ok" : status === "failed" ? "status-failed" : "muted";
+        }
+
+        async function request(path, method = "GET", body = null) {
+            const token = document.getElementById("token").value.trim();
+            const headers = {"Content-Type": "application/json"};
+            if (token) headers["X-Watchtower-Token"] = token;
+            const res = await fetch(path, {
+                method,
+                headers,
+                body: body ? JSON.stringify(body) : null,
+            });
+            if (!res.ok) {
+                const txt = await res.text();
+                throw new Error(txt || "Request failed");
+            }
+            return res.json();
+        }
+
+        async function deployApp(name) {
+            try {
+                await request(`/apps/${name}/deploy`, "POST", {});
+                await refreshData();
+            } catch (err) {
+                alert(`Deploy failed for ${name}: ${err.message}`);
+            }
+        }
+
+        function renderProjects(apps) {
+            const holder = document.getElementById("projects");
+            holder.innerHTML = "";
+            apps.forEach((app) => {
+                const item = document.createElement("article");
+                item.className = "project";
+                item.innerHTML = `
+                    <div class="project-head">
+                        <strong>${app.name}</strong>
+                        <span class="small ${statusClass(app.last_status)}">${app.last_status}</span>
+                    </div>
+                    <div class="small muted">Branch: ${app.branch}</div>
+                    <div class="small muted">Repo: ${app.repo_dir}</div>
+                    <div class="small muted">Last deploy: ${app.last_deployed_at || "never"}</div>
+                    <button data-app="${app.name}">Deploy</button>
+                `;
+                item.querySelector("button").addEventListener("click", () => deployApp(app.name));
+                holder.appendChild(item);
+            });
+        }
+
+        function renderRecent(rows) {
+            const holder = document.getElementById("recent");
+            holder.innerHTML = "";
+            rows.forEach((row) => {
+                const li = document.createElement("li");
+                li.className = "small";
+                li.innerHTML = `<span class="${statusClass(row.status)}">${row.status}</span> - ${row.app} (${row.branch})`;
+                holder.appendChild(li);
+            });
+        }
+
+        async function refreshData() {
+            try {
+                const data = await request("/ui/data");
+                document.getElementById("kpi-projects").textContent = String(data.usage.total_apps);
+                document.getElementById("kpi-nodes").textContent = String(data.usage.total_nodes);
+                document.getElementById("kpi-deploys").textContent = String(data.usage.deployments_24h);
+                renderProjects(data.apps);
+                renderRecent(data.recent_deployments);
+            } catch (err) {
+                alert(`Unable to load dashboard data: ${err.message}`);
+            }
+        }
+
+        refreshData();
+    </script>
+</body>
+</html>
+"""
+
+
+def build_ui_data() -> dict[str, Any]:
+    apps_path = Path(os.getenv("WATCHTOWER_APPS_FILE", "./apps.json"))
+    inventory_path = Path(os.getenv("WATCHTOWER_NODES_FILE", "./nodes.json"))
+
+    apps_registry = load_apps_registry(apps_path)
+    nodes, _ = load_inventory(inventory_path)
+
+    history_list = list(DEPLOY_HISTORY)
+    recent_rows = history_list[:12]
+
+    by_app: dict[str, dict[str, Any]] = {}
+    for row in history_list:
+        app_key = row["app"]
+        if app_key not in by_app:
+            by_app[app_key] = row
+
+    apps: list[dict[str, Any]] = []
+    for name, app_cfg in sorted(apps_registry.items()):
+        last = by_app.get(name)
+        apps.append(
+            {
+                "name": name,
+                "branch": app_cfg.get("branch", "main"),
+                "repo_dir": app_cfg.get("repo_dir", ""),
+                "last_status": last["status"] if last else "unknown",
+                "last_deployed_at": last["timestamp"] if last else None,
+            }
+        )
+
+    now = datetime.now(timezone.utc)
+    deploys_24h = 0
+    for row in history_list:
+        ts = datetime.fromisoformat(row["timestamp"])
+        if (now - ts).total_seconds() <= 86400:
+            deploys_24h += 1
+
+    return {
+        "apps": apps,
+        "recent_deployments": recent_rows,
+        "usage": {
+            "total_apps": len(apps),
+            "total_nodes": len(nodes),
+            "deployments_24h": deploys_24h,
+        },
+    }
+
+
+def validate_token(x_watchtower_token: str | None) -> None:
+    required_token = os.getenv("WATCHTOWER_TRIGGER_TOKEN")
+    if required_token and x_watchtower_token != required_token:
+        raise HTTPException(status_code=401, detail="Invalid deployment token")
+
+
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.get("/dashboard", response_class=HTMLResponse)
+def dashboard() -> str:
+    return DASHBOARD_HTML
+
+
+@app.get("/ui/data")
+def ui_data(
+    x_watchtower_token: str | None = Header(default=None),
+) -> dict[str, Any]:
+    validate_token(x_watchtower_token)
+    try:
+        return build_ui_data()
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
 @app.post("/deploy")
@@ -272,16 +612,29 @@ def trigger_deploy(
     payload: DeployRequest,
     x_watchtower_token: str | None = Header(default=None),
 ) -> dict[str, Any]:
-    required_token = os.getenv("WATCHTOWER_TRIGGER_TOKEN")
-    if required_token and x_watchtower_token != required_token:
-        raise HTTPException(status_code=401, detail="Invalid deployment token")
+    validate_token(x_watchtower_token)
 
     source_path = (
         Path(payload.source_path).resolve() if payload.source_path else None
     )
     try:
-        return deploy(payload.branch, source_path)
+        result = deploy(payload.branch, source_path)
+        append_history(
+            deployment_type="generic",
+            app_name="generic",
+            branch=payload.branch,
+            status=result.get("status", "unknown"),
+            message="Generic deployment requested",
+        )
+        return result
     except Exception as exc:
+        append_history(
+            deployment_type="generic",
+            app_name="generic",
+            branch=payload.branch,
+            status="failed",
+            message=str(exc),
+        )
         logger.exception("Deployment failed")
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
@@ -290,9 +643,7 @@ def trigger_deploy(
 def list_apps(
     x_watchtower_token: str | None = Header(default=None),
 ) -> dict[str, Any]:
-    required_token = os.getenv("WATCHTOWER_TRIGGER_TOKEN")
-    if required_token and x_watchtower_token != required_token:
-        raise HTTPException(status_code=401, detail="Invalid deployment token")
+    validate_token(x_watchtower_token)
 
     try:
         apps_path = Path(os.getenv("WATCHTOWER_APPS_FILE", "./apps.json"))
@@ -311,13 +662,26 @@ def trigger_app_deploy(
     payload: AppDeployRequest,
     x_watchtower_token: str | None = Header(default=None),
 ) -> dict[str, Any]:
-    required_token = os.getenv("WATCHTOWER_TRIGGER_TOKEN")
-    if required_token and x_watchtower_token != required_token:
-        raise HTTPException(status_code=401, detail="Invalid deployment token")
+    validate_token(x_watchtower_token)
 
     try:
-        return deploy_registered_app(app_name, payload.branch)
+        result = deploy_registered_app(app_name, payload.branch)
+        append_history(
+            deployment_type="app",
+            app_name=app_name,
+            branch=result.get("branch", payload.branch or "main"),
+            status=result.get("status", "unknown"),
+            message="App deployment requested",
+        )
+        return result
     except Exception as exc:
+        append_history(
+            deployment_type="app",
+            app_name=app_name,
+            branch=payload.branch or "main",
+            status="failed",
+            message=str(exc),
+        )
         logger.exception("App deployment failed")
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
