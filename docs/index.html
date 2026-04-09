@@ -3,176 +3,244 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>WatchTower Docs</title>
+  <title>WatchTower Control Center Docs</title>
   <style>
     :root {
-      --bg: #0b1220;
-      --card: #121b2f;
-      --muted: #a8b3c7;
-      --text: #f4f7ff;
-      --accent: #33d6a6;
-      --accent-2: #4ea3ff;
-      --border: #243352;
+      --bg: #060b13;
+      --panel: #0f1728;
+      --panel-2: #0b1220;
+      --line: #243655;
+      --text: #eaf0ff;
+      --muted: #97a9c8;
+      --good: #30d0a0;
+      --warn: #ffbf5f;
+      --bad: #ff8191;
+      --accent: #56a7ff;
     }
     * { box-sizing: border-box; }
     body {
       margin: 0;
-      font-family: "Segoe UI", "SF Pro Text", "Helvetica Neue", sans-serif;
-      background: radial-gradient(circle at 10% 10%, #15264a 0%, var(--bg) 45%);
       color: var(--text);
-      line-height: 1.55;
+      background: radial-gradient(circle at 13% 8%, #162849 0%, var(--bg) 35%);
+      font-family: "Segoe UI", "SF Pro Text", "Helvetica Neue", sans-serif;
+      min-height: 100vh;
     }
-    .container {
-      width: min(1100px, 92vw);
-      margin: 0 auto;
-      padding: 32px 0 48px;
-    }
-    .hero {
-      border: 1px solid var(--border);
-      background: linear-gradient(140deg, rgba(78, 163, 255, 0.13), rgba(51, 214, 166, 0.09));
-      border-radius: 18px;
-      padding: 28px;
-    }
-    h1, h2, h3 { margin: 0 0 10px; }
-    h1 { font-size: clamp(2rem, 4vw, 3rem); }
-    h2 { font-size: 1.35rem; margin-top: 26px; }
-    h3 { font-size: 1.05rem; margin-top: 16px; }
-    p { margin: 0 0 12px; color: var(--muted); }
-    .grid {
-      margin-top: 20px;
+    .layout {
       display: grid;
-      gap: 14px;
-      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      min-height: 100vh;
+      grid-template-columns: 230px 1fr;
     }
-    .card {
-      border: 1px solid var(--border);
-      border-radius: 14px;
-      background: var(--card);
-      padding: 18px;
+    .side {
+      border-right: 1px solid var(--line);
+      padding: 18px 14px;
+      background: rgba(7, 11, 20, 0.85);
     }
-    .badge {
-      display: inline-block;
-      background: rgba(51, 214, 166, 0.2);
-      color: #b6ffe8;
-      border: 1px solid rgba(51, 214, 166, 0.35);
-      border-radius: 999px;
-      padding: 2px 10px;
-      font-size: 0.8rem;
-      margin-bottom: 10px;
-    }
-    code {
-      background: #0e1628;
-      border: 1px solid #2a3e66;
-      border-radius: 8px;
-      padding: 2px 6px;
-      color: #d7e7ff;
-    }
-    pre {
-      background: #0e1628;
-      border: 1px solid #2a3e66;
+    .brand { font-weight: 700; margin-bottom: 18px; }
+    .menu a {
+      display: block;
+      text-decoration: none;
+      color: var(--muted);
       border-radius: 10px;
-      padding: 14px;
-      overflow-x: auto;
-      color: #d7e7ff;
-      font-size: 0.93rem;
+      border: 1px solid transparent;
+      padding: 9px 10px;
+      margin-bottom: 7px;
     }
-    a { color: var(--accent-2); }
-    .pill-row {
-      margin-top: 10px;
+    .menu a.active, .menu a:hover {
+      color: var(--text);
+      border-color: var(--line);
+      background: var(--panel-2);
+    }
+    .main { padding: 22px; }
+    .toolbar {
       display: flex;
       gap: 10px;
-      flex-wrap: wrap;
+      align-items: center;
+      margin-bottom: 14px;
     }
-    .pill {
-      text-decoration: none;
-      border: 1px solid var(--border);
+    .search {
+      flex: 1;
+      background: var(--panel-2);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      color: var(--muted);
+      padding: 9px 12px;
+    }
+    .btn {
+      border: 1px solid var(--line);
+      background: var(--panel);
       color: var(--text);
-      padding: 8px 13px;
-      border-radius: 999px;
-      background: #111b2f;
+      border-radius: 10px;
+      padding: 8px 12px;
+      text-decoration: none;
+      font-size: 0.9rem;
     }
-    .pill:hover {
-      border-color: var(--accent-2);
+    .kpis {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(180px, 1fr));
+      gap: 12px;
+      margin-bottom: 12px;
     }
-    ul { margin: 8px 0 12px 20px; color: var(--muted); }
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: var(--panel);
+      padding: 14px;
+    }
+    .label { font-size: 0.85rem; color: var(--muted); }
+    .value { font-size: 1.55rem; margin-top: 7px; font-weight: 700; }
+    .body {
+      display: grid;
+      gap: 12px;
+      grid-template-columns: 1.5fr 1fr;
+    }
+    .project-grid {
+      display: grid;
+      gap: 10px;
+      grid-template-columns: repeat(2, 1fr);
+      margin-top: 8px;
+    }
+    .project {
+      border: 1px solid var(--line);
+      background: var(--panel-2);
+      border-radius: 12px;
+      padding: 11px;
+    }
+    .project-top {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+    .ok { color: var(--good); }
+    .warn { color: var(--warn); }
+    .bad { color: var(--bad); }
+    .muted { color: var(--muted); }
+    .small { font-size: 0.83rem; }
+    .list { margin: 8px 0 0 18px; }
+    .list li { margin-bottom: 8px; }
+    pre {
+      margin: 0;
+      padding: 11px;
+      border-radius: 10px;
+      border: 1px solid var(--line);
+      background: #0a1221;
+      color: #dce7ff;
+      font-size: 0.86rem;
+      overflow-x: auto;
+    }
+    code {
+      color: #dce7ff;
+    }
+    @media (max-width: 1024px) {
+      .layout { grid-template-columns: 1fr; }
+      .side { display: none; }
+      .kpis { grid-template-columns: 1fr; }
+      .body { grid-template-columns: 1fr; }
+      .project-grid { grid-template-columns: 1fr; }
+    }
   </style>
 </head>
 <body>
-  <div class="container">
-    <section class="hero">
-      <div class="badge">WatchTower App Center</div>
-      <h1>Deploy Websites Across Nodes, Safely</h1>
-      <p>WatchTower is a self-hosted deployment control plane for Linux/macOS/Windows environments. Use app-level deploys, SSH-based node sync, and automated security scanning in CI.</p>
-      <div class="pill-row">
-        <a class="pill" href="https://github.com/sinhaankur/WatchTower">Repository</a>
-        <a class="pill" href="https://github.com/sinhaankur/WatchTower/actions">Actions</a>
-        <a class="pill" href="https://github.com/sinhaankur/WatchTower/pkgs/container/watchtower">GHCR Package</a>
+  <div class="layout">
+    <aside class="side">
+      <div class="brand">WatchTower Docs</div>
+      <nav class="menu">
+        <a class="active" href="#">Overview</a>
+        <a href="#workflow">Workflow</a>
+        <a href="#security">Security</a>
+        <a href="#releases">Releases</a>
+        <a href="https://github.com/sinhaankur/WatchTower">Repository</a>
+      </nav>
+    </aside>
+
+    <main class="main">
+      <div class="toolbar">
+        <div class="search">Search docs, APIs, and release workflows...</div>
+        <a class="btn" href="https://sinhaankur.github.io/WatchTower/">Live Site</a>
+        <a class="btn" href="http://127.0.0.1:8000/dashboard">App Dashboard</a>
       </div>
-    </section>
 
-    <section class="grid">
-      <article class="card">
-        <h3>Linux App Center Install</h3>
-        <pre><code>sudo ./install_app_center.sh
-sudo systemctl status watchtower-appcenter
-curl http://127.0.0.1:8000/health</code></pre>
-      </article>
-      <article class="card">
-        <h3>Windows Install</h3>
-        <pre><code>powershell -ExecutionPolicy Bypass -File .\install_windows.ps1
-powershell -ExecutionPolicy Bypass -File .\run_app_center_windows.ps1</code></pre>
-      </article>
-      <article class="card">
-        <h3>macOS Install</h3>
-        <pre><code>./install_macos.sh
-./run_app_center_macos.sh</code></pre>
-      </article>
-    </section>
+      <section class="kpis">
+        <article class="card">
+          <div class="label">Deployment Modes</div>
+          <div class="value">3</div>
+          <div class="small muted">Linux, Windows, macOS App Center</div>
+        </article>
+        <article class="card">
+          <div class="label">Primary Endpoints</div>
+          <div class="value">5</div>
+          <div class="small muted">Health, Apps, Deploy, UI Data, Dashboard</div>
+        </article>
+        <article class="card">
+          <div class="label">Security Gates</div>
+          <div class="value">2</div>
+          <div class="small muted">Filesystem and container Trivy scans</div>
+        </article>
+      </section>
 
-    <section class="card" style="margin-top:16px;">
-      <h2>Core API Endpoints</h2>
-      <ul>
-        <li><code>GET /health</code> - service health</li>
-        <li><code>GET /apps</code> - list registered apps</li>
-        <li><code>POST /apps/{app_name}/deploy</code> - deploy an app by name</li>
-        <li><code>POST /deploy</code> - generic deploy endpoint</li>
-      </ul>
-      <h3>Trigger app deploy from dev machine</h3>
-      <pre><code>WATCHTOWER_BASE_URL=http://server:8000 \
-WATCHTOWER_TOKEN=change-me \
-./deploy.sh --app website-main main</code></pre>
-    </section>
+      <section class="body">
+        <article class="card" id="workflow">
+          <h3>Projects and Workflow</h3>
+          <div class="project-grid">
+            <div class="project">
+              <div class="project-top">
+                <strong>website-main</strong>
+                <span class="ok small">deploy-ready</span>
+              </div>
+              <div class="small muted">1. Register in apps.json</div>
+              <div class="small muted">2. Trigger via /apps/{app}/deploy</div>
+              <div class="small muted">3. Watch status in /dashboard</div>
+            </div>
+            <div class="project">
+              <div class="project-top">
+                <strong>api-python</strong>
+                <span class="warn small">build-step</span>
+              </div>
+              <div class="small muted">Build and sync via rsync</div>
+              <div class="small muted">Remote reload over SSH</div>
+              <div class="small muted">Node outcomes in deployment history</div>
+            </div>
+            <div class="project">
+              <div class="project-top">
+                <strong>windows-agent</strong>
+                <span class="ok small">supported</span>
+              </div>
+              <pre><code>powershell -ExecutionPolicy Bypass -File .\install_windows.ps1</code></pre>
+            </div>
+            <div class="project">
+              <div class="project-top">
+                <strong>macos-agent</strong>
+                <span class="ok small">supported</span>
+              </div>
+              <pre><code>./install_macos.sh</code></pre>
+            </div>
+          </div>
+        </article>
 
-    <section class="grid" style="margin-top:16px;">
-      <article class="card">
-        <h2>Safe-by-default Baseline</h2>
-        <ul>
-          <li>Protect API with strong <code>WATCHTOWER_TRIGGER_TOKEN</code></li>
-          <li>Use restricted deploy users and narrow sudoers rules</li>
-          <li>Use SSH keys only; disable password auth on nodes</li>
-          <li>Require TLS + security headers on public web services</li>
-          <li>Keep rollback-capable backups before deployments</li>
-        </ul>
-      </article>
-      <article class="card">
-        <h2>Release Channels</h2>
-        <ul>
-          <li>Container publish to GHCR via <code>publish-container.yml</code></li>
-          <li>Python package publish to PyPI via <code>publish-pypi.yml</code></li>
-          <li>Security gate via Trivy scan workflow</li>
-        </ul>
-      </article>
-    </section>
+        <article class="card" id="security">
+          <h3>Safe Website Checklist</h3>
+          <ul class="list">
+            <li>Protect deploy endpoints with <code>WATCHTOWER_TRIGGER_TOKEN</code></li>
+            <li>Use key-only SSH on nodes, disable password auth</li>
+            <li>Use limited sudoers commands for service reload</li>
+            <li>Run Trivy checks on pull requests before merge</li>
+            <li>Keep rollback-capable backups for each app</li>
+          </ul>
+        </article>
+      </section>
 
-    <section class="card" style="margin-top:16px;">
-      <h2>Contribute More Features</h2>
-      <p>WatchTower is designed to be extended. Add deployment strategies, integrations, and additional package targets.</p>
-      <ul>
-        <li>Read contributing guide in <code>CONTRIBUTING.md</code></li>
-        <li>Add tests and documentation for each new feature</li>
-        <li>Keep new features secure by default</li>
-      </ul>
-    </section>
+      <section class="card" id="releases" style="margin-top: 12px;">
+        <h3>Version-Controlled Release Flow</h3>
+        <ol class="list">
+          <li>Bump <code>watchtower.__version__</code> in <code>watchtower/__init__.py</code></li>
+          <li>Merge changes to main</li>
+          <li>Create semantic tag like <code>v1.1.1</code></li>
+          <li>GitHub Actions auto-publishes to GHCR and PyPI</li>
+        </ol>
+        <pre><code>./scripts/release.sh 1.1.1</code></pre>
+      </section>
+    </main>
   </div>
 </body>
 </html>
