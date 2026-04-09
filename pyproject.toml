@@ -4,11 +4,11 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "watchtower-podman"
-version = "1.1.0"
 description = "Podman update and multi-node website deployment automation"
 readme = "README.md"
 requires-python = ">=3.8"
 license = "MIT"
+dynamic = ["version"]
 authors = [
   { name = "WatchTower Contributors" }
 ]
@@ -45,6 +45,9 @@ watchtower-package = "watchtower.package_builder:main"
 
 [tool.setuptools]
 include-package-data = true
+
+[tool.setuptools.dynamic]
+version = {attr = "watchtower.__version__"}
 
 [tool.setuptools.packages.find]
 include = ["watchtower*"]
