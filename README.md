@@ -49,13 +49,34 @@ If you selected both distribution channels, this repository now supports:
 2. **PyPI package publishing**
   - Workflow: `.github/workflows/publish-pypi.yml`
   - Publishes project: `watchtower-podman`
-  - Trigger: GitHub Release publish or manual dispatch
+  - Trigger: version tags (`v*`) or manual dispatch
+
+3. **GitHub Release creation**
+  - Workflow: `.github/workflows/release.yml`
+  - Trigger: version tags (`v*`)
+  - Validates that tag version matches `watchtower.__version__`
 
 One-time setup needed:
 
 - In GitHub repo settings, allow workflow permissions to write packages.
-- In PyPI, configure Trusted Publishing for this repository and the `pypi` environment.
+- In PyPI, configure Trusted Publishing for this repository.
 - Use release tags (for example `v1.1.1`) to produce versioned artifacts.
+
+Version-controlled release process:
+
+1. Bump `watchtower/__init__.py` version (single source of truth).
+2. Commit and merge to `main`.
+3. Create and push a semantic tag like `v1.1.1`.
+4. GitHub Actions will automatically:
+  - Create GitHub Release notes
+  - Publish container image to GHCR
+  - Publish package to PyPI
+
+Optional helper command:
+
+```bash
+./scripts/release.sh 1.1.1
+```
 
 ### GitHub Pages Documentation Site
 
