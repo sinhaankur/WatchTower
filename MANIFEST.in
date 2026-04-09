@@ -1,0 +1,9 @@
+include README.md
+include LICENSE
+include requirements.txt
+recursive-include config *.yml *.yaml
+recursive-include systemd *.service
+include nodes.json
+include deploy.sh
+include apps.json
+include install_app_center.sh

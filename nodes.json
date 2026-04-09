@@ -1,0 +1,21 @@
+{
+  "ssh_key": "/home/watchtower/.ssh/id_rsa",
+  "nodes": [
+    {
+      "name": "web-node-1",
+      "host": "192.168.1.101",
+      "user": "deploy",
+      "port": 22,
+      "remote_path": "/var/www/html",
+      "reload_command": "sudo systemctl restart nginx"
+    },
+    {
+      "name": "web-node-2",
+      "host": "192.168.1.102",
+      "user": "deploy",
+      "port": 22,
+      "remote_path": "/var/www/html",
+      "reload_command": "sudo systemctl restart nginx"
+    }
+  ]
+}

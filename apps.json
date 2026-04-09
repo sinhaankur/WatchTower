@@ -1,0 +1,20 @@
+{
+  "apps": [
+    {
+      "name": "website-main",
+      "repo_dir": "/opt/apps/website-main",
+      "branch": "main",
+      "source_subpath": "dist",
+      "nodes_file": "/etc/watchtower/nodes.json",
+      "build_command": "npm ci && npm run build"
+    },
+    {
+      "name": "api-python",
+      "repo_dir": "/opt/apps/api-python",
+      "branch": "main",
+      "source_subpath": ".",
+      "nodes_file": "/etc/watchtower/nodes.json",
+      "build_command": "python3 -m pip install -r requirements.txt"
+    }
+  ]
+}
