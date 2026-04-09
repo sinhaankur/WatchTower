@@ -34,6 +34,26 @@ The App Center mode is designed to feel simple like hosted deployment platforms:
 
 ## Installation
 
+### Publish Option 3 (Containers + PyPI)
+
+If you selected both distribution channels, this repository now supports:
+
+1. **GitHub Container Registry (GHCR)**
+  - Workflow: `.github/workflows/publish-container.yml`
+  - Publishes image: `ghcr.io/<owner>/watchtower`
+  - Trigger: push to `main`, version tags (`v*`), or manual dispatch
+
+2. **PyPI package publishing**
+  - Workflow: `.github/workflows/publish-pypi.yml`
+  - Publishes project: `watchtower-podman`
+  - Trigger: GitHub Release publish or manual dispatch
+
+One-time setup needed:
+
+- In GitHub repo settings, allow workflow permissions to write packages.
+- In PyPI, configure Trusted Publishing for this repository and the `pypi` environment.
+- Use release tags (for example `v1.1.1`) to produce versioned artifacts.
+
 ### One-Command App Center Install (Linux)
 
 ```bash
@@ -50,6 +70,38 @@ After install:
 ```bash
 sudo systemctl status watchtower-appcenter
 curl http://<server-ip>:8000/health
+```
+
+### Windows Installation (App Center)
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\install_windows.ps1
+powershell -ExecutionPolicy Bypass -File .\run_app_center_windows.ps1
+```
+
+Default user paths on Windows:
+- Install dir: `%USERPROFILE%\\WatchTowerAppCenter`
+- Config dir: `%USERPROFILE%\\WatchTowerConfig`
+
+Health check:
+```powershell
+curl http://127.0.0.1:8000/health
+```
+
+### macOS Installation (App Center)
+
+```bash
+./install_macos.sh
+./run_app_center_macos.sh
+```
+
+Default user paths on macOS:
+- Install dir: `~/watchtower-appcenter`
+- Config dir: `~/.watchtower`
+
+Health check:
+```bash
+curl http://127.0.0.1:8000/health
 ```
 
 ### Ubuntu/Linux Installation
@@ -231,6 +283,9 @@ export WATCHTOWER_NODES_FILE=/opt/watchtower/nodes.json
 export WATCHTOWER_APPS_FILE=/opt/watchtower/apps.json
 export WATCHTOWER_TRIGGER_TOKEN=change-me
 ```
+
+On Windows and macOS, these values are written automatically to `appcenter.env`
+by the platform installer scripts and loaded by the platform run scripts.
 
 #### Deploy by App Name (Recommended)
 ```bash
