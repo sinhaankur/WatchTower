@@ -11,3 +11,4 @@ include install_windows.ps1
 include run_app_center_windows.ps1
 include install_macos.sh
 include run_app_center_macos.sh
+include scripts/release.sh
