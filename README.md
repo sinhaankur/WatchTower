@@ -306,10 +306,23 @@ watchtower validate-config
 WatchTower also provides a deployment API/server mode for website rollouts to
 multiple Linux nodes over SSH.
 
+It now includes a dashboard-style control center UI (inspired by modern
+deployment consoles) for projects, usage, and recent deployment activity.
+
 #### Start Deployment Listener
 ```bash
 watchtower-deploy serve --host 0.0.0.0 --port 8000
 ```
+
+#### Open Dashboard UI
+```bash
+http://<server-ip>:8000/dashboard
+```
+
+The dashboard fetches live data from:
+- `GET /ui/data`
+- `GET /apps`
+- `POST /apps/{app_name}/deploy`
 
 Required environment variables:
 
