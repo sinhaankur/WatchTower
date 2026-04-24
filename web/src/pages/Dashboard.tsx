@@ -57,28 +57,21 @@ const Dashboard = () => {
   const isFirstVisit = projects.length === 0;
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="flex-1 overflow-auto bg-gray-50">
+      {/* Page header */}
       <header className="bg-white border-b border-gray-100">
-        <div className="max-w-5xl mx-auto px-6 py-5 flex justify-between items-center">
+        <div className="px-8 py-5 flex justify-between items-center">
           <div>
-            <h1 className="text-xl font-semibold text-gray-900">WatchTower</h1>
-            <p className="text-xs text-gray-400 mt-0.5">Self-hosted deploy platform</p>
+            <h1 className="text-base font-semibold text-gray-900">Overview</h1>
+            <p className="text-xs text-gray-400 mt-0.5">Your projects and deployment status</p>
           </div>
-          <nav className="flex items-center gap-2">
-            <Link to="/team">
-              <Button variant="outline" className="rounded-none border-gray-200 text-sm">👥 Team</Button>
-            </Link>
-            <Link to="/nodes">
-              <Button variant="outline" className="rounded-none border-gray-200 text-sm">🖥 Nodes</Button>
-            </Link>
-            <Link to="/setup">
-              <Button className="bg-gray-900 text-white hover:bg-gray-800 rounded-none text-sm">+ New Project</Button>
-            </Link>
-          </nav>
+          <Link to="/setup">
+            <Button className="bg-gray-900 text-white hover:bg-gray-800 rounded-none text-sm">+ New Project</Button>
+          </Link>
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto px-6 py-8 space-y-6">
+      <main className="px-8 py-6 space-y-6 max-w-5xl">
 
         {/* Getting started banner for first-time users */}
         {isFirstVisit && (
