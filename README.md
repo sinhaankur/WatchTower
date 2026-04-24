@@ -58,6 +58,29 @@ Use the following files to install and run WatchTower by OS:
   - Install: `npm run install:desktop`
   - Run: `npm run desktop`
 
+5. PowerShell installers (Linux/macOS/Windows):
+  - Linux file: `scripts/install-powershell-linux.sh`
+  - macOS file: `scripts/install-powershell-macos.sh`
+  - Windows file: `scripts/install-powershell-windows.ps1`
+
+Run commands:
+
+```bash
+# Linux
+sudo ./scripts/install-powershell-linux.sh
+pwsh --version
+
+# macOS
+./scripts/install-powershell-macos.sh
+pwsh --version
+```
+
+```powershell
+# Windows (PowerShell)
+powershell -ExecutionPolicy Bypass -File .\scripts\install-powershell-windows.ps1
+pwsh --version
+```
+
 Security defaults:
 - macOS/Windows installers now generate a random `WATCHTOWER_TRIGGER_TOKEN` automatically.
 - Runtime bind host defaults to `127.0.0.1` for local-only access.
