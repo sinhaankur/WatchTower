@@ -361,7 +361,6 @@ class NodeNetwork(Base):
 
     organization = relationship("Organization", backref="node_networks")
     nodes = relationship("OrgNode", secondary="node_network_members", back_populates="networks")
-    projects = relationship("Project", backref="node_network")
 
 
 class NodeNetworkMember(Base):
