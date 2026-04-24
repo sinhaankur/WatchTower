@@ -5,6 +5,8 @@
     "dev": "npm --prefix web run dev --",
     "build": "npm --prefix web run build",
     "preview": "npm --prefix web run preview",
-    "install:web": "npm --prefix web install"
+    "install:web": "npm --prefix web install",
+    "install:desktop": "npm --prefix desktop install",
+    "desktop": "npm --prefix desktop run start"
   }
 }
