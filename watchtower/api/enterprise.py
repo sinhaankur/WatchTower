@@ -11,6 +11,7 @@ import hashlib
 import subprocess
 from urllib.parse import urlencode
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from uuid import UUID
@@ -118,17 +119,78 @@ def _resolve_github_oauth_endpoints(provider: schemas.GitHubProvider, enterprise
             "authorize_url": f"{base}/login/oauth/authorize",
             "token_url": f"{base}/login/oauth/access_token",
             "user_url": f"{base}/api/v3/user",
-            "client_id": os.getenv("GITHUB_ENTERPRISE_CLIENT_ID") or os.getenv("GITHUB_OAUTH_CLIENT_ID"),
-            "client_secret": os.getenv("GITHUB_ENTERPRISE_CLIENT_SECRET") or os.getenv("GITHUB_OAUTH_CLIENT_SECRET"),
+            "client_id": os.getenv("GITHUB_ENTERPRISE_CLIENT_ID") or os.getenv("GITHUB_OAUTH_CLIENT_ID") or os.getenv("GITHUB_CLIENT_ID"),
+            "client_secret": os.getenv("GITHUB_ENTERPRISE_CLIENT_SECRET") or os.getenv("GITHUB_OAUTH_CLIENT_SECRET") or os.getenv("GITHUB_CLIENT_SECRET"),
         }
 
     return {
         "authorize_url": "https://github.com/login/oauth/authorize",
         "token_url": "https://github.com/login/oauth/access_token",
         "user_url": "https://api.github.com/user",
-        "client_id": os.getenv("GITHUB_OAUTH_CLIENT_ID"),
-        "client_secret": os.getenv("GITHUB_OAUTH_CLIENT_SECRET"),
+        "client_id": os.getenv("GITHUB_OAUTH_CLIENT_ID") or os.getenv("GITHUB_CLIENT_ID"),
+        "client_secret": os.getenv("GITHUB_OAUTH_CLIENT_SECRET") or os.getenv("GITHUB_CLIENT_SECRET"),
     }
+
+
+def _upsert_user_from_github_profile(db: Session, profile: dict):
+    github_id = profile.get("id")
+    if github_id is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="GitHub profile missing id")
+
+    login = profile.get("login") or "github-user"
+    email = profile.get("email") or f"{login}@users.noreply.github.com"
+    name = profile.get("name") or login
+
+    user = db.query(User).filter(User.github_id == github_id).first()
+    if not user:
+        user = db.query(User).filter(User.email == email).first()
+
+    if user:
+        user.github_id = github_id
+        user.email = email
+        user.name = name
+        user.is_active = True
+        db.flush()
+        return user
+
+    user = User(
+        email=email,
+        github_id=github_id,
+        name=name,
+        is_active=True,
+    )
+    db.add(user)
+    db.flush()
+    return user
+
+
+def _ensure_owner_membership(db: Session, user: User):
+    org = db.query(Organization).filter(Organization.owner_id == user.id).first()
+    if not org:
+        org = Organization(name=f"{user.name} Organization", owner_id=user.id)
+        db.add(org)
+        db.flush()
+
+    member = db.query(TeamMember).filter(
+        TeamMember.org_id == org.id,
+        TeamMember.user_id == user.id,
+    ).first()
+    if not member:
+        member = TeamMember(
+            org_id=org.id,
+            user_id=user.id,
+            email=user.email,
+            role=TeamRole.OWNER,
+            can_create_projects=True,
+            can_manage_deployments=True,
+            can_manage_nodes=True,
+            can_manage_team=True,
+            is_active=True,
+        )
+        db.add(member)
+        db.flush()
+
+    return org
 
 
 def _perform_ssh_health_check(node: OrgNode):
@@ -195,6 +257,117 @@ async def get_enterprise_context(
             "can_manage_team": member.can_manage_team,
             "can_manage_nodes": member.can_manage_nodes,
             "can_manage_deployments": member.can_manage_deployments,
+        },
+    }
+
+
+@router.get("/auth/github/start")
+async def start_github_login_oauth(
+    redirect_uri: str,
+):
+    """Generate OAuth authorize URL for GitHub login."""
+    oauth = _resolve_github_oauth_endpoints(schemas.GitHubProvider.GITHUB_COM, None)
+    if not oauth["client_id"]:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="OAuth client id not configured")
+
+    state = _sign_oauth_state(
+        {
+            "mode": "login",
+            "provider": schemas.GitHubProvider.GITHUB_COM.value,
+            "iat": int(datetime.utcnow().timestamp()),
+        }
+    )
+
+    params = {
+        "client_id": oauth["client_id"],
+        "redirect_uri": redirect_uri,
+        "scope": "read:user user:email",
+        "state": state,
+    }
+
+    return {
+        "authorize_url": f"{oauth['authorize_url']}?{urlencode(params)}",
+        "state": state,
+    }
+
+
+@router.get("/auth/github/login")
+async def redirect_github_login_oauth(
+    redirect_uri: str,
+):
+    """Redirect directly to GitHub authorization for browser-first login."""
+    payload = await start_github_login_oauth(redirect_uri=redirect_uri)
+    return RedirectResponse(url=payload["authorize_url"], status_code=status.HTTP_307_TEMPORARY_REDIRECT)
+
+
+@router.post("/auth/github/callback")
+async def github_login_oauth_callback(
+    payload: schemas.GitHubOAuthCallback,
+    db: Session = Depends(get_db),
+):
+    """Exchange OAuth code and return a signed WatchTower session token."""
+    state_data = _parse_oauth_state(payload.state)
+    if state_data.get("mode") != "login":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid OAuth login state")
+
+    oauth = _resolve_github_oauth_endpoints(schemas.GitHubProvider.GITHUB_COM, None)
+    if not oauth["client_id"] or not oauth["client_secret"]:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="OAuth client is not configured")
+
+    token_resp = requests.post(
+        oauth["token_url"],
+        headers={"Accept": "application/json"},
+        data={
+            "client_id": oauth["client_id"],
+            "client_secret": oauth["client_secret"],
+            "code": payload.code,
+            "redirect_uri": payload.redirect_uri,
+        },
+        timeout=15,
+    )
+    if token_resp.status_code >= 400:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="OAuth token exchange failed")
+
+    token_data = token_resp.json()
+    access_token = token_data.get("access_token")
+    if not access_token:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="OAuth token not returned by provider")
+
+    profile_resp = requests.get(
+        oauth["user_url"],
+        headers={
+            "Accept": "application/json",
+            "Authorization": f"Bearer {access_token}",
+            "X-GitHub-Api-Version": "2022-11-28",
+        },
+        timeout=15,
+    )
+    if profile_resp.status_code >= 400:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unable to fetch GitHub user profile")
+
+    profile = profile_resp.json()
+    user = _upsert_user_from_github_profile(db, profile)
+    org = _ensure_owner_membership(db, user)
+    db.commit()
+    db.refresh(user)
+    db.refresh(org)
+
+    session_token = util.create_user_session_token(
+        user_id=str(user.id),
+        email=user.email,
+        name=user.name,
+    )
+
+    return {
+        "token": session_token,
+        "user": {
+            "id": str(user.id),
+            "email": user.email,
+            "name": user.name,
+        },
+        "organization": {
+            "id": str(org.id),
+            "name": org.name,
         },
     }
 

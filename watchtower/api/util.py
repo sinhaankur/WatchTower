@@ -6,6 +6,10 @@ import hmac
 import os
 import secrets
 import uuid
+import json
+import time
+import base64
+import hashlib
 from fastapi import Header, HTTPException, status
 
 try:
@@ -17,6 +21,63 @@ except Exception:  # pragma: no cover - dependency check at runtime
 def generate_webhook_secret() -> str:
     """Generate a secure webhook secret"""
     return secrets.token_urlsafe(32)
+
+
+def _auth_signing_secret() -> str:
+    return (
+        os.getenv("WATCHTOWER_AUTH_SECRET")
+        or os.getenv("WATCHTOWER_API_TOKEN")
+        or "watchtower-auth-dev-secret"
+    )
+
+
+def create_user_session_token(*, user_id: str, email: str, name: str) -> str:
+    """Create a signed user session token for browser login flows."""
+    now = int(time.time())
+    ttl_hours = int(os.getenv("WATCHTOWER_SESSION_TTL_HOURS", "12"))
+    payload = {
+        "uid": user_id,
+        "email": email,
+        "name": name,
+        "iat": now,
+        "exp": now + (ttl_hours * 3600),
+    }
+    raw = json.dumps(payload, separators=(",", ":"), sort_keys=True).encode("utf-8")
+    sig = hmac.new(_auth_signing_secret().encode("utf-8"), raw, hashlib.sha256).hexdigest().encode("utf-8")
+    return base64.urlsafe_b64encode(raw + b"." + sig).decode("utf-8")
+
+
+def _parse_user_session_token(token: str):
+    try:
+        decoded = base64.urlsafe_b64decode(token.encode("utf-8"))
+        raw, sig = decoded.rsplit(b".", 1)
+    except Exception:
+        return None
+
+    expected = hmac.new(_auth_signing_secret().encode("utf-8"), raw, hashlib.sha256).hexdigest().encode("utf-8")
+    if not hmac.compare_digest(sig, expected):
+        return None
+
+    try:
+        payload = json.loads(raw.decode("utf-8"))
+    except Exception:
+        return None
+
+    exp = int(payload.get("exp", 0))
+    if exp <= int(time.time()):
+        return None
+
+    user_id = payload.get("uid")
+    email = payload.get("email")
+    name = payload.get("name")
+    if not user_id or not email:
+        return None
+
+    return {
+        "user_id": user_id,
+        "email": email,
+        "name": name or "WatchTower User",
+    }
 
 
 def encrypt_secret(value: str) -> str:
@@ -70,6 +131,10 @@ def get_current_user(
         )
 
     provided_token = authorization.split(" ", 1)[1].strip()
+
+    session_user = _parse_user_session_token(provided_token)
+    if session_user:
+        return session_user
 
     if expected_token:
         if not hmac.compare_digest(provided_token, expected_token):

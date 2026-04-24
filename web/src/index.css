@@ -2,11 +2,118 @@
 @import 'tailwindcss/components';
 @import 'tailwindcss/utilities';
 
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
 * {
   @apply box-border;
 }
 
+:root {
+  --wt-bg-0: #050b16;
+  --wt-bg-1: #0a1324;
+  --wt-bg-2: #0f1f38;
+  --wt-surface: rgba(11, 22, 42, 0.72);
+  --wt-surface-2: rgba(11, 22, 42, 0.86);
+  --wt-border: rgba(125, 211, 252, 0.2);
+  --wt-text: #dbeafe;
+  --wt-text-dim: #94a3b8;
+  --wt-accent: #7dd3fc;
+  --wt-accent-strong: #38bdf8;
+}
+
 body {
-  @apply bg-white text-gray-900;
+  @apply antialiased;
+  font-family: 'Inter', 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+  background:
+    radial-gradient(1200px 600px at 0% -20%, rgba(56, 189, 248, 0.22), transparent 60%),
+    radial-gradient(1000px 500px at 100% 0%, rgba(59, 130, 246, 0.14), transparent 55%),
+    linear-gradient(180deg, var(--wt-bg-2) 0%, var(--wt-bg-1) 40%, var(--wt-bg-0) 100%);
+  color: var(--wt-text);
+}
+
+[data-theme='dark'] body {
+  color: var(--wt-text);
+}
+
+[data-theme='light'] body {
+  background:
+    radial-gradient(900px 480px at 0% -15%, rgba(2, 132, 199, 0.14), transparent 60%),
+    radial-gradient(900px 480px at 100% 0%, rgba(59, 130, 246, 0.08), transparent 55%),
+    #f8fbff;
+  color: #0f172a;
+}
+
+.electron-shell {
+  background: rgba(2, 6, 23, 0.45);
+  backdrop-filter: blur(6px);
+}
+
+.electron-card {
+  background: var(--wt-surface);
+  border: 1px solid var(--wt-border);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 8px 30px rgba(2, 6, 23, 0.45);
+  backdrop-filter: blur(8px);
+}
+
+.electron-card-solid {
+  background: var(--wt-surface-2);
+  border: 1px solid var(--wt-border);
+}
+
+.electron-divider {
+  border-color: rgba(148, 163, 184, 0.22) !important;
+}
+
+.electron-accent {
+  color: var(--wt-accent);
+}
+
+.electron-accent-bg {
+  background: linear-gradient(135deg, #0ea5e9 0%, #38bdf8 55%, #7dd3fc 100%);
+  color: #042034 !important;
+}
+
+.wt-logo {
+  background: linear-gradient(140deg, #67e8f9 0%, #38bdf8 45%, #2563eb 100%);
+  color: #04111d;
+  box-shadow: 0 4px 14px rgba(56, 189, 248, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+}
+
+.electron-button {
+  border: 1px solid rgba(125, 211, 252, 0.35);
+  background: rgba(14, 165, 233, 0.16);
+  color: #dbeafe;
+}
+
+.electron-button:hover {
+  background: rgba(14, 165, 233, 0.26);
+}
+
+[data-theme='light'] .electron-shell {
+  background: rgba(255, 255, 255, 0.8);
+}
+
+[data-theme='light'] .electron-card,
+[data-theme='light'] .electron-card-solid {
+  background: rgba(255, 255, 255, 0.88);
+  border-color: rgba(14, 116, 144, 0.18);
+  box-shadow: 0 10px 35px rgba(14, 116, 144, 0.08);
+}
+
+[data-theme='light'] .electron-button {
+  border-color: rgba(14, 116, 144, 0.3);
+  color: #0c4a6e;
+  background: rgba(186, 230, 253, 0.5);
+}
+
+[data-theme='light'] .electron-accent {
+  color: #0369a1;
+}
+
+[data-theme='light'] .wt-logo {
+  box-shadow: 0 5px 16px rgba(14, 116, 144, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+
+code, pre {
   font-family: 'SF Mono', 'Menlo', 'Monaco', 'Courier New', monospace;
 }

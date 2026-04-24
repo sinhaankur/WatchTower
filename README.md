@@ -57,6 +57,12 @@ Use the following files to install and run WatchTower by OS:
   - Launcher files: `desktop/package.json`, `desktop/main.js`
   - Install: `npm run install:desktop`
   - Run: `npm run desktop`
+  - Build installable app packages (for app menu + dock/taskbar pinning): `npm run desktop:dist`
+
+5. Linux launcher shortcut (local/dev install):
+  - Script: `scripts/install-desktop-shortcut-linux.sh`
+  - Run: `./scripts/install-desktop-shortcut-linux.sh`
+  - Result: WatchTower appears in application launchers and can be pinned.
 
 5. PowerShell installers (Linux/macOS/Windows):
   - Linux file: `scripts/install-powershell-linux.sh`
@@ -176,6 +182,80 @@ export WATCHTOWER_ALLOW_INSECURE_DEV_AUTH=true
 ```
 
 This should never be enabled in production.
+
+### Desktop Pinning and Application Listing
+
+To make WatchTower appear as a normal desktop app (dock/taskbar/start-menu/applications):
+
+1. Install desktop dependencies:
+
+```bash
+npm run install:desktop
+```
+
+2. Build platform installers/artifacts:
+
+```bash
+npm run desktop:dist
+```
+
+Generated artifacts are in `desktop/dist/`:
+- Linux: AppImage, deb
+- macOS: dmg, zip
+- Windows: nsis installer, zip
+
+Install the artifact for your OS, then pin WatchTower from the system app launcher/taskbar.
+
+For Linux local development without packaging:
+
+```bash
+./scripts/install-desktop-shortcut-linux.sh
+```
+
+### Global Versioning for Updates
+
+WatchTower now keeps desktop/runtime package versions aligned with the Python package version (`watchtower/__init__.py`).
+
+Run version sync before releases:
+
+```bash
+npm run sync:versions
+```
+
+This updates:
+- `package.json`
+- `desktop/package.json`
+
+This ensures globally published update artifacts and release metadata stay on the same version.
+
+### GitHub Login (Recommended Web UX)
+
+To make the web app seamless, users can sign in with GitHub and receive a WatchTower session token automatically.
+
+Set these variables on the API server:
+
+```bash
+export GITHUB_OAUTH_CLIENT_ID="your-github-oauth-app-client-id"
+export GITHUB_OAUTH_CLIENT_SECRET="your-github-oauth-app-client-secret"
+```
+
+Compatibility aliases are also supported:
+
+```bash
+export GITHUB_CLIENT_ID="your-github-oauth-app-client-id"
+export GITHUB_CLIENT_SECRET="your-github-oauth-app-client-secret"
+```
+
+Configure your GitHub OAuth app callback URL to:
+
+```text
+http://localhost:5173/oauth/github/login/callback
+```
+
+Notes:
+- With GitHub login enabled, users do not need to manually set `VITE_API_TOKEN` in the browser.
+- Existing API token mode (`WATCHTOWER_API_TOKEN` + `VITE_API_TOKEN`) still works for non-interactive or local admin flows.
+- Login now supports direct browser redirect via `/api/auth/github/login` (used by the login button) for immediate OAuth validation.
 
 ### DIY "Vercel-like" Deployment (Podman + Watchtower)
 

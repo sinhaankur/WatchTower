@@ -34,6 +34,8 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const [serverStatus, setServerStatus] = useState<'checking' | 'online' | 'offline'>('checking');
   const [dataSource, setDataSource] = useState<'server' | 'local'>('local');
+  const [serverClock, setServerClock] = useState<string>('');
+  const [deviceMode, setDeviceMode] = useState<'light' | 'dark'>('light');
 
   const loadLocalProjects = () => {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -59,6 +61,10 @@ const Dashboard = () => {
 
       if (healthResp.status >= 200 && healthResp.status < 300) {
         setServerStatus('online');
+      }
+      const httpDate = healthResp.headers?.date as string | undefined;
+      if (httpDate) {
+        setServerClock(httpDate);
       }
 
       const rows = (projectsResp.data as any[]) ?? [];
@@ -88,6 +94,30 @@ const Dashboard = () => {
     void loadProjects();
   }, []);
 
+  useEffect(() => {
+    const media = window.matchMedia('(prefers-color-scheme: dark)');
+    const setMode = () => setDeviceMode(media.matches ? 'dark' : 'light');
+    setMode();
+
+    if (media.addEventListener) {
+      media.addEventListener('change', setMode);
+      return () => media.removeEventListener('change', setMode);
+    }
+
+    media.addListener(setMode);
+    return () => media.removeListener(setMode);
+  }, []);
+
+  const clientTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const clientLocale = Intl.DateTimeFormat().resolvedOptions().locale;
+  const utcOffsetMins = -new Date().getTimezoneOffset();
+  const utcOffsetHours = Math.trunc(Math.abs(utcOffsetMins) / 60)
+    .toString()
+    .padStart(2, '0');
+  const utcOffsetMinutes = (Math.abs(utcOffsetMins) % 60).toString().padStart(2, '0');
+  const utcOffsetSign = utcOffsetMins >= 0 ? '+' : '-';
+  const apiTarget = ((import.meta as any).env?.VITE_API_URL as string | undefined) || '/api';
+
   const stats = useMemo(() => ({
     staticCount: projects.filter((p) => p.use_case === 'netlify_like').length,
     ssrCount:    projects.filter((p) => p.use_case === 'vercel_like').length,
@@ -114,29 +144,66 @@ const Dashboard = () => {
   const isFirstVisit = projects.length === 0;
 
   return (
-    <div className="flex-1 overflow-auto bg-gray-50">
+    <div className="flex-1 overflow-auto">
       {/* Page header */}
-      <header className="bg-white border-b border-gray-100">
+      <header className="electron-card-solid electron-divider border-b">
         <div className="px-8 py-5 flex justify-between items-center">
           <div>
-            <h1 className="text-base font-semibold text-gray-900">Overview</h1>
-            <p className="text-xs text-gray-400 mt-0.5">Your projects and deployment status</p>
+            <h1 className="text-base font-semibold">Overview</h1>
+            <p className="text-xs electron-accent mt-0.5">Your projects and deployment status</p>
           </div>
           <div className="flex items-center gap-2">
             <span className={`text-xs px-2 py-1 border ${serverStatus === 'online' ? 'bg-green-50 text-green-700 border-green-200' : serverStatus === 'offline' ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-gray-50 text-gray-500 border-gray-200'}`}>
               {serverStatus === 'online' ? 'API online' : serverStatus === 'offline' ? 'Offline mode' : 'Checking API...'}
             </span>
-            <Button variant="outline" onClick={() => void loadProjects()} className="rounded-none border-gray-300 text-xs" disabled={loading}>
+            <Button variant="outline" onClick={() => void loadProjects()} className="electron-button rounded-md text-xs" disabled={loading}>
               {loading ? 'Refreshing…' : 'Refresh'}
             </Button>
             <Link to="/setup">
-              <Button className="bg-gray-900 text-white hover:bg-gray-800 rounded-none text-sm">+ New Project</Button>
+              <Button className="electron-accent-bg rounded-md text-sm">+ New Project</Button>
             </Link>
           </div>
         </div>
       </header>
 
       <main className="px-8 py-6 space-y-6 max-w-5xl">
+
+        <div className="electron-card rounded-xl p-6">
+          <p className="text-xs uppercase tracking-[0.2em] electron-accent">WatchTower Desktop</p>
+          <h2 className="text-2xl font-semibold mt-2">Ship from your own infrastructure with Electron-style clarity</h2>
+          <p className="text-sm mt-2 text-slate-300">Monitor deployments, node health, team access, and environment context from one control surface.</p>
+        </div>
+
+        <Card className="electron-card rounded-xl shadow-none">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">Environment Context</CardTitle>
+            <CardDescription>Mode and timezone details for better server location awareness</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid md:grid-cols-2 gap-3 text-xs">
+              <div className="electron-card-solid rounded-md px-3 py-2">
+                <p className="text-gray-500">Device mode</p>
+                <p className="text-gray-900 font-medium mt-0.5">{deviceMode === 'dark' ? 'Dark (from OS)' : 'Light (from OS)'}</p>
+              </div>
+              <div className="electron-card-solid rounded-md px-3 py-2">
+                <p className="text-gray-500">Client timezone</p>
+                <p className="text-gray-900 font-medium mt-0.5">{clientTimeZone} (UTC{utcOffsetSign}{utcOffsetHours}:{utcOffsetMinutes})</p>
+              </div>
+              <div className="electron-card-solid rounded-md px-3 py-2">
+                <p className="text-gray-500">Client locale</p>
+                <p className="text-gray-900 font-medium mt-0.5">{clientLocale}</p>
+              </div>
+              <div className="electron-card-solid rounded-md px-3 py-2">
+                <p className="text-gray-500">Server clock (HTTP Date)</p>
+                <p className="text-gray-900 font-medium mt-0.5">{serverClock || 'Not available yet (server offline)'}</p>
+              </div>
+              <div className="electron-card-solid rounded-md px-3 py-2 md:col-span-2">
+                <p className="text-gray-500">API target</p>
+                <p className="text-gray-900 font-medium mt-0.5">{apiTarget}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         {serverStatus === 'offline' && (
           <div className="border border-amber-200 bg-amber-50 px-5 py-4">
@@ -153,7 +220,7 @@ const Dashboard = () => {
               <p className="text-sm font-medium text-amber-900">Welcome to WatchTower!</p>
               <p className="text-xs text-amber-700 mt-0.5">Get started by creating your first project. The setup wizard will guide you through every step.</p>
               <Link to="/setup">
-                <Button className="mt-3 bg-gray-900 text-white hover:bg-gray-800 rounded-none text-xs">Start Setup Wizard →</Button>
+                <Button className="mt-3 electron-accent-bg rounded-md text-xs">Start Setup Wizard →</Button>
               </Link>
             </div>
           </div>
@@ -166,7 +233,7 @@ const Dashboard = () => {
             { label: 'SSR Apps', count: stats.ssrCount, icon: '▲' },
             { label: 'Docker Apps', count: stats.dockerCount, icon: '🐳' },
           ].map((s) => (
-            <Card key={s.label} className="rounded-none border-gray-200 shadow-none bg-white">
+            <Card key={s.label} className="electron-card rounded-xl shadow-none">
               <CardContent className="py-4 flex items-center gap-3">
                 <span className="text-2xl">{s.icon}</span>
                 <div>
@@ -179,7 +246,7 @@ const Dashboard = () => {
         </div>
 
         {/* Quick setup guide */}
-        <Card className="rounded-none border-gray-200 shadow-none bg-white">
+        <Card className="electron-card rounded-xl shadow-none">
           <CardHeader className="pb-3">
             <CardTitle className="text-base">How to get started</CardTitle>
             <CardDescription>Four steps to deploy your first app</CardDescription>
@@ -192,7 +259,7 @@ const Dashboard = () => {
                 { n: 3, title: 'Connect your repo', body: 'Enter your repository URL, branch, and build command.' },
                 { n: 4, title: 'Deploy & monitor', body: 'Use Nodes to add servers, Team to invite collaborators.' },
               ].map(({ n, title, body }) => (
-                <li key={n} className="flex gap-3 border border-gray-100 bg-gray-50 px-4 py-3">
+                <li key={n} className="flex gap-3 electron-card-solid rounded-md px-4 py-3">
                   <span className="w-6 h-6 rounded-full bg-gray-900 text-white text-xs flex items-center justify-center shrink-0 mt-0.5">{n}</span>
                   <div>
                     <p className="text-sm font-medium text-gray-800">{title}</p>
@@ -205,7 +272,7 @@ const Dashboard = () => {
         </Card>
 
         {/* Projects list */}
-        <Card className="rounded-none border-gray-200 shadow-none bg-white">
+        <Card className="electron-card rounded-xl shadow-none">
           <CardHeader className="pb-3 flex flex-row items-center justify-between">
             <div>
               <CardTitle className="text-base">Your Projects</CardTitle>
@@ -215,7 +282,7 @@ const Dashboard = () => {
             </div>
             {projects.length > 0 && (
               <Link to="/setup">
-                <Button className="bg-gray-900 text-white hover:bg-gray-800 rounded-none text-xs">+ New Project</Button>
+                <Button className="electron-accent-bg rounded-md text-xs">+ New Project</Button>
               </Link>
             )}
           </CardHeader>
@@ -226,7 +293,7 @@ const Dashboard = () => {
                 <p className="text-sm font-medium text-gray-600">No projects yet</p>
                 <p className="text-xs text-gray-400 mt-1">Create a project using the Setup Wizard to get started.</p>
                 <Link to="/setup">
-                  <Button className="mt-4 bg-gray-900 text-white hover:bg-gray-800 rounded-none text-sm">Start Setup Wizard →</Button>
+                  <Button className="mt-4 electron-accent-bg rounded-md text-sm">Start Setup Wizard →</Button>
                 </Link>
               </div>
             )}
@@ -235,7 +302,7 @@ const Dashboard = () => {
               {projects.map((project) => {
                 const meta = USE_CASE_META[project.use_case];
                 return (
-                  <div key={project.id} className="border border-gray-200 bg-gray-50 px-4 py-3 flex items-center justify-between gap-4">
+                  <div key={project.id} className="electron-card-solid rounded-md px-4 py-3 flex items-center justify-between gap-4">
                     <div className="flex items-center gap-3 min-w-0">
                       <span className="text-xl">{meta.icon}</span>
                       <div className="min-w-0">
@@ -260,14 +327,14 @@ const Dashboard = () => {
                           <span className="text-xs text-gray-500">Delete?</span>
                           <Button
                             variant="outline"
-                            className="rounded-none border-red-300 text-red-600 text-xs px-2 py-1 h-auto hover:bg-red-50"
+                            className="rounded-md border-red-300 text-red-600 text-xs px-2 py-1 h-auto hover:bg-red-50"
                             onClick={() => void deleteProject(project.id)}
                           >
                             Yes
                           </Button>
                           <Button
                             variant="outline"
-                            className="rounded-none border-gray-300 text-xs px-2 py-1 h-auto"
+                            className="rounded-md border-gray-300 text-xs px-2 py-1 h-auto"
                             onClick={() => setConfirmDelete(null)}
                           >
                             No
@@ -276,7 +343,7 @@ const Dashboard = () => {
                       ) : (
                         <Button
                           variant="outline"
-                          className="rounded-none border-gray-300 text-gray-500 text-xs hover:border-red-300 hover:text-red-600"
+                          className="rounded-md border-gray-300 text-gray-500 text-xs hover:border-red-300 hover:text-red-600"
                           onClick={() => setConfirmDelete(project.id)}
                         >
                           Delete
