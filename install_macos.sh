@@ -7,6 +7,13 @@ PORT="${PORT:-8000}"
 REPO_SOURCE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 VENV_DIR="${INSTALL_DIR}/.venv"
 
+generate_token() {
+  python3 - <<'PY'
+import secrets
+print(secrets.token_urlsafe(32))
+PY
+}
+
 if ! command -v python3 >/dev/null 2>&1; then
   echo "Python 3.8+ is required. Install with Homebrew: brew install python"
   exit 1
@@ -28,15 +35,18 @@ python3 -m venv "${VENV_DIR}"
 [[ -f "${CONFIG_DIR}/apps.json" ]] || cp "${INSTALL_DIR}/apps.json" "${CONFIG_DIR}/apps.json"
 
 if [[ ! -f "${CONFIG_DIR}/appcenter.env" ]]; then
+  TRIGGER_TOKEN="$(generate_token)"
   cat > "${CONFIG_DIR}/appcenter.env" <<EOF
 WATCHTOWER_REPO_DIR=${INSTALL_DIR}
 WATCHTOWER_NODES_FILE=${CONFIG_DIR}/nodes.json
 WATCHTOWER_APPS_FILE=${CONFIG_DIR}/apps.json
-WATCHTOWER_TRIGGER_TOKEN=change-me-now
+WATCHTOWER_TRIGGER_TOKEN=${TRIGGER_TOKEN}
 WATCHTOWER_DEFAULT_BRANCH=main
 WATCHTOWER_LOG_LEVEL=INFO
 WATCHTOWER_PORT=${PORT}
+WATCHTOWER_BIND_HOST=127.0.0.1
 EOF
+  chmod 600 "${CONFIG_DIR}/appcenter.env"
 fi
 
 echo

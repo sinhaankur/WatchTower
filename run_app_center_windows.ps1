@@ -24,5 +24,6 @@ Get-Content $envPath | ForEach-Object {
 }
 
 $port = if ($env:WATCHTOWER_PORT) { [int]$env:WATCHTOWER_PORT } else { 8000 }
+$bindHost = if ($env:WATCHTOWER_BIND_HOST) { $env:WATCHTOWER_BIND_HOST } else { "127.0.0.1" }
 
-& $venvPython -m watchtower.deploy_server serve --host 0.0.0.0 --port $port
+& $venvPython -m watchtower.deploy_server serve --host $bindHost --port $port
