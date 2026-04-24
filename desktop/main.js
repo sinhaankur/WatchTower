@@ -1,5 +1,6 @@
 const { app, BrowserWindow, dialog } = require('electron');
 const { spawn } = require('child_process');
+const crypto = require('crypto');
 const fs = require('fs');
 const http = require('http');
 const path = require('path');
@@ -12,6 +13,7 @@ const repoRoot = path.resolve(__dirname, '..');
 const webRoot = path.join(repoRoot, 'web');
 const pythonUnix = path.join(repoRoot, '.venv', 'bin', 'python');
 const pythonWin = path.join(repoRoot, '.venv', 'Scripts', 'python.exe');
+const runtimeApiToken = process.env.WATCHTOWER_API_TOKEN || `wt-${crypto.randomBytes(24).toString('hex')}`;
 
 let backendProcess;
 let frontendProcess;
@@ -72,7 +74,8 @@ function startBackend() {
       cwd: repoRoot,
       env: {
         ...process.env,
-        WATCHTOWER_ALLOW_INSECURE_DEV_AUTH: process.env.WATCHTOWER_ALLOW_INSECURE_DEV_AUTH || 'true',
+        WATCHTOWER_API_TOKEN: runtimeApiToken,
+        WATCHTOWER_ALLOW_INSECURE_DEV_AUTH: process.env.WATCHTOWER_ALLOW_INSECURE_DEV_AUTH || 'false',
       },
       stdio: 'inherit',
     }
@@ -85,7 +88,10 @@ function startFrontend() {
     ['run', 'dev', '--', '--host', HOST, '--port', String(FRONTEND_PORT), '--strictPort'],
     {
       cwd: webRoot,
-      env: process.env,
+      env: {
+        ...process.env,
+        VITE_API_TOKEN: process.env.VITE_API_TOKEN || runtimeApiToken,
+      },
       stdio: 'inherit',
     }
   );
