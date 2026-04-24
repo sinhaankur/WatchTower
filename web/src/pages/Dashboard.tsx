@@ -1,5 +1,7 @@
 import { Link } from 'react-router-dom';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import axios from 'axios';
+import apiClient from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -28,18 +30,63 @@ const USE_CASE_META: Record<LocalProject['use_case'], { label: string; icon: str
 };
 
 const Dashboard = () => {
-  const [projects, setProjects] = useState<LocalProject[]>(() => {
+  const [projects, setProjects] = useState<LocalProject[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [serverStatus, setServerStatus] = useState<'checking' | 'online' | 'offline'>('checking');
+  const [dataSource, setDataSource] = useState<'server' | 'local'>('local');
+
+  const loadLocalProjects = () => {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
+    if (!raw) return;
     try {
       const parsed = JSON.parse(raw) as LocalProject[];
-      return Array.isArray(parsed) ? parsed : [];
+      setProjects(Array.isArray(parsed) ? parsed : []);
+      setDataSource('local');
     } catch {
-      return [];
+      setProjects([]);
+      setDataSource('local');
     }
-  });
+  };
+
+  const loadProjects = async () => {
+    setLoading(true);
+    setServerStatus('checking');
+    try {
+      const [healthResp, projectsResp] = await Promise.all([
+        apiClient.get('/health'),
+        apiClient.get('/projects'),
+      ]);
+
+      if (healthResp.status >= 200 && healthResp.status < 300) {
+        setServerStatus('online');
+      }
+
+      const rows = (projectsResp.data as any[]) ?? [];
+      const normalized = rows.map((p) => ({
+        id: String(p.id),
+        name: p.name ?? 'Unnamed Project',
+        use_case: (p.use_case ?? 'docker_platform') as LocalProject['use_case'],
+        deployment_model: (p.deployment_model ?? 'self_hosted') as LocalProject['deployment_model'],
+        repo_url: p.repo_url ?? '',
+        repo_branch: p.repo_branch ?? 'main',
+        created_at: p.created_at ?? new Date().toISOString(),
+      }));
+
+      setProjects(normalized);
+      setDataSource('server');
+    } catch {
+      setServerStatus('offline');
+      loadLocalProjects();
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+
+  useEffect(() => {
+    void loadProjects();
+  }, []);
 
   const stats = useMemo(() => ({
     staticCount: projects.filter((p) => p.use_case === 'netlify_like').length,
@@ -47,7 +94,17 @@ const Dashboard = () => {
     dockerCount: projects.filter((p) => p.use_case === 'docker_platform').length,
   }), [projects]);
 
-  const deleteProject = (id: string) => {
+  const deleteProject = async (id: string) => {
+    if (dataSource === 'server') {
+      try {
+        await apiClient.delete(`/projects/${id}`);
+      } catch (error) {
+        if (!axios.isAxiosError(error) || !error.response) {
+          return;
+        }
+      }
+    }
+
     const next = projects.filter((p) => p.id !== id);
     setProjects(next);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
@@ -65,13 +122,28 @@ const Dashboard = () => {
             <h1 className="text-base font-semibold text-gray-900">Overview</h1>
             <p className="text-xs text-gray-400 mt-0.5">Your projects and deployment status</p>
           </div>
-          <Link to="/setup">
-            <Button className="bg-gray-900 text-white hover:bg-gray-800 rounded-none text-sm">+ New Project</Button>
-          </Link>
+          <div className="flex items-center gap-2">
+            <span className={`text-xs px-2 py-1 border ${serverStatus === 'online' ? 'bg-green-50 text-green-700 border-green-200' : serverStatus === 'offline' ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-gray-50 text-gray-500 border-gray-200'}`}>
+              {serverStatus === 'online' ? 'API online' : serverStatus === 'offline' ? 'Offline mode' : 'Checking API...'}
+            </span>
+            <Button variant="outline" onClick={() => void loadProjects()} className="rounded-none border-gray-300 text-xs" disabled={loading}>
+              {loading ? 'Refreshing…' : 'Refresh'}
+            </Button>
+            <Link to="/setup">
+              <Button className="bg-gray-900 text-white hover:bg-gray-800 rounded-none text-sm">+ New Project</Button>
+            </Link>
+          </div>
         </div>
       </header>
 
       <main className="px-8 py-6 space-y-6 max-w-5xl">
+
+        {serverStatus === 'offline' && (
+          <div className="border border-amber-200 bg-amber-50 px-5 py-4">
+            <p className="text-sm font-medium text-amber-800">Server connection unavailable</p>
+            <p className="text-xs text-amber-700 mt-1">You are viewing local project cache. Start backend at 127.0.0.1:8000 for live project data and team/node features.</p>
+          </div>
+        )}
 
         {/* Getting started banner for first-time users */}
         {isFirstVisit && (
@@ -137,7 +209,9 @@ const Dashboard = () => {
           <CardHeader className="pb-3 flex flex-row items-center justify-between">
             <div>
               <CardTitle className="text-base">Your Projects</CardTitle>
-              <CardDescription>{projects.length === 0 ? 'No projects yet' : `${projects.length} project${projects.length !== 1 ? 's' : ''}`}</CardDescription>
+              <CardDescription>
+                {loading ? 'Loading projects…' : projects.length === 0 ? 'No projects yet' : `${projects.length} project${projects.length !== 1 ? 's' : ''} · ${dataSource === 'server' ? 'live data' : 'local cache'}`}
+              </CardDescription>
             </div>
             {projects.length > 0 && (
               <Link to="/setup">
@@ -146,7 +220,7 @@ const Dashboard = () => {
             )}
           </CardHeader>
           <CardContent>
-            {projects.length === 0 && (
+            {!loading && projects.length === 0 && (
               <div className="text-center py-10 border border-dashed border-gray-200">
                 <p className="text-3xl mb-2">📦</p>
                 <p className="text-sm font-medium text-gray-600">No projects yet</p>
@@ -187,7 +261,7 @@ const Dashboard = () => {
                           <Button
                             variant="outline"
                             className="rounded-none border-red-300 text-red-600 text-xs px-2 py-1 h-auto hover:bg-red-50"
-                            onClick={() => deleteProject(project.id)}
+                            onClick={() => void deleteProject(project.id)}
                           >
                             Yes
                           </Button>
