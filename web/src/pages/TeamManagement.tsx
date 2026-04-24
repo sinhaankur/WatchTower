@@ -124,13 +124,13 @@ const TeamManagement = () => {
       });
       window.location.href = (resp.data as { authorize_url: string }).authorize_url;
     } catch {
-      setActionError('GitHub OAuth setup failed. Ensure GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET are set on the server.');
+      setActionError('GitHub OAuth setup failed. Ensure GITHUB_OAUTH_CLIENT_ID/GITHUB_CLIENT_ID and GITHUB_OAUTH_CLIENT_SECRET/GITHUB_CLIENT_SECRET are set on the server.');
     }
   };
 
   return (
-    <div className="flex-1 overflow-auto bg-gray-50">
-      <header className="bg-white border-b border-gray-100">
+    <div className="flex-1 overflow-auto">
+      <header className="electron-card-solid electron-divider border-b">
         <div className="px-8 py-5 flex items-center justify-between">
           <div>
             <h1 className="text-base font-semibold text-gray-900">Team</h1>
@@ -139,7 +139,7 @@ const TeamManagement = () => {
             </p>
           </div>
           {offlineMode && (
-            <Button variant="outline" onClick={() => void loadContext()} className="rounded-none border-gray-300 text-sm">
+            <Button variant="outline" onClick={() => void loadContext()} className="rounded-md border-gray-300 text-sm">
               ↺ Retry Connection
             </Button>
           )}
@@ -149,7 +149,7 @@ const TeamManagement = () => {
       <main className="px-8 py-6 space-y-6 max-w-4xl">
 
         {pageError && (
-          <div className="flex items-start gap-3 border border-amber-200 bg-amber-50 px-4 py-3">
+          <div className="flex items-start gap-3 border border-amber-200 bg-amber-50 rounded-md px-4 py-3">
             <span className="text-amber-500 mt-0.5">⚠</span>
             <div>
               <p className="text-sm font-medium text-amber-800">Connection issue</p>
@@ -159,14 +159,14 @@ const TeamManagement = () => {
         )}
 
         {actionSuccess && (
-          <div className="flex items-center gap-2 border border-green-200 bg-green-50 px-4 py-3">
+          <div className="flex items-center gap-2 border border-green-200 bg-green-50 rounded-md px-4 py-3">
             <span className="text-green-500">✓</span>
             <p className="text-sm text-green-700">{actionSuccess}</p>
           </div>
         )}
 
         {actionError && (
-          <div className="flex items-start gap-2 border border-red-200 bg-red-50 px-4 py-3">
+          <div className="flex items-start gap-2 border border-red-200 bg-red-50 rounded-md px-4 py-3">
             <span className="text-red-500 mt-0.5">✗</span>
             <p className="text-sm text-red-700">{actionError}</p>
           </div>
@@ -174,7 +174,7 @@ const TeamManagement = () => {
 
         <div className="grid md:grid-cols-2 gap-5">
           {/* Invite */}
-          <Card className="rounded-none border-gray-200 shadow-none bg-white">
+          <Card className="electron-card rounded-xl shadow-none">
             <CardHeader className="pb-3">
               <CardTitle className="text-base">Invite a Team Member</CardTitle>
               <CardDescription>Send an invite by email and choose their access level.</CardDescription>
@@ -185,14 +185,14 @@ const TeamManagement = () => {
                 <Input id="invite_email" type="email" value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && void inviteMember()}
-                  className="mt-1.5 rounded-none border-gray-300"
+                  className="mt-1.5 rounded-md border-gray-300"
                   placeholder="engineer@example.com" />
               </div>
               <div>
                 <Label htmlFor="invite_role">Role</Label>
                 <select id="invite_role" value={role}
                   onChange={(e) => setRole(e.target.value as TeamMember['role'])}
-                  className="mt-1.5 w-full border border-gray-300 h-10 px-3 text-sm bg-white">
+                  className="mt-1.5 w-full border border-gray-300 rounded-md h-10 px-3 text-sm bg-white">
                   <option value="developer">Developer — can create projects & deploy</option>
                   <option value="viewer">Viewer — read-only access</option>
                   <option value="admin">Admin — manage nodes, team & deployments</option>
@@ -201,14 +201,14 @@ const TeamManagement = () => {
               </div>
               <Button onClick={() => void inviteMember()}
                 disabled={inviting || offlineMode || !orgId || !email.trim()}
-                className="w-full bg-gray-900 text-white hover:bg-gray-800 rounded-none">
+                className="w-full bg-black text-white hover:bg-gray-900 rounded-md">
                 {inviting ? 'Sending invite…' : offlineMode ? 'Server offline' : 'Send Invite'}
               </Button>
             </CardContent>
           </Card>
 
           {/* GitHub Connections */}
-          <Card className="rounded-none border-gray-200 shadow-none bg-white">
+          <Card className="electron-card rounded-xl shadow-none">
             <CardHeader className="pb-3">
               <CardTitle className="text-base">GitHub Connections</CardTitle>
               <CardDescription>Link GitHub accounts so WatchTower can pull repositories.</CardDescription>
@@ -217,12 +217,12 @@ const TeamManagement = () => {
               <div className="grid grid-cols-2 gap-2">
                 <Button onClick={() => void startOAuth('github_com')}
                   disabled={loading || !orgId || offlineMode}
-                  className="bg-gray-900 text-white hover:bg-gray-800 rounded-none text-sm">
+                  className="bg-black text-white hover:bg-gray-900 rounded-md text-sm">
                   🔗 GitHub.com
                 </Button>
                 <Button onClick={() => void startOAuth('github_enterprise')}
                   disabled={loading || !orgId || offlineMode}
-                  variant="outline" className="rounded-none border-gray-300 text-sm">
+                  variant="outline" className="rounded-md border-gray-300 text-sm">
                   🏢 GitHub Enterprise
                 </Button>
               </div>
@@ -235,7 +235,7 @@ const TeamManagement = () => {
               )}
               <div className="space-y-2">
                 {connections.map((conn) => (
-                  <div key={conn.id} className="border border-gray-200 bg-gray-50 px-3 py-2.5 flex items-center justify-between">
+                  <div key={conn.id} className="electron-card-solid rounded-md px-3 py-2.5 flex items-center justify-between">
                     <div>
                       <p className="text-sm font-semibold text-gray-900">@{conn.github_username}</p>
                       <p className="text-xs text-gray-500 mt-0.5">
@@ -254,7 +254,7 @@ const TeamManagement = () => {
         </div>
 
         {/* Members list */}
-        <Card className="rounded-none border-gray-200 shadow-none bg-white">
+        <Card className="electron-card rounded-xl shadow-none">
           <CardHeader className="pb-3">
             <CardTitle className="text-base">Team Members</CardTitle>
             <CardDescription>
@@ -273,7 +273,7 @@ const TeamManagement = () => {
               {members.map((member) => {
                 const roleMeta = ROLE_META[member.role];
                 return (
-                  <div key={member.id} className="border border-gray-200 bg-gray-50 px-4 py-3 flex items-center justify-between gap-3">
+                  <div key={member.id} className="electron-card-solid rounded-md px-4 py-3 flex items-center justify-between gap-3">
                     <div>
                       <p className="text-sm font-semibold text-gray-900">{member.email}</p>
                       <div className="flex items-center gap-2 mt-1 flex-wrap">

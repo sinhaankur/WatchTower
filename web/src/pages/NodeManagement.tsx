@@ -176,8 +176,8 @@ const NodeManagement = () => {
   };
 
   return (
-    <div className="flex-1 overflow-auto bg-gray-50">
-      <header className="bg-white border-b border-gray-100">
+    <div className="flex-1 overflow-auto">
+      <header className="electron-card-solid electron-divider border-b">
         <div className="px-8 py-5 flex items-center justify-between">
           <div>
             <h1 className="text-base font-semibold text-gray-900">Nodes</h1>
@@ -189,7 +189,7 @@ const NodeManagement = () => {
             <Button
               variant="outline"
               onClick={() => void loadContext()}
-              className="rounded-none border-gray-300 text-sm"
+              className="rounded-md border-gray-300 text-sm"
             >
               ↺ Retry Connection
             </Button>
@@ -201,7 +201,7 @@ const NodeManagement = () => {
 
         {/* Page-level notice */}
         {pageError && (
-          <div className="flex items-start gap-3 rounded-none border border-amber-200 bg-amber-50 px-4 py-3">
+          <div className="flex items-start gap-3 rounded-md border border-amber-200 bg-amber-50 px-4 py-3">
             <span className="text-amber-500 mt-0.5">⚠</span>
             <div>
               <p className="text-sm font-medium text-amber-800">Connection issue</p>
@@ -212,20 +212,20 @@ const NodeManagement = () => {
 
         {/* Action feedback */}
         {actionSuccess && (
-          <div className="flex items-center gap-2 rounded-none border border-green-200 bg-green-50 px-4 py-3">
+          <div className="flex items-center gap-2 rounded-md border border-green-200 bg-green-50 px-4 py-3">
             <span className="text-green-500">✓</span>
             <p className="text-sm text-green-700">{actionSuccess}</p>
           </div>
         )}
         {actionError && (
-          <div className="flex items-start gap-2 rounded-none border border-red-200 bg-red-50 px-4 py-3">
+          <div className="flex items-start gap-2 rounded-md border border-red-200 bg-red-50 px-4 py-3">
             <span className="text-red-500 mt-0.5">✗</span>
             <p className="text-sm text-red-700">{actionError}</p>
           </div>
         )}
 
         {/* Add Node — Step-by-step form */}
-        <Card className="rounded-none border-gray-200 shadow-none bg-white">
+        <Card className="electron-card rounded-xl shadow-none">
           <CardHeader className="pb-4">
             <CardTitle className="text-base">Add a Deployment Node</CardTitle>
             <CardDescription>Complete 3 quick steps to register a node for deployment.</CardDescription>
@@ -270,7 +270,7 @@ const NodeManagement = () => {
                       placeholder="e.g. web-node-1"
                       value={form.name}
                       onChange={(e) => setField('name', e.target.value)}
-                      className="mt-1.5 rounded-none border-gray-300"
+                      className="mt-1.5 rounded-md border-gray-300"
                     />
                   </div>
                   <div>
@@ -280,7 +280,7 @@ const NodeManagement = () => {
                       placeholder="e.g. 192.168.1.101 or server.example.com"
                       value={form.host}
                       onChange={(e) => setField('host', e.target.value)}
-                      className="mt-1.5 rounded-none border-gray-300"
+                      className="mt-1.5 rounded-md border-gray-300"
                     />
                   </div>
                 </div>
@@ -307,7 +307,7 @@ const NodeManagement = () => {
                       id="user"
                       value={form.user}
                       onChange={(e) => setField('user', e.target.value)}
-                      className="mt-1.5 rounded-none border-gray-300"
+                      className="mt-1.5 rounded-md border-gray-300"
                     />
                   </div>
                   <div>
@@ -317,7 +317,7 @@ const NodeManagement = () => {
                       type="number"
                       value={form.port}
                       onChange={(e) => setField('port', Number(e.target.value || 22))}
-                      className="mt-1.5 rounded-none border-gray-300"
+                      className="mt-1.5 rounded-md border-gray-300"
                     />
                   </div>
                   <div>
@@ -327,7 +327,7 @@ const NodeManagement = () => {
                       placeholder="~/.ssh/id_rsa"
                       value={form.ssh_key_path}
                       onChange={(e) => setField('ssh_key_path', e.target.value)}
-                      className="mt-1.5 rounded-none border-gray-300"
+                      className="mt-1.5 rounded-md border-gray-300"
                     />
                   </div>
                 </div>
@@ -346,7 +346,7 @@ const NodeManagement = () => {
                       id="remote_path"
                       value={form.remote_path}
                       onChange={(e) => setField('remote_path', e.target.value)}
-                      className="mt-1.5 rounded-none border-gray-300"
+                      className="mt-1.5 rounded-md border-gray-300"
                     />
                   </div>
                   <div>
@@ -381,7 +381,7 @@ const NodeManagement = () => {
                 variant="outline"
                 disabled={step === 0}
                 onClick={() => setStep((s) => s - 1)}
-                className="rounded-none border-gray-300 text-sm"
+                className="rounded-md border-gray-300 text-sm"
               >
                 ← Back
               </Button>
@@ -389,7 +389,7 @@ const NodeManagement = () => {
                 <Button
                   onClick={() => isStepValid(step) && setStep((s) => s + 1)}
                   disabled={!isStepValid(step)}
-                  className="bg-gray-900 text-white hover:bg-gray-800 rounded-none text-sm"
+                  className="bg-black text-white hover:bg-gray-900 rounded-md text-sm"
                 >
                   Continue →
                 </Button>
@@ -397,7 +397,7 @@ const NodeManagement = () => {
                 <Button
                   onClick={() => void addNode()}
                   disabled={addingNode || offlineMode || !orgId}
-                  className="bg-gray-900 text-white hover:bg-gray-800 rounded-none text-sm"
+                  className="bg-black text-white hover:bg-gray-900 rounded-md text-sm"
                 >
                   {addingNode ? 'Adding…' : offlineMode ? 'Server offline' : 'Add Node'}
                 </Button>
@@ -407,7 +407,7 @@ const NodeManagement = () => {
         </Card>
 
         {/* Registered Nodes */}
-        <Card className="rounded-none border-gray-200 shadow-none bg-white">
+        <Card className="electron-card rounded-xl shadow-none">
           <CardHeader className="pb-3">
             <CardTitle className="text-base">Registered Nodes</CardTitle>
             <CardDescription>
@@ -433,7 +433,7 @@ const NodeManagement = () => {
               {nodes.map((node) => {
                 const s = STATUS_STYLES[node.status] ?? STATUS_STYLES.offline;
                 return (
-                  <div key={node.id} className="border border-gray-200 bg-gray-50 p-4">
+                  <div key={node.id} className="electron-card-solid rounded-md p-4">
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex-1 min-w-0">
                         {/* Title row */}
@@ -467,7 +467,7 @@ const NodeManagement = () => {
 
                       <Button
                         variant="outline"
-                        className="rounded-none border-gray-300 text-xs shrink-0"
+                        className="rounded-md border-gray-300 text-xs shrink-0"
                         onClick={() => void checkHealth(node.id)}
                         disabled={healthLoading === node.id}
                       >
@@ -482,7 +482,7 @@ const NodeManagement = () => {
         </Card>
 
         {/* Help section */}
-        <Card className="rounded-none border-gray-100 shadow-none bg-white">
+        <Card className="electron-card rounded-xl shadow-none">
           <CardContent className="py-4">
             <p className="text-xs text-gray-500 font-medium mb-2">Quick tips</p>
             <ul className="text-xs text-gray-400 space-y-1 list-disc list-inside">
