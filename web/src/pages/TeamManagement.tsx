@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
 import apiClient from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -130,29 +129,24 @@ const TeamManagement = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="flex-1 overflow-auto bg-gray-50">
       <header className="bg-white border-b border-gray-100">
-        <div className="max-w-4xl mx-auto px-6 py-5 flex items-center justify-between">
+        <div className="px-8 py-5 flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-semibold text-gray-900">Team</h1>
+            <h1 className="text-base font-semibold text-gray-900">Team</h1>
             <p className="text-xs text-gray-400 mt-0.5">
-              {loading ? 'Loading…' : orgName ? `Organization: ${orgName}` : offlineMode ? 'Server offline' : ''}
+              {loading ? 'Loading…' : orgName ? `Organization: ${orgName}` : offlineMode ? 'Server offline — showing cached data' : ''}
             </p>
           </div>
-          <div className="flex gap-2">
-            {offlineMode && (
-              <Button variant="outline" onClick={() => void loadContext()} className="rounded-none border-gray-300 text-sm">
-                Retry Connection
-              </Button>
-            )}
-            <Link to="/">
-              <Button variant="outline" className="rounded-none border-gray-200 text-sm">← Dashboard</Button>
-            </Link>
-          </div>
+          {offlineMode && (
+            <Button variant="outline" onClick={() => void loadContext()} className="rounded-none border-gray-300 text-sm">
+              ↺ Retry Connection
+            </Button>
+          )}
         </div>
       </header>
 
-      <main className="max-w-4xl mx-auto px-6 py-8 space-y-6">
+      <main className="px-8 py-6 space-y-6 max-w-4xl">
 
         {pageError && (
           <div className="flex items-start gap-3 border border-amber-200 bg-amber-50 px-4 py-3">
