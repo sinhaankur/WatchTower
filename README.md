@@ -255,7 +255,7 @@ One-time setup needed:
 
 - In GitHub repo settings, allow workflow permissions to write packages.
 - In PyPI, configure Trusted Publishing for this repository.
-- Use release tags (for example `v1.2.1`) to produce versioned artifacts.
+- Use release tags (for example `v1.2.2`) to produce versioned artifacts.
 
 Version-controlled release process:
 
@@ -266,7 +266,7 @@ Version-controlled release process:
 Example:
 
 ```bash
-./scripts/release.sh 1.2.1
+./scripts/release.sh 1.2.2
 ```
 
 1. Bump `watchtower/__init__.py` version (single source of truth).
