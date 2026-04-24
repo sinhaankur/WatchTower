@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import axios from 'axios';
 import apiClient from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -99,9 +100,20 @@ const NodeManagement = () => {
       setOrgId(ctx.organization.id);
       setOrgName(ctx.organization.name);
       await refreshNodes(ctx.organization.id);
-    } catch {
+    } catch (error) {
       setOfflineMode(true);
-      setPageError('Could not connect to the WatchTower server. You can still review the form below and add nodes once the server is reachable.');
+      if (axios.isAxiosError(error)) {
+        const status = error.response?.status;
+        if (status === 401) {
+          setPageError('Authentication failed. Set VITE_API_TOKEN (or localStorage authToken) and ensure it matches WATCHTOWER_API_TOKEN on the server.');
+        } else if (status === 503) {
+          setPageError('Server authentication is not configured yet. Set WATCHTOWER_API_TOKEN, or enable WATCHTOWER_ALLOW_INSECURE_DEV_AUTH=true for local development.');
+        } else {
+          setPageError('Could not connect to the WatchTower server. You can still review the form below and add nodes once the server is reachable.');
+        }
+      } else {
+        setPageError('Could not connect to the WatchTower server. You can still review the form below and add nodes once the server is reachable.');
+      }
     } finally {
       setLoading(false);
     }
