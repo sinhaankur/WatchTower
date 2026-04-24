@@ -163,14 +163,14 @@
 
       <section class="kpis">
         <article class="card">
+          <div class="label">Current Release</div>
+          <div class="value">v1.2.0</div>
+          <div class="small muted">Python package + OCI image + release assets</div>
+        </article>
+        <article class="card">
           <div class="label">Deployment Modes</div>
           <div class="value">3</div>
           <div class="small muted">Linux, Windows, macOS App Center</div>
-        </article>
-        <article class="card">
-          <div class="label">Primary Endpoints</div>
-          <div class="value">5</div>
-          <div class="small muted">Health, Apps, Deploy, UI Data, Dashboard</div>
         </article>
         <article class="card">
           <div class="label">Security Gates</div>
@@ -235,10 +235,18 @@
         <ol class="list">
           <li>Bump <code>watchtower.__version__</code> in <code>watchtower/__init__.py</code></li>
           <li>Merge changes to main</li>
-          <li>Create semantic tag like <code>v1.1.1</code></li>
-          <li>GitHub Actions auto-publishes to GHCR and PyPI</li>
+          <li>Create semantic tag like <code>v1.2.0</code></li>
+          <li>GitHub Actions auto-publishes to GHCR, PyPI, and GitHub Releases</li>
         </ol>
-        <pre><code>./scripts/release.sh 1.1.1</code></pre>
+        <pre><code>./scripts/release.sh 1.2.0</code></pre>
+
+        <h3 style="margin-top: 14px;">Install and Use Across Compatible Ecosystems</h3>
+        <ul class="list">
+          <li><strong>Python ecosystem (pip)</strong>: <code>pip install watchtower-podman</code></li>
+          <li><strong>Container ecosystem (OCI)</strong>: <code>ghcr.io/sinhaankur/watchtower:latest</code></li>
+          <li><strong>Linux service ecosystem</strong>: use <code>systemd/watchtower.service</code></li>
+          <li><strong>Windows/macOS script ecosystem</strong>: use <code>install_windows.ps1</code> and <code>install_macos.sh</code></li>
+        </ul>
       </section>
     </main>
   </div>
