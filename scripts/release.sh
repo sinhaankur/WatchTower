@@ -26,6 +26,12 @@ if [[ -n "$(git status --porcelain)" ]]; then
   exit 1
 fi
 
+echo "Running tests before creating release tag ..."
+python3 -m pip install --upgrade pip >/dev/null
+python3 -m pip install -r requirements.txt >/dev/null
+python3 -m pip install pytest >/dev/null
+python3 -m pytest -q
+
 PKG_VERSION=$(python3 - <<'PY'
 from watchtower import __version__
 print(__version__)

@@ -37,6 +37,201 @@ The App Center mode is designed to feel simple like hosted deployment platforms:
 
 ## Installation
 
+### Quick Start (Platform UI + API, Local Development)
+
+Run the full WatchTower platform locally with one command:
+
+```bash
+./scripts/dev-up.sh
+```
+
+This starts:
+- UI at `http://127.0.0.1:5173`
+- API at `http://127.0.0.1:8000`
+
+Stop everything:
+
+```bash
+./scripts/dev-down.sh
+```
+
+Notes:
+- The script auto-creates `.venv` and installs backend dependencies from `requirements-new.txt`.
+- It auto-installs frontend dependencies in `web/` if `node_modules` is missing.
+- If Docker Compose starts successfully, it uses PostgreSQL and Redis.
+- If Docker Compose is unavailable or fails, it automatically falls back to local SQLite mode.
+
+### Quick Start (Full Docker Application)
+
+Run WatchTower as a single Dockerized application stack (UI + API + PostgreSQL + Redis):
+
+```bash
+./scripts/app-up.sh
+```
+
+What this script now does before launching:
+- Detects whether Docker/Podman runtime is available.
+- If missing on Ubuntu/Debian, it can auto-install Podman.
+- If installed but not running, it attempts to start container services.
+- If it still cannot connect, it prints exact commands to run.
+
+Then open:
+- UI: `http://127.0.0.1:5173`
+- API: `http://127.0.0.1:8000`
+
+Stop the application stack:
+
+```bash
+./scripts/app-down.sh
+```
+
+If you prefer direct compose commands:
+
+```bash
+docker compose up --build -d
+docker compose down
+```
+
+You can also run the runtime check directly:
+
+```bash
+./scripts/ensure-container-runtime.sh --auto-install --auto-start
+```
+
+### Security Hardening
+
+WatchTower now supports explicit API token authentication for backend routes.
+
+Recommended production setup:
+
+```bash
+export WATCHTOWER_API_TOKEN="change-this-to-a-long-random-token"
+export WATCHTOWER_SECRET_KEY="$(python3 - <<'PY'
+from cryptography.fernet import Fernet
+print(Fernet.generate_key().decode())
+PY
+)"
+docker compose up --build -d
+```
+
+Notes:
+- The backend validates `Authorization: Bearer <token>` using timing-safe comparison.
+- Enterprise GitHub access tokens are encrypted at rest using `WATCHTOWER_SECRET_KEY`.
+- The frontend can forward the same token using `VITE_API_TOKEN` in compose.
+- Insecure development bypass is disabled by default.
+- To allow local insecure mode intentionally (development only), set:
+
+```bash
+export WATCHTOWER_ALLOW_INSECURE_DEV_AUTH=true
+```
+
+This should never be enabled in production.
+
+### DIY "Vercel-like" Deployment (Podman + Watchtower)
+
+This repository now includes a push-to-deploy style setup:
+
+1. CI pipeline to publish image to GHCR on `main`:
+  - Workflow: `.github/workflows/deploy.yml`
+2. Podman-compatible runtime stack:
+  - Compose file: `docker-compose.vercel-like.yml`
+3. Bootstrap script for Podman socket + GHCR login + startup:
+  - Script: `scripts/init-podman-watchtower.sh`
+
+Quick start:
+
+```bash
+cp .env.watchtower.example .env.watchtower
+# edit .env.watchtower with GH username/token and app image
+./scripts/init-podman-watchtower.sh
+```
+
+This starts:
+- `my-app` from `APP_IMAGE`
+- `watchtower` polling every `30s` by default
+
+Notes:
+- Podman socket required for Watchtower: `systemctl --user enable --now podman.socket`
+- Use GHCR token with `read:packages` for private images.
+- Discord/Slack notifications can be configured via `WATCHTOWER_NOTIFICATION_URL`.
+
+### High Availability (Primary-Standby Across Sites)
+
+For a two-node HA edge cluster (home + office, or multi-site):
+
+- Compose stack: `docker-compose.ha.yml`
+- Node env templates: `.env.ha.primary.example`, `.env.ha.standby.example`
+- Bootstrap script: `scripts/ha-node-up.sh`
+- DB backup script: `scripts/ha-db-backup.sh`
+- Full runbook: `docs/HA_PODMAN_WATCHTOWER.md`
+
+Quick start:
+
+```bash
+cp .env.ha.primary.example .env.ha   # on primary
+# or cp .env.ha.standby.example .env.ha on standby
+./scripts/ha-node-up.sh .env.ha
+```
+
+### Hybrid Cloud Database Mode (Atlas Or Managed DB)
+
+If you want Podman nodes on your own hardware but a managed shared database in the cloud:
+
+- Compose stack: `docker-compose.hybrid.yml`
+- Node env templates: `.env.hybrid.primary.example`, `.env.hybrid.standby.example`
+- Bootstrap script: `scripts/hybrid-node-up.sh`
+- Runbook: `docs/HYBRID_CLOUD_DATABASES.md`
+
+Quick start:
+
+```bash
+cp .env.hybrid.primary.example .env.hybrid   # on node A
+# or cp .env.hybrid.standby.example .env.hybrid on node B
+echo 'mongodb+srv://user:pass@cluster.mongodb.net/app?retryWrites=true&w=majority' | podman secret create mongo_uri -
+./scripts/hybrid-node-up.sh .env.hybrid
+```
+
+Notes:
+
+- This hybrid mode is for workload containers that already support Atlas or another managed DB.
+- The current WatchTower API/control plane still uses SQLite or PostgreSQL via `DATABASE_URL`.
+- Prefer Podman secrets over plain env vars for connection strings.
+- The deploy workflow at `.github/workflows/deploy.yml` is the `WatchTower Deployer` pipeline and pushes both `latest` and SHA tags to `ghcr.io/<owner>/<repo>` on every push to `main`.
+- The node-side default Watchtower poll interval for hybrid mode is 30 seconds.
+
+### WatchTower Mesh (Vercel-On-Podman)
+
+For a Vercel-style self-hosted path with blue-green cutover and Caddy routing:
+
+- Compose stack: `docker-compose.mesh.yml`
+- Node env templates: `.env.mesh.primary.example`, `.env.mesh.standby.example`
+- Join script: `scripts/join-watchtower-mesh.sh`
+- Blue-green rollout: `scripts/mesh-bluegreen-deploy.sh`
+- Preview deployments: `scripts/mesh-preview-deploy.sh`
+- Runbook: `docs/WATCHTOWER_MESH_VERCEL.md`
+
+Quick start:
+
+```bash
+cp .env.mesh.primary.example .env.mesh
+echo 'mongodb+srv://user:pass@cluster.mongodb.net/dbname?retryWrites=true&w=majority' | podman secret create mongo_uri -
+./scripts/join-watchtower-mesh.sh .env.mesh
+```
+
+Notes:
+
+- Caddy handles automatic TLS and stable domain routing.
+- The mesh defaults to a 15-second Watchtower poll interval for fast sync.
+- Zero-downtime promotion is handled by the blue-green deploy script, because Watchtower alone is not a health-gated blue-green rollout engine.
+- Non-main branches can publish preview images through `.github/workflows/preview-image.yml`.
+
+### Release Safety (Tests First)
+
+Releases are now gated by tests:
+
+- CI release workflow `.github/workflows/release.yml` runs `pytest` before creating a release.
+- Local release helper `scripts/release.sh` runs tests before tag creation/push.
+
 ### Publish Option 3 (Containers + PyPI)
 
 If you selected both distribution channels, this repository now supports:
@@ -60,9 +255,19 @@ One-time setup needed:
 
 - In GitHub repo settings, allow workflow permissions to write packages.
 - In PyPI, configure Trusted Publishing for this repository.
-- Use release tags (for example `v1.1.1`) to produce versioned artifacts.
+- Use release tags (for example `v1.2.0`) to produce versioned artifacts.
 
 Version-controlled release process:
+
+- `watchtower-podman` on PyPI for `pip` installs
+- OCI container image on GHCR for Docker/Podman/Kubernetes ecosystems
+- GitHub Release artifacts for manual distribution on Linux/macOS/Windows
+
+Example:
+
+```bash
+./scripts/release.sh 1.2.0
+```
 
 1. Bump `watchtower/__init__.py` version (single source of truth).
 2. Commit and merge to `main`.
