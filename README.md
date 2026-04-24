@@ -37,6 +37,33 @@ The App Center mode is designed to feel simple like hosted deployment platforms:
 
 ## Installation
 
+### Cross-Platform Install Files (Linux, macOS, Windows)
+
+Use the following files to install and run WatchTower by OS:
+
+1. Linux service mode:
+  - Install file: `install.sh`
+  - Run as service: `sudo systemctl start watchtower`
+
+2. macOS App Center mode:
+  - Install file: `install_macos.sh`
+  - Run file: `run_app_center_macos.sh`
+
+3. Windows App Center mode:
+  - Install file: `install_windows.ps1`
+  - Run file: `run_app_center_windows.ps1`
+
+4. Cross-platform desktop window mode (Linux/macOS/Windows):
+  - Launcher files: `desktop/package.json`, `desktop/main.js`
+  - Install: `npm run install:desktop`
+  - Run: `npm run desktop`
+
+Security defaults:
+- macOS/Windows installers now generate a random `WATCHTOWER_TRIGGER_TOKEN` automatically.
+- Runtime bind host defaults to `127.0.0.1` for local-only access.
+- Desktop launcher uses token-based API auth by default (no insecure bypass required).
+- If you need remote access, explicitly set `WATCHTOWER_BIND_HOST=0.0.0.0` and secure firewall rules.
+
 ### Quick Start (Platform UI + API, Local Development)
 
 Run the full WatchTower platform locally with one command:
