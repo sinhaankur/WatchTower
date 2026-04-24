@@ -140,3 +140,5 @@ Thumbs.db
 watchtower.db
 .dev/
 MoonTracker UI /
+node_modules/
+desktop/node_modules/
