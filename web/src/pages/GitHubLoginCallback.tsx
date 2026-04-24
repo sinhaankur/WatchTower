@@ -38,14 +38,16 @@ const GitHubLoginCallback = () => {
           redirect_uri: redirectUri,
         });
 
-        const token = (resp.data as { token?: string }).token;
-        if (!token) {
+        const data = resp.data as { token?: string; redirect_to?: string };
+        if (!data.token) {
           throw new Error('No session token returned');
         }
 
-        localStorage.setItem('authToken', token);
+        localStorage.setItem('authToken', data.token);
+        const nextPath = data.redirect_to && data.redirect_to.startsWith('/') ? data.redirect_to : '/';
+
         setStatus('success');
-        setTimeout(() => navigate('/'), 600);
+        setTimeout(() => navigate(nextPath, { replace: true }), 600);
       } catch {
         setStatus('error');
         setDetail('Failed to complete GitHub sign-in. Check API OAuth configuration and try again.');
@@ -64,7 +66,7 @@ const GitHubLoginCallback = () => {
         {status === 'loading' && (
           <>
             <div className="text-4xl mb-4 animate-spin inline-block">⌛</div>
-            <h1 className="text-base font-semibold mb-1">Signing you in…</h1>
+            <h1 className="text-base font-semibold mb-1">Signing you in...</h1>
             <p className="text-sm text-slate-300">Completing GitHub authentication.</p>
           </>
         )}

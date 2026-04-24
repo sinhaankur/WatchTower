@@ -264,16 +264,22 @@ async def get_enterprise_context(
 @router.get("/auth/github/start")
 async def start_github_login_oauth(
     redirect_uri: str,
+    next_path: Optional[str] = None,
 ):
     """Generate OAuth authorize URL for GitHub login."""
     oauth = _resolve_github_oauth_endpoints(schemas.GitHubProvider.GITHUB_COM, None)
     if not oauth["client_id"]:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="OAuth client id not configured")
 
+    effective_next = next_path or "/"
+    if not effective_next.startswith("/") or effective_next.startswith("//"):
+        effective_next = "/"
+
     state = _sign_oauth_state(
         {
             "mode": "login",
             "provider": schemas.GitHubProvider.GITHUB_COM.value,
+            "next": effective_next,
             "iat": int(datetime.utcnow().timestamp()),
         }
     )
@@ -288,15 +294,17 @@ async def start_github_login_oauth(
     return {
         "authorize_url": f"{oauth['authorize_url']}?{urlencode(params)}",
         "state": state,
+        "next": effective_next,
     }
 
 
 @router.get("/auth/github/login")
 async def redirect_github_login_oauth(
     redirect_uri: str,
+    next_path: Optional[str] = None,
 ):
     """Redirect directly to GitHub authorization for browser-first login."""
-    payload = await start_github_login_oauth(redirect_uri=redirect_uri)
+    payload = await start_github_login_oauth(redirect_uri=redirect_uri, next_path=next_path)
     return RedirectResponse(url=payload["authorize_url"], status_code=status.HTTP_307_TEMPORARY_REDIRECT)
 
 
@@ -360,6 +368,7 @@ async def github_login_oauth_callback(
 
     return {
         "token": session_token,
+        "redirect_to": state_data.get("next") or "/",
         "user": {
             "id": str(user.id),
             "email": user.email,

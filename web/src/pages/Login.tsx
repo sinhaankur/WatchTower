@@ -1,46 +1,44 @@
-import { useState } from 'react';
-import axios from 'axios';
-import apiClient from '@/lib/api';
+import { useEffect, useState } from 'react';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import BrandLogo from '@/components/BrandLogo';
 
 const Login = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    const existing = localStorage.getItem('authToken');
+    if (existing) {
+      navigate('/', { replace: true });
+    }
+  }, [navigate]);
 
   const loginWithGitHub = async () => {
     setLoading(true);
     setError('');
     try {
       const redirectUri = `${window.location.origin}/oauth/github/login/callback`;
+      const fromState = (location.state as { from?: string } | null)?.from;
+      const fromQuery = searchParams.get('next') || undefined;
+      const nextPath = fromQuery || fromState || '/';
 
-      // Some deployments configure VITE_API_URL with and without `/api`.
-      // Probe both common endpoint shapes and use the first successful response.
-      const candidates = ['/auth/github/start', '/api/auth/github/start'];
-      let authorizeUrl: string | null = null;
+      const baseUrl = (import.meta as any).env?.VITE_API_URL || '/api';
+      const cleanBase = String(baseUrl).replace(/\/+$/, '');
 
-      for (const endpoint of candidates) {
-        try {
-          const resp = await apiClient.get(endpoint, {
-            params: { redirect_uri: redirectUri },
-          });
-          authorizeUrl = (resp.data as { authorize_url?: string }).authorize_url ?? null;
-          if (authorizeUrl) break;
-        } catch (error) {
-          if (!axios.isAxiosError(error) || error.response?.status !== 404) {
-            throw error;
-          }
-        }
+      let loginUrl = `${cleanBase}/auth/github/login`;
+      if (!cleanBase.endsWith('/api')) {
+        loginUrl = `${cleanBase}/api/auth/github/login`;
       }
 
-      if (!authorizeUrl) {
-        throw new Error('OAuth start endpoint not found');
-      }
-
-      const popup = window.open(authorizeUrl, '_blank', 'noopener,noreferrer');
-      if (!popup) {
-        window.location.href = authorizeUrl;
-      }
+      const params = new URLSearchParams({
+        redirect_uri: redirectUri,
+        next_path: nextPath,
+      });
+      window.location.assign(`${loginUrl}?${params.toString()}`);
     } catch {
       setError('Unable to start GitHub login. Ensure GITHUB_OAUTH_CLIENT_ID/GITHUB_CLIENT_ID and GITHUB_OAUTH_CLIENT_SECRET/GITHUB_CLIENT_SECRET are configured on the API server.');
       setLoading(false);
@@ -67,7 +65,7 @@ const Login = () => {
           disabled={loading}
           className="w-full electron-accent-bg rounded-md"
         >
-          {loading ? 'Redirecting…' : 'Sign in with GitHub'}
+          {loading ? 'Redirecting...' : 'Sign in with GitHub'}
         </Button>
       </div>
     </div>
