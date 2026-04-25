@@ -6,6 +6,8 @@ import hmac
 import hashlib
 import json
 import logging
+from uuid import UUID
+
 from fastapi import APIRouter, BackgroundTasks, Request, Header, HTTPException, status, Depends
 from sqlalchemy.orm import Session
 
@@ -41,7 +43,7 @@ def verify_webhook_signature(
 
 @router.post("/github/{project_id}")
 async def github_webhook(
-    project_id: str,
+    project_id: UUID,
     request: Request,
     background_tasks: BackgroundTasks,
     x_hub_signature_256: str = Header(None),

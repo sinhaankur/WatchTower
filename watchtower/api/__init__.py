@@ -5,10 +5,12 @@ import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from watchtower.database import init_db
 
@@ -74,6 +76,16 @@ def _ensure_secret_key() -> None:
                 "Set this env var explicitly in production.",
                 key_path,
             )
+        # Validate that the loaded key is a usable Fernet key before exporting
+        # it; a corrupt file would otherwise surface as 503 on first encrypt.
+        try:
+            from cryptography.fernet import Fernet  # type: ignore
+            Fernet(key.encode("utf-8"))
+        except Exception:
+            logger.exception(
+                "Stored secret key at %s is invalid; ignoring.", key_path
+            )
+            return
         os.environ["WATCHTOWER_SECRET_KEY"] = key
     except Exception:
         logger.exception(
@@ -114,13 +126,17 @@ app = FastAPI(
 )
 
 
-allowed_origins = os.getenv(
-    "CORS_ORIGINS",
-    (
-        "http://localhost:3000,http://localhost:8000,"
-        "http://127.0.0.1:5173,http://127.0.0.1:5222"
-    ),
-).split(",")
+allowed_origins = [
+    o.strip()
+    for o in os.getenv(
+        "CORS_ORIGINS",
+        (
+            "http://localhost:3000,http://localhost:8000,"
+            "http://127.0.0.1:5173,http://127.0.0.1:5222"
+        ),
+    ).split(",")
+    if o.strip()
+]
 
 app.add_middleware(
     CORSMiddleware,
@@ -129,6 +145,31 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "Accept", "X-Requested-With"],
 )
+
+
+# ── Global error handlers ────────────────────────────────────────────────────
+# Without these, unhandled exceptions surface as bare 500s with full tracebacks
+# in dev (and confusing client errors in prod). These handlers preserve the
+# response shape FastAPI already uses ({"detail": ...}) and ensure server-side
+# logs always include the path + method for triage.
+
+@app.exception_handler(StarletteHTTPException)
+async def _http_exception_handler(request: Request, exc: StarletteHTTPException):
+    if exc.status_code >= 500:
+        logger.error("%s %s -> %s: %s", request.method, request.url.path, exc.status_code, exc.detail)
+    return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
+
+
+@app.exception_handler(RequestValidationError)
+async def _validation_exception_handler(request: Request, exc: RequestValidationError):
+    logger.info("%s %s -> 422 validation: %s", request.method, request.url.path, exc.errors())
+    return JSONResponse(status_code=422, content={"detail": exc.errors()})
+
+
+@app.exception_handler(Exception)
+async def _unhandled_exception_handler(request: Request, exc: Exception):
+    logger.exception("Unhandled error on %s %s", request.method, request.url.path)
+    return JSONResponse(status_code=500, content={"detail": "Internal server error"})
 
 
 @app.get("/", tags=["Health"], include_in_schema=False)
