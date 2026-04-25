@@ -131,6 +131,31 @@ def encrypt_secret(value: str) -> str:
         ) from exc
 
 
+def decrypt_secret(value: str) -> str:
+    """Decrypt values previously encrypted with encrypt_secret."""
+    key = os.getenv("WATCHTOWER_SECRET_KEY")
+    if not key:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Secret encryption key is not configured"
+        )
+
+    if Fernet is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Encryption backend is unavailable"
+        )
+
+    try:
+        fernet = Fernet(key.encode("utf-8"))
+        return fernet.decrypt(value.encode("utf-8")).decode("utf-8")
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Failed to decrypt secret — key may have changed"
+        ) from exc
+
+
 def get_current_user(
     authorization: str = Header(None)
 ):

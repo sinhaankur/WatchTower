@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import apiClient from '@/lib/api';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -48,6 +48,20 @@ const SetupWizard = () => {
   const [submitting, setSubmitting] = useState(false);
   const [hasNodes, setHasNodes] = useState<boolean | null>(null);
   const [quickMode, setQuickMode] = useState(false);
+  const [searchParams] = useSearchParams();
+
+  // GitHub repo picker state
+  type GHOrg = { login: string; avatar_url: string | null; type: 'user' | 'organization' };
+  type GHRepo = { id: number; name: string; full_name: string; html_url: string; description: string | null; private: boolean; default_branch: string };
+  const [orgId, setOrgId] = useState<string | null>(null);
+  const [ghPickerOpen, setGhPickerOpen] = useState(false);
+  const [ghPickerLoading, setGhPickerLoading] = useState(false);
+  const [ghPickerError, setGhPickerError] = useState('');
+  const [ghOrgs, setGhOrgs] = useState<GHOrg[]>([]);
+  const [selectedGHOrg, setSelectedGHOrg] = useState('');
+  const [ghRepos, setGhRepos] = useState<GHRepo[]>([]);
+  const [repoSearch, setRepoSearch] = useState('');
+  const [ghConnected, setGhConnected] = useState(false);
   const navigate = useNavigate();
 
   // Check if any deployment nodes exist so we can warn before wasting the user's time
@@ -55,16 +69,103 @@ const SetupWizard = () => {
     const checkNodes = async () => {
       try {
         const ctxRes = await apiClient.get('/context');
-        const orgId = (ctxRes.data as any)?.organization?.id;
-        if (!orgId) { setHasNodes(false); return; }
-        const nodesRes = await apiClient.get(`/orgs/${orgId}/nodes`);
+        const fetchedOrgId = (ctxRes.data as any)?.organization?.id;
+        if (!fetchedOrgId) { setHasNodes(false); return; }
+        setOrgId(fetchedOrgId);
+        const nodesRes = await apiClient.get(`/orgs/${fetchedOrgId}/nodes`);
         setHasNodes(((nodesRes.data as any[]) ?? []).length > 0);
+        // Check if user already has an active GitHub connection
+        try {
+          await apiClient.get('/github/user/orgs');
+          setGhConnected(true);
+        } catch {
+          setGhConnected(false);
+        }
       } catch {
         setHasNodes(null); // unknown — don't block
       }
     };
     void checkNodes();
   }, []);
+
+  // Auto-open repo picker when returning from GitHub OAuth
+  useEffect(() => {
+    if (searchParams.get('github_picker') === '1' && ghConnected) {
+      setStep(3);
+      setGhPickerOpen(true);
+    }
+  }, [searchParams, ghConnected]);
+
+  // Fetch repos when picker opens or org changes
+  useEffect(() => {
+    if (!ghPickerOpen) return;
+    const fetchOrgs = async () => {
+      setGhPickerLoading(true);
+      setGhPickerError('');
+      try {
+        const res = await apiClient.get('/github/user/orgs');
+        const orgs = res.data as GHOrg[];
+        setGhOrgs(orgs);
+        if (orgs.length > 0 && !selectedGHOrg) setSelectedGHOrg(orgs[0].login);
+      } catch (e: any) {
+        setGhPickerError(e?.response?.data?.detail || 'Failed to load GitHub organizations.');
+      } finally {
+        setGhPickerLoading(false);
+      }
+    };
+    void fetchOrgs();
+  }, [ghPickerOpen]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!ghPickerOpen || !selectedGHOrg) return;
+    const fetchRepos = async () => {
+      setGhPickerLoading(true);
+      try {
+        // Determine if we're fetching user repos or org repos
+        const isUser = ghOrgs.find(o => o.login === selectedGHOrg)?.type === 'user';
+        const params: Record<string, string> = {};
+        if (!isUser) params['org'] = selectedGHOrg;
+        const res = await apiClient.get('/github/user/repos', { params });
+        setGhRepos(res.data as GHRepo[]);
+      } catch {
+        setGhRepos([]);
+      } finally {
+        setGhPickerLoading(false);
+      }
+    };
+    void fetchRepos();
+  }, [selectedGHOrg, ghPickerOpen]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const openGitHubPicker = async () => {
+    const isLoggedIn = Boolean(localStorage.getItem('authToken'));
+    if (!isLoggedIn) {
+      navigate('/login?next=/setup');
+      return;
+    }
+    if (!ghConnected) {
+      // Need to connect GitHub with repo scope
+      if (!orgId) { setGhPickerError('Organization context not loaded. Refresh and try again.'); return; }
+      try {
+        const redirectUri = `${window.location.origin}/oauth/github/callback`;
+        const res = await apiClient.get('/github/oauth/start', {
+          params: { org_id: orgId, redirect_uri: redirectUri, next_path: '/setup?github_picker=1' },
+        });
+        const url = (res.data as any)?.authorize_url;
+        if (url) { window.location.href = url; }
+      } catch {
+        setGhPickerError('Could not start GitHub authorization. Check OAuth configuration in settings.');
+      }
+      return;
+    }
+    setGhPickerOpen(true);
+  };
+
+  const selectRepo = (repo: GHRepo) => {
+    setField('repo_url', repo.html_url);
+    setField('repo_branch', repo.default_branch);
+    if (!data.project_name) setField('project_name', repo.name);
+    setGhPickerOpen(false);
+  };
 
   const [data, setData] = useState<WizardData>({
     source_type: 'github',
@@ -391,9 +492,85 @@ const SetupWizard = () => {
                   <>
                     <div className="flex items-center justify-between gap-2">
                       <Label htmlFor="repo_url">Repository URL *</Label>
-                      <Link to="/login" className="text-xs electron-accent underline">Sign in with GitHub</Link>
+                      <button
+                        type="button"
+                        onClick={() => void openGitHubPicker()}
+                        className="text-xs electron-accent underline hover:opacity-80"
+                      >
+                        {ghConnected ? '📂 Browse GitHub Repos' : '🔗 Sign in with GitHub'}
+                      </button>
                     </div>
                     <Input id="repo_url" value={data.repo_url} onChange={(e) => setField('repo_url', e.target.value)} className="mt-1.5 rounded-md border-border bg-white" placeholder="https://github.com/owner/repo" />
+
+                    {/* GitHub Repo Picker Panel */}
+                    {ghPickerOpen && (
+                      <div className="mt-3 border border-sky-200 rounded-lg bg-sky-50 p-4 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <p className="text-sm font-semibold text-sky-900">Select a GitHub Repository</p>
+                          <button type="button" onClick={() => setGhPickerOpen(false)} className="text-sky-600 hover:text-sky-800 text-xs">✕ Close</button>
+                        </div>
+
+                        {ghPickerError && (
+                          <p className="text-xs text-red-700 bg-red-50 border border-red-200 rounded px-2 py-1">{ghPickerError}</p>
+                        )}
+
+                        {ghOrgs.length > 0 && (
+                          <div>
+                            <label className="text-xs font-medium text-sky-800 block mb-1">Organization / Account</label>
+                            <select
+                              value={selectedGHOrg}
+                              onChange={(e) => setSelectedGHOrg(e.target.value)}
+                              className="w-full rounded-md border border-sky-200 bg-white text-sm px-2 py-1.5"
+                            >
+                              {ghOrgs.map((o) => (
+                                <option key={o.login} value={o.login}>
+                                  {o.type === 'user' ? `👤 ${o.login}` : `🏢 ${o.login}`}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        )}
+
+                        <div>
+                          <label className="text-xs font-medium text-sky-800 block mb-1">Search Repositories</label>
+                          <Input
+                            value={repoSearch}
+                            onChange={(e) => setRepoSearch(e.target.value)}
+                            placeholder="Filter by name..."
+                            className="rounded-md border-sky-200 bg-white text-sm"
+                          />
+                        </div>
+
+                        {ghPickerLoading && <p className="text-xs text-sky-600 animate-pulse">Loading repositories…</p>}
+
+                        {!ghPickerLoading && ghRepos.length === 0 && !ghPickerError && (
+                          <p className="text-xs text-slate-500">No repositories found for this account.</p>
+                        )}
+
+                        {!ghPickerLoading && ghRepos.length > 0 && (
+                          <div className="max-h-48 overflow-y-auto rounded-md border border-sky-200 bg-white divide-y divide-sky-100">
+                            {ghRepos
+                              .filter((r) => !repoSearch || r.name.toLowerCase().includes(repoSearch.toLowerCase()))
+                              .map((repo) => (
+                                <button
+                                  key={repo.id}
+                                  type="button"
+                                  onClick={() => selectRepo(repo)}
+                                  className="w-full text-left px-3 py-2 hover:bg-sky-50 transition-colors"
+                                >
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-xs font-medium text-slate-800">{repo.name}</span>
+                                    {repo.private && <span className="text-[10px] bg-amber-100 text-amber-700 px-1 rounded">private</span>}
+                                  </div>
+                                  {repo.description && (
+                                    <p className="text-[11px] text-slate-500 truncate mt-0.5">{repo.description}</p>
+                                  )}
+                                </button>
+                              ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </>
                 ) : (
                   <div>
