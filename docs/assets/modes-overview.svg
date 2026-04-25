@@ -13,32 +13,32 @@
 
   <rect x="64" y="52" width="1472" height="164" rx="24" fill="#ffffff" stroke="#1f2937" stroke-width="2" filter="url(#cs)"/>
   <rect x="96" y="84" width="64" height="64" rx="16" fill="#fde68a" stroke="#1f2937" stroke-width="2" filter="url(#ps)"/>
-  <text x="116" y="124" font-family="'DM Sans', Arial, sans-serif" font-size="28" font-weight="800" fill="#b91c1c">Wt</text>
-  <text x="186" y="106" font-family="'Space Mono', monospace" font-size="18" font-weight="700" fill="#b91c1c" letter-spacing="2">WATCHTOWER MODES</text>
-  <text x="96" y="162" font-family="'DM Sans', Arial, sans-serif" font-size="44" font-weight="800" fill="#0f172a">Choose between host upkeep and application delivery.</text>
-  <text x="96" y="194" font-family="'DM Sans', Arial, sans-serif" font-size="20" font-weight="500" fill="#475569">Both modes share the same control plane, but solve different operator jobs.</text>
+  <text x="116" y="124" font-family="Arial, 'Helvetica Neue', Helvetica, sans-serif" font-size="28" font-weight="800" fill="#b91c1c">Wt</text>
+  <text x="186" y="106" font-family="'Courier New', Courier, monospace" font-size="18" font-weight="700" fill="#b91c1c" letter-spacing="2">WATCHTOWER MODES</text>
+  <text x="96" y="162" font-family="Arial, 'Helvetica Neue', Helvetica, sans-serif" font-size="44" font-weight="800" fill="#0f172a">Choose between host upkeep and application delivery.</text>
+  <text x="96" y="194" font-family="Arial, 'Helvetica Neue', Helvetica, sans-serif" font-size="20" font-weight="500" fill="#475569">Both modes share the same control plane, but solve different operator jobs.</text>
 
   <rect x="64" y="270" width="708" height="564" rx="22" fill="#ffffff" stroke="#1f2937" stroke-width="2" filter="url(#cs)"/>
   <rect x="98" y="302" width="292" height="32" rx="16" fill="#fde68a" stroke="#1f2937" stroke-width="1.5" filter="url(#ps)"/>
-  <text x="112" y="323" font-family="'DM Sans', Arial, sans-serif" font-size="15" font-weight="700" fill="#7f1d1d">Mode 1 · Podman Auto-Update</text>
-  <text x="98" y="388" font-family="'DM Sans', Arial, sans-serif" font-size="30" font-weight="800" fill="#0f172a">Keep existing hosts current.</text>
-  <text x="98" y="426" font-family="'DM Sans', Arial, sans-serif" font-size="17" font-weight="500" fill="#475569">WatchTower checks running containers, pulls newer images,</text>
-  <text x="98" y="452" font-family="'DM Sans', Arial, sans-serif" font-size="17" font-weight="500" fill="#475569">restarts safely, and confirms health before it settles.</text>
+  <text x="112" y="323" font-family="Arial, 'Helvetica Neue', Helvetica, sans-serif" font-size="15" font-weight="700" fill="#7f1d1d">Mode 1 · Podman Auto-Update</text>
+  <text x="98" y="388" font-family="Arial, 'Helvetica Neue', Helvetica, sans-serif" font-size="30" font-weight="800" fill="#0f172a">Keep existing hosts current.</text>
+  <text x="98" y="426" font-family="Arial, 'Helvetica Neue', Helvetica, sans-serif" font-size="17" font-weight="500" fill="#475569">WatchTower checks running containers, pulls newer images,</text>
+  <text x="98" y="452" font-family="Arial, 'Helvetica Neue', Helvetica, sans-serif" font-size="17" font-weight="500" fill="#475569">restarts safely, and confirms health before it settles.</text>
 
   <rect x="98" y="500" width="176" height="108" rx="18" fill="#f8fafc" stroke="#1f2937" stroke-width="2"/>
-  <text x="124" y="540" font-family="'Space Mono', monospace" font-size="13" font-weight="700" fill="#0f172a">INPUT</text>
-  <text x="124" y="570" font-family="'DM Sans', Arial, sans-serif" font-size="18" font-weight="700" fill="#0f172a">Podman host</text>
-  <text x="124" y="594" font-family="'DM Sans', Arial, sans-serif" font-size="15" font-weight="500" fill="#475569">Running containers</text>
+  <text x="124" y="540" font-family="'Courier New', Courier, monospace" font-size="13" font-weight="700" fill="#0f172a">INPUT</text>
+  <text x="124" y="570" font-family="Arial, 'Helvetica Neue', Helvetica, sans-serif" font-size="18" font-weight="700" fill="#0f172a">Podman host</text>
+  <text x="124" y="594" font-family="Arial, 'Helvetica Neue', Helvetica, sans-serif" font-size="15" font-weight="500" fill="#475569">Running containers</text>
 
   <rect x="330" y="500" width="176" height="108" rx="18" fill="#f8fafc" stroke="#1f2937" stroke-width="2"/>
-  <text x="356" y="540" font-family="'Space Mono', monospace" font-size="13" font-weight="700" fill="#0f172a">ENGINE</text>
-  <text x="356" y="570" font-family="'DM Sans', Arial, sans-serif" font-size="18" font-weight="700" fill="#0f172a">Poll + restart</text>
-  <text x="356" y="594" font-family="'DM Sans', Arial, sans-serif" font-size="15" font-weight="500" fill="#475569">Scheduled update loop</text>
+  <text x="356" y="540" font-family="'Courier New', Courier, monospace" font-size="13" font-weight="700" fill="#0f172a">ENGINE</text>
+  <text x="356" y="570" font-family="Arial, 'Helvetica Neue', Helvetica, sans-serif" font-size="18" font-weight="700" fill="#0f172a">Poll + restart</text>
+  <text x="356" y="594" font-family="Arial, 'Helvetica Neue', Helvetica, sans-serif" font-size="15" font-weight="500" fill="#475569">Scheduled update loop</text>
 
   <rect x="562" y="500" width="176" height="108" rx="18" fill="#ecfdf5" stroke="#10b981" stroke-width="2"/>
-  <text x="588" y="540" font-family="'Space Mono', monospace" font-size="13" font-weight="700" fill="#047857">SAFE EXIT</text>
-  <text x="588" y="570" font-family="'DM Sans', Arial, sans-serif" font-size="18" font-weight="700" fill="#0f172a">Healthy service</text>
-  <text x="588" y="594" font-family="'DM Sans', Arial, sans-serif" font-size="15" font-weight="500" fill="#475569">Rollback on failure</text>
+  <text x="588" y="540" font-family="'Courier New', Courier, monospace" font-size="13" font-weight="700" fill="#047857">SAFE EXIT</text>
+  <text x="588" y="570" font-family="Arial, 'Helvetica Neue', Helvetica, sans-serif" font-size="18" font-weight="700" fill="#0f172a">Healthy service</text>
+  <text x="588" y="594" font-family="Arial, 'Helvetica Neue', Helvetica, sans-serif" font-size="15" font-weight="500" fill="#475569">Rollback on failure</text>
 
   <line x1="274" y1="554" x2="330" y2="554" stroke="#1f2937" stroke-width="4" stroke-linecap="round"/>
   <polygon points="318,543 342,554 318,565" fill="#1f2937"/>
@@ -46,31 +46,31 @@
   <polygon points="550,543 574,554 550,565" fill="#1f2937"/>
 
   <rect x="98" y="656" width="640" height="146" rx="18" fill="#fffdf7" stroke="#1f2937" stroke-width="2"/>
-  <text x="130" y="696" font-family="'DM Sans', Arial, sans-serif" font-size="20" font-weight="800" fill="#0f172a">When to use it</text>
-  <text x="130" y="728" font-family="'DM Sans', Arial, sans-serif" font-size="17" font-weight="500" fill="#475569">Use this when your release process already exists and you only want</text>
-  <text x="130" y="754" font-family="'DM Sans', Arial, sans-serif" font-size="17" font-weight="500" fill="#475569">container image updates, health checks, and low-touch host maintenance.</text>
+  <text x="130" y="696" font-family="Arial, 'Helvetica Neue', Helvetica, sans-serif" font-size="20" font-weight="800" fill="#0f172a">When to use it</text>
+  <text x="130" y="728" font-family="Arial, 'Helvetica Neue', Helvetica, sans-serif" font-size="17" font-weight="500" fill="#475569">Use this when your release process already exists and you only want</text>
+  <text x="130" y="754" font-family="Arial, 'Helvetica Neue', Helvetica, sans-serif" font-size="17" font-weight="500" fill="#475569">container image updates, health checks, and low-touch host maintenance.</text>
 
   <rect x="828" y="270" width="708" height="564" rx="22" fill="#ffffff" stroke="#1f2937" stroke-width="2" filter="url(#cs)"/>
   <rect x="862" y="302" width="210" height="32" rx="16" fill="#fde68a" stroke="#1f2937" stroke-width="1.5" filter="url(#ps)"/>
-  <text x="876" y="323" font-family="'DM Sans', Arial, sans-serif" font-size="15" font-weight="700" fill="#7f1d1d">Mode 2 · App Center</text>
-  <text x="862" y="388" font-family="'DM Sans', Arial, sans-serif" font-size="30" font-weight="800" fill="#0f172a">Ship apps across multiple nodes.</text>
-  <text x="862" y="426" font-family="'DM Sans', Arial, sans-serif" font-size="17" font-weight="500" fill="#475569">Register workloads once, package them from a workstation,</text>
-  <text x="862" y="452" font-family="'DM Sans', Arial, sans-serif" font-size="17" font-weight="500" fill="#475569">then deploy, preview, and promote from one operator view.</text>
+  <text x="876" y="323" font-family="Arial, 'Helvetica Neue', Helvetica, sans-serif" font-size="15" font-weight="700" fill="#7f1d1d">Mode 2 · App Center</text>
+  <text x="862" y="388" font-family="Arial, 'Helvetica Neue', Helvetica, sans-serif" font-size="30" font-weight="800" fill="#0f172a">Ship apps across multiple nodes.</text>
+  <text x="862" y="426" font-family="Arial, 'Helvetica Neue', Helvetica, sans-serif" font-size="17" font-weight="500" fill="#475569">Register workloads once, package them from a workstation,</text>
+  <text x="862" y="452" font-family="Arial, 'Helvetica Neue', Helvetica, sans-serif" font-size="17" font-weight="500" fill="#475569">then deploy, preview, and promote from one operator view.</text>
 
   <rect x="862" y="500" width="176" height="108" rx="18" fill="#f8fafc" stroke="#1f2937" stroke-width="2"/>
-  <text x="888" y="540" font-family="'Space Mono', monospace" font-size="13" font-weight="700" fill="#0f172a">INPUT</text>
-  <text x="888" y="570" font-family="'DM Sans', Arial, sans-serif" font-size="18" font-weight="700" fill="#0f172a">Apps registry</text>
-  <text x="888" y="594" font-family="'DM Sans', Arial, sans-serif" font-size="15" font-weight="500" fill="#475569">Named workloads</text>
+  <text x="888" y="540" font-family="'Courier New', Courier, monospace" font-size="13" font-weight="700" fill="#0f172a">INPUT</text>
+  <text x="888" y="570" font-family="Arial, 'Helvetica Neue', Helvetica, sans-serif" font-size="18" font-weight="700" fill="#0f172a">Apps registry</text>
+  <text x="888" y="594" font-family="Arial, 'Helvetica Neue', Helvetica, sans-serif" font-size="15" font-weight="500" fill="#475569">Named workloads</text>
 
   <rect x="1094" y="500" width="176" height="108" rx="18" fill="#f8fafc" stroke="#1f2937" stroke-width="2"/>
-  <text x="1120" y="540" font-family="'Space Mono', monospace" font-size="13" font-weight="700" fill="#0f172a">ENGINE</text>
-  <text x="1120" y="570" font-family="'DM Sans', Arial, sans-serif" font-size="18" font-weight="700" fill="#0f172a">Package + sync</text>
-  <text x="1120" y="594" font-family="'DM Sans', Arial, sans-serif" font-size="15" font-weight="500" fill="#475569">SSH-based rollout</text>
+  <text x="1120" y="540" font-family="'Courier New', Courier, monospace" font-size="13" font-weight="700" fill="#0f172a">ENGINE</text>
+  <text x="1120" y="570" font-family="Arial, 'Helvetica Neue', Helvetica, sans-serif" font-size="18" font-weight="700" fill="#0f172a">Package + sync</text>
+  <text x="1120" y="594" font-family="Arial, 'Helvetica Neue', Helvetica, sans-serif" font-size="15" font-weight="500" fill="#475569">SSH-based rollout</text>
 
   <rect x="1326" y="500" width="176" height="108" rx="18" fill="#eff6ff" stroke="#2563eb" stroke-width="2"/>
-  <text x="1352" y="540" font-family="'Space Mono', monospace" font-size="13" font-weight="700" fill="#1d4ed8">OUTCOME</text>
-  <text x="1352" y="570" font-family="'DM Sans', Arial, sans-serif" font-size="18" font-weight="700" fill="#0f172a">Live app</text>
-  <text x="1352" y="594" font-family="'DM Sans', Arial, sans-serif" font-size="15" font-weight="500" fill="#475569">Preview or production</text>
+  <text x="1352" y="540" font-family="'Courier New', Courier, monospace" font-size="13" font-weight="700" fill="#1d4ed8">OUTCOME</text>
+  <text x="1352" y="570" font-family="Arial, 'Helvetica Neue', Helvetica, sans-serif" font-size="18" font-weight="700" fill="#0f172a">Live app</text>
+  <text x="1352" y="594" font-family="Arial, 'Helvetica Neue', Helvetica, sans-serif" font-size="15" font-weight="500" fill="#475569">Preview or production</text>
 
   <line x1="1038" y1="554" x2="1094" y2="554" stroke="#1f2937" stroke-width="4" stroke-linecap="round"/>
   <polygon points="1082,543 1106,554 1082,565" fill="#1f2937"/>
@@ -78,7 +78,7 @@
   <polygon points="1314,543 1338,554 1314,565" fill="#1f2937"/>
 
   <rect x="862" y="656" width="640" height="146" rx="18" fill="#fffdf7" stroke="#1f2937" stroke-width="2"/>
-  <text x="894" y="696" font-family="'DM Sans', Arial, sans-serif" font-size="20" font-weight="800" fill="#0f172a">When to use it</text>
-  <text x="894" y="728" font-family="'DM Sans', Arial, sans-serif" font-size="17" font-weight="500" fill="#475569">Use this when WatchTower should behave like a lightweight deployment</text>
-  <text x="894" y="754" font-family="'DM Sans', Arial, sans-serif" font-size="17" font-weight="500" fill="#475569">control plane for websites, APIs, previews, blue-green slots, and teams.</text>
+  <text x="894" y="696" font-family="Arial, 'Helvetica Neue', Helvetica, sans-serif" font-size="20" font-weight="800" fill="#0f172a">When to use it</text>
+  <text x="894" y="728" font-family="Arial, 'Helvetica Neue', Helvetica, sans-serif" font-size="17" font-weight="500" fill="#475569">Use this when WatchTower should behave like a lightweight deployment</text>
+  <text x="894" y="754" font-family="Arial, 'Helvetica Neue', Helvetica, sans-serif" font-size="17" font-weight="500" fill="#475569">control plane for websites, APIs, previews, blue-green slots, and teams.</text>
 </svg>
