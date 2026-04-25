@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  watchtower:
+    # Build from local source (default for contributors).
+    # Override WATCHTOWER_IMAGE to pin a published GHCR tag if preferred.
+    image: ${WATCHTOWER_IMAGE:-ghcr.io/sinhaankur/watchtower:latest}
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: watchtower-app
+    init: true
+    security_opt:
+      - no-new-privileges:true
+    ports:
+      - "${WATCHTOWER_PORT:-8000}:8000"
+    environment:
+      WATCHTOWER_HOST: 0.0.0.0
+      WATCHTOWER_PORT: 8000
+      # Persist app data in a Docker volume instead of inside the container.
+      DATABASE_URL: ${DATABASE_URL:-sqlite:////data/watchtower.db}
+      WATCHTOWER_API_TOKEN: ${WATCHTOWER_API_TOKEN:-watchtower-dev-token}
+      WATCHTOWER_DEFAULT_USER_EMAIL: ${WATCHTOWER_DEFAULT_USER_EMAIL:-developer@watchtower.local}
+      WATCHTOWER_DEFAULT_USER_NAME: ${WATCHTOWER_DEFAULT_USER_NAME:-WatchTower Developer}
+      WATCHTOWER_INSTALL_OWNER_MODE: ${WATCHTOWER_INSTALL_OWNER_MODE:-false}
+      WATCHTOWER_ALLOW_INSECURE_DEV_AUTH: ${WATCHTOWER_ALLOW_INSECURE_DEV_AUTH:-false}
+    volumes:
+      - watchtower_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 25s
+    restart: unless-stopped
+    stop_grace_period: 25s
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  watchtower_data:
