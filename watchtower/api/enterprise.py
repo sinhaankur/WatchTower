@@ -13,13 +13,14 @@ from urllib.parse import urlencode
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from typing import List, Optional
 from uuid import UUID
 from datetime import datetime
 import requests
 
 from watchtower.database import (
-    get_db, Organization, User, GitHubConnection, TeamMember, OrgNode,
+    get_db, Organization, User, GitHubConnection, TeamMember, OrgNode, InstallationClaim,
     NodeNetwork, NodeNetworkMember, Project, NodeStatus, TeamRole, GitHubProvider
 )
 from watchtower import schemas_enterprise as schemas
@@ -27,6 +28,11 @@ from watchtower.api import util
 
 router = APIRouter(prefix="/api", tags=["Enterprise"])
 logger = logging.getLogger(__name__)
+
+
+def _owner_mode_enabled() -> bool:
+    raw = os.getenv("WATCHTOWER_INSTALL_OWNER_MODE", "true").lower()
+    return raw not in {"0", "false", "no", "off"}
 
 
 @router.get("/auth/status")
@@ -70,11 +76,44 @@ async def auth_status():
             if oauth_client_id and oauth_client_secret
             else "api_token"
         ),
+        "installation": {
+            "owner_mode_enabled": _owner_mode_enabled(),
+        },
     }
 
 
 def _current_user_uuid(current_user: dict) -> UUID:
     return UUID(str(current_user["user_id"]))
+
+
+def _role_value(role) -> str:
+    return role.value if hasattr(role, "value") else str(role)
+
+
+def _is_owner_or_admin(member: TeamMember) -> bool:
+    return _role_value(member.role) in {"owner", "admin"}
+
+
+def _get_installation_claim(db: Session) -> Optional[InstallationClaim]:
+    return db.query(InstallationClaim).order_by(InstallationClaim.claimed_at.asc()).first()
+
+
+def _claim_installation_if_needed(db: Session, user: User) -> Optional[InstallationClaim]:
+    if not _owner_mode_enabled():
+        return None
+
+    claim = _get_installation_claim(db)
+    if claim:
+        return claim
+
+    claim = InstallationClaim(
+        owner_user_id=user.id,
+        owner_github_id=user.github_id,
+        owner_login=(user.name or user.email or "owner"),
+    )
+    db.add(claim)
+    db.flush()
+    return claim
 
 
 def _ensure_user_org_member(db: Session, current_user: dict):
@@ -89,6 +128,67 @@ def _ensure_user_org_member(db: Session, current_user: dict):
         )
         db.add(user)
         db.flush()
+
+    if _owner_mode_enabled():
+        claim = _claim_installation_if_needed(db, user)
+        owner_user_id = claim.owner_user_id
+        owner_user = db.query(User).filter(User.id == owner_user_id).first()
+
+        org = db.query(Organization).filter(Organization.owner_id == owner_user_id).first()
+        if not org:
+            org_owner = owner_user or user
+            org = Organization(name=f"{org_owner.name} Organization", owner_id=owner_user_id)
+            db.add(org)
+            db.flush()
+
+        member = db.query(TeamMember).filter(
+            TeamMember.org_id == org.id,
+            TeamMember.user_id == user_id,
+        ).first()
+
+        if user_id == owner_user_id:
+            if not member:
+                member = TeamMember(
+                    org_id=org.id,
+                    user_id=user_id,
+                    email=user.email,
+                    role=TeamRole.OWNER,
+                    can_create_projects=True,
+                    can_manage_deployments=True,
+                    can_manage_nodes=True,
+                    can_manage_team=True,
+                    is_active=True,
+                )
+                db.add(member)
+                db.flush()
+        else:
+            if not member and user.email:
+                member = db.query(TeamMember).filter(
+                    TeamMember.org_id == org.id,
+                    TeamMember.user_id.is_(None),
+                    func.lower(TeamMember.email) == user.email.lower(),
+                ).first()
+                if member:
+                    member.user_id = user_id
+                    member.is_active = True
+                    member.joined_at = member.joined_at or datetime.utcnow()
+                    db.flush()
+
+            if not member or not member.is_active:
+                owner_label = claim.owner_login or "installation owner"
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=(
+                        f"This WatchTower installation is owned by {owner_label}. "
+                        "Ask an owner/admin to invite your account before accessing resources."
+                    ),
+                )
+
+        db.commit()
+        db.refresh(user)
+        db.refresh(org)
+        db.refresh(member)
+        return user, org, member
 
     org = db.query(Organization).filter(Organization.owner_id == user_id).first()
     if not org:
@@ -219,6 +319,14 @@ def _upsert_user_from_github_profile(db: Session, profile: dict):
 
 
 def _ensure_owner_membership(db: Session, user: User):
+    if _owner_mode_enabled():
+        claim = _claim_installation_if_needed(db, user)
+        if claim.owner_user_id != user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only the installation owner can create owner membership.",
+            )
+
     org = db.query(Organization).filter(Organization.owner_id == user.id).first()
     if not org:
         org = Organization(name=f"{user.name} Organization", owner_id=user.id)
@@ -295,6 +403,12 @@ async def get_enterprise_context(
 ):
     """Return the current user/org context used by team and node screens."""
     user, org, member = _ensure_user_org_member(db, current_user)
+    claim = _get_installation_claim(db)
+    primary_connection = db.query(GitHubConnection).filter(
+        GitHubConnection.org_id == org.id,
+        GitHubConnection.is_active == True,
+    ).order_by(GitHubConnection.is_primary.desc(), GitHubConnection.created_at.desc()).first()
+
     return {
         "user": {
             "id": str(user.id),
@@ -312,6 +426,60 @@ async def get_enterprise_context(
             "can_manage_nodes": member.can_manage_nodes,
             "can_manage_deployments": member.can_manage_deployments,
         },
+        "installation": {
+            "owner_mode_enabled": _owner_mode_enabled(),
+            "is_claimed": bool(claim),
+            "owner_user_id": str(claim.owner_user_id) if claim else None,
+            "owner_login": claim.owner_login if claim else None,
+            "is_owner": bool(claim and claim.owner_user_id == user.id),
+        },
+        "github_connection": {
+            "connected": bool(primary_connection),
+            "provider": primary_connection.provider.value if primary_connection else None,
+            "github_username": primary_connection.github_username if primary_connection else None,
+            "managed_by_user_id": str(primary_connection.user_id) if primary_connection else None,
+            "last_synced": primary_connection.last_synced if primary_connection else None,
+        },
+    }
+
+
+@router.get("/auth/ownership", response_model=schemas.InstallationOwnerResponse)
+async def get_installation_ownership(
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(util.get_current_user)
+):
+    user, _org, _member = _ensure_user_org_member(db, current_user)
+    claim = _get_installation_claim(db)
+    return {
+        "owner_user_id": claim.owner_user_id if claim else None,
+        "owner_login": claim.owner_login if claim else None,
+        "owner_github_id": claim.owner_github_id if claim else None,
+        "claimed_at": claim.claimed_at if claim else None,
+        "github_connected_at": claim.github_connected_at if claim else None,
+        "is_claimed": bool(claim),
+        "is_owner": bool(claim and claim.owner_user_id == user.id),
+        "owner_mode_enabled": _owner_mode_enabled(),
+    }
+
+
+@router.get("/auth/github/managed-status")
+async def get_managed_github_status(
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(util.get_current_user)
+):
+    user, org, _member = _ensure_user_org_member(db, current_user)
+    connection = db.query(GitHubConnection).filter(
+        GitHubConnection.org_id == org.id,
+        GitHubConnection.is_active == True,
+    ).order_by(GitHubConnection.is_primary.desc(), GitHubConnection.created_at.desc()).first()
+    return {
+        "connected": bool(connection),
+        "org_id": str(org.id),
+        "provider": connection.provider.value if connection else None,
+        "github_username": connection.github_username if connection else None,
+        "connected_by_user_id": str(connection.user_id) if connection else None,
+        "is_connected_by_current_user": bool(connection and connection.user_id == user.id),
+        "last_synced": connection.last_synced if connection else None,
     }
 
 
@@ -409,15 +577,18 @@ async def github_login_oauth_callback(
 
     profile = profile_resp.json()
     user = _upsert_user_from_github_profile(db, profile)
-    org = _ensure_owner_membership(db, user)
-    db.commit()
-    db.refresh(user)
-    db.refresh(org)
+    user_payload = {
+        "user_id": str(user.id),
+        "email": user.email,
+        "name": user.name,
+    }
+    user, org, _member = _ensure_user_org_member(db, user_payload)
 
     session_token = util.create_user_session_token(
         user_id=str(user.id),
         email=user.email,
         name=user.name,
+        github_id=user.github_id,
     )
 
     return {
@@ -546,6 +717,12 @@ async def github_oauth_callback(
         existing.enterprise_name = payload.enterprise_name
         existing.is_active = True
         existing.last_synced = datetime.utcnow()
+        claim = _get_installation_claim(db)
+        if claim and claim.owner_user_id == user_id:
+            owner_user = db.query(User).filter(User.id == user_id).first()
+            claim.owner_github_id = owner_user.github_id if owner_user else None
+            claim.owner_login = github_username
+            claim.github_connected_at = datetime.utcnow()
         db.commit()
         db.refresh(existing)
         return existing
@@ -567,6 +744,12 @@ async def github_oauth_callback(
         last_synced=datetime.utcnow(),
     )
     db.add(connection)
+    claim = _get_installation_claim(db)
+    if claim and claim.owner_user_id == user_id:
+        owner_user = db.query(User).filter(User.id == user_id).first()
+        claim.owner_github_id = owner_user.github_id if owner_user else None
+        claim.owner_login = github_username
+        claim.github_connected_at = datetime.utcnow()
     db.commit()
     db.refresh(connection)
     return connection
@@ -625,7 +808,7 @@ async def add_github_connection(
         TeamMember.user_id == user_id
     ).first()
     
-    if not member or member.role not in ["owner", "admin"]:
+    if not member or not _is_owner_or_admin(member):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only admins can add connections")
     
     try:
@@ -730,7 +913,7 @@ async def invite_team_member(
         TeamMember.user_id == user_id
     ).first()
     
-    if not current_member or current_member.role not in ["owner", "admin"]:
+    if not current_member or not _is_owner_or_admin(current_member):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only admins can invite members")
     
     try:
@@ -779,7 +962,7 @@ async def update_team_member(
         TeamMember.user_id == user_id
     ).first()
     
-    if not current_member or current_member.role not in ["owner", "admin"]:
+    if not current_member or not _is_owner_or_admin(current_member):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only admins can update members")
     
     # Update fields
@@ -847,7 +1030,9 @@ async def add_org_node(
             ssh_key_path=node_data.ssh_key_path,
             reload_command=node_data.reload_command,
             is_primary=node_data.is_primary,
-            max_concurrent_deployments=node_data.max_concurrent_deployments
+            max_concurrent_deployments=node_data.max_concurrent_deployments,
+            created_by_user_id=user_id,
+            updated_by_user_id=user_id,
         )
         
         db.add(node)
@@ -904,6 +1089,7 @@ async def update_org_node(
         node.max_concurrent_deployments = update_data.max_concurrent_deployments
     if update_data.is_active is not None:
         node.is_active = update_data.is_active
+    node.updated_by_user_id = user_id
     
     db.commit()
     db.refresh(node)
