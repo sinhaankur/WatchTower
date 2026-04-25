@@ -1,9 +1,13 @@
 FROM python:3.12-slim-bookworm
 
+LABEL org.opencontainers.image.title="Wt" \
+    org.opencontainers.image.description="Wt deployment control plane with Podman and App Center workflows" \
+    org.opencontainers.image.source="https://github.com/sinhaankur/WatchTower"
+
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
-RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     rsync \
     openssh-client \
