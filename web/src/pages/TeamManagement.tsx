@@ -197,6 +197,59 @@ const TeamManagement = () => {
     }
   };
 
+  const [patToken, setPatToken] = useState('');
+  const [patUsername, setPatUsername] = useState('');
+  const [patEnterpriseUrl, setPatEnterpriseUrl] = useState('');
+  const [patProvider, setPatProvider] = useState<'github_com' | 'github_enterprise'>('github_com');
+  const [savingPat, setSavingPat] = useState(false);
+
+  const savePat = async () => {
+    if (!orgId || !patToken.trim() || !patUsername.trim()) {
+      setActionError('GitHub username and personal access token are both required.');
+      return;
+    }
+    setSavingPat(true);
+    setActionError('');
+    setActionSuccess('');
+    try {
+      await apiClient.post(`/orgs/${orgId}/github-connections`, {
+        provider: patProvider,
+        github_username: patUsername.trim(),
+        github_access_token: patToken.trim(),
+        enterprise_url: patProvider === 'github_enterprise' ? patEnterpriseUrl.trim() || undefined : undefined,
+        enterprise_name: patProvider === 'github_enterprise' ? patEnterpriseUrl.trim() || undefined : undefined,
+        is_primary: connections.length === 0,
+      });
+      setActionSuccess('Personal access token saved. Private repository deploys will now authenticate with this token.');
+      setPatToken('');
+      setPatUsername('');
+      setPatEnterpriseUrl('');
+      await refreshData(orgId);
+    } catch (err: any) {
+      const detail = err?.response?.data?.detail;
+      setActionError(
+        detail
+          ? `Could not save token: ${detail}`
+          : 'Could not save token. The server may need WATCHTOWER_SECRET_KEY configured to encrypt secrets, or you may not have admin permissions.',
+      );
+    } finally {
+      setSavingPat(false);
+    }
+  };
+
+  const removeConnection = async (connectionId: string, label: string) => {
+    if (!window.confirm(`Remove the GitHub connection for ${label}?`)) return;
+    setActionError('');
+    setActionSuccess('');
+    try {
+      await apiClient.delete(`/github-connections/${connectionId}`);
+      setActionSuccess(`Removed connection for ${label}.`);
+      await refreshData(orgId);
+    } catch {
+      setActionError('Failed to remove connection.');
+    }
+  };
+
   return (
     <div className="flex-1 overflow-auto">
       <header className="electron-card-solid electron-divider border-b sticky top-0 z-10 backdrop-blur-sm">
@@ -335,6 +388,65 @@ const TeamManagement = () => {
               </div>
               <p className="text-xs text-gray-400">You'll be redirected to GitHub to authorize access.</p>
 
+              <div className="border-t border-dashed border-gray-200 pt-3 mt-3 space-y-2">
+                <div>
+                  <p className="text-xs font-semibold text-gray-700">Or paste a Personal Access Token</p>
+                  <p className="text-[11px] text-gray-500 mt-0.5">
+                    The fastest way to enable private repository deploys. Token is encrypted at rest and only used to
+                    clone your repos. Required scopes: <code className="text-[10px]">repo</code>.
+                    {' '}
+                    <a
+                      href="https://github.com/settings/tokens/new?scopes=repo&description=WatchTower"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-600 hover:underline"
+                    >
+                      Generate one →
+                    </a>
+                  </p>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <select
+                    value={patProvider}
+                    onChange={(e) => setPatProvider(e.target.value as 'github_com' | 'github_enterprise')}
+                    className="text-xs border border-slate-300 rounded-md h-9 px-2 bg-white text-slate-900 focus:outline-none focus:ring-1 focus:ring-red-600"
+                  >
+                    <option value="github_com">GitHub.com</option>
+                    <option value="github_enterprise">GitHub Enterprise</option>
+                  </select>
+                  <Input
+                    placeholder="GitHub username"
+                    value={patUsername}
+                    onChange={(e) => setPatUsername(e.target.value)}
+                    className="text-xs h-9 rounded-md"
+                  />
+                </div>
+                {patProvider === 'github_enterprise' && (
+                  <Input
+                    placeholder="https://github.your-company.com"
+                    value={patEnterpriseUrl}
+                    onChange={(e) => setPatEnterpriseUrl(e.target.value)}
+                    className="text-xs h-9 rounded-md"
+                  />
+                )}
+                <Input
+                  type="password"
+                  placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
+                  value={patToken}
+                  onChange={(e) => setPatToken(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && void savePat()}
+                  className="text-xs h-9 rounded-md font-mono"
+                  autoComplete="new-password"
+                />
+                <Button
+                  onClick={() => void savePat()}
+                  disabled={savingPat || offlineMode || !orgId || !patToken.trim() || !patUsername.trim()}
+                  className="w-full bg-slate-900 text-white hover:bg-slate-800 rounded-md text-sm h-9"
+                >
+                  {savingPat ? 'Saving…' : 'Save Personal Access Token'}
+                </Button>
+              </div>
+
               {connections.length === 0 && !loading && (
                 <div className="py-4 text-center border border-dashed border-gray-200">
                   <p className="text-xs text-gray-400">No GitHub accounts connected yet.</p>
@@ -350,9 +462,17 @@ const TeamManagement = () => {
                         {conn.is_primary && <span className="ml-2 text-blue-600">· Primary</span>}
                       </p>
                     </div>
-                    <span className={`text-xs px-2 py-0.5 border rounded-full shrink-0 ${conn.is_active ? 'bg-green-50 text-green-700 border-green-200' : 'bg-gray-100 text-gray-400 border-gray-200'}`}>
-                      {conn.is_active ? 'Active' : 'Inactive'}
-                    </span>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className={`text-xs px-2 py-0.5 border rounded-full ${conn.is_active ? 'bg-green-50 text-green-700 border-green-200' : 'bg-gray-100 text-gray-400 border-gray-200'}`}>
+                        {conn.is_active ? 'Active' : 'Inactive'}
+                      </span>
+                      <button
+                        onClick={() => void removeConnection(conn.id, `@${conn.github_username}`)}
+                        className="text-xs px-2 py-1 rounded border border-red-200 text-red-600 hover:bg-red-50 transition-colors"
+                      >
+                        Remove
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
