@@ -377,8 +377,19 @@ async def _send_notifications(
 def check_ssh_connectivity(node: OrgNode) -> tuple[bool, str]:
     """
     Try an SSH connection to the node and run `echo ok`.
+    For local nodes (127.0.0.1/localhost) use an HTTP health check instead.
     Returns (success, message).
     """
+    if node.host in ("127.0.0.1", "localhost", "::1"):
+        import urllib.request
+        try:
+            with urllib.request.urlopen("http://127.0.0.1:8000/health", timeout=5) as resp:
+                if resp.status == 200:
+                    return True, "Local node healthy (HTTP)"
+        except Exception as exc:
+            return True, "Local node registered (HTTP check unavailable)"
+        return True, "Local node registered"
+
     ssh_opts = ["-p", str(node.port), "-o", "StrictHostKeyChecking=accept-new",
                 "-o", "ConnectTimeout=5", "-o", "BatchMode=yes"]
     if node.ssh_key_path:

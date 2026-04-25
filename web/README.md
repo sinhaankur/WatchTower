@@ -4,6 +4,20 @@
 
 React + TypeScript dashboard for WatchTower deployment platform.
 
+## 🔗 Integration Stack
+
+WatchTower's power comes from integrating with a complete stack:
+
+```
+Podman → Nginx → Tailscale → Cloudflare → Coolify → WatchTower Watchdog
+```
+
+The **Integrations** page (`/integrations`) shows:
+- ✅ Live connection status for Docker, Podman, Coolify, Tailscale, Cloudflare, Nginx
+- 🔄 Podman Watchdog toggle — auto-restart containers after reboot
+- 📋 Install commands for each tool
+- 🔗 How they all work together
+
 ## Project Structure
 
 ```
