@@ -314,6 +314,10 @@
     .markdown-panel {
       padding: 20px;
     }
+
+    .markdown-panel {
+      overflow: hidden;
+    }
     .toc h3,
     .markdown-panel h3 {
       margin: 0 0 12px;
@@ -389,6 +393,8 @@
     }
     .markdown-body table {
       width: 100%;
+      display: block;
+      overflow-x: auto;
       border-collapse: collapse;
       margin: 1rem 0;
       font-size: 0.9rem;
@@ -437,6 +443,8 @@
       height: auto;
       border-radius: 12px;
       border: 1px solid var(--wt-border-soft);
+      background: #fffdf7;
+      padding: 6px;
     }
 
     @media (max-width: 980px) {
@@ -452,18 +460,51 @@
         border-right: 0;
         border-bottom: 1px solid var(--wt-border-soft);
       }
+      .sidebar-nav {
+        flex-direction: row;
+        overflow-x: auto;
+        overflow-y: hidden;
+        padding-bottom: 12px;
+        scrollbar-width: thin;
+      }
+      .nav-link {
+        flex: 0 0 auto;
+        white-space: nowrap;
+      }
       .topbar,
       .content { padding-left: 18px; padding-right: 18px; }
-      .topbar { flex-direction: column; align-items: flex-start; }
+      .topbar {
+        position: relative;
+        flex-direction: column;
+        align-items: flex-start;
+      }
       .hero,
       .toc,
       .markdown-panel { padding: 18px; }
+      .doc-layout { gap: 14px; }
     }
     @media (max-width: 640px) {
       .actions { flex-direction: column; }
       .primary-button,
       .secondary-button,
       .ghost-button { width: 100%; }
+      .content {
+        padding-top: 18px;
+        padding-bottom: 28px;
+      }
+      .hero h2 {
+        font-size: 1.7rem;
+        line-height: 1.08;
+      }
+      .hero,
+      .toc,
+      .markdown-panel,
+      .doc-nav-card { padding: 16px; }
+      .doc-nav-title { font-size: 0.95rem; }
+      .markdown-body { font-size: 0.93rem; }
+      .markdown-body h1 { font-size: 1.7rem; }
+      .markdown-body h2 { font-size: 1.28rem; }
+      .markdown-body pre { font-size: 0.78rem; }
     }
   </style>
 </head>
