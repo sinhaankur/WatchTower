@@ -35,6 +35,25 @@ def _owner_mode_enabled() -> bool:
     return raw not in {"0", "false", "no", "off"}
 
 
+# Public OAuth Client ID baked into shipped builds. Users do NOT need to
+# register their own OAuth app — they only need to authorize this one via
+# GitHub Device Flow (no client secret required).
+# Override with WATCHTOWER_GITHUB_DEVICE_CLIENT_ID env var if you publish
+# your own fork. The Client ID is intentionally public — it's safe to embed.
+DEFAULT_DEVICE_CLIENT_ID = ""  # set in shipped builds, or via env
+
+
+def _device_flow_client_id() -> Optional[str]:
+    """Resolve the Client ID used for GitHub Device Flow (no secret needed)."""
+    return (
+        os.getenv("WATCHTOWER_GITHUB_DEVICE_CLIENT_ID")
+        or os.getenv("GITHUB_OAUTH_CLIENT_ID")
+        or os.getenv("GITHUB_CLIENT_ID")
+        or DEFAULT_DEVICE_CLIENT_ID
+        or None
+    )
+
+
 @router.get("/auth/status")
 async def auth_status():
     """Return current auth mode and OAuth readiness for UI diagnostics."""
@@ -51,6 +70,7 @@ async def auth_status():
         os.getenv("WATCHTOWER_ALLOW_INSECURE_DEV_AUTH", "false").lower()
         == "true"
     )
+    device_client_id = _device_flow_client_id()
 
     missing = []
     if not oauth_client_id:
@@ -60,10 +80,15 @@ async def auth_status():
             "GITHUB_OAUTH_CLIENT_SECRET or GITHUB_CLIENT_SECRET"
         )
 
+    device_flow_ready = bool(device_client_id)
+
     return {
         "oauth": {
             "github_configured": bool(oauth_client_id and oauth_client_secret),
             "missing": missing,
+        },
+        "device_flow": {
+            "github_configured": device_flow_ready,
         },
         "api_token": {
             "configured": api_token_set,
@@ -72,9 +97,9 @@ async def auth_status():
             "allow_insecure": insecure_dev_auth,
         },
         "recommended": (
-            "oauth"
-            if oauth_client_id and oauth_client_secret
-            else "api_token"
+            "device_flow"
+            if device_flow_ready
+            else ("oauth" if oauth_client_id and oauth_client_secret else "api_token")
         ),
         "installation": {
             "owner_mode_enabled": _owner_mode_enabled(),
@@ -655,6 +680,184 @@ async def github_login_oauth_callback(
             "id": str(user.id),
             "email": user.email,
             "name": user.name,
+        },
+        "organization": {
+            "id": str(org.id),
+            "name": org.name,
+        },
+    }
+
+
+# ---------------------------------------------------------------------------
+# GitHub Device Flow (no client secret required, no callback URL required).
+# Recommended for shipped desktop apps — works exactly like `gh auth login`.
+# Users do NOT register their own OAuth app; the publisher embeds one public
+# Client ID and every install of WatchTower uses it.
+# ---------------------------------------------------------------------------
+
+
+@router.post("/auth/github/device/start")
+async def start_github_device_flow():
+    """Begin GitHub Device Flow. Returns a user code + verification URL."""
+    client_id = _device_flow_client_id()
+    if not client_id:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=(
+                "GitHub Device Flow client id is not configured. Set "
+                "WATCHTOWER_GITHUB_DEVICE_CLIENT_ID or GITHUB_OAUTH_CLIENT_ID."
+            ),
+        )
+
+    try:
+        resp = requests.post(
+            "https://github.com/login/device/code",
+            headers={"Accept": "application/json"},
+            data={
+                "client_id": client_id,
+                "scope": "read:user user:email repo",
+            },
+            timeout=15,
+        )
+    except requests.RequestException as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Unable to reach GitHub device endpoint",
+        ) from exc
+
+    if resp.status_code >= 400:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"GitHub device endpoint error: {resp.text[:200]}",
+        )
+
+    data = resp.json()
+    return {
+        "device_code": data.get("device_code"),
+        "user_code": data.get("user_code"),
+        "verification_uri": data.get("verification_uri"),
+        "verification_uri_complete": data.get("verification_uri_complete"),
+        "expires_in": data.get("expires_in", 900),
+        "interval": max(int(data.get("interval", 5)), 1),
+    }
+
+
+class _DevicePollPayload:
+    pass
+
+
+from pydantic import BaseModel as _PydBaseModel  # local import to avoid top-level churn
+
+
+class DevicePollRequest(_PydBaseModel):
+    device_code: str
+
+
+@router.post("/auth/github/device/poll")
+async def poll_github_device_flow(
+    payload: DevicePollRequest,
+    db: Session = Depends(get_db),
+):
+    """Poll GitHub for device flow completion. Returns a session token on success."""
+    client_id = _device_flow_client_id()
+    if not client_id:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="GitHub Device Flow client id is not configured.",
+        )
+
+    try:
+        resp = requests.post(
+            "https://github.com/login/oauth/access_token",
+            headers={"Accept": "application/json"},
+            data={
+                "client_id": client_id,
+                "device_code": payload.device_code,
+                "grant_type": "urn:ietf:params:oauth:grant-type:device_code",
+            },
+            timeout=15,
+        )
+    except requests.RequestException as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Unable to reach GitHub token endpoint",
+        ) from exc
+
+    data = resp.json() if resp.headers.get("content-type", "").startswith("application/json") else {}
+    error = data.get("error")
+    if error:
+        # authorization_pending / slow_down / expired_token / access_denied
+        return {"status": error, "interval": data.get("interval")}
+
+    access_token = data.get("access_token")
+    if not access_token:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="GitHub did not return an access token",
+        )
+
+    profile_resp = requests.get(
+        "https://api.github.com/user",
+        headers={
+            "Accept": "application/json",
+            "Authorization": f"Bearer {access_token}",
+            "X-GitHub-Api-Version": "2022-11-28",
+        },
+        timeout=15,
+    )
+    if profile_resp.status_code >= 400:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Unable to fetch GitHub user profile",
+        )
+    profile = profile_resp.json()
+
+    # Try to fetch a primary verified email if the public profile didn't expose one
+    if not profile.get("email"):
+        try:
+            emails_resp = requests.get(
+                "https://api.github.com/user/emails",
+                headers={
+                    "Accept": "application/json",
+                    "Authorization": f"Bearer {access_token}",
+                    "X-GitHub-Api-Version": "2022-11-28",
+                },
+                timeout=10,
+            )
+            if emails_resp.ok:
+                emails = emails_resp.json() or []
+                primary = next(
+                    (e for e in emails if e.get("primary") and e.get("verified")),
+                    next((e for e in emails if e.get("verified")), None),
+                )
+                if primary and primary.get("email"):
+                    profile["email"] = primary["email"]
+        except requests.RequestException:
+            pass
+
+    user = _upsert_user_from_github_profile(db, profile)
+    user_payload = {
+        "user_id": str(user.id),
+        "email": user.email,
+        "name": user.name,
+    }
+    user, org, _member = _ensure_user_org_member(db, user_payload)
+
+    session_token = util.create_user_session_token(
+        user_id=str(user.id),
+        email=user.email,
+        name=user.name,
+        github_id=user.github_id,
+    )
+
+    return {
+        "status": "success",
+        "token": session_token,
+        "user": {
+            "id": str(user.id),
+            "email": user.email,
+            "name": user.name,
+            "github_login": profile.get("login"),
         },
         "organization": {
             "id": str(org.id),
