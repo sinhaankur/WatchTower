@@ -44,10 +44,10 @@ install_app() {
 
   mkdir -p /etc/watchtower
   if [[ ! -f /etc/watchtower/nodes.json ]]; then
-    cp "${INSTALL_DIR}/nodes.json" /etc/watchtower/nodes.json
+    cp "${INSTALL_DIR}/config/nodes.json" /etc/watchtower/nodes.json
   fi
   if [[ ! -f /etc/watchtower/apps.json ]]; then
-    cp "${INSTALL_DIR}/apps.json" /etc/watchtower/apps.json
+    cp "${INSTALL_DIR}/config/apps.json" /etc/watchtower/apps.json
   fi
   if [[ ! -f /etc/watchtower/appcenter.env ]]; then
     cat > /etc/watchtower/appcenter.env <<'EOF'

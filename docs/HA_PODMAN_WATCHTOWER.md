@@ -10,6 +10,12 @@ This guide implements a two-node Primary-Standby deployment across different phy
 - Watchtower: pulls new images from GHCR and restarts services on both nodes.
 - Failover: choose Cloudflare health-based DNS failover or host-level Keepalived VIP.
 
+Upstream Watchtower reference:
+
+- This HA mode uses the upstream container updater behavior from `containrrr/watchtower`.
+- For feature flags, scheduling behavior, notifications, and limitations, refer to:
+  https://github.com/containrrr/watchtower
+
 ## 1. Prerequisites
 
 Install on both nodes:

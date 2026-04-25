@@ -1,0 +1,4 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Wt logo">
+  <rect x="2" y="2" width="60" height="60" rx="11" fill="#fde68a" stroke="#0f172a" stroke-width="4"/>
+  <text x="32" y="39" text-anchor="middle" font-family="DM Sans, Arial, sans-serif" font-size="22" font-weight="800" fill="#b91c1c">Wt</text>
+</svg>

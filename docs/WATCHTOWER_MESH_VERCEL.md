@@ -4,9 +4,9 @@ This mode implements the closest practical equivalent to a self-hosted Vercel wo
 
 ## Visual Overview
 
-![WatchTower mesh topology](./assets/mesh-topology.svg)
+![WatchTower mesh topology](https://sinhaankur.github.io/WatchTower/assets/mesh-topology.svg)
 
-![WatchTower deployment process](./assets/deploy-process.svg)
+![WatchTower deployment process](https://sinhaankur.github.io/WatchTower/assets/deploy-process.svg)
 
 ## Architecture
 
