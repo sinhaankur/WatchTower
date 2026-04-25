@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import apiClient from '@/lib/api';
 import { Card, CardContent } from '@/components/ui/card';
@@ -46,7 +46,24 @@ const STEP_LABELS = ['Deployment', 'App Type', 'Repository', 'Finalize'];
 const SetupWizard = () => {
   const [step, setStep] = useState(1);
   const [submitting, setSubmitting] = useState(false);
+  const [hasNodes, setHasNodes] = useState<boolean | null>(null);
   const navigate = useNavigate();
+
+  // Check if any deployment nodes exist so we can warn before wasting the user's time
+  useEffect(() => {
+    const checkNodes = async () => {
+      try {
+        const ctxRes = await apiClient.get('/context');
+        const orgId = (ctxRes.data as any)?.organization?.id;
+        if (!orgId) { setHasNodes(false); return; }
+        const nodesRes = await apiClient.get(`/orgs/${orgId}/nodes`);
+        setHasNodes(((nodesRes.data as any[]) ?? []).length > 0);
+      } catch {
+        setHasNodes(null); // unknown — don't block
+      }
+    };
+    void checkNodes();
+  }, []);
 
   const [data, setData] = useState<WizardData>({
     source_type: 'github',
@@ -233,7 +250,25 @@ const SetupWizard = () => {
           {step === 1 && (
             <div className="electron-card rounded-xl p-6">
               <h2 className="text-lg font-semibold text-slate-900">Where will you deploy?</h2>
-              <p className="text-sm text-slate-600 mb-6">Select runtime ownership mode.</p>
+              <p className="text-sm text-slate-600 mb-4">Select runtime ownership mode.</p>
+
+              {/* No-nodes warning — only shown when self_hosted is selected and we know there are no nodes */}
+              {hasNodes === false && data.deployment_model === 'self_hosted' && (
+                <div className="mb-5 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm">
+                  <p className="font-semibold text-amber-900">⚠ No server nodes added yet</p>
+                  <p className="text-amber-800 mt-1 text-xs">
+                    You need at least one infrastructure node before WatchTower can deploy your app.
+                    You can still create the project now, but deployments will fail until you add a server.
+                  </p>
+                  <Link
+                    to="/servers"
+                    className="inline-block mt-2 text-xs font-medium text-amber-900 underline underline-offset-2 hover:text-amber-700"
+                  >
+                    → Add a server node first
+                  </Link>
+                </div>
+              )}
+
               <div className="space-y-3">
                 {([
                   { value: 'self_hosted', title: 'Self-Hosted', desc: 'Run WatchTower on your own servers.' },
@@ -417,6 +452,23 @@ const SetupWizard = () => {
         </section>
 
         <aside className="space-y-4">
+          {hasNodes === false && data.deployment_model === 'self_hosted' && (
+            <Card className="rounded-xl shadow-none border-amber-300 bg-amber-50">
+              <CardContent className="py-4">
+                <p className="text-xs font-semibold text-amber-900 mb-1">⚠ Server node required</p>
+                <p className="text-xs text-amber-800 mb-2">
+                  No deployment nodes are registered. Add one in Servers before deploying.
+                </p>
+                <Link
+                  to="/servers"
+                  className="text-xs font-medium text-amber-900 underline underline-offset-2 hover:text-amber-700"
+                >
+                  → Go to Servers
+                </Link>
+              </CardContent>
+            </Card>
+          )}
+
           <Card className="electron-card rounded-xl shadow-none">
             <CardContent className="py-4">
               <p className="text-xs font-semibold uppercase tracking-[0.16em] electron-accent">Next Steps</p>
