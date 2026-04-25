@@ -148,7 +148,7 @@ If your traffic is bursty or high-concurrency, increase pool size only after obs
 
 ## 3. Multi-Node Deployment Config
 
-The repository ships the node-side compose file as [docker-compose.hybrid.yml](/home/ankursinha/Documents/GitHub/WatchTower/docker-compose.hybrid.yml). This is the shared deployment config that both nodes run with Podman.
+The repository ships the node-side compose file as [docker-compose.hybrid.yml](../docker-compose.hybrid.yml). This is the shared deployment config that both nodes run with Podman.
 
 Its effective structure is:
 
@@ -227,7 +227,7 @@ This means a node failure does not require database promotion on the node itself
 
 ## 4. Automated GitHub Action
 
-The repository workflow at [.github/workflows/deploy.yml](/home/ankursinha/Documents/GitHub/WatchTower/.github/workflows/deploy.yml) now builds on pushes to `main` and publishes:
+The repository workflow at [.github/workflows/deploy.yml](../.github/workflows/deploy.yml) now builds on pushes to `main` and publishes:
 
 - `ghcr.io/<owner>/<repo>:latest`
 - `ghcr.io/<owner>/<repo>:<git-sha>`
