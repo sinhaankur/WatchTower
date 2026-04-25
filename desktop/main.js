@@ -9,48 +9,28 @@ const path = require('path');
 // ── GPU / Renderer stability flags ──────────────────────────────────────────
 // Must be set before app.whenReady().
 //
-// On Linux the correct flags depend on the display server and architecture:
+// On Linux the correct GPU strategy depends on display server and architecture:
 //
-//   ARM (Raspberry Pi) — VideoCore/V3D GPU has limited desktop-GL support.
-//              Force software rendering so Chromium uses SwiftShader (CPU).
-//              Electron still renders correctly; Pi 4/5 RAM is sufficient.
+//   Wayland  — each app has an isolated GPU context; no workarounds needed.
+//              Enable native Wayland window decorations and auto-select backend.
 //
-//   Wayland  — each app has an isolated GPU context; no sandbox workarounds
-//              needed. Enable native Wayland window decorations and let
-//              Chromium auto-select the best platform backend.
-//
-//   X11      — Electron apps share the GPU compositor. NVIDIA driver 500+
-//              with kernel 6.x causes the Chromium GPU sandbox process to
-//              crash with SIGSEGV, which also kills other Electron apps
-//              (e.g. VS Code) that share the same GPU compositor.
-//              Work around by running GPU in-process with no sandbox.
-//
-// Software-rendering fallback: set WATCHTOWER_NO_GPU=1 or pass --no-gpu.
+//   X11 / ARM / no-gpu — use SwiftShader software rendering via
+//              disableHardwareAcceleration(). NVIDIA driver 500+ on kernel 6.x
+//              crashes the Chromium GPU process (SIGSEGV in SharedImageStub)
+//              regardless of EGL/ANGLE/sandbox flags. SwiftShader is bundled
+//              in Electron, renders the UI correctly, and avoids the crash
+//              entirely. For a dashboard app the CPU rendering overhead is
+//              negligible. ARM (Pi) and headless also use this path.
 if (process.platform === 'linux') {
-  const isArm = process.arch === 'arm64' || process.arch === 'arm';
-
-  if (process.argv.includes('--no-gpu') || process.env.WATCHTOWER_NO_GPU === '1' || isArm) {
-    // Raspberry Pi / ARM: VideoCore GPU is incompatible with Chromium's desktop-GL
-    // path. SwiftShader (software) renders the UI correctly with zero GPU crashes.
-    // Also used as an explicit fallback for headless / broken-GPU environments.
-    app.disableHardwareAcceleration();
-  } else if (process.env.WAYLAND_DISPLAY) {
+  if (process.env.WAYLAND_DISPLAY && !process.argv.includes('--no-gpu') && process.env.WATCHTOWER_NO_GPU !== '1') {
     // Wayland: native GPU isolation — no sandbox workarounds needed.
     app.commandLine.appendSwitch('enable-features', 'WaylandWindowDecorations');
     app.commandLine.appendSwitch('ozone-platform-hint', 'auto');
   } else {
-    // X11 fallback: guard against NVIDIA 500+ / kernel 6.x sandbox crash.
-    // Run GPU in the browser process — avoids the sandbox fork that segfaults.
-    app.commandLine.appendSwitch('in-process-gpu');
-    // Use EGL directly — NOT ANGLE. ANGLE's GL backend creates "shared contexts
-    // for virtualization" (SharedImageStub) that fail on NVIDIA 500+ drivers
-    // with SIGSEGV. Direct EGL bypasses ANGLE entirely.
-    app.commandLine.appendSwitch('use-gl', 'egl');
-    // Disable GPU sandbox — causes SIGSEGV on new NVIDIA open drivers.
-    app.commandLine.appendSwitch('disable-gpu-sandbox');
-    // Disable compositing — reduces GPU memory pressure and avoids additional
-    // context creation paths that can SIGSEGV on broken drivers.
-    app.commandLine.appendSwitch('disable-gpu-compositing');
+    // X11, ARM, explicit --no-gpu / WATCHTOWER_NO_GPU=1:
+    // Use SwiftShader (CPU software renderer bundled in Electron).
+    // Avoids all GPU driver crashes on NVIDIA 500+ + kernel 6.x + X11.
+    app.disableHardwareAcceleration();
   }
 }
 
