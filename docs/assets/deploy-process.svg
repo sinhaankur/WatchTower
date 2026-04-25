@@ -1,0 +1,67 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" role="img" aria-label="WatchTower deployment process">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#fffaf0" />
+      <stop offset="100%" stop-color="#eef6ff" />
+    </linearGradient>
+    <style>
+      .title { font: 800 50px 'DM Sans', Arial, sans-serif; fill: #0f172a; }
+      .subtitle { font: 500 23px 'DM Sans', Arial, sans-serif; fill: #475569; }
+      .stepTitle { font: 800 26px 'DM Sans', Arial, sans-serif; fill: #0f172a; }
+      .stepCopy { font: 500 20px 'DM Sans', Arial, sans-serif; fill: #475569; }
+      .stepNo { font: 800 20px 'Space Mono', monospace; fill: #b91c1c; }
+      .eyebrow { font: 700 20px 'Space Mono', monospace; letter-spacing: 2px; fill: #b91c1c; }
+      .pill { font: 700 18px 'DM Sans', Arial, sans-serif; fill: #7f1d1d; }
+    </style>
+  </defs>
+  <rect width="1600" height="900" fill="url(#bg)" />
+  <circle cx="124" cy="130" r="120" fill="#fde68a" opacity="0.24" />
+  <circle cx="1490" cy="150" r="170" fill="#dbeafe" opacity="0.45" />
+
+  <text x="90" y="86" class="eyebrow">APP CENTER FLOW</text>
+  <text x="90" y="146" class="title">From repo change to live nodes in a visible pipeline.</text>
+  <text x="90" y="184" class="subtitle">This is the flow used for README and Pages documentation: package locally, transfer predictably, activate remotely, and confirm health.</text>
+
+  <rect x="90" y="235" width="1420" height="90" rx="26" fill="#ffffff" stroke="#1f2937" stroke-width="3" />
+  <rect x="120" y="260" width="340" height="40" rx="20" fill="#fde68a" stroke="#1f2937" stroke-width="2" />
+  <text x="145" y="286" class="pill">Developer → Control Plane → Package → SSH Sync → Activation</text>
+
+  <rect x="90" y="380" width="230" height="250" rx="26" fill="#ffffff" stroke="#1f2937" stroke-width="3" />
+  <rect x="380" y="380" width="230" height="250" rx="26" fill="#ffffff" stroke="#1f2937" stroke-width="3" />
+  <rect x="670" y="380" width="230" height="250" rx="26" fill="#ffffff" stroke="#1f2937" stroke-width="3" />
+  <rect x="960" y="380" width="230" height="250" rx="26" fill="#ffffff" stroke="#1f2937" stroke-width="3" />
+  <rect x="1250" y="380" width="230" height="250" rx="26" fill="#ffffff" stroke="#1f2937" stroke-width="3" />
+
+  <line x1="320" y1="505" x2="380" y2="505" stroke="#1f2937" stroke-width="4" stroke-linecap="round" />
+  <polygon points="366,494 388,505 366,516" fill="#1f2937" />
+  <line x1="610" y1="505" x2="670" y2="505" stroke="#1f2937" stroke-width="4" stroke-linecap="round" />
+  <polygon points="656,494 678,505 656,516" fill="#1f2937" />
+  <line x1="900" y1="505" x2="960" y2="505" stroke="#1f2937" stroke-width="4" stroke-linecap="round" />
+  <polygon points="946,494 968,505 946,516" fill="#1f2937" />
+  <line x1="1190" y1="505" x2="1250" y2="505" stroke="#1f2937" stroke-width="4" stroke-linecap="round" />
+  <polygon points="1236,494 1258,505 1236,516" fill="#1f2937" />
+
+  <text x="120" y="430" class="stepNo">STEP 01</text>
+  <text x="120" y="474" class="stepTitle">Select App</text>
+  <text x="120" y="516" class="stepCopy">Pick a named workload from apps.json or the dashboard.</text>
+
+  <text x="410" y="430" class="stepNo">STEP 02</text>
+  <text x="410" y="474" class="stepTitle">Package Build</text>
+  <text x="410" y="516" class="stepCopy">Create tar.gz or zip artifacts from the chosen source tree.</text>
+
+  <text x="700" y="430" class="stepNo">STEP 03</text>
+  <text x="700" y="474" class="stepTitle">SSH Transfer</text>
+  <text x="700" y="516" class="stepCopy">Sync release payloads and release metadata to selected nodes.</text>
+
+  <text x="990" y="430" class="stepNo">STEP 04</text>
+  <text x="990" y="474" class="stepTitle">Remote Activate</text>
+  <text x="990" y="516" class="stepCopy">Run build hooks, restart services, and switch live targets.</text>
+
+  <text x="1280" y="430" class="stepNo">STEP 05</text>
+  <text x="1280" y="474" class="stepTitle">Health Verify</text>
+  <text x="1280" y="516" class="stepCopy">Capture status and expose results back to operators.</text>
+
+  <rect x="90" y="690" width="1420" height="120" rx="26" fill="#fffdf7" stroke="#1f2937" stroke-width="3" />
+  <text x="130" y="740" class="stepTitle">Process outcome</text>
+  <text x="130" y="780" class="stepCopy">The same five-stage release narrative now has dedicated visuals for GitHub README and GitHub Pages, instead of relying on text-only setup instructions.</text>
+</svg>
