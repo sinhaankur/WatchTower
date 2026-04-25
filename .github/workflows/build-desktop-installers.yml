@@ -1,10 +1,12 @@
 name: Build Desktop Installers
 
+# Manual trigger only — tag-based release builds are handled by release.yml
 on:
   workflow_dispatch:
-  push:
-    tags:
-      - "v*"
+  pull_request:
+    paths:
+      - "desktop/**"
+      - "web/**"
 
 permissions:
   contents: read
@@ -18,43 +20,50 @@ jobs:
       matrix:
         include:
           - os: ubuntu-latest
-            args: --linux AppImage deb
+            eb_args: --linux AppImage deb
             artifact: watchtower-desktop-linux
           - os: macos-latest
-            args: --mac dmg zip
+            eb_args: --mac dmg zip
             artifact: watchtower-desktop-macos
           - os: windows-latest
-            args: --win nsis zip
+            eb_args: --win nsis zip
             artifact: watchtower-desktop-windows
 
-    defaults:
-      run:
-        working-directory: desktop
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      # ── Build web frontend first ──────────────────────────────────────────
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install web dependencies
+        run: npm --prefix web install
+
+      - name: Build frontend (web/dist)
+        run: npm --prefix web run build
+
+      # ── Build desktop ─────────────────────────────────────────────────────
+      - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
           cache-dependency-path: desktop/package-lock.json
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      - name: Install Pillow (for installer image generation)
+      - name: Install Pillow
         run: pip install Pillow
 
-      - name: Install dependencies
-        run: npm install
+      - name: Install desktop dependencies
+        run: npm --prefix desktop install
 
-      - name: Build installers
-        run: npm run dist -- ${{ matrix.args }}
+      - name: Build installers (no publish)
+        run: npm --prefix desktop run dist -- ${{ matrix.eb_args }}
 
       - name: Upload installer artifacts
         uses: actions/upload-artifact@v4

@@ -30,6 +30,14 @@ const Login = () => {
   const oauthReady = Boolean(authStatus?.oauth?.github_configured);
 
   useEffect(() => {
+    // Auto-login: Electron injects VITE_API_TOKEN into the Vite process at launch.
+    // If present, store it and go straight to the dashboard.
+    const injectedToken = (import.meta as any).env?.VITE_API_TOKEN as string | undefined;
+    if (injectedToken && injectedToken.trim()) {
+      localStorage.setItem('authToken', injectedToken.trim());
+      navigate('/', { replace: true });
+      return;
+    }
     const existing = localStorage.getItem('authToken');
     if (existing) {
       navigate('/', { replace: true });
@@ -41,7 +49,14 @@ const Login = () => {
       setStatusLoading(true);
       try {
         const resp = await apiClient.get('/auth/status');
-        setAuthStatus(resp.data as AuthStatus);
+        const status = resp.data as AuthStatus;
+        setAuthStatus(status);
+        // Auto-login when running locally with insecure dev auth enabled (browser/script mode)
+        if (status?.dev_auth?.allow_insecure && !localStorage.getItem('authToken')) {
+          const devToken = `dev-local-${Date.now()}`;
+          localStorage.setItem('authToken', devToken);
+          navigate('/', { replace: true });
+        }
       } catch {
         setAuthStatus(null);
       } finally {
@@ -50,7 +65,7 @@ const Login = () => {
     };
 
     void loadAuthStatus();
-  }, []);
+  }, [navigate]);
 
   const continueWithToken = async () => {
     const trimmed = tokenInput.trim();
@@ -93,7 +108,16 @@ const Login = () => {
         redirect_uri: redirectUri,
         next_path: nextPath,
       });
-      window.location.assign(`${loginUrl}?${params.toString()}`);
+      const oauthUrl = `${loginUrl}?${params.toString()}`;
+
+      // Inside Electron: open a popup BrowserWindow so the main window stays alive.
+      const electron = (window as any).electronAPI;
+      if (electron?.openOAuth) {
+        electron.openOAuth(oauthUrl);
+        setLoading(false);
+      } else {
+        window.location.assign(oauthUrl);
+      }
     } catch {
       setError('Unable to start GitHub login. Ensure GITHUB_OAUTH_CLIENT_ID/GITHUB_CLIENT_ID and GITHUB_OAUTH_CLIENT_SECRET/GITHUB_CLIENT_SECRET are configured on the API server.');
       setLoading(false);

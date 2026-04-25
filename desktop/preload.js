@@ -11,5 +11,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('wt:maximizeChange', listener);
     return () => ipcRenderer.off('wt:maximizeChange', listener);
   },
+  // Open the GitHub OAuth URL in a popup BrowserWindow (shared session).
+  openOAuth: (url) => ipcRenderer.send('wt:openOAuth', url),
+  // Signal main process that OAuth completed — close popup, reload main window.
+  oauthDone: () => ipcRenderer.send('wt:oauthDone'),
   platform: process.platform,
 });

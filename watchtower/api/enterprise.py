@@ -123,11 +123,21 @@ def _ensure_user_org_member(db: Session, current_user: dict):
 
 
 def _oauth_state_secret() -> str:
-    return (
+    secret = (
         os.getenv("WATCHTOWER_OAUTH_STATE_SECRET")
         or os.getenv("WATCHTOWER_API_TOKEN")
-        or "watchtower-oauth-dev-secret"
     )
+    if not secret:
+        if os.getenv("WATCHTOWER_ALLOW_INSECURE_DEV_AUTH", "false").lower() == "true":
+            import secrets as _secrets
+            secret = _secrets.token_hex(32)
+            os.environ["WATCHTOWER_OAUTH_STATE_SECRET"] = secret
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="OAuth state signing key is not configured.",
+            )
+    return secret
 
 
 def _sign_oauth_state(payload: dict) -> str:
