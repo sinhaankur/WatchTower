@@ -1,6 +1,16 @@
 'use strict';
 const { contextBridge, ipcRenderer } = require('electron');
 
+// Inject the per-launch API token into localStorage BEFORE React renders.
+// sendSync blocks until the main process replies, so the token is in place
+// before any useEffect runs — no race condition.
+try {
+  const token = ipcRenderer.sendSync('wt:getApiToken');
+  if (typeof token === 'string' && token) {
+    window.localStorage.setItem('authToken', token);
+  }
+} catch (_) { /* non-fatal */ }
+
 contextBridge.exposeInMainWorld('electronAPI', {
   minimize:   ()        => ipcRenderer.send('wt:minimize'),
   maximize:   ()        => ipcRenderer.send('wt:maximize'),
