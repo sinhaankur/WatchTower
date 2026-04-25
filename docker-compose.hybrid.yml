@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  app-server:
+    image: ${APP_IMAGE:?set APP_IMAGE in .env}
+    container_name: wt-app-${NODE_NAME:-node}
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      MONGODB_URI: ${MONGODB_URI:-}
+      MONGODB_URI_FILE: ${MONGODB_URI_FILE:-}
+      DATABASE_URL: ${DATABASE_URL:-}
+      DATABASE_URL_FILE: ${DATABASE_URL_FILE:-}
+      ATLAS_APP_NAME: ${ATLAS_APP_NAME:-watchtower-edge}
+      MONGO_MAX_POOL_SIZE: ${MONGO_MAX_POOL_SIZE:-}
+      MONGO_MIN_POOL_SIZE: ${MONGO_MIN_POOL_SIZE:-}
+      MONGO_MAX_IDLE_TIME_MS: ${MONGO_MAX_IDLE_TIME_MS:-}
+      MONGO_CONNECT_TIMEOUT_MS: ${MONGO_CONNECT_TIMEOUT_MS:-}
+      MONGO_SOCKET_TIMEOUT_MS: ${MONGO_SOCKET_TIMEOUT_MS:-}
+      MONGO_SERVER_SELECTION_TIMEOUT_MS: ${MONGO_SERVER_SELECTION_TIMEOUT_MS:-}
+      WATCHTOWER_API_TOKEN: ${WATCHTOWER_API_TOKEN:-}
+      WATCHTOWER_SECRET_KEY: ${WATCHTOWER_SECRET_KEY:-}
+    ports:
+      - "${APP_PORT:-8080}:80"
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+    restart: always
+
+  watchtower:
+    image: docker.io/containrrr/watchtower:latest
+    container_name: wt-updater-${NODE_NAME:-node}
+    volumes:
+      - ${XDG_RUNTIME_DIR}/podman/podman.sock:/var/run/docker.sock
+    environment:
+      WATCHTOWER_POLL_INTERVAL: ${WATCHTOWER_POLL_INTERVAL:-30}
+      WATCHTOWER_CLEANUP: "true"
+      WATCHTOWER_INCLUDE_STOPPED: "false"
+      WATCHTOWER_LABEL_ENABLE: "true"
+      WATCHTOWER_NOTIFICATIONS: ${WATCHTOWER_NOTIFICATIONS:-shoutrrr}
+      WATCHTOWER_NOTIFICATION_URL: ${WATCHTOWER_NOTIFICATION_URL:-}
+      REPO_USER: ${GH_USERNAME:-}
+      REPO_PASS: ${GH_PAT_TOKEN:-}
+    command: --interval ${WATCHTOWER_POLL_INTERVAL:-30} --label-enable
+    restart: always

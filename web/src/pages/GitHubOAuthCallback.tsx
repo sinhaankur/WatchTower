@@ -1,0 +1,95 @@
+import { useEffect, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
+import apiClient from '@/lib/api';
+import { Button } from '@/components/ui/button';
+
+const GitHubOAuthCallback = () => {
+  const [searchParams] = useSearchParams();
+  const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
+  const [detail, setDetail] = useState('');
+
+  useEffect(() => {
+    const code = searchParams.get('code');
+    const state = searchParams.get('state');
+    const error = searchParams.get('error');
+
+    if (error) {
+      setStatus('error');
+      setDetail(error === 'access_denied'
+        ? 'You declined the GitHub authorization request. No changes were made.'
+        : `GitHub returned an error: ${error}`);
+      return;
+    }
+
+    if (!code || !state) {
+      setStatus('error');
+      setDetail('The callback URL is missing required parameters (code or state). Try connecting again from the Team page.');
+      return;
+    }
+
+    const complete = async () => {
+      try {
+        const redirectUri = `${window.location.origin}/oauth/github/callback`;
+        await apiClient.post('/github/oauth/callback', { code, state, redirect_uri: redirectUri });
+        setStatus('success');
+      } catch {
+        setStatus('error');
+        setDetail('The server could not complete the OAuth exchange. Make sure GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET are configured, then try again.');
+      }
+    };
+
+    void complete();
+  }, [searchParams]);
+
+  return (
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center px-6">
+      <div className="w-full max-w-md bg-white border border-gray-200 px-8 py-10 text-center">
+
+        {status === 'loading' && (
+          <>
+            <div className="text-4xl mb-4 animate-spin inline-block">⌛</div>
+            <h1 className="text-base font-semibold text-gray-900 mb-1">Connecting GitHub…</h1>
+            <p className="text-sm text-gray-500">Completing your GitHub authorization. Please wait.</p>
+          </>
+        )}
+
+        {status === 'success' && (
+          <>
+            <div className="text-5xl mb-4">✅</div>
+            <h1 className="text-base font-semibold text-gray-900 mb-1">GitHub Connected!</h1>
+            <p className="text-sm text-gray-500 mb-6">Your GitHub account has been linked to WatchTower. You can now pull repositories for deployments.</p>
+            <div className="flex flex-col gap-2">
+              <Link to="/team">
+                <Button className="w-full bg-gray-900 text-white hover:bg-gray-800 rounded-none">→ Go to Team Management</Button>
+              </Link>
+              <Link to="/">
+                <Button variant="outline" className="w-full rounded-none border-gray-300">Dashboard</Button>
+              </Link>
+            </div>
+          </>
+        )}
+
+        {status === 'error' && (
+          <>
+            <div className="text-5xl mb-4">❌</div>
+            <h1 className="text-base font-semibold text-gray-900 mb-1">Connection failed</h1>
+            {detail && (
+              <p className="text-sm text-red-600 mb-4 bg-red-50 border border-red-200 px-3 py-2 text-left">{detail}</p>
+            )}
+            <p className="text-xs text-gray-400 mb-6">If the problem persists, check that the API server is running and environment variables are configured correctly.</p>
+            <div className="flex flex-col gap-2">
+              <Link to="/team">
+                <Button className="w-full bg-gray-900 text-white hover:bg-gray-800 rounded-none">← Try again from Team page</Button>
+              </Link>
+              <Link to="/">
+                <Button variant="outline" className="w-full rounded-none border-gray-300">Dashboard</Button>
+              </Link>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default GitHubOAuthCallback;

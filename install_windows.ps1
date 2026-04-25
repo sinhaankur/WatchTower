@@ -39,14 +39,16 @@ if (-not (Test-Path $appsPath)) {
     Copy-Item (Join-Path $InstallDir "apps.json") $appsPath
 }
 if (-not (Test-Path $envPath)) {
+    $triggerToken = & "$venvDir\Scripts\python.exe" -c "import secrets; print(secrets.token_urlsafe(32))"
 @"
 WATCHTOWER_REPO_DIR=$InstallDir
 WATCHTOWER_NODES_FILE=$nodesPath
 WATCHTOWER_APPS_FILE=$appsPath
-WATCHTOWER_TRIGGER_TOKEN=change-me-now
+WATCHTOWER_TRIGGER_TOKEN=$triggerToken
 WATCHTOWER_DEFAULT_BRANCH=main
 WATCHTOWER_LOG_LEVEL=INFO
 WATCHTOWER_PORT=$Port
+WATCHTOWER_BIND_HOST=127.0.0.1
 "@ | Set-Content -Path $envPath -Encoding UTF8
 }
 

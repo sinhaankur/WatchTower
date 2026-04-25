@@ -21,5 +21,6 @@ source "${ENV_FILE}"
 set +a
 
 PORT="${WATCHTOWER_PORT:-8000}"
+BIND_HOST="${WATCHTOWER_BIND_HOST:-127.0.0.1}"
 
-exec "${VENV_PYTHON}" -m watchtower.deploy_server serve --host 0.0.0.0 --port "${PORT}"
+exec "${VENV_PYTHON}" -m watchtower.deploy_server serve --host "${BIND_HOST}" --port "${PORT}"
