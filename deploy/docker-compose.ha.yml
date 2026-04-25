@@ -40,7 +40,7 @@ services:
       WATCHTOWER_API_TOKEN: ${WATCHTOWER_API_TOKEN:-}
       WATCHTOWER_SECRET_KEY: ${WATCHTOWER_SECRET_KEY:-}
     ports:
-      - "${APP_PORT:-8080}:80"
+      - "${APP_PORT:-8080}:${APP_CONTAINER_PORT:-8000}"
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
     restart: always
