@@ -1,10 +1,10 @@
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, type Variants } from 'framer-motion';
 import { useLocation } from 'react-router-dom';
 
-const variants = {
+const variants: Variants = {
   initial: { opacity: 0, y: 8 },
-  animate: { opacity: 1, y: 0, transition: { duration: 0.18, ease: 'easeOut' } },
-  exit: { opacity: 0, y: -6, transition: { duration: 0.12, ease: 'easeIn' } },
+  animate: { opacity: 1, y: 0, transition: { duration: 0.18, ease: [0.16, 1, 0.3, 1] } },
+  exit: { opacity: 0, y: -6, transition: { duration: 0.12, ease: [0.16, 1, 0.3, 1] } },
 };
 
 export function PageTransition({ children }: { children: React.ReactNode }) {
