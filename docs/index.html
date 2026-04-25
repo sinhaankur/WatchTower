@@ -3,252 +3,306 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>WatchTower Control Center Docs</title>
+  <title>WatchTower Docs</title>
+  <link rel="icon" type="image/svg+xml" href="../assets/wt-logo.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
   <style>
     :root {
-      --bg: #060b13;
-      --panel: #0f1728;
-      --panel-2: #0b1220;
-      --line: #243655;
-      --text: #eaf0ff;
-      --muted: #97a9c8;
-      --good: #30d0a0;
-      --warn: #ffbf5f;
-      --bad: #ff8191;
-      --accent: #56a7ff;
+      --bg: #fbf6ea;
+      --panel: #ffffff;
+      --line: #1f2937;
+      --text: #101828;
+      --muted: #505a69;
+      --brand: #b91c1c;
+      --brand-soft: #fde68a;
+      --ok: #1a8f63;
+      --warn: #b77700;
     }
     * { box-sizing: border-box; }
     body {
       margin: 0;
+      font-family: "DM Sans", "Segoe UI", sans-serif;
+      background: var(--bg);
       color: var(--text);
-      background: radial-gradient(circle at 13% 8%, #162849 0%, var(--bg) 35%);
-      font-family: "Segoe UI", "SF Pro Text", "Helvetica Neue", sans-serif;
       min-height: 100vh;
     }
-    .layout {
-      display: grid;
-      min-height: 100vh;
-      grid-template-columns: 230px 1fr;
+    .wrap {
+      max-width: 1140px;
+      margin: 0 auto;
+      padding: 20px;
     }
-    .side {
-      border-right: 1px solid var(--line);
-      padding: 18px 14px;
-      background: rgba(7, 11, 20, 0.85);
+    .hero {
+      background: linear-gradient(140deg, #ffffff 0%, #fff9e8 100%);
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      padding: 28px;
+      margin-bottom: 16px;
     }
-    .brand { font-weight: 700; margin-bottom: 18px; }
-    .menu a {
-      display: block;
-      text-decoration: none;
-      color: var(--muted);
-      border-radius: 10px;
-      border: 1px solid transparent;
-      padding: 9px 10px;
-      margin-bottom: 7px;
-    }
-    .menu a.active, .menu a:hover {
-      color: var(--text);
-      border-color: var(--line);
-      background: var(--panel-2);
-    }
-    .main { padding: 22px; }
-    .toolbar {
-      display: flex;
-      gap: 10px;
+    .brand {
+      display: inline-flex;
       align-items: center;
-      margin-bottom: 14px;
+      gap: 10px;
+      margin-bottom: 12px;
     }
-    .search {
-      flex: 1;
-      background: var(--panel-2);
-      border: 1px solid var(--line);
-      border-radius: 10px;
+    .brand-mark {
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
+      overflow: hidden;
+      display: inline-block;
+    }
+    .brand-mark img {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+    .brand-label {
+      font-size: 0.88rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+    }
+    .hero h1 {
+      margin: 0;
+      font-size: 2.05rem;
+      letter-spacing: -0.02em;
+    }
+    .hero p {
+      margin: 10px 0 0;
       color: var(--muted);
-      padding: 9px 12px;
+      max-width: 820px;
+      line-height: 1.5;
     }
-    .btn {
-      border: 1px solid var(--line);
-      background: var(--panel);
-      color: var(--text);
-      border-radius: 10px;
-      padding: 8px 12px;
-      text-decoration: none;
-      font-size: 0.9rem;
+    .pill-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 14px;
     }
-    .kpis {
+    .pill {
+      background: var(--brand-soft);
+      border: 1px solid #1f2937;
+      color: #7f1d1d;
+      border-radius: 999px;
+      padding: 5px 10px;
+      font-size: 0.78rem;
+      font-weight: 600;
+    }
+    .grid {
       display: grid;
-      grid-template-columns: repeat(3, minmax(180px, 1fr));
       gap: 12px;
+      grid-template-columns: repeat(3, minmax(220px, 1fr));
       margin-bottom: 12px;
     }
     .card {
-      border: 1px solid var(--line);
-      border-radius: 12px;
       background: var(--panel);
-      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 16px;
     }
-    .label { font-size: 0.85rem; color: var(--muted); }
-    .value { font-size: 1.55rem; margin-top: 7px; font-weight: 700; }
-    .body {
+    .title {
+      font-size: 0.82rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin: 0 0 8px;
+    }
+    .value {
+      font-size: 1.45rem;
+      font-weight: 700;
+      margin: 0;
+    }
+    .layout {
       display: grid;
       gap: 12px;
-      grid-template-columns: 1.5fr 1fr;
+      grid-template-columns: 1.25fr 1fr;
     }
-    .project-grid {
+    .section-title {
+      margin: 0 0 10px;
+      font-size: 1.05rem;
+    }
+    .list {
+      margin: 0;
+      padding-left: 18px;
+      line-height: 1.55;
+    }
+    .list li { margin-bottom: 7px; }
+    .status {
+      font-size: 0.78rem;
+      font-weight: 600;
+      padding: 3px 8px;
+      border-radius: 999px;
+      border: 1px solid;
+    }
+    .ok {
+      color: var(--ok);
+      background: #ecfaf4;
+      border-color: #b5e7d0;
+    }
+    .warn {
+      color: var(--warn);
+      background: #fff8e8;
+      border-color: #f3dfb0;
+    }
+    .mini {
+      margin-top: 10px;
       display: grid;
-      gap: 10px;
-      grid-template-columns: repeat(2, 1fr);
-      margin-top: 8px;
+      gap: 8px;
     }
-    .project {
-      border: 1px solid var(--line);
-      background: var(--panel-2);
-      border-radius: 12px;
-      padding: 11px;
-    }
-    .project-top {
+    .row {
       display: flex;
       justify-content: space-between;
-      gap: 8px;
       align-items: center;
-      margin-bottom: 8px;
+      gap: 8px;
+      padding: 9px 10px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #fafcff;
     }
-    .ok { color: var(--good); }
-    .warn { color: var(--warn); }
-    .bad { color: var(--bad); }
-    .muted { color: var(--muted); }
-    .small { font-size: 0.83rem; }
-    .list { margin: 8px 0 0 18px; }
-    .list li { margin-bottom: 8px; }
+    .meta {
+      font-size: 0.84rem;
+      color: var(--muted);
+      margin-top: 6px;
+    }
+    .actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 12px;
+      flex-wrap: wrap;
+    }
+    .btn {
+      text-decoration: none;
+      border-radius: 12px;
+      border: 1px solid #1f2937;
+      background: #fff;
+      color: #7f1d1d;
+      padding: 8px 12px;
+      font-size: 0.86rem;
+      font-weight: 600;
+    }
+    .btn.primary {
+      background: var(--brand);
+      border-color: var(--brand);
+      color: #fff;
+    }
     pre {
       margin: 0;
-      padding: 11px;
-      border-radius: 10px;
       border: 1px solid var(--line);
-      background: #0a1221;
-      color: #dce7ff;
-      font-size: 0.86rem;
+      background: #f7faff;
+      border-radius: 10px;
+      padding: 10px;
       overflow-x: auto;
+      font-size: 0.85rem;
+      font-family: "Space Mono", ui-monospace, monospace;
     }
-    code {
-      color: #dce7ff;
-    }
-    @media (max-width: 1024px) {
+    code { color: #22405f; }
+    @media (max-width: 980px) {
+      .grid { grid-template-columns: 1fr; }
       .layout { grid-template-columns: 1fr; }
-      .side { display: none; }
-      .kpis { grid-template-columns: 1fr; }
-      .body { grid-template-columns: 1fr; }
-      .project-grid { grid-template-columns: 1fr; }
     }
   </style>
 </head>
 <body>
-  <div class="layout">
-    <aside class="side">
-      <div class="brand">WatchTower Docs</div>
-      <nav class="menu">
-        <a class="active" href="#">Overview</a>
-        <a href="#workflow">Workflow</a>
-        <a href="#security">Security</a>
-        <a href="#releases">Releases</a>
-        <a href="https://github.com/sinhaankur/WatchTower">Repository</a>
-      </nav>
-    </aside>
-
-    <main class="main">
-      <div class="toolbar">
-        <div class="search">Search docs, APIs, and release workflows...</div>
-        <a class="btn" href="https://sinhaankur.github.io/WatchTower/">Live Site</a>
-        <a class="btn" href="http://127.0.0.1:8000/dashboard">App Dashboard</a>
+  <div class="wrap">
+    <header class="hero">
+      <div class="brand">
+        <span class="brand-mark"><img src="../assets/wt-logo.svg" alt="Wt logo"></span>
+        <span class="brand-label">WatchTower</span>
       </div>
+      <h1>WatchTower Docs</h1>
+      <p>
+        Clear setup guides for the WatchTower control plane, designed for fast team onboarding and simple operations.
+      </p>
+      <div class="pill-row">
+        <span class="pill">Tailscale-like product clarity</span>
+        <span class="pill">Container updates powered by containrrr/watchtower</span>
+        <span class="pill">Onboarding: Podman, Docker, Tailscale, Cloudflare, Nginx</span>
+      </div>
+      <div class="actions">
+        <a class="btn primary" href="https://github.com/sinhaankur/WatchTower">Repository</a>
+        <a class="btn" href="../README.md">Main README</a>
+        <a class="btn" href="./WATCHTOWER_MESH_VERCEL.md">Mesh Runbook</a>
+      </div>
+    </header>
 
-      <section class="kpis">
-        <article class="card">
-          <div class="label">Current Release</div>
-          <div class="value">v1.2.2</div>
-          <div class="small muted">Python package + OCI image + release assets</div>
-        </article>
-        <article class="card">
-          <div class="label">Deployment Modes</div>
-          <div class="value">3</div>
-          <div class="small muted">Linux, Windows, macOS App Center</div>
-        </article>
-        <article class="card">
-          <div class="label">Security Gates</div>
-          <div class="value">2</div>
-          <div class="small muted">Filesystem and container Trivy scans</div>
-        </article>
-      </section>
+    <section class="grid">
+      <article class="card">
+        <p class="title">Release Channel</p>
+        <p class="value">GitHub + GHCR + PyPI</p>
+        <p class="meta">Versioned tags publish package, image, and CLI artifacts.</p>
+      </article>
+      <article class="card">
+        <p class="title">Deployment Modes</p>
+        <p class="value">App Center, Mesh, Hybrid</p>
+        <p class="meta">Local-first plus optional cloud-backed persistence.</p>
+      </article>
+      <article class="card">
+        <p class="title">Auth Modes</p>
+        <p class="value">GitHub OAuth or API Token</p>
+        <p class="meta">OAuth optional, API token fallback supported.</p>
+      </article>
+    </section>
 
-      <section class="body">
-        <article class="card" id="workflow">
-          <h3>Projects and Workflow</h3>
-          <div class="project-grid">
-            <div class="project">
-              <div class="project-top">
-                <strong>website-main</strong>
-                <span class="ok small">deploy-ready</span>
-              </div>
-              <div class="small muted">1. Register in apps.json</div>
-              <div class="small muted">2. Trigger via /apps/{app}/deploy</div>
-              <div class="small muted">3. Watch status in /dashboard</div>
-            </div>
-            <div class="project">
-              <div class="project-top">
-                <strong>api-python</strong>
-                <span class="warn small">build-step</span>
-              </div>
-              <div class="small muted">Build and sync via rsync</div>
-              <div class="small muted">Remote reload over SSH</div>
-              <div class="small muted">Node outcomes in deployment history</div>
-            </div>
-            <div class="project">
-              <div class="project-top">
-                <strong>windows-agent</strong>
-                <span class="ok small">supported</span>
-              </div>
-              <pre><code>powershell -ExecutionPolicy Bypass -File .\install_windows.ps1</code></pre>
-            </div>
-            <div class="project">
-              <div class="project-top">
-                <strong>macos-agent</strong>
-                <span class="ok small">supported</span>
-              </div>
-              <pre><code>./install_macos.sh</code></pre>
-            </div>
-          </div>
-        </article>
-
-        <article class="card" id="security">
-          <h3>Safe Website Checklist</h3>
-          <ul class="list">
-            <li>Protect deploy endpoints with <code>WATCHTOWER_TRIGGER_TOKEN</code></li>
-            <li>Use key-only SSH on nodes, disable password auth</li>
-            <li>Use limited sudoers commands for service reload</li>
-            <li>Run Trivy checks on pull requests before merge</li>
-            <li>Keep rollback-capable backups for each app</li>
-          </ul>
-        </article>
-      </section>
-
-      <section class="card" id="releases" style="margin-top: 12px;">
-        <h3>Version-Controlled Release Flow</h3>
-        <ol class="list">
-          <li>Bump <code>watchtower.__version__</code> in <code>watchtower/__init__.py</code></li>
-          <li>Merge changes to main</li>
-          <li>Create semantic tag like <code>v1.2.2</code></li>
-          <li>GitHub Actions auto-publishes to GHCR, PyPI, and GitHub Releases</li>
-        </ol>
-        <pre><code>./scripts/release.sh 1.2.2</code></pre>
-
-        <h3 style="margin-top: 14px;">Install and Use Across Compatible Ecosystems</h3>
+    <section class="layout">
+      <article class="card">
+        <h2 class="section-title">What This Project Uses From Upstream</h2>
         <ul class="list">
-          <li><strong>Python ecosystem (pip)</strong>: <code>pip install watchtower-podman</code></li>
-          <li><strong>Container ecosystem (OCI)</strong>: <code>ghcr.io/sinhaankur/watchtower:latest</code></li>
-          <li><strong>Linux service ecosystem</strong>: use <code>systemd/watchtower.service</code></li>
-          <li><strong>Windows/macOS script ecosystem</strong>: use <code>install_windows.ps1</code> and <code>install_macos.sh</code></li>
+          <li>
+            <strong>Container updater behavior:</strong> Uses upstream
+            <a href="https://github.com/containrrr/watchtower">containrrr/watchtower</a>
+            for image polling and restart semantics.
+          </li>
+          <li>
+            <strong>Networking concept direction:</strong> UX and control flow are inspired by
+            <a href="https://github.com/tailscale/tailscale">tailscale/tailscale</a>
+            for team-friendly host connectivity workflows.
+          </li>
+          <li>
+            <strong>Domain connectivity:</strong> Cloudflare tunnel setup is generated through
+            WatchTower Host Connect helper endpoints.
+          </li>
         </ul>
-      </section>
-    </main>
+
+        <h2 class="section-title" style="margin-top:14px;">Quick Team Setup</h2>
+        <pre><code>1) Open Host Connect in WatchTower
+2) Install missing tools on each team machine
+3) Join Tailscale tailnet for private connectivity
+      4) Configure encrypted terminal audit key
+      5) Generate Cloudflare tunnel domain plan
+      6) Deploy applications from Dashboard</code></pre>
+      </article>
+
+      <article class="card">
+        <h2 class="section-title">Feature Provenance</h2>
+        <div class="mini">
+          <div class="row">
+            <span>WatchTower runtime API</span>
+            <span class="status ok">native</span>
+          </div>
+          <div class="row">
+            <span>GitHub OAuth + API token auth</span>
+            <span class="status ok">native</span>
+          </div>
+          <div class="row">
+            <span>Auto image polling/restart</span>
+            <span class="status warn">upstream watchtower</span>
+          </div>
+          <div class="row">
+            <span>Host-connect UX pattern</span>
+            <span class="status warn">tailscale-inspired</span>
+          </div>
+          <div class="row">
+            <span>Managed DB + Nginx setup plans</span>
+            <span class="status ok">native</span>
+          </div>
+          <div class="row">
+            <span>Secure terminal command runner + encrypted audit</span>
+            <span class="status ok">native</span>
+          </div>
+        </div>
+      </article>
+    </section>
   </div>
 </body>
 </html>
