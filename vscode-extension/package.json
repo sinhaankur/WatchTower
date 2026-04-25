@@ -9,8 +9,16 @@
   "engines": {
     "vscode": "^1.90.0"
   },
-  "categories": ["Other"],
-  "keywords": ["watchtower", "deploy", "docker", "podman", "devops"],
+  "categories": [
+    "Other"
+  ],
+  "keywords": [
+    "watchtower",
+    "deploy",
+    "docker",
+    "podman",
+    "devops"
+  ],
   "repository": {
     "type": "git",
     "url": "https://github.com/sinhaankur/WatchTower"
@@ -189,10 +197,10 @@
   "devDependencies": {
     "@types/node": "^20.0.0",
     "@types/vscode": "^1.90.0",
-    "@typescript-eslint/eslint-plugin": "^7.0.0",
-    "@typescript-eslint/parser": "^7.0.0",
-    "eslint": "^9.0.0",
+    "@typescript-eslint/eslint-plugin": "^8.59.0",
+    "@typescript-eslint/parser": "^8.59.0",
     "@vscode/vsce": "^3.0.0",
+    "eslint": "^9.0.0",
     "typescript": "^5.4.0"
   }
 }
