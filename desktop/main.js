@@ -5,6 +5,33 @@ const fs = require('fs');
 const http = require('http');
 const path = require('path');
 
+// ── GPU / Renderer stability flags ──────────────────────────────────────────
+// Must be set before app.whenReady().
+//
+// On Linux the correct GPU strategy depends on display server and architecture:
+//
+//   Wayland  — each app has an isolated GPU context; no workarounds needed.
+//              Enable native Wayland window decorations and auto-select backend.
+//
+//   X11 / ARM / no-gpu — use SwiftShader software rendering via
+//              disableHardwareAcceleration(). NVIDIA driver 500+ on kernel 6.x
+//              crashes the Chromium GPU process (SIGSEGV in SharedImageStub)
+//              regardless of EGL/ANGLE/sandbox flags. SwiftShader is bundled
+//              in Electron, renders the UI correctly, and avoids the crash
+//              entirely. For a dashboard app the CPU rendering overhead is
+//              negligible. ARM (Pi) and headless also use this path.
+if (process.platform === 'linux') {
+  if (process.env.WAYLAND_DISPLAY && !process.argv.includes('--no-gpu') && process.env.WATCHTOWER_NO_GPU !== '1') {
+    // Wayland: native GPU isolation — no sandbox workarounds needed.
+    app.commandLine.appendSwitch('enable-features', 'WaylandWindowDecorations');
+    app.commandLine.appendSwitch('ozone-platform-hint', 'auto');
+  } else {
+    // X11, ARM, explicit --no-gpu / WATCHTOWER_NO_GPU=1:
+    // Use SwiftShader (CPU software renderer bundled in Electron).
+    // Avoids all GPU driver crashes on NVIDIA 500+ + kernel 6.x + X11.
+    app.disableHardwareAcceleration();
+  }
+}
 const HOST = '127.0.0.1';
 const FRONTEND_PORT = 5222;
 const BACKEND_PORT = 8000;
