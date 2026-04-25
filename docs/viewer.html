@@ -1,0 +1,665 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WatchTower Docs Viewer</title>
+  <link rel="icon" type="image/svg+xml" href="./wt-logo.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <style>
+    :root {
+      --wt-bg: #fbf6ea;
+      --wt-panel: #ffffff;
+      --wt-panel-soft: #fffdf7;
+      --wt-sidebar: #f8fbff;
+      --wt-border: #1f2937;
+      --wt-border-soft: #d7e0ec;
+      --wt-text: #101828;
+      --wt-text-dim: #505a69;
+      --wt-accent: #b91c1c;
+      --wt-accent-strong: #7f1d1d;
+      --wt-accent-soft: #fde68a;
+      --wt-ok-bg: rgba(16, 185, 129, 0.12);
+      --wt-ok-text: #047857;
+      --wt-ok-border: rgba(16, 185, 129, 0.28);
+      --wt-link: #1d4ed8;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "DM Sans", system-ui, -apple-system, sans-serif;
+      background: var(--wt-bg);
+      color: var(--wt-text);
+    }
+    a { color: inherit; }
+    code, pre { font-family: "Space Mono", ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+    .app-shell {
+      min-height: 100vh;
+      display: flex;
+      background:
+        radial-gradient(circle at top left, rgba(253, 230, 138, 0.24), transparent 26%),
+        linear-gradient(180deg, rgba(255, 253, 248, 0.94), rgba(251, 246, 234, 1));
+    }
+    .sidebar {
+      width: 260px;
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      background: rgba(248, 251, 255, 0.9);
+      backdrop-filter: blur(8px);
+      border-right: 1px solid var(--wt-border-soft);
+      position: sticky;
+      top: 0;
+      height: 100vh;
+    }
+    .brand-block {
+      padding: 20px 16px;
+      border-bottom: 1px solid var(--wt-border-soft);
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+    }
+    .brand-mark {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      border: 2px solid var(--wt-border);
+      background: var(--wt-accent-soft);
+      box-shadow: 2px 2px 0 0 #0f172a;
+      overflow: hidden;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .brand-mark img { width: 100%; height: 100%; display: block; }
+    .brand-copy strong {
+      display: block;
+      font-size: 0.95rem;
+      color: #0f172a;
+      letter-spacing: -0.02em;
+    }
+    .brand-copy span {
+      display: block;
+      margin-top: 1px;
+      font-size: 0.67rem;
+      color: #64748b;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+    .sidebar-cta { padding: 16px 12px 10px; }
+    .primary-button,
+    .secondary-button,
+    .ghost-button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      min-height: 42px;
+      padding: 10px 14px;
+      border-radius: 12px;
+      font-size: 0.9rem;
+      font-weight: 700;
+      text-decoration: none;
+      transition: background-color 140ms ease, color 140ms ease, transform 140ms ease;
+    }
+    .primary-button {
+      width: 100%;
+      border: 1px solid var(--wt-border);
+      color: #ffffff;
+      background: var(--wt-accent);
+      box-shadow: 2px 2px 0 0 var(--wt-border);
+    }
+    .secondary-button,
+    .ghost-button {
+      border: 1px solid var(--wt-border);
+      background: #ffffff;
+      color: #0f172a;
+      box-shadow: 2px 2px 0 0 rgba(31, 41, 55, 0.08);
+    }
+    .primary-button:hover,
+    .secondary-button:hover,
+    .ghost-button:hover { transform: translateY(-1px); }
+    .primary-button:hover { background: #991b1b; }
+    .sidebar-nav {
+      padding: 10px 12px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      overflow-y: auto;
+    }
+    .nav-link {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px 10px 10px;
+      border-left: 2px solid transparent;
+      border-radius: 10px;
+      font-size: 0.92rem;
+      font-weight: 600;
+      color: #475569;
+      text-decoration: none;
+      transition: background-color 140ms ease, color 140ms ease, border-color 140ms ease;
+    }
+    .nav-link:hover { background: #ffffff; color: #0f172a; }
+    .nav-link.active {
+      background: #fef2f2;
+      color: var(--wt-accent-strong);
+      border-left-color: var(--wt-accent-strong);
+      box-shadow: 0 1px 0 rgba(15, 23, 42, 0.06);
+    }
+    .nav-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      background: currentColor;
+      opacity: 0.55;
+      flex-shrink: 0;
+    }
+    .sidebar-footer {
+      margin-top: auto;
+      padding: 16px;
+      border-top: 1px solid var(--wt-border-soft);
+      font-size: 0.75rem;
+      color: #64748b;
+      line-height: 1.5;
+    }
+    .sidebar-footer a { color: #475569; text-decoration: none; }
+    .main-shell {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+    }
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 20px 32px;
+      border-bottom: 1px solid var(--wt-border-soft);
+      background: rgba(248, 251, 255, 0.9);
+      backdrop-filter: blur(8px);
+    }
+    .topbar h1 {
+      margin: 0;
+      font-size: 1.1rem;
+      color: #0f172a;
+    }
+    .topbar p {
+      margin: 4px 0 0;
+      font-size: 0.8rem;
+      color: #64748b;
+    }
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      border-radius: 999px;
+      padding: 8px 12px;
+      border: 1px solid var(--wt-ok-border);
+      background: var(--wt-ok-bg);
+      color: var(--wt-ok-text);
+      font-size: 0.8rem;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    .status-pill::before {
+      content: "";
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      background: #10b981;
+      box-shadow: 0 0 0 5px rgba(16, 185, 129, 0.12);
+    }
+    .content {
+      padding: 24px 32px 40px;
+      max-width: 1240px;
+      width: 100%;
+    }
+    .panel {
+      border: 1px solid var(--wt-border);
+      border-radius: 18px;
+      background: var(--wt-panel);
+      box-shadow: 2px 2px 0 0 rgba(31, 41, 55, 0.08);
+    }
+    .hero {
+      padding: 28px;
+      background: linear-gradient(135deg, #ffffff 0%, #fff6db 100%);
+    }
+    .eyebrow {
+      margin: 0;
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.18em;
+      color: var(--wt-accent);
+      font-weight: 700;
+    }
+    .hero h2 {
+      margin: 8px 0 0;
+      font-size: clamp(1.9rem, 3vw, 2.6rem);
+      line-height: 1.05;
+      letter-spacing: -0.04em;
+      color: #0f172a;
+      max-width: 860px;
+    }
+    .hero p {
+      margin: 14px 0 0;
+      max-width: 760px;
+      color: var(--wt-text-dim);
+      line-height: 1.65;
+      font-size: 0.98rem;
+    }
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 18px;
+    }
+    .doc-layout {
+      display: grid;
+      gap: 18px;
+      margin-top: 18px;
+      grid-template-columns: minmax(0, 220px) minmax(0, 1fr);
+      align-items: start;
+    }
+    .toc,
+    .markdown-panel {
+      padding: 20px;
+    }
+    .toc h3,
+    .markdown-panel h3 {
+      margin: 0 0 12px;
+      font-size: 0.96rem;
+      color: #0f172a;
+    }
+    .toc-list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      gap: 6px;
+    }
+    .toc-list a {
+      display: block;
+      padding: 8px 10px;
+      border-radius: 10px;
+      color: #475569;
+      text-decoration: none;
+      font-size: 0.88rem;
+      font-weight: 600;
+    }
+    .toc-list a:hover,
+    .toc-list a.active {
+      background: #fef2f2;
+      color: var(--wt-accent-strong);
+    }
+    .loading,
+    .error-box {
+      padding: 18px;
+      border-radius: 14px;
+      border: 1px solid var(--wt-border-soft);
+      background: var(--wt-panel-soft);
+      color: var(--wt-text-dim);
+    }
+    .error-box { color: #991b1b; }
+
+    .markdown-body {
+      color: #1f2937;
+      line-height: 1.75;
+      font-size: 0.96rem;
+    }
+    .markdown-body > *:first-child { margin-top: 0; }
+    .markdown-body h1,
+    .markdown-body h2,
+    .markdown-body h3,
+    .markdown-body h4 {
+      color: #0f172a;
+      line-height: 1.2;
+      scroll-margin-top: 110px;
+    }
+    .markdown-body h1 { font-size: 2rem; margin: 0 0 1rem; letter-spacing: -0.04em; }
+    .markdown-body h2 { font-size: 1.45rem; margin: 2rem 0 0.9rem; letter-spacing: -0.03em; }
+    .markdown-body h3 { font-size: 1.18rem; margin: 1.6rem 0 0.7rem; }
+    .markdown-body h4 { font-size: 1rem; margin: 1.2rem 0 0.6rem; }
+    .markdown-body p,
+    .markdown-body ul,
+    .markdown-body ol,
+    .markdown-body blockquote { margin: 0 0 1rem; }
+    .markdown-body a {
+      color: var(--wt-link);
+      text-decoration: underline;
+      text-decoration-thickness: 1.5px;
+      text-underline-offset: 2px;
+    }
+    .markdown-body ul,
+    .markdown-body ol { padding-left: 1.4rem; }
+    .markdown-body li { margin-bottom: 0.4rem; }
+    .markdown-body hr {
+      border: 0;
+      border-top: 1px solid var(--wt-border-soft);
+      margin: 1.6rem 0;
+    }
+    .markdown-body table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 1rem 0;
+      font-size: 0.9rem;
+    }
+    .markdown-body th,
+    .markdown-body td {
+      border: 1px solid var(--wt-border-soft);
+      padding: 10px 12px;
+      text-align: left;
+      vertical-align: top;
+    }
+    .markdown-body th {
+      background: #f8fbff;
+      color: #0f172a;
+    }
+    .markdown-body pre {
+      overflow-x: auto;
+      padding: 14px;
+      border-radius: 12px;
+      background: #f7faff;
+      border: 1px solid var(--wt-border-soft);
+      color: #22405f;
+      font-size: 0.83rem;
+    }
+    .markdown-body code {
+      padding: 0.12rem 0.35rem;
+      border-radius: 6px;
+      background: rgba(148, 163, 184, 0.14);
+      color: #0f172a;
+      font-size: 0.9em;
+    }
+    .markdown-body pre code {
+      padding: 0;
+      background: transparent;
+      color: inherit;
+    }
+    .markdown-body blockquote {
+      padding: 0.1rem 0 0.1rem 1rem;
+      border-left: 4px solid #f59e0b;
+      color: #475569;
+      background: rgba(245, 158, 11, 0.08);
+      border-radius: 0 10px 10px 0;
+    }
+    .markdown-body img {
+      max-width: 100%;
+      height: auto;
+      border-radius: 12px;
+      border: 1px solid var(--wt-border-soft);
+    }
+
+    @media (max-width: 980px) {
+      .doc-layout { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 860px) {
+      .app-shell { display: block; }
+      .sidebar {
+        position: relative;
+        width: 100%;
+        height: auto;
+        border-right: 0;
+        border-bottom: 1px solid var(--wt-border-soft);
+      }
+      .topbar,
+      .content { padding-left: 18px; padding-right: 18px; }
+      .topbar { flex-direction: column; align-items: flex-start; }
+      .hero,
+      .toc,
+      .markdown-panel { padding: 18px; }
+    }
+    @media (max-width: 640px) {
+      .actions { flex-direction: column; }
+      .primary-button,
+      .secondary-button,
+      .ghost-button { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand-block">
+        <a class="brand" href="./index.html">
+          <span class="brand-mark"><img src="./wt-logo.svg" alt="Wt logo"></span>
+          <span class="brand-copy">
+            <strong>WatchTower</strong>
+            <span>Control Plane Docs</span>
+          </span>
+        </a>
+      </div>
+      <div class="sidebar-cta">
+        <a class="primary-button" href="./index.html">Docs Home</a>
+      </div>
+      <nav class="sidebar-nav" aria-label="Documents">
+        <a class="nav-link" data-doc-link="readme" href="./viewer.html?doc=readme"><span class="nav-dot"></span>Main README</a>
+        <a class="nav-link" data-doc-link="mesh" href="./viewer.html?doc=mesh"><span class="nav-dot"></span>Mesh Runbook</a>
+        <a class="nav-link" data-doc-link="ha" href="./viewer.html?doc=ha"><span class="nav-dot"></span>HA Podman WatchTower</a>
+        <a class="nav-link" data-doc-link="hybrid" href="./viewer.html?doc=hybrid"><span class="nav-dot"></span>Hybrid Cloud Databases</a>
+        <a class="nav-link" data-doc-link="enterprise" href="./viewer.html?doc=enterprise"><span class="nav-dot"></span>Enterprise Features</a>
+      </nav>
+      <div class="sidebar-footer">
+        <div>All document links now resolve through GitHub Pages instead of raw markdown endpoints.</div>
+        <div style="margin-top: 10px;"><a href="https://github.com/sinhaankur/WatchTower">GitHub</a> · <a href="./index.html">Docs Home</a></div>
+      </div>
+    </aside>
+
+    <main class="main-shell">
+      <header class="topbar">
+        <div>
+          <h1 id="page-title">Docs Viewer</h1>
+          <p id="page-subtitle">Rendered documentation with clickable internal links and Pages-safe navigation.</p>
+        </div>
+        <div class="status-pill">GitHub Pages Viewer</div>
+      </header>
+
+      <div class="content">
+        <section class="panel hero">
+          <p class="eyebrow">Document</p>
+          <h2 id="hero-title">Loading document…</h2>
+          <p id="hero-description">Preparing the selected guide inside the same WatchTower docs shell.</p>
+          <div class="actions">
+            <a class="secondary-button" href="./index.html">Back To Docs Home</a>
+            <a class="ghost-button" id="raw-link" href="#">Open Raw Source</a>
+          </div>
+        </section>
+
+        <div class="doc-layout">
+          <aside class="panel toc">
+            <h3>On This Page</h3>
+            <div id="toc-content" class="loading">Loading headings…</div>
+          </aside>
+
+          <section class="panel markdown-panel">
+            <div id="content" class="loading">Loading document content…</div>
+          </section>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    const DOCS = {
+      readme: {
+        title: 'Main README',
+        subtitle: 'Project overview, installation, features, security, release flow, and usage guidance.',
+        source: 'https://raw.githubusercontent.com/sinhaankur/WatchTower/main/README.md',
+        raw: 'https://github.com/sinhaankur/WatchTower/blob/main/README.md'
+      },
+      mesh: {
+        title: 'Mesh Runbook',
+        subtitle: 'Mesh-style deployment guidance and preview workflows for WatchTower.',
+        source: './WATCHTOWER_MESH_VERCEL.md',
+        raw: 'https://github.com/sinhaankur/WatchTower/blob/main/docs/WATCHTOWER_MESH_VERCEL.md'
+      },
+      ha: {
+        title: 'HA Podman WatchTower',
+        subtitle: 'High-availability operations guidance for Podman-based update flows.',
+        source: './HA_PODMAN_WATCHTOWER.md',
+        raw: 'https://github.com/sinhaankur/WatchTower/blob/main/docs/HA_PODMAN_WATCHTOWER.md'
+      },
+      hybrid: {
+        title: 'Hybrid Cloud Databases',
+        subtitle: 'Connectivity and deployment notes for hybrid local and cloud database use.',
+        source: './HYBRID_CLOUD_DATABASES.md',
+        raw: 'https://github.com/sinhaankur/WatchTower/blob/main/docs/HYBRID_CLOUD_DATABASES.md'
+      },
+      enterprise: {
+        title: 'Enterprise Features',
+        subtitle: 'Enterprise-oriented capabilities, controls, and platform considerations.',
+        source: './ENTERPRISE_FEATURES.md',
+        raw: 'https://github.com/sinhaankur/WatchTower/blob/main/docs/ENTERPRISE_FEATURES.md'
+      }
+    };
+
+    const params = new URLSearchParams(window.location.search);
+    const docKey = params.get('doc') || 'readme';
+    const docMeta = DOCS[docKey] || DOCS.readme;
+
+    const pageTitle = document.getElementById('page-title');
+    const pageSubtitle = document.getElementById('page-subtitle');
+    const heroTitle = document.getElementById('hero-title');
+    const heroDescription = document.getElementById('hero-description');
+    const rawLink = document.getElementById('raw-link');
+    const content = document.getElementById('content');
+    const tocContent = document.getElementById('toc-content');
+
+    pageTitle.textContent = docMeta.title;
+    pageSubtitle.textContent = docMeta.subtitle;
+    heroTitle.textContent = docMeta.title;
+    heroDescription.textContent = docMeta.subtitle;
+    rawLink.href = docMeta.raw;
+
+    document.querySelectorAll('[data-doc-link]').forEach((link) => {
+      link.classList.toggle('active', link.getAttribute('data-doc-link') === docKey);
+    });
+
+    const slugify = (text) => text
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9\s-]/g, '')
+      .replace(/\s+/g, '-')
+      .replace(/-+/g, '-');
+
+    const renderToc = () => {
+      const headings = Array.from(content.querySelectorAll('h1, h2, h3')).filter((heading) => heading.id);
+      if (!headings.length) {
+        tocContent.innerHTML = '<div class="loading">No headings found in this document.</div>';
+        return;
+      }
+      const list = document.createElement('ul');
+      list.className = 'toc-list';
+      headings.forEach((heading) => {
+        const item = document.createElement('li');
+        const link = document.createElement('a');
+        link.href = `#${heading.id}`;
+        link.textContent = heading.textContent;
+        link.dataset.target = heading.id;
+        item.appendChild(link);
+        list.appendChild(item);
+      });
+      tocContent.innerHTML = '';
+      tocContent.appendChild(list);
+    };
+
+    const observeHeadings = () => {
+      const tocLinks = Array.from(document.querySelectorAll('.toc-list a'));
+      const headings = Array.from(content.querySelectorAll('h1, h2, h3')).filter((heading) => heading.id);
+      if (!headings.length) return;
+
+      const setActive = (id) => {
+        tocLinks.forEach((link) => link.classList.toggle('active', link.dataset.target === id));
+      };
+
+      const observer = new IntersectionObserver(
+        (entries) => {
+          const visible = entries
+            .filter((entry) => entry.isIntersecting)
+            .sort((a, b) => b.intersectionRatio - a.intersectionRatio);
+          if (visible.length > 0) {
+            setActive(visible[0].target.id);
+          }
+        },
+        {
+          rootMargin: '-20% 0px -70% 0px',
+          threshold: [0.2, 0.5, 0.9],
+        }
+      );
+
+      headings.forEach((heading) => observer.observe(heading));
+      setActive(headings[0].id);
+    };
+
+    const absolutizeRelativeMarkdownLinks = () => {
+      content.querySelectorAll('a[href]').forEach((link) => {
+        const href = link.getAttribute('href');
+        if (!href || href.startsWith('http') || href.startsWith('#') || href.startsWith('mailto:')) {
+          return;
+        }
+        if (href.endsWith('.md')) {
+          const fileName = href.split('/').pop();
+          const match = Object.entries(DOCS).find(([, meta]) => meta.source.endsWith(fileName));
+          if (match) {
+            link.href = `./viewer.html?doc=${match[0]}`;
+            return;
+          }
+        }
+        if (href.startsWith('./') || href.startsWith('../')) {
+          try {
+            link.href = new URL(href, docMeta.raw).toString();
+          } catch {
+            // leave unresolved links unchanged
+          }
+        }
+      });
+    };
+
+    const renderMarkdown = async () => {
+      try {
+        const response = await fetch(docMeta.source);
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+        const markdown = await response.text();
+        marked.setOptions({
+          gfm: true,
+          breaks: false,
+        });
+        const html = marked.parse(markdown);
+        content.innerHTML = `<div class="markdown-body">${html}</div>`;
+
+        content.querySelectorAll('h1, h2, h3').forEach((heading) => {
+          if (!heading.id) {
+            heading.id = slugify(heading.textContent || 'section');
+          }
+        });
+
+        absolutizeRelativeMarkdownLinks();
+        renderToc();
+        observeHeadings();
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unable to load document.';
+        content.innerHTML = `<div class="error-box">Failed to load this document: ${message}</div>`;
+        tocContent.innerHTML = '<div class="error-box">No table of contents available.</div>';
+      }
+    };
+
+    renderMarkdown();
+  </script>
+</body>
+</html>
