@@ -10,299 +10,774 @@
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
   <style>
     :root {
-      --bg: #fbf6ea;
-      --panel: #ffffff;
-      --line: #1f2937;
-      --text: #101828;
-      --muted: #505a69;
-      --brand: #b91c1c;
-      --brand-soft: #fde68a;
-      --ok: #1a8f63;
-      --warn: #b77700;
+      --wt-bg: #fbf6ea;
+      --wt-panel: #ffffff;
+      --wt-panel-soft: #fffdf7;
+      --wt-sidebar: #f8fbff;
+      --wt-border: #1f2937;
+      --wt-border-soft: #d7e0ec;
+      --wt-text: #101828;
+      --wt-text-dim: #505a69;
+      --wt-accent: #b91c1c;
+      --wt-accent-strong: #7f1d1d;
+      --wt-accent-soft: #fde68a;
+      --wt-ok-bg: rgba(16, 185, 129, 0.12);
+      --wt-ok-text: #047857;
+      --wt-ok-border: rgba(16, 185, 129, 0.28);
     }
-    * { box-sizing: border-box; }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
     body {
       margin: 0;
-      font-family: "DM Sans", "Segoe UI", sans-serif;
-      background: var(--bg);
-      color: var(--text);
       min-height: 100vh;
+      font-family: "DM Sans", system-ui, -apple-system, sans-serif;
+      background: var(--wt-bg);
+      color: var(--wt-text);
     }
-    .wrap {
-      max-width: 1140px;
-      margin: 0 auto;
-      padding: 20px;
+
+    a {
+      color: inherit;
     }
-    .hero {
-      background: linear-gradient(140deg, #ffffff 0%, #fff9e8 100%);
-      border: 1px solid var(--line);
-      border-radius: 20px;
-      padding: 28px;
-      margin-bottom: 16px;
+
+    code,
+    pre {
+      font-family: "Space Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
     }
+
+    .app-shell {
+      min-height: 100vh;
+      display: flex;
+      background:
+        radial-gradient(circle at top left, rgba(253, 230, 138, 0.24), transparent 26%),
+        linear-gradient(180deg, rgba(255, 253, 248, 0.94), rgba(251, 246, 234, 1));
+    }
+
+    .sidebar {
+      width: 260px;
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      background: rgba(248, 251, 255, 0.9);
+      backdrop-filter: blur(8px);
+      border-right: 1px solid var(--wt-border-soft);
+      position: sticky;
+      top: 0;
+      height: 100vh;
+    }
+
+    .brand-block {
+      padding: 20px 16px;
+      border-bottom: 1px solid var(--wt-border-soft);
+    }
+
     .brand {
-      display: inline-flex;
+      display: flex;
       align-items: center;
       gap: 10px;
-      margin-bottom: 12px;
+      text-decoration: none;
     }
+
     .brand-mark {
-      width: 28px;
-      height: 28px;
+      width: 32px;
+      height: 32px;
       border-radius: 8px;
+      border: 2px solid var(--wt-border);
+      background: var(--wt-accent-soft);
+      box-shadow: 2px 2px 0 0 #0f172a;
       overflow: hidden;
-      display: inline-block;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
     }
+
     .brand-mark img {
       width: 100%;
       height: 100%;
       display: block;
     }
-    .brand-label {
-      font-size: 0.88rem;
-      font-weight: 700;
-      letter-spacing: 0.02em;
-    }
-    .hero h1 {
-      margin: 0;
-      font-size: 2.05rem;
+
+    .brand-copy strong {
+      display: block;
+      font-size: 0.95rem;
+      color: #0f172a;
       letter-spacing: -0.02em;
     }
-    .hero p {
-      margin: 10px 0 0;
-      color: var(--muted);
-      max-width: 820px;
+
+    .brand-copy span {
+      display: block;
+      margin-top: 1px;
+      font-size: 0.67rem;
+      color: #64748b;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .sidebar-cta {
+      padding: 16px 12px 10px;
+    }
+
+    .primary-button,
+    .secondary-button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      min-height: 42px;
+      padding: 10px 14px;
+      border-radius: 12px;
+      font-size: 0.9rem;
+      font-weight: 700;
+      text-decoration: none;
+      transition: background-color 140ms ease, color 140ms ease, transform 140ms ease;
+    }
+
+    .primary-button {
+      width: 100%;
+      border: 1px solid var(--wt-border);
+      color: #ffffff;
+      background: var(--wt-accent);
+      box-shadow: 2px 2px 0 0 var(--wt-border);
+    }
+
+    .primary-button:hover,
+    .secondary-button:hover {
+      transform: translateY(-1px);
+    }
+
+    .primary-button:hover {
+      background: #991b1b;
+    }
+
+    .sidebar-nav {
+      padding: 10px 12px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      overflow-y: auto;
+    }
+
+    .nav-link {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px 10px 10px;
+      border-left: 2px solid transparent;
+      border-radius: 10px;
+      font-size: 0.92rem;
+      font-weight: 600;
+      color: #475569;
+      text-decoration: none;
+      transition: background-color 140ms ease, color 140ms ease, border-color 140ms ease;
+    }
+
+    .nav-link:hover {
+      background: #ffffff;
+      color: #0f172a;
+    }
+
+    .nav-link.active {
+      background: #fef2f2;
+      color: var(--wt-accent-strong);
+      border-left-color: var(--wt-accent-strong);
+      box-shadow: 0 1px 0 rgba(15, 23, 42, 0.06);
+    }
+
+    .nav-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      background: currentColor;
+      opacity: 0.55;
+      flex-shrink: 0;
+    }
+
+    .sidebar-footer {
+      margin-top: auto;
+      padding: 16px;
+      border-top: 1px solid var(--wt-border-soft);
+      font-size: 0.75rem;
+      color: #64748b;
       line-height: 1.5;
     }
-    .pill-row {
+
+    .sidebar-footer a {
+      color: #475569;
+      text-decoration: none;
+    }
+
+    .main-shell {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 20px 32px;
+      border-bottom: 1px solid var(--wt-border-soft);
+      background: rgba(248, 251, 255, 0.9);
+      backdrop-filter: blur(8px);
+    }
+
+    .topbar h1 {
+      margin: 0;
+      font-size: 1.1rem;
+      color: #0f172a;
+    }
+
+    .topbar p {
+      margin: 4px 0 0;
+      font-size: 0.8rem;
+      color: #64748b;
+    }
+
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      border-radius: 999px;
+      padding: 8px 12px;
+      border: 1px solid var(--wt-ok-border);
+      background: var(--wt-ok-bg);
+      color: var(--wt-ok-text);
+      font-size: 0.8rem;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .status-pill::before {
+      content: "";
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      background: #10b981;
+      box-shadow: 0 0 0 5px rgba(16, 185, 129, 0.12);
+    }
+
+    .content {
+      padding: 24px 32px 40px;
+      max-width: 1240px;
+      width: 100%;
+    }
+
+    .panel {
+      border: 1px solid var(--wt-border);
+      border-radius: 18px;
+      background: var(--wt-panel);
+      box-shadow: 2px 2px 0 0 rgba(31, 41, 55, 0.08);
+    }
+
+    .hero {
+      padding: 28px;
+      background: linear-gradient(135deg, #ffffff 0%, #fff6db 100%);
+    }
+
+    .eyebrow {
+      margin: 0;
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.18em;
+      color: var(--wt-accent);
+      font-weight: 700;
+    }
+
+    .hero h2 {
+      margin: 8px 0 0;
+      font-size: clamp(1.9rem, 3vw, 2.6rem);
+      line-height: 1.05;
+      letter-spacing: -0.04em;
+      color: #0f172a;
+      max-width: 820px;
+    }
+
+    .hero p {
+      margin: 14px 0 0;
+      max-width: 760px;
+      color: var(--wt-text-dim);
+      line-height: 1.65;
+      font-size: 0.98rem;
+    }
+
+    .chip-row,
+    .actions {
       display: flex;
       flex-wrap: wrap;
-      gap: 8px;
-      margin-top: 14px;
+      gap: 10px;
     }
-    .pill {
-      background: var(--brand-soft);
-      border: 1px solid #1f2937;
-      color: #7f1d1d;
+
+    .chip-row {
+      margin-top: 16px;
+    }
+
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      min-height: 34px;
+      padding: 7px 12px;
       border-radius: 999px;
-      padding: 5px 10px;
-      font-size: 0.78rem;
-      font-weight: 600;
+      border: 1px solid var(--wt-border);
+      background: var(--wt-accent-soft);
+      color: var(--wt-accent-strong);
+      font-size: 0.8rem;
+      font-weight: 700;
     }
-    .grid {
+
+    .actions {
+      margin-top: 18px;
+    }
+
+    .secondary-button {
+      border: 1px solid var(--wt-border);
+      background: #ffffff;
+      color: #0f172a;
+      box-shadow: 2px 2px 0 0 rgba(31, 41, 55, 0.08);
+    }
+
+    .stats {
+      margin-top: 18px;
       display: grid;
-      gap: 12px;
-      grid-template-columns: repeat(3, minmax(220px, 1fr));
-      margin-bottom: 12px;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 14px;
     }
-    .card {
-      background: var(--panel);
-      border: 1px solid var(--line);
+
+    .stat-card {
+      padding: 18px;
       border-radius: 16px;
+      border: 1px solid var(--wt-border);
+      background: #ffffff;
+      transition: border-color 140ms ease;
+    }
+
+    .stat-card:hover {
+      border-color: #ef9a9a;
+    }
+
+    .stat-card .label {
+      margin: 0 0 10px;
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      color: #64748b;
+      font-weight: 700;
+    }
+
+    .stat-card .value {
+      margin: 0;
+      font-size: 1.55rem;
+      line-height: 1.1;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      color: #0f172a;
+    }
+
+    .stat-card .meta {
+      margin: 8px 0 0;
+      color: #64748b;
+      font-size: 0.82rem;
+      line-height: 1.5;
+    }
+
+    .sections {
+      margin-top: 18px;
+      display: grid;
+      gap: 16px;
+    }
+
+    .section-card {
+      padding: 22px;
+      scroll-margin-top: 100px;
+    }
+
+    .section-card h3 {
+      margin: 0;
+      font-size: 1.02rem;
+      color: #0f172a;
+    }
+
+    .section-card p.lead {
+      margin: 8px 0 0;
+      color: #64748b;
+      font-size: 0.92rem;
+      line-height: 1.55;
+      max-width: 720px;
+    }
+
+    .info-grid {
+      margin-top: 16px;
+      display: grid;
+      grid-template-columns: minmax(0, 1.1fr) minmax(280px, 0.9fr);
+      gap: 16px;
+    }
+
+    .subpanel {
+      border: 1px solid var(--wt-border-soft);
+      background: var(--wt-panel-soft);
+      border-radius: 14px;
       padding: 16px;
     }
-    .title {
-      font-size: 0.82rem;
-      color: var(--muted);
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-      margin: 0 0 8px;
+
+    .subpanel h4 {
+      margin: 0 0 12px;
+      font-size: 0.92rem;
+      color: #0f172a;
     }
-    .value {
-      font-size: 1.45rem;
-      font-weight: 700;
-      margin: 0;
-    }
-    .layout {
-      display: grid;
-      gap: 12px;
-      grid-template-columns: 1.25fr 1fr;
-    }
-    .section-title {
-      margin: 0 0 10px;
-      font-size: 1.05rem;
-    }
+
     .list {
+      list-style: none;
       margin: 0;
-      padding-left: 18px;
-      line-height: 1.55;
-    }
-    .list li { margin-bottom: 7px; }
-    .status {
-      font-size: 0.78rem;
-      font-weight: 600;
-      padding: 3px 8px;
-      border-radius: 999px;
-      border: 1px solid;
-    }
-    .ok {
-      color: var(--ok);
-      background: #ecfaf4;
-      border-color: #b5e7d0;
-    }
-    .warn {
-      color: var(--warn);
-      background: #fff8e8;
-      border-color: #f3dfb0;
-    }
-    .mini {
-      margin-top: 10px;
+      padding: 0;
       display: grid;
-      gap: 8px;
+      gap: 10px;
     }
-    .row {
+
+    .list li {
+      padding: 12px 14px;
+      border: 1px solid var(--wt-border-soft);
+      border-radius: 12px;
+      background: #ffffff;
+      line-height: 1.55;
+      color: #334155;
+      font-size: 0.9rem;
+    }
+
+    .list strong {
+      color: #0f172a;
+    }
+
+    .stack {
+      display: grid;
+      gap: 10px;
+    }
+
+    .status-row {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      gap: 8px;
-      padding: 9px 10px;
-      border: 1px solid var(--line);
-      border-radius: 10px;
-      background: #fafcff;
-    }
-    .meta {
-      font-size: 0.84rem;
-      color: var(--muted);
-      margin-top: 6px;
-    }
-    .actions {
-      display: flex;
-      gap: 8px;
-      margin-top: 12px;
-      flex-wrap: wrap;
-    }
-    .btn {
-      text-decoration: none;
+      gap: 10px;
+      padding: 11px 12px;
+      border: 1px solid var(--wt-border-soft);
       border-radius: 12px;
-      border: 1px solid #1f2937;
-      background: #fff;
-      color: #7f1d1d;
-      padding: 8px 12px;
-      font-size: 0.86rem;
+      background: #ffffff;
+      font-size: 0.9rem;
+    }
+
+    .status-row span:first-child {
+      color: #0f172a;
       font-weight: 600;
     }
-    .btn.primary {
-      background: var(--brand);
-      border-color: var(--brand);
-      color: #fff;
+
+    .badge {
+      border-radius: 999px;
+      padding: 5px 9px;
+      border: 1px solid;
+      font-size: 0.76rem;
+      font-weight: 700;
+      white-space: nowrap;
     }
-    pre {
+
+    .badge.native {
+      color: var(--wt-ok-text);
+      background: var(--wt-ok-bg);
+      border-color: var(--wt-ok-border);
+    }
+
+    .badge.upstream {
+      color: #92400e;
+      background: rgba(245, 158, 11, 0.14);
+      border-color: rgba(245, 158, 11, 0.28);
+    }
+
+    .code-block {
       margin: 0;
-      border: 1px solid var(--line);
+      border: 1px solid var(--wt-border-soft);
       background: #f7faff;
-      border-radius: 10px;
-      padding: 10px;
+      color: #22405f;
+      border-radius: 12px;
+      padding: 14px;
       overflow-x: auto;
-      font-size: 0.85rem;
-      font-family: "Space Mono", ui-monospace, monospace;
+      font-size: 0.83rem;
+      line-height: 1.75;
     }
-    code { color: #22405f; }
-    @media (max-width: 980px) {
-      .grid { grid-template-columns: 1fr; }
-      .layout { grid-template-columns: 1fr; }
+
+    .link-grid {
+      margin-top: 14px;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .doc-link {
+      text-decoration: none;
+      padding: 16px;
+      border-radius: 14px;
+      border: 1px solid var(--wt-border-soft);
+      background: #ffffff;
+      transition: transform 140ms ease, border-color 140ms ease;
+    }
+
+    .doc-link:hover {
+      transform: translateY(-1px);
+      border-color: #ef9a9a;
+    }
+
+    .doc-link strong {
+      display: block;
+      font-size: 0.92rem;
+      color: #0f172a;
+    }
+
+    .doc-link span {
+      display: block;
+      margin-top: 6px;
+      font-size: 0.82rem;
+      color: #64748b;
+      line-height: 1.5;
+    }
+
+    @media (max-width: 1100px) {
+      .stats {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .info-grid,
+      .link-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 860px) {
+      .app-shell {
+        display: block;
+      }
+
+      .sidebar {
+        position: relative;
+        width: 100%;
+        height: auto;
+        border-right: 0;
+        border-bottom: 1px solid var(--wt-border-soft);
+      }
+
+      .topbar,
+      .content {
+        padding-left: 18px;
+        padding-right: 18px;
+      }
+
+      .topbar {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .hero,
+      .section-card {
+        padding: 20px;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .stats {
+        grid-template-columns: 1fr;
+      }
+
+      .actions,
+      .chip-row {
+        flex-direction: column;
+      }
+
+      .primary-button,
+      .secondary-button {
+        width: 100%;
+      }
     }
   </style>
 </head>
 <body>
-  <div class="wrap">
-    <header class="hero">
-      <div class="brand">
-        <span class="brand-mark"><img src="./wt-logo.svg" alt="Wt logo"></span>
-        <span class="brand-label">WatchTower</span>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand-block">
+        <a class="brand" href="#overview">
+          <span class="brand-mark"><img src="./wt-logo.svg" alt="Wt logo"></span>
+          <span class="brand-copy">
+            <strong>WatchTower</strong>
+            <span>Control Plane Docs</span>
+          </span>
+        </a>
       </div>
-      <h1>WatchTower Docs</h1>
-      <p>
-        Clear setup guides for WatchTower as both a Podman auto-update service and an App Center deployment control plane.
-      </p>
-      <div class="pill-row">
-        <span class="pill">Mode 1: Podman container auto-updates</span>
-        <span class="pill">Mode 2: App Center multi-node SSH deploys</span>
-        <span class="pill">Onboarding: Podman, Docker, Tailscale, Cloudflare, Nginx</span>
+
+      <div class="sidebar-cta">
+        <a class="primary-button" href="https://github.com/sinhaankur/WatchTower">Open Repository</a>
       </div>
-      <div class="actions">
-        <a class="btn primary" href="https://github.com/sinhaankur/WatchTower">Repository</a>
-        <a class="btn" href="../README.md">Main README</a>
-        <a class="btn" href="./WATCHTOWER_MESH_VERCEL.md">Mesh Runbook</a>
+
+      <nav class="sidebar-nav" aria-label="Documentation sections">
+        <a class="nav-link active" href="#overview"><span class="nav-dot"></span>Overview</a>
+        <a class="nav-link" href="#modes"><span class="nav-dot"></span>Deployment Modes</a>
+        <a class="nav-link" href="#upstream"><span class="nav-dot"></span>Upstream Usage</a>
+        <a class="nav-link" href="#setup"><span class="nav-dot"></span>Quick Team Setup</a>
+        <a class="nav-link" href="#provenance"><span class="nav-dot"></span>Feature Provenance</a>
+        <a class="nav-link" href="#guides"><span class="nav-dot"></span>Guides</a>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div>GitHub Pages mirrors the same visual shell as the app dashboard for faster team onboarding.</div>
+        <div style="margin-top: 10px;"><a href="https://github.com/sinhaankur/WatchTower">GitHub</a> · <a href="./WATCHTOWER_MESH_VERCEL.md">Mesh Runbook</a></div>
       </div>
-    </header>
+    </aside>
 
-    <section class="grid">
-      <article class="card">
-        <p class="title">Release Channel</p>
-        <p class="value">GitHub + GHCR + PyPI</p>
-        <p class="meta">Versioned tags publish package, image, and CLI artifacts.</p>
-      </article>
-      <article class="card">
-        <p class="title">Deployment Modes</p>
-        <p class="value">App Center, Mesh, Hybrid</p>
-        <p class="meta">Local-first plus optional cloud-backed persistence.</p>
-      </article>
-      <article class="card">
-        <p class="title">Auth Modes</p>
-        <p class="value">GitHub OAuth or API Token</p>
-        <p class="meta">OAuth optional, API token fallback supported.</p>
-      </article>
-    </section>
+    <main class="main-shell">
+      <header class="topbar">
+        <div>
+          <h1>Docs Dashboard</h1>
+          <p>Product-style documentation for WatchTower operations, setup, and release flow.</p>
+        </div>
+        <div class="status-pill">GitHub Pages Live</div>
+      </header>
 
-    <section class="layout">
-      <article class="card">
-        <h2 class="section-title">What This Project Uses From Upstream</h2>
-        <ul class="list">
-          <li>
-            <strong>Container updater behavior:</strong> Uses upstream
-            <a href="https://github.com/containrrr/watchtower">containrrr/watchtower</a>
-            for image polling and restart semantics.
-          </li>
-          <li>
-            <strong>Networking concept direction:</strong> UX and control flow are inspired by
-            <a href="https://github.com/tailscale/tailscale">tailscale/tailscale</a>
-            for team-friendly host connectivity workflows.
-          </li>
-          <li>
-            <strong>Domain connectivity:</strong> Cloudflare tunnel setup is generated through
-            WatchTower Host Connect helper endpoints.
-          </li>
-        </ul>
+      <div class="content">
+        <section class="panel hero" id="overview">
+          <p class="eyebrow">WatchTower</p>
+          <h2>Use the docs with the same UI language as the app itself.</h2>
+          <p>
+            GitHub Pages now follows the WatchTower control-plane shell: the same retro product palette, the same left navigation model,
+            the same card rhythm, and the same quick-action structure used inside the application dashboard.
+          </p>
+          <div class="chip-row">
+            <span class="chip">Mode 1: Podman container auto-updates</span>
+            <span class="chip">Mode 2: App Center multi-node SSH deploys</span>
+            <span class="chip">Onboarding: Podman, Docker, Tailscale, Cloudflare, Nginx</span>
+          </div>
+          <div class="actions">
+            <a class="primary-button" href="https://github.com/sinhaankur/WatchTower">Repository</a>
+            <a class="secondary-button" href="https://github.com/sinhaankur/WatchTower/blob/main/README.md">Main README</a>
+            <a class="secondary-button" href="./WATCHTOWER_MESH_VERCEL.md">Mesh Runbook</a>
+          </div>
+        </section>
 
-        <h2 class="section-title" style="margin-top:14px;">Quick Team Setup</h2>
-        <pre><code>1) Open Host Connect in WatchTower
+        <section class="stats" id="modes">
+          <article class="stat-card panel">
+            <p class="label">Release Channel</p>
+            <p class="value">GitHub + GHCR + PyPI</p>
+            <p class="meta">Versioned tags publish package, image, and CLI artifacts.</p>
+          </article>
+          <article class="stat-card panel">
+            <p class="label">Deployment Modes</p>
+            <p class="value">App Center, Mesh, Hybrid</p>
+            <p class="meta">Local-first control plane with optional cloud-backed persistence.</p>
+          </article>
+          <article class="stat-card panel">
+            <p class="label">Auth Modes</p>
+            <p class="value">GitHub OAuth or API Token</p>
+            <p class="meta">GitHub sign-in is optional; token-based access remains available.</p>
+          </article>
+          <article class="stat-card panel">
+            <p class="label">Docs UX</p>
+            <p class="value">Sidebar + Panels</p>
+            <p class="meta">The docs now mirror dashboard navigation and action placement.</p>
+          </article>
+        </section>
+
+        <div class="sections">
+          <section class="panel section-card" id="upstream">
+            <h3>What This Project Uses From Upstream</h3>
+            <p class="lead">This section keeps the provenance story explicit while matching the application’s panel-based information layout.</p>
+            <div class="info-grid">
+              <div class="subpanel">
+                <h4>Upstream Dependencies</h4>
+                <ul class="list">
+                  <li><strong>Container updater behavior:</strong> Uses upstream <a href="https://github.com/containrrr/watchtower">containrrr/watchtower</a> for image polling and restart semantics.</li>
+                  <li><strong>Networking concept direction:</strong> UX and control flow are inspired by <a href="https://github.com/tailscale/tailscale">tailscale/tailscale</a> for team-friendly host connectivity workflows.</li>
+                  <li><strong>Domain connectivity:</strong> Cloudflare tunnel setup is generated through WatchTower Host Connect helper endpoints.</li>
+                </ul>
+              </div>
+              <div class="subpanel" id="provenance">
+                <h4>Feature Provenance</h4>
+                <div class="stack">
+                  <div class="status-row"><span>WatchTower runtime API</span><span class="badge native">native</span></div>
+                  <div class="status-row"><span>GitHub OAuth + API token auth</span><span class="badge native">native</span></div>
+                  <div class="status-row"><span>Auto image polling and restart</span><span class="badge upstream">upstream watchtower</span></div>
+                  <div class="status-row"><span>Host-connect UX pattern</span><span class="badge upstream">tailscale-inspired</span></div>
+                  <div class="status-row"><span>Managed DB + Nginx setup plans</span><span class="badge native">native</span></div>
+                  <div class="status-row"><span>Secure terminal command runner + encrypted audit</span><span class="badge native">native</span></div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="panel section-card" id="setup">
+            <h3>Quick Team Setup</h3>
+            <p class="lead">The same “what do I do next?” UX from the product dashboard is carried into the docs as a concise operational checklist.</p>
+            <pre class="code-block"><code>1) Open Host Connect in WatchTower
 2) Install missing tools on each team machine
 3) Join Tailscale tailnet for private connectivity
-      4) Configure encrypted terminal audit key
-      5) Generate Cloudflare tunnel domain plan
-      6) Deploy applications from Dashboard</code></pre>
-      </article>
+4) Configure encrypted terminal audit key
+5) Generate Cloudflare tunnel domain plan
+6) Deploy applications from Dashboard</code></pre>
+          </section>
 
-      <article class="card">
-        <h2 class="section-title">Feature Provenance</h2>
-        <div class="mini">
-          <div class="row">
-            <span>WatchTower runtime API</span>
-            <span class="status ok">native</span>
-          </div>
-          <div class="row">
-            <span>GitHub OAuth + API token auth</span>
-            <span class="status ok">native</span>
-          </div>
-          <div class="row">
-            <span>Auto image polling/restart</span>
-            <span class="status warn">upstream watchtower</span>
-          </div>
-          <div class="row">
-            <span>Host-connect UX pattern</span>
-            <span class="status warn">tailscale-inspired</span>
-          </div>
-          <div class="row">
-            <span>Managed DB + Nginx setup plans</span>
-            <span class="status ok">native</span>
-          </div>
-          <div class="row">
-            <span>Secure terminal command runner + encrypted audit</span>
-            <span class="status ok">native</span>
-          </div>
+          <section class="panel section-card" id="guides">
+            <h3>Guides And Runbooks</h3>
+            <p class="lead">Use the same quick-link discovery pattern as the app for the documents teams actually open during setup and operations.</p>
+            <div class="link-grid">
+              <a class="doc-link" href="./WATCHTOWER_MESH_VERCEL.md">
+                <strong>Mesh Runbook</strong>
+                <span>Deploy WatchTower in mesh-style topologies with operational guardrails and preview patterns.</span>
+              </a>
+              <a class="doc-link" href="./HA_PODMAN_WATCHTOWER.md">
+                <strong>HA Podman WatchTower</strong>
+                <span>High-availability guidance for Podman-based update flows and service operations.</span>
+              </a>
+              <a class="doc-link" href="./HYBRID_CLOUD_DATABASES.md">
+                <strong>Hybrid Cloud Databases</strong>
+                <span>Reference material for mixed local and remote database connectivity in WatchTower deployments.</span>
+              </a>
+            </div>
+          </section>
         </div>
-      </article>
-    </section>
+      </div>
+    </main>
   </div>
+
+  <script>
+    const sections = document.querySelectorAll('section[id], div[id]');
+    const links = document.querySelectorAll('.nav-link');
+
+    const setActiveLink = (id) => {
+      links.forEach((link) => {
+        const isActive = link.getAttribute('href') === `#${id}`;
+        link.classList.toggle('active', isActive);
+      });
+    };
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries
+          .filter((entry) => entry.isIntersecting)
+          .sort((left, right) => right.intersectionRatio - left.intersectionRatio);
+        if (visible.length > 0) {
+          setActiveLink(visible[0].target.id);
+        }
+      },
+      {
+        rootMargin: '-25% 0px -55% 0px',
+        threshold: [0.2, 0.45, 0.7],
+      }
+    );
+
+    sections.forEach((section) => observer.observe(section));
+  </script>
 </body>
 </html>
