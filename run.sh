@@ -25,13 +25,40 @@ success() { echo -e "${GREEN}[WatchTower]${NC} $*"; }
 warn()    { echo -e "${YELLOW}[WatchTower]${NC} $*"; }
 error()   { echo -e "${RED}[WatchTower]${NC} $*" >&2; }
 
-is_listening() { lsof -i ":$1" -sTCP:LISTEN -n -P >/dev/null 2>&1; }
+# Detect architecture (Raspberry Pi reports aarch64 or armv7l)
+ARCH=$(uname -m)
+IS_ARM=false
+[[ "$ARCH" == aarch64 || "$ARCH" == armv7l || "$ARCH" == armv6l ]] && IS_ARM=true
 
+# Portable TCP listen check — prefers ss (iproute2, always on Pi OS),
+# falls back to lsof (macOS, Debian desktop), then netstat.
+is_listening() {
+  local port="$1"
+  if command -v ss >/dev/null 2>&1; then
+    ss -tlnH "sport = :${port}" 2>/dev/null | grep -q "."
+  elif command -v lsof >/dev/null 2>&1; then
+    lsof -i ":${port}" -sTCP:LISTEN -n -P >/dev/null 2>&1
+  else
+    netstat -tln 2>/dev/null | grep -q ":${port} "
+  fi
+}
+
+# Kill whatever is holding a port — works without fuser (not on Pi OS Lite)
 free_port() {
   local port="$1"
   if is_listening "$port"; then
     warn "Port $port is occupied — killing existing process..."
-    fuser -k "${port}/tcp" 2>/dev/null || true
+    # Try fuser first (Debian full), fall back to ss+kill (Pi OS Lite)
+    if command -v fuser >/dev/null 2>&1; then
+      fuser -k "${port}/tcp" 2>/dev/null || true
+    else
+      local pids
+      pids=$(ss -tlnpH "sport = :${port}" 2>/dev/null \
+             | grep -oP 'pid=\K[0-9]+' || true)
+      for pid in $pids; do
+        kill "$pid" 2>/dev/null || true
+      done
+    fi
     sleep 0.5
   fi
 }
@@ -132,8 +159,16 @@ fi
 # ── Step 5: Launch UI ────────────────────────────────────────────────────────
 # Detect best mode if auto
 if [[ "$MODE" == "auto" ]]; then
-  if [[ -n "${DISPLAY:-}" ]] && command -v electron >/dev/null 2>&1 \
-     || [[ -d "$ROOT/desktop/node_modules" ]]; then
+  if [[ "$IS_ARM" == true ]]; then
+    # Raspberry Pi / ARM: default to browser mode.
+    # Electron can run on Pi 4/5 (arm64) but requires ~500 MB RAM and a
+    # connected display. Browser mode works on any Pi with just the backend.
+    # Override with: ./run.sh desktop
+    info "ARM detected ($ARCH) — defaulting to browser mode."
+    info "To run the desktop app instead: ./run.sh desktop"
+    MODE=browser
+  elif [[ -n "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ]] && \
+       ( command -v electron >/dev/null 2>&1 || [[ -d "$ROOT/desktop/node_modules" ]] ); then
     MODE=desktop
   else
     MODE=browser

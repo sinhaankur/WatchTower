@@ -9,7 +9,11 @@ const path = require('path');
 // ── GPU / Renderer stability flags ──────────────────────────────────────────
 // Must be set before app.whenReady().
 //
-// On Linux the correct flags depend on the display server:
+// On Linux the correct flags depend on the display server and architecture:
+//
+//   ARM (Raspberry Pi) — VideoCore/V3D GPU has limited desktop-GL support.
+//              Force software rendering so Chromium uses SwiftShader (CPU).
+//              Electron still renders correctly; Pi 4/5 RAM is sufficient.
 //
 //   Wayland  — each app has an isolated GPU context; no sandbox workarounds
 //              needed. Enable native Wayland window decorations and let
@@ -21,11 +25,14 @@ const path = require('path');
 //              (e.g. VS Code) that share the same GPU compositor.
 //              Work around by running GPU in-process with no sandbox.
 //
-// Software-rendering fallback: set env WATCHTOWER_NO_GPU=1 or pass --no-gpu
-// on the command line to force CPU rendering (safe on any GPU/driver).
+// Software-rendering fallback: set WATCHTOWER_NO_GPU=1 or pass --no-gpu.
 if (process.platform === 'linux') {
-  if (process.argv.includes('--no-gpu') || process.env.WATCHTOWER_NO_GPU === '1') {
-    // Explicit software-rendering fallback for broken/headless environments.
+  const isArm = process.arch === 'arm64' || process.arch === 'arm';
+
+  if (process.argv.includes('--no-gpu') || process.env.WATCHTOWER_NO_GPU === '1' || isArm) {
+    // Raspberry Pi / ARM: VideoCore GPU is incompatible with Chromium's desktop-GL
+    // path. SwiftShader (software) renders the UI correctly with zero GPU crashes.
+    // Also used as an explicit fallback for headless / broken-GPU environments.
     app.disableHardwareAcceleration();
   } else if (process.env.WAYLAND_DISPLAY) {
     // Wayland: native GPU isolation — no sandbox workarounds needed.

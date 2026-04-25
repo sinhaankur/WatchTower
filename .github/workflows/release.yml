@@ -70,8 +70,17 @@ jobs:
       matrix:
         include:
           - os: ubuntu-latest
-            eb_args: --linux AppImage deb
-            artifact_glob: "desktop/dist/*.AppImage desktop/dist/*.deb"
+            eb_args: --linux AppImage deb --x64
+            artifact_glob: "desktop/dist/*x64*"
+          - os: ubuntu-latest
+            eb_args: --linux AppImage deb --arm64
+            artifact_glob: "desktop/dist/*arm64*"
+            # arm64 cross-compile needs the ARM64 sysroot libs
+            extra_apt: "gcc-aarch64-linux-gnu"
+          - os: ubuntu-latest
+            eb_args: --linux AppImage deb --armv7l
+            artifact_glob: "desktop/dist/*armv7l*"
+            extra_apt: "gcc-arm-linux-gnueabihf"
           - os: macos-latest
             eb_args: --mac dmg zip
             artifact_glob: "desktop/dist/*.dmg desktop/dist/*.zip"
@@ -81,6 +90,13 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+
+      # ── ARM cross-compile toolchain (Linux ARM64/armv7l only) ───────────────
+      - name: Install ARM cross-compiler
+        if: matrix.extra_apt != ''
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y ${{ matrix.extra_apt }}
 
       # ── Build the React frontend first (web/dist/) ──────────────────────────
       - uses: actions/setup-node@v4
