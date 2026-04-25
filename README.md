@@ -39,6 +39,18 @@ App Center mode is designed to feel simple like hosted deployment platforms:
   <img src="docs/assets/hybrid-stack.svg" alt="WatchTower hybrid stack overview showing local operator workspace, WatchTower API, managed services, app nodes, and data plane" />
 </a>
 
+### Application And Web App Surface
+
+<a href="https://sinhaankur.github.io/WatchTower/" target="_blank" rel="noreferrer">
+  <img src="docs/assets/application-surface.svg" alt="WatchTower application and web app surface showing dashboard, artifact build, and public web app delivery" />
+</a>
+
+### Secure Terminal Command Flow
+
+<a href="https://sinhaankur.github.io/WatchTower/viewer.html?doc=readme" target="_blank" rel="noreferrer">
+  <img src="docs/assets/secure-terminal-flow.svg" alt="WatchTower secure terminal command flow showing Host Connect request, policy gate, execution path, encrypted audit, and operator result" />
+</a>
+
 ---
 
 ## Core Features
