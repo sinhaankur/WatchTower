@@ -8,6 +8,7 @@
 #   ./run.sh browser      # Browser (http://127.0.0.1:5222)
 #   ./run.sh stop         # Kill all WatchTower processes
 #   ./run.sh logs         # Tail backend + frontend logs
+#   ./run.sh update       # Pull latest code from GitHub and rebuild
 # ──────────────────────────────────────────────────────────────────────────────
 set -euo pipefail
 
@@ -74,7 +75,63 @@ free_port() {
   fi
 }
 
-# ── stop ─────────────────────────────────────────────────────────────────────
+# ── update ────────────────────────────────────────────────────────────────────
+cmd_update() {
+  info "Checking for updates..."
+
+  # Must be run from a git checkout
+  if [[ ! -d "$ROOT/.git" ]]; then
+    error "Not a git repository — cannot self-update. Download the latest release from:"
+    echo "  https://github.com/sinhaankur/WatchTower/releases"
+    exit 1
+  fi
+
+  # Fetch and compare
+  git -C "$ROOT" fetch origin main -q
+  LOCAL=$(git -C "$ROOT" rev-parse HEAD)
+  REMOTE=$(git -C "$ROOT" rev-parse origin/main)
+
+  if [[ "$LOCAL" == "$REMOTE" ]]; then
+    success "Already up to date ($(git -C "$ROOT" describe --tags --always 2>/dev/null || echo ${LOCAL:0:8}))."
+    exit 0
+  fi
+
+  CURRENT_VERSION=$(git -C "$ROOT" describe --tags --always 2>/dev/null || echo "${LOCAL:0:8}")
+  NEW_VERSION=$(git -C "$ROOT" describe --tags --always origin/main 2>/dev/null || echo "${REMOTE:0:8}")
+  info "Updating from $CURRENT_VERSION → $NEW_VERSION..."
+
+  # Stop running services first
+  cmd_stop 2>/dev/null || true
+
+  # Pull latest code
+  git -C "$ROOT" pull --ff-only origin main
+
+  # Force dependency reinstall
+  rm -f "$VENV/.deps_installed"
+
+  # Recreate venv if Python was upgraded
+  if [[ -x "$VENV/bin/python" ]]; then
+    "$VENV/bin/pip" install --prefer-binary --upgrade pip -q
+    "$VENV/bin/pip" install --prefer-binary -r "$ROOT/requirements.txt" -q
+    "$VENV/bin/pip" install -e "$ROOT" -q
+    touch "$VENV/.deps_installed"
+  fi
+
+  # Rebuild frontend
+  info "Rebuilding frontend..."
+  npm --prefix "$ROOT/web" install --silent
+  npm --prefix "$ROOT/web" run build --silent
+
+  # Update desktop deps if present
+  if [[ -d "$ROOT/desktop/node_modules" ]]; then
+    npm --prefix "$ROOT/desktop" install --silent
+  fi
+
+  success "Update complete! Run ./run.sh to start the updated app."
+  exit 0
+}
+
+
 cmd_stop() {
   info "Stopping WatchTower..."
   pkill -f "electron \." 2>/dev/null && info "Electron stopped." || true
@@ -94,12 +151,13 @@ cmd_logs() {
 # ── Parse args ───────────────────────────────────────────────────────────────
 MODE="${1:-auto}"
 case "$MODE" in
-  stop)  cmd_stop ;;
-  logs)  cmd_logs ;;
+  stop)   cmd_stop ;;
+  logs)   cmd_logs ;;
+  update) cmd_update ;;
   desktop|browser|auto) ;;
   *)
     error "Unknown command: $MODE"
-    echo "Usage: $0 [desktop|browser|stop|logs]"
+    echo "Usage: $0 [desktop|browser|stop|logs|update]"
     exit 1 ;;
 esac
 
