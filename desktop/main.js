@@ -5,6 +5,26 @@ const fs = require('fs');
 const http = require('http');
 const path = require('path');
 
+// ── GPU / Renderer stability flags ──────────────────────────────────────────
+// Required on Linux with NVIDIA driver 500+ and kernel 6.x.
+// The GPU sandbox crashes Chromium's GPU process on new NVIDIA open drivers,
+// which also brings down other Electron apps (e.g. VS Code) sharing the GPU.
+//
+// These flags MUST be set before app.whenReady().
+if (process.platform === 'linux') {
+  // Keep hardware acceleration but run GPU in the browser process
+  // (avoids the sandbox fork that crashes with new NVIDIA drivers).
+  app.commandLine.appendSwitch('in-process-gpu');
+  // Use desktop GL (EGL via NVIDIA) instead of SwiftShader.
+  app.commandLine.appendSwitch('use-gl', 'desktop');
+  // Disable GPU sandbox — causes SIGSEGV on NVIDIA 500+ / kernel 6.x.
+  app.commandLine.appendSwitch('disable-gpu-sandbox');
+  // Prevent Chromium from using ANGLE (causes black windows on some NVIDIA X11 setups).
+  app.commandLine.appendSwitch('use-angle', 'gl');
+  // Reduce GPU memory pressure during startup.
+  app.commandLine.appendSwitch('disable-features', 'VizDisplayCompositor');
+}
+
 const HOST = '127.0.0.1';
 const FRONTEND_PORT = 5222;
 const BACKEND_PORT = 8000;
