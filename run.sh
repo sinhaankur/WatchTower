@@ -19,6 +19,15 @@ VENV="$ROOT/.venv"
 LOG_API=/tmp/watchtower-api.log
 LOG_WEB=/tmp/watchtower-web.log
 
+# Load .env once for all run modes so desktop/browser share the same local config
+# (OAuth credentials, custom API token, etc.). Keep existing shell values if already set.
+if [[ -f "$ROOT/.env" ]]; then
+  set -a
+  # shellcheck disable=SC1091
+  source "$ROOT/.env"
+  set +a
+fi
+
 # ── Colours ──────────────────────────────────────────────────────────────────
 GREEN='\033[0;32m'; YELLOW='\033[1;33m'; RED='\033[0;31m'; CYAN='\033[0;36m'; NC='\033[0m'
 info()    { echo -e "${CYAN}[WatchTower]${NC} $*"; }
@@ -234,10 +243,6 @@ fi
 if [[ "$MODE" != "desktop" ]] && ! is_listening "$API_PORT"; then
   free_port "$API_PORT"
   info "Starting backend on 127.0.0.1:$API_PORT..."
-  # Load .env if present (non-secret dev config only)
-  if [[ -f "$ROOT/.env" ]]; then
-    set -a; source "$ROOT/.env"; set +a
-  fi
   WATCHTOWER_ALLOW_INSECURE_DEV_AUTH="${WATCHTOWER_ALLOW_INSECURE_DEV_AUTH:-true}" \
     "$VENV/bin/python" -m uvicorn watchtower.api:app \
       --app-dir "$ROOT" --host 127.0.0.1 --port "$API_PORT" \
