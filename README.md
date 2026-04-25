@@ -42,6 +42,30 @@ That's it. `run.sh` will:
 
 > **Requirements:** Python 3.8+, Node.js 18+, npm. Podman optional (only needed for container auto-update mode).
 
+### Run With Docker
+
+Use the single-node app compose file for a production-like local run:
+
+```bash
+git clone https://github.com/sinhaankur/WatchTower.git
+cd WatchTower
+
+# Optional: set your own strong token first
+export WATCHTOWER_API_TOKEN="change-this-token"
+
+docker compose -f docker-compose.app.yml up -d --build
+```
+
+Open `http://127.0.0.1:8000` and authenticate with the token you configured.
+
+Useful Docker commands:
+
+```bash
+docker compose -f docker-compose.app.yml ps
+docker compose -f docker-compose.app.yml logs -f watchtower
+docker compose -f docker-compose.app.yml down
+```
+
 ---
 
 WatchTower is an operator-facing tool for two adjacent jobs:
