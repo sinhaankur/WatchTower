@@ -120,14 +120,21 @@ def _ensure_user_org_member(db: Session, current_user: dict):
     user_id = _current_user_uuid(current_user)
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
-        user = User(
-            id=user_id,
-            email=current_user.get("email", "developer@watchtower.local"),
-            name=current_user.get("name", "WatchTower Developer"),
-            is_active=True,
-        )
-        db.add(user)
-        db.flush()
+        # Fallback: look up by email to handle token changes between restarts
+        email = current_user.get("email", "developer@watchtower.local")
+        user = db.query(User).filter(User.email == email).first()
+        if not user:
+            user = User(
+                id=user_id,
+                email=email,
+                name=current_user.get("name", "WatchTower Developer"),
+                is_active=True,
+            )
+            db.add(user)
+            db.flush()
+        else:
+            # Use the existing user's canonical ID for all ownership checks
+            user_id = user.id
 
     if _owner_mode_enabled():
         claim = _claim_installation_if_needed(db, user)
