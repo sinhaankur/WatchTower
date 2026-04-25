@@ -138,11 +138,14 @@ const runtimeApiToken = process.env.WATCHTOWER_API_TOKEN || `wt-${crypto.randomB
 // Resolve the best available icon for this platform.
 const iconsDir = path.join(__dirname, 'build', 'icons');
 function resolveAppIcon() {
-  const candidates = [
-    path.join(iconsDir, 'app.icns'),  // macOS
-    path.join(iconsDir, 'app.ico'),   // Windows
-    path.join(iconsDir, 'favicon-128.png'), // Linux / fallback
-  ];
+  // Only offer formats the current OS can actually load.
+  const candidates =
+    process.platform === 'darwin'
+      ? [path.join(iconsDir, 'app.icns'), path.join(iconsDir, 'favicon-128.png')]
+      : process.platform === 'win32'
+      ? [path.join(iconsDir, 'app.ico'), path.join(iconsDir, 'favicon-128.png')]
+      : /* linux / other */
+        [path.join(iconsDir, 'favicon-128.png'), path.join(iconsDir, 'favicon-96.png')];
   for (const f of candidates) {
     if (fs.existsSync(f)) return f;
   }
@@ -151,6 +154,12 @@ function resolveAppIcon() {
 const APP_ICON = resolveAppIcon();
 
 // ── Single-instance lock ─────────────────────────────────────────────────────
+
+// Expose the per-launch API token to the renderer via synchronous IPC.
+// The preload script calls this before React boots so the token is already
+// in localStorage when the first useEffect runs.
+ipcMain.on('wt:getApiToken', (event) => { event.returnValue = runtimeApiToken; });
+
 // Prevents a second Electron process from opening a duplicate splash window.
 const gotSingleInstanceLock = app.requestSingleInstanceLock();
 if (!gotSingleInstanceLock) {
