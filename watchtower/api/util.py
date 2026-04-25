@@ -42,6 +42,72 @@ def to_uuid(value) -> uuid.UUID:
         ) from exc
 
 
+def assert_safe_external_url(url: str) -> str:
+    """Validate ``url`` for use in server-side outbound HTTP requests.
+
+    Blocks SSRF vectors:
+      - Non-http(s) schemes (file://, gopher://, ftp://...).
+      - Hostnames that resolve to loopback, link-local, private, or
+        reserved address ranges (127/8, 10/8, 172.16/12, 192.168/16,
+        169.254/16 incl. cloud metadata 169.254.169.254, ::1, fc00::/7).
+      - Empty / malformed URLs.
+
+    Returns the original URL on success; raises HTTPException(400) otherwise.
+
+    Set ``WATCHTOWER_ALLOW_INTERNAL_HTTP=true`` to bypass (only for local
+    dev against a self-hosted GHES on localhost).
+    """
+    import ipaddress
+    import socket
+    from urllib.parse import urlsplit
+
+    if os.getenv("WATCHTOWER_ALLOW_INTERNAL_HTTP", "false").lower() == "true":
+        return url
+
+    try:
+        parts = urlsplit(url)
+    except (ValueError, AttributeError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid URL",
+        ) from exc
+
+    if parts.scheme not in ("http", "https") or not parts.hostname:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="URL must be an http(s) URL with a hostname",
+        )
+
+    host = parts.hostname
+    try:
+        infos = socket.getaddrinfo(host, None)
+    except socket.gaierror as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Could not resolve hostname",
+        ) from exc
+
+    for info in infos:
+        ip = info[4][0]
+        try:
+            addr = ipaddress.ip_address(ip)
+        except ValueError:
+            continue
+        if (
+            addr.is_loopback
+            or addr.is_private
+            or addr.is_link_local
+            or addr.is_reserved
+            or addr.is_multicast
+            or addr.is_unspecified
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="URL points to a non-routable / internal address",
+            )
+    return url
+
+
 def _auth_signing_secret() -> str:
     secret = (
         os.getenv("WATCHTOWER_AUTH_SECRET")
