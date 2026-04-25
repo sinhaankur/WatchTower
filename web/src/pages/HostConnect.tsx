@@ -136,16 +136,40 @@ const HostConnect = () => {
     setLoading(true);
     setError('');
     try {
-      const [statusResp, cmdResp] = await Promise.all([
+      const [statusResp, cmdResp, terminalPolicyResp] = await Promise.allSettled([
         apiClient.get('/runtime/integrations/status'),
         apiClient.get('/runtime/integrations/install-commands'),
+        apiClient.get('/runtime/terminal/policy'),
       ]);
-      setIntegrations(statusResp.data as IntegrationsPayload);
-      setCommands(cmdResp.data as InstallCommandsPayload);
-      const terminalPolicyResp = await apiClient.get('/runtime/terminal/policy');
-      setTerminalPolicy(terminalPolicyResp.data as TerminalPolicyResponse);
+
+      const failedSections: string[] = [];
+
+      if (statusResp.status === 'fulfilled') {
+        setIntegrations(statusResp.value.data as IntegrationsPayload);
+      } else {
+        setIntegrations(null);
+        failedSections.push('tool status');
+      }
+
+      if (cmdResp.status === 'fulfilled') {
+        setCommands(cmdResp.value.data as InstallCommandsPayload);
+      } else {
+        setCommands(null);
+        failedSections.push('install commands');
+      }
+
+      if (terminalPolicyResp.status === 'fulfilled') {
+        setTerminalPolicy(terminalPolicyResp.value.data as TerminalPolicyResponse);
+      } else {
+        setTerminalPolicy(null);
+        failedSections.push('terminal policy');
+      }
+
+      if (failedSections.length > 0) {
+        setError(`Some Host Connect sections failed to load (${failedSections.join(', ')}). Check API connectivity and token.`);
+      }
     } catch {
-      setError('Failed to load integration status. Check API connectivity and token.');
+      setError('Failed to load Host Connect data. Check API connectivity and token.');
     } finally {
       setLoading(false);
     }
