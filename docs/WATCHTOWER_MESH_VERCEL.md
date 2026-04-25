@@ -2,6 +2,12 @@
 
 This mode implements the closest practical equivalent to a self-hosted Vercel workflow in this repository.
 
+## Visual Overview
+
+![WatchTower mesh topology](./assets/mesh-topology.svg)
+
+![WatchTower deployment process](./assets/deploy-process.svg)
+
 ## Architecture
 
 - Git listener: GitHub Actions builds images from repository pushes.
@@ -20,6 +26,12 @@ Because of that, this mesh mode uses:
 - GitHub Actions for automated image creation
 - Watchtower for fast infrastructure image sync and registry polling
 - `scripts/mesh-bluegreen-deploy.sh` for zero-downtime application promotion
+
+Upstream reference:
+
+- Watchtower updater semantics in this mode come from `containrrr/watchtower`.
+- Use upstream docs for supported flags and runtime behavior:
+	https://github.com/containrrr/watchtower
 
 That is the safe engineering tradeoff in this repository today.
 
