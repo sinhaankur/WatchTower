@@ -87,7 +87,11 @@ const TeamManagement = () => {
     }
   };
 
-  useEffect(() => { void loadContext(); }, []);
+  useEffect(() => {
+    void loadContext();
+    // Initial page bootstrap should run once on mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const inviteMember = async () => {
     if (!orgId || !email.trim()) return;
@@ -139,7 +143,7 @@ const TeamManagement = () => {
             </p>
           </div>
           {offlineMode && (
-            <Button variant="outline" onClick={() => void loadContext()} className="rounded-md border-gray-300 text-sm">
+            <Button variant="outline" onClick={() => void loadContext()} className="text-sm">
               ↺ Retry Connection
             </Button>
           )}
@@ -185,14 +189,14 @@ const TeamManagement = () => {
                 <Input id="invite_email" type="email" value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && void inviteMember()}
-                  className="mt-1.5 rounded-md border-gray-300"
+                  className="mt-1.5 rounded-md"
                   placeholder="engineer@example.com" />
               </div>
               <div>
                 <Label htmlFor="invite_role">Role</Label>
                 <select id="invite_role" value={role}
                   onChange={(e) => setRole(e.target.value as TeamMember['role'])}
-                  className="mt-1.5 w-full border border-gray-300 rounded-md h-10 px-3 text-sm bg-white">
+                  className="mt-1.5 w-full border border-slate-800 rounded-md h-10 px-3 text-sm bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-red-700 focus:ring-offset-2">
                   <option value="developer">Developer — can create projects & deploy</option>
                   <option value="viewer">Viewer — read-only access</option>
                   <option value="admin">Admin — manage nodes, team & deployments</option>
@@ -201,7 +205,7 @@ const TeamManagement = () => {
               </div>
               <Button onClick={() => void inviteMember()}
                 disabled={inviting || offlineMode || !orgId || !email.trim()}
-                className="w-full bg-black text-white hover:bg-gray-900 rounded-md">
+                className="w-full bg-red-700 text-white hover:bg-red-800 rounded-md">
                 {inviting ? 'Sending invite…' : offlineMode ? 'Server offline' : 'Send Invite'}
               </Button>
             </CardContent>
@@ -217,12 +221,12 @@ const TeamManagement = () => {
               <div className="grid grid-cols-2 gap-2">
                 <Button onClick={() => void startOAuth('github_com')}
                   disabled={loading || !orgId || offlineMode}
-                  className="bg-black text-white hover:bg-gray-900 rounded-md text-sm">
+                  className="bg-red-700 text-white hover:bg-red-800 rounded-md text-sm">
                   🔗 GitHub.com
                 </Button>
                 <Button onClick={() => void startOAuth('github_enterprise')}
                   disabled={loading || !orgId || offlineMode}
-                  variant="outline" className="rounded-md border-gray-300 text-sm">
+                  variant="outline" className="text-sm">
                   🏢 GitHub Enterprise
                 </Button>
               </div>

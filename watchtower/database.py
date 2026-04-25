@@ -3,7 +3,21 @@ Database configuration and ORM setup for WatchTower
 """
 
 import os
-from sqlalchemy import create_engine, Column, String, Integer, DateTime, Boolean, Enum, ForeignKey, Text, UniqueConstraint, Uuid
+from sqlalchemy import (
+    create_engine,
+    Column,
+    String,
+    Integer,
+    DateTime,
+    Boolean,
+    Enum,
+    ForeignKey,
+    Text,
+    UniqueConstraint,
+    Uuid,
+    inspect,
+    text,
+)
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
 
@@ -38,6 +52,11 @@ class UseCaseType(str, enum.Enum):
 class DeploymentModel(str, enum.Enum):
     SELF_HOSTED = "self_hosted"
     SAAS = "saas"
+
+
+class ProjectSourceType(str, enum.Enum):
+    GITHUB = "github"
+    LOCAL_FOLDER = "local_folder"
 
 
 class DeploymentStatus(str, enum.Enum):
@@ -126,6 +145,9 @@ class Project(Base):
     name = Column(String, index=True)
     use_case = Column(Enum(UseCaseType), index=True)
     deployment_model = Column(Enum(DeploymentModel), default=DeploymentModel.SELF_HOSTED)
+    source_type = Column(String, default=ProjectSourceType.GITHUB.value)
+    local_folder_path = Column(String, nullable=True)
+    launch_url = Column(String, nullable=True)
     repo_url = Column(String)
     repo_branch = Column(String, default="main")
     webhook_secret = Column(String)
@@ -406,3 +428,34 @@ def get_db():
 # Create all tables
 def init_db():
     Base.metadata.create_all(bind=engine)
+    _ensure_project_columns()
+
+
+def _ensure_project_columns():
+    """Add newly introduced project columns in existing databases."""
+    inspector = inspect(engine)
+    if "projects" not in inspector.get_table_names():
+        return
+
+    existing_cols = {col["name"] for col in inspector.get_columns("projects")}
+    alter_statements = []
+
+    if "source_type" not in existing_cols:
+        alter_statements.append(
+            "ALTER TABLE projects ADD COLUMN source_type VARCHAR DEFAULT 'github'"
+        )
+    if "local_folder_path" not in existing_cols:
+        alter_statements.append(
+            "ALTER TABLE projects ADD COLUMN local_folder_path VARCHAR"
+        )
+    if "launch_url" not in existing_cols:
+        alter_statements.append(
+            "ALTER TABLE projects ADD COLUMN launch_url VARCHAR"
+        )
+
+    if not alter_statements:
+        return
+
+    with engine.begin() as conn:
+        for stmt in alter_statements:
+            conn.execute(text(stmt))

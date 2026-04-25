@@ -101,7 +101,7 @@ App Center mode is designed to feel simple like hosted deployment platforms:
 ### One-Command App Center Install (Linux)
 
 ```bash
-sudo ./install_app_center.sh
+sudo ./install/install_app_center.sh
 ```
 
 This installer:
@@ -121,8 +121,8 @@ curl http://<server-ip>:8000/health
 ### Windows Installation (App Center)
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\install_windows.ps1
-powershell -ExecutionPolicy Bypass -File .\run_app_center_windows.ps1
+powershell -ExecutionPolicy Bypass -File .\install\install_windows.ps1
+powershell -ExecutionPolicy Bypass -File .\install\run_app_center_windows.ps1
 ```
 
 Default paths:
@@ -139,8 +139,8 @@ curl http://127.0.0.1:8000/health
 ### macOS Installation (App Center)
 
 ```bash
-./install_macos.sh
-./run_app_center_macos.sh
+./install/install_macos.sh
+./install/run_app_center_macos.sh
 ```
 
 Default paths:
@@ -301,7 +301,7 @@ On Windows and macOS, platform installer/run scripts write and load these automa
 Deploy by app name:
 
 ```bash
-WATCHTOWER_BASE_URL=http://server:8000 WATCHTOWER_TOKEN=change-me ./deploy.sh --app website-main main
+WATCHTOWER_BASE_URL=http://server:8000 WATCHTOWER_TOKEN=change-me ./scripts/deploy.sh --app website-main main
 ```
 
 List registered apps:
@@ -313,7 +313,7 @@ curl -H "X-Watchtower-Token: change-me" http://server:8000/apps
 Trigger deployment from dev machine:
 
 ```bash
-WATCHTOWER_URL=http://server:8000/deploy WATCHTOWER_TOKEN=change-me ./deploy.sh main
+WATCHTOWER_URL=http://server:8000/deploy WATCHTOWER_TOKEN=change-me ./scripts/deploy.sh main
 ```
 
 One-off server deploy commands:
