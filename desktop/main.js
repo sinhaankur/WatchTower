@@ -6,6 +6,67 @@ const http = require('http');
 const net = require('net');
 const path = require('path');
 
+// ── Auto-updater (GitHub Releases) ──────────────────────────────────────────
+// electron-updater checks the GitHub Release for a newer version and
+// downloads + installs it automatically. The publish config in package.json
+// points at sinhaankur/WatchTower — the same repo that release.yml pushes to.
+let autoUpdater = null;
+try {
+  ({ autoUpdater } = require('electron-updater'));
+  // Opt out of Squirrel on Windows — we use NSIS which handles its own installer.
+  autoUpdater.autoInstallOnAppQuit = true;
+  autoUpdater.logger = null;   // silence file logger; we surface messages via dialog
+} catch {
+  // electron-updater is a runtime dep but may be missing in dev (no node_modules).
+  // Silently skip auto-update rather than crashing.
+}
+
+/**
+ * Fire-and-forget update check called once after the main window is shown.
+ * Shows a non-blocking notification dialog; never interrupts the user mid-task.
+ */
+function checkForAppUpdates(win) {
+  if (!autoUpdater) return;
+  // Skip when running from source (not packaged) — no installer artifacts exist.
+  if (!app.isPackaged) return;
+
+  autoUpdater.on('update-available', (info) => {
+    dialog.showMessageBox(win, {
+      type: 'info',
+      title: 'Update Available',
+      message: `WatchTower ${info.version} is available`,
+      detail: 'Downloading in the background. You'll be prompted to restart when it's ready.',
+      buttons: ['OK'],
+    });
+  });
+
+  autoUpdater.on('update-downloaded', (info) => {
+    dialog.showMessageBox(win, {
+      type: 'info',
+      title: 'Update Ready',
+      message: `WatchTower ${info.version} is ready to install`,
+      detail: 'Restart WatchTower now to apply the update, or do it later from the tray menu.',
+      buttons: ['Restart Now', 'Later'],
+      defaultId: 0,
+      cancelId: 1,
+    }).then(({ response }) => {
+      if (response === 0) {
+        autoUpdater.quitAndInstall(false, true);
+      }
+    });
+  });
+
+  autoUpdater.on('error', (err) => {
+    // Log only — never show an error dialog for a background update failure.
+    console.warn('[WatchTower] Auto-update check failed:', err.message);
+  });
+
+  autoUpdater.checkForUpdates().catch((err) => {
+    console.warn('[WatchTower] Auto-update check error:', err.message);
+  });
+}
+
+
 // ── GPU / Renderer stability flags ──────────────────────────────────────────
 // Must be set before app.whenReady().
 //
@@ -593,6 +654,23 @@ function createTray() {
     },
     { type: 'separator' },
     {
+      label: 'Check for Updates…',
+      enabled: Boolean(autoUpdater) && app.isPackaged,
+      click: () => {
+        if (autoUpdater && app.isPackaged && mainWindow) {
+          autoUpdater.checkForUpdates().catch((err) => {
+            dialog.showMessageBox(mainWindow, {
+              type: 'info',
+              title: 'No Update Found',
+              message: 'WatchTower is already up to date.',
+              buttons: ['OK'],
+            });
+          });
+        }
+      },
+    },
+    { type: 'separator' },
+    {
       label: 'Quit',
       click: () => {
         isQuitting = true;
@@ -618,6 +696,9 @@ app.whenReady().then(async () => {
   try {
     await launch();
     createTray();
+
+    // Check for updates a few seconds after startup (non-blocking).
+    if (mainWindow) setTimeout(() => checkForAppUpdates(mainWindow), 5000);
 
     // Hide to tray instead of quitting when the window X is clicked.
     mainWindow?.on('close', (event) => {
