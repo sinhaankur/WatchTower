@@ -135,6 +135,22 @@ const pythonUnix = path.join(repoRoot, '.venv', 'bin', 'python');
 const pythonWin = path.join(repoRoot, '.venv', 'Scripts', 'python.exe');
 const runtimeApiToken = process.env.WATCHTOWER_API_TOKEN || `wt-${crypto.randomBytes(24).toString('hex')}`;
 
+function isGithubOauthConfigured() {
+  const clientId = process.env.GITHUB_OAUTH_CLIENT_ID || process.env.GITHUB_CLIENT_ID;
+  const clientSecret = process.env.GITHUB_OAUTH_CLIENT_SECRET || process.env.GITHUB_CLIENT_SECRET;
+  return Boolean(clientId && clientSecret);
+}
+
+function shouldAutoAuthDesktop() {
+  // Explicit override for local/dev automation.
+  if (process.env.WATCHTOWER_DESKTOP_AUTO_AUTH === '1') return true;
+  if (process.env.WATCHTOWER_DESKTOP_AUTO_AUTH === '0') return false;
+  // Default behavior:
+  // - OAuth configured => require per-user login.
+  // - OAuth not configured => keep bootstrap token login for local usability.
+  return !isGithubOauthConfigured();
+}
+
 // Resolve the best available icon for this platform.
 const iconsDir = path.join(__dirname, 'build', 'icons');
 
@@ -169,7 +185,12 @@ const APP_ICON = resolveAppIcon();
 // Expose the per-launch API token to the renderer via synchronous IPC.
 // The preload script calls this before React boots so the token is already
 // in localStorage when the first useEffect runs.
-ipcMain.on('wt:getApiToken', (event) => { event.returnValue = runtimeApiToken; });
+ipcMain.on('wt:getAuthBootstrap', (event) => {
+  event.returnValue = {
+    autoAuth: shouldAutoAuthDesktop(),
+    apiToken: runtimeApiToken,
+  };
+});
 
 // Prevents a second Electron process from opening a duplicate splash window.
 const gotSingleInstanceLock = app.requestSingleInstanceLock();

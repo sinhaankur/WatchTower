@@ -5,8 +5,10 @@ const { contextBridge, ipcRenderer } = require('electron');
 // sendSync blocks until the main process replies, so the token is in place
 // before any useEffect runs — no race condition.
 try {
-  const token = ipcRenderer.sendSync('wt:getApiToken');
-  if (typeof token === 'string' && token) {
+  const bootstrap = ipcRenderer.sendSync('wt:getAuthBootstrap');
+  const autoAuth = Boolean(bootstrap?.autoAuth);
+  const token = typeof bootstrap?.apiToken === 'string' ? bootstrap.apiToken : '';
+  if (autoAuth && token) {
     window.localStorage.setItem('authToken', token);
   }
 } catch (_) { /* non-fatal */ }
