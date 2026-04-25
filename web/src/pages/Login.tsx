@@ -129,6 +129,22 @@ const Login = () => {
     }
   };
 
+  const devAutoLogin = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const devToken = 'dev-' + Math.random().toString(36).slice(2, 10);
+      localStorage.setItem('authToken', devToken);
+      const user = await resolveUserFromContext();
+      trackEvent('login', { method: 'dev_auto' });
+      showSuccessAndRedirect(user);
+    } catch {
+      localStorage.removeItem('authToken');
+      setError('Dev auto-login failed. Check that WATCHTOWER_ALLOW_INSECURE_DEV_AUTH=true on the server.');
+      setLoading(false);
+    }
+  };
+
   const loginWithGitHub = async () => {
     setLoading(true);
     setError('');
@@ -253,6 +269,24 @@ const Login = () => {
               </button>
             </div>
 
+        {/* Dev mode: one-click login */}
+        {!statusLoading && authStatus?.dev_auth?.allow_insecure && (
+          <div className="mb-5 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-left">
+            <p className="text-sm font-semibold text-amber-800 mb-1">🛠 Dev mode active</p>
+            <p className="text-xs text-amber-700 mb-3">
+              Server is running with <code className="font-mono bg-amber-100 px-1 rounded">WATCHTOWER_ALLOW_INSECURE_DEV_AUTH=true</code>.
+              Any token is accepted — click below to log in instantly.
+            </p>
+            <Button
+              onClick={() => void devAutoLogin()}
+              disabled={loading}
+              className="w-full rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-semibold py-5"
+            >
+              {loading ? 'Logging in…' : 'Quick Dev Login →'}
+            </Button>
+          </div>
+        )}
+
         {/* Server not configured at all */}
         {nothingConfigured && (
             <div className="text-left text-sm mb-5 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 space-y-1">
@@ -333,12 +367,48 @@ const Login = () => {
             {/* API token — SECONDARY auth method */}
             <div className="text-left">
               <label htmlFor="api-token" className="block text-xs font-medium text-slate-700 mb-1.5">
-                Alternative: API Token
+                Sign in with a GitHub Personal Access Token
               </label>
-              <p className="text-xs text-slate-500 mb-2 text-center">
-                Paste a <code className="font-mono bg-slate-100 px-1 rounded">WATCHTOWER_API_TOKEN</code> from your server
-              </p>
-              <div className="mb-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+
+              {/* PAT generation links */}
+              <div className="mb-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 space-y-2">
+                <p className="text-xs font-medium text-slate-700 flex items-center gap-1.5">
+                  <svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor" className="shrink-0 text-slate-500" aria-hidden="true">
+                    <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/>
+                  </svg>
+                  Create a GitHub token, paste it below
+                </p>
+                <div className="flex flex-col gap-1.5">
+                  <a
+                    href="https://github.com/settings/personal-access-tokens/new"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-between rounded-md border border-slate-300 bg-white hover:bg-slate-100 px-3 py-2 text-xs text-slate-800 transition-colors group"
+                  >
+                    <span className="font-medium">Fine-grained PAT <span className="text-slate-400 font-normal">(recommended)</span></span>
+                    <span className="text-slate-400 group-hover:text-slate-700 text-[10px]">github.com ↗</span>
+                  </a>
+                  <a
+                    href="https://github.com/settings/tokens/new?scopes=repo,read%3Apackages&description=WatchTower+API+Token"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-between rounded-md border border-slate-300 bg-white hover:bg-slate-100 px-3 py-2 text-xs text-slate-800 transition-colors group"
+                  >
+                    <span className="font-medium">Classic PAT</span>
+                    <span className="text-slate-400 group-hover:text-slate-700 text-[10px]">github.com ↗</span>
+                  </a>
+                </div>
+                <p className="text-[11px] text-slate-500">
+                  Required scopes: <code className="font-mono bg-white border border-slate-200 px-1 rounded">Contents: Read</code> · <code className="font-mono bg-white border border-slate-200 px-1 rounded">Packages: Read</code>
+                </p>
+              </div>
+
+              <div className="mb-2">
+                <p className="text-xs text-slate-500 mb-0 text-center hidden">
+                  Paste a <code className="font-mono bg-slate-100 px-1 rounded">WATCHTOWER_API_TOKEN</code> from your server
+                </p>
+              </div>
+              <div className="mb-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 hidden">
                 <p className="text-[11px] text-slate-700 mb-2">
                   Need a GitHub token? Generate one with <span className="font-semibold">Contents: Read</span> and <span className="font-semibold">Packages: Read</span> (for private GHCR images).
                 </p>
