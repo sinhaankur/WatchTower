@@ -123,7 +123,17 @@ if [[ ! -f "$SENTINEL" ]] || [[ "$ROOT/requirements.txt" -nt "$SENTINEL" ]]; the
   # Critical on ARM (Pi, M1) where C extension compilation often fails or is slow.
   "$VENV/bin/pip" install --prefer-binary --upgrade pip -q
   "$VENV/bin/pip" install --prefer-binary -r "$ROOT/requirements.txt" -q
+  # Install the watchtower package itself in editable mode so that
+  # `import watchtower` works for both the backend and the test suite.
+  "$VENV/bin/pip" install -e "$ROOT" -q
   touch "$SENTINEL"
+fi
+
+# Ensure the watchtower package itself is importable (editable install).
+# Runs unconditionally — fast no-op when already installed, catches the
+# case where the sentinel already exists but pip install -e . was never run.
+if ! "$VENV/bin/pip" show watchtower >/dev/null 2>&1; then
+  "$VENV/bin/pip" install -e "$ROOT" -q
 fi
 
 # ── Step 2: Node deps ─────────────────────────────────────────────────────────
