@@ -15,6 +15,9 @@ type AuthStatus = {
   dev_auth?: {
     allow_insecure?: boolean;
   };
+  installation?: {
+    owner_mode_enabled?: boolean;
+  };
   recommended?: 'oauth' | 'api_token';
 };
 
@@ -51,12 +54,6 @@ const Login = () => {
         const resp = await apiClient.get('/auth/status');
         const status = resp.data as AuthStatus;
         setAuthStatus(status);
-        // Auto-login when running locally with insecure dev auth enabled (browser/script mode)
-        if (status?.dev_auth?.allow_insecure && !localStorage.getItem('authToken')) {
-          const devToken = `dev-local-${Date.now()}`;
-          localStorage.setItem('authToken', devToken);
-          navigate('/', { replace: true });
-        }
       } catch {
         setAuthStatus(null);
       } finally {
@@ -82,7 +79,7 @@ const Login = () => {
       navigate('/', { replace: true });
     } catch {
       localStorage.removeItem('authToken');
-      setError('Invalid API token or server is unreachable. Verify WATCHTOWER_API_TOKEN and try again.');
+      setError('Authentication failed. If installation ownership is enabled, your account must be invited by an owner/admin before access is granted.');
       setLoading(false);
     }
   };
@@ -141,6 +138,9 @@ const Login = () => {
             </p>
             <p className="text-slate-600">
               API token: {authStatus.api_token?.configured ? 'configured' : 'not configured'}
+            </p>
+            <p className="text-slate-600">
+              Install owner mode: {authStatus.installation?.owner_mode_enabled ? 'enabled' : 'disabled'}
             </p>
             {authStatus.oauth?.missing && authStatus.oauth.missing.length > 0 && (
               <p className="mt-1 text-amber-700">

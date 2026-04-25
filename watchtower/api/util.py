@@ -10,6 +10,7 @@ import json
 import time
 import base64
 import hashlib
+from typing import Optional
 from fastapi import Header, HTTPException, status
 
 try:
@@ -48,7 +49,13 @@ def _auth_signing_secret() -> str:
     return secret
 
 
-def create_user_session_token(*, user_id: str, email: str, name: str) -> str:
+def create_user_session_token(
+    *,
+    user_id: str,
+    email: str,
+    name: str,
+    github_id: Optional[int] = None,
+) -> str:
     """Create a signed user session token for browser login flows."""
     now = int(time.time())
     ttl_hours = int(os.getenv("WATCHTOWER_SESSION_TTL_HOURS", "12"))
@@ -56,6 +63,7 @@ def create_user_session_token(*, user_id: str, email: str, name: str) -> str:
         "uid": user_id,
         "email": email,
         "name": name,
+        "gid": github_id,
         "iat": now,
         "exp": now + (ttl_hours * 3600),
     }
@@ -94,6 +102,7 @@ def _parse_user_session_token(token: str):
         "user_id": user_id,
         "email": email,
         "name": name or "WatchTower User",
+        "github_id": payload.get("gid"),
     }
 
 

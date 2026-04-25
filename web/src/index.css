@@ -2,8 +2,6 @@
 @import 'tailwindcss/components';
 @import 'tailwindcss/utilities';
 
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700;800&family=Space+Mono:wght@400;700&display=swap');
-
 * {
   @apply box-border;
 }
@@ -20,7 +18,7 @@
 
 body {
   @apply antialiased;
-  font-family: 'DM Sans', system-ui, -apple-system, sans-serif;
+  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
   background: #fbf6ea;
   color: var(--wt-text);
 }
@@ -83,5 +81,5 @@ body {
 }
 
 code, pre {
-  font-family: 'Space Mono', 'SF Mono', 'Menlo', 'Monaco', 'Courier New', monospace;
+  font-family: 'SF Mono', 'Menlo', 'Monaco', 'Courier New', monospace;
 }
