@@ -275,6 +275,41 @@
       grid-template-columns: minmax(0, 220px) minmax(0, 1fr);
       align-items: start;
     }
+    .doc-footer-nav {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 18px;
+    }
+    .doc-nav-card {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      padding: 16px;
+      text-decoration: none;
+    }
+    .doc-nav-card[aria-disabled="true"] {
+      opacity: 0.45;
+      pointer-events: none;
+    }
+    .doc-nav-label {
+      font-size: 0.74rem;
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      color: #64748b;
+      font-weight: 700;
+    }
+    .doc-nav-title {
+      font-size: 1rem;
+      font-weight: 700;
+      color: #0f172a;
+      line-height: 1.35;
+    }
+    .doc-nav-meta {
+      font-size: 0.84rem;
+      color: #64748b;
+      line-height: 1.45;
+    }
     .toc,
     .markdown-panel {
       padding: 20px;
@@ -406,6 +441,7 @@
 
     @media (max-width: 980px) {
       .doc-layout { grid-template-columns: 1fr; }
+      .doc-footer-nav { grid-template-columns: 1fr; }
     }
     @media (max-width: 860px) {
       .app-shell { display: block; }
@@ -489,11 +525,25 @@
             <div id="content" class="loading">Loading document content…</div>
           </section>
         </div>
+
+        <nav class="doc-footer-nav" aria-label="Document navigation">
+          <a class="panel doc-nav-card" id="prev-doc-link" href="./index.html" aria-disabled="true">
+            <span class="doc-nav-label">Previous Document</span>
+            <span class="doc-nav-title">Start Of Docs</span>
+            <span class="doc-nav-meta">Return to the docs home page.</span>
+          </a>
+          <a class="panel doc-nav-card" id="next-doc-link" href="./index.html" aria-disabled="true">
+            <span class="doc-nav-label">Next Document</span>
+            <span class="doc-nav-title">End Of Docs</span>
+            <span class="doc-nav-meta">Choose another guide from the docs home page.</span>
+          </a>
+        </nav>
       </div>
     </main>
   </div>
 
   <script>
+    const DOC_ORDER = ['readme', 'mesh', 'ha', 'hybrid', 'enterprise'];
     const DOCS = {
       readme: {
         title: 'Main README',
@@ -538,6 +588,8 @@
     const rawLink = document.getElementById('raw-link');
     const content = document.getElementById('content');
     const tocContent = document.getElementById('toc-content');
+    const prevDocLink = document.getElementById('prev-doc-link');
+    const nextDocLink = document.getElementById('next-doc-link');
 
     pageTitle.textContent = docMeta.title;
     pageSubtitle.textContent = docMeta.subtitle;
@@ -548,6 +600,34 @@
     document.querySelectorAll('[data-doc-link]').forEach((link) => {
       link.classList.toggle('active', link.getAttribute('data-doc-link') === docKey);
     });
+
+    const setDocNavCard = (element, label, key) => {
+      const title = element.querySelector('.doc-nav-title');
+      const meta = element.querySelector('.doc-nav-meta');
+      const doc = DOCS[key];
+
+      if (!doc) {
+        element.href = './index.html';
+        element.setAttribute('aria-disabled', 'true');
+        title.textContent = label === 'Previous Document' ? 'Start Of Docs' : 'End Of Docs';
+        meta.textContent = label === 'Previous Document'
+          ? 'Return to the docs home page.'
+          : 'Choose another guide from the docs home page.';
+        return;
+      }
+
+      element.href = `./viewer.html?doc=${key}`;
+      element.setAttribute('aria-disabled', 'false');
+      title.textContent = doc.title;
+      meta.textContent = doc.subtitle;
+    };
+
+    const currentIndex = DOC_ORDER.indexOf(docKey);
+    const previousKey = currentIndex > 0 ? DOC_ORDER[currentIndex - 1] : null;
+    const nextKey = currentIndex >= 0 && currentIndex < DOC_ORDER.length - 1 ? DOC_ORDER[currentIndex + 1] : null;
+
+    setDocNavCard(prevDocLink, 'Previous Document', previousKey);
+    setDocNavCard(nextDocLink, 'Next Document', nextKey);
 
     const slugify = (text) => text
       .toLowerCase()
