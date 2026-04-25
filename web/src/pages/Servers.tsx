@@ -139,7 +139,7 @@ const Servers = () => {
   return (
     <div className="flex-1 overflow-auto bg-slate-50">
       <header
-        className="px-8 py-5 flex items-center justify-between border-b sticky top-0 z-10 backdrop-blur-sm"
+        className="px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between border-b sticky top-0 z-10 backdrop-blur-sm"
         style={{ borderColor: 'hsl(214 32% 88%)', background: 'rgba(248, 251, 255, 0.9)' }}
       >
         <div>
@@ -164,7 +164,7 @@ const Servers = () => {
         </div>
       </header>
 
-      <main className="px-8 py-6 space-y-6 max-w-5xl">
+      <main className="px-4 sm:px-6 lg:px-8 py-6 space-y-6 max-w-5xl mx-auto w-full">
         {/* Notices */}
         {pageError && (
           <div className="flex items-start gap-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3">
@@ -341,16 +341,16 @@ const Servers = () => {
                 <div key={node.id}
                   className="p-4 rounded-xl border border-border hover:border-red-300 bg-muted/20 hover:bg-red-50/40 transition-all">
                   <div className="flex items-start justify-between gap-4">
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
                       <span className={`w-2.5 h-2.5 rounded-full shrink-0 mt-1 ${meta.dot} ${node.status === 'healthy' ? 'status-pulse' : ''}`} />
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <p className="text-sm font-semibold text-slate-900">{node.name}</p>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="text-sm font-semibold text-slate-900 truncate" title={node.name}>{node.name}</p>
                           {node.is_primary && (
-                            <span className="text-xs px-1.5 py-0.5 rounded border border-red-200 bg-red-50 text-red-700">Primary</span>
+                            <span className="text-xs px-1.5 py-0.5 rounded border border-red-200 bg-red-50 text-red-700 shrink-0">Primary</span>
                           )}
                         </div>
-                        <p className="text-xs text-slate-600 mt-0.5 font-mono">{node.user}@{node.host}:{node.port}</p>
+                        <p className="text-xs text-slate-600 mt-0.5 font-mono truncate" title={`${node.user}@${node.host}:${node.port}`}>{node.user}@{node.host}:{node.port}</p>
                         {node.last_health_check && (
                           <p className="text-xs text-slate-600 mt-0.5">
                             Last check: {new Date(node.last_health_check).toLocaleString()}

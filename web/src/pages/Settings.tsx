@@ -177,14 +177,14 @@ function VSCodeCard() {
 const Settings = () => (
   <div className="flex-1 overflow-auto bg-slate-50">
     <header
-      className="px-8 py-5 border-b"
+      className="px-4 sm:px-6 lg:px-8 py-4 border-b"
       style={{ borderColor: 'hsl(214 32% 88%)' }}
     >
       <h1 className="text-lg font-semibold text-slate-900">Settings</h1>
       <p className="text-xs text-slate-600 mt-0.5">Configure your WatchTower instance</p>
     </header>
 
-    <main className="px-8 py-6 max-w-4xl space-y-4">
+    <main className="px-4 sm:px-6 lg:px-8 py-6 max-w-4xl mx-auto w-full space-y-4">
 
       {/* VS Code Integration — prominent card */}
       <VSCodeCard />

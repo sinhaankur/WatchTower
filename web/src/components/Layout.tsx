@@ -108,11 +108,12 @@ const SECONDARY_NAV: NavItem[] = [
   { path: '/settings', label: 'Settings', Icon: IconSettings },
 ];
 
-function NavLink({ item, pathname }: { item: NavItem; pathname: string }) {
+function NavLink({ item, pathname, onClick }: { item: NavItem; pathname: string; onClick?: () => void }) {
   const active = item.path === '/' ? pathname === '/' : pathname.startsWith(item.path);
   return (
     <Link
       to={item.path}
+      onClick={onClick}
       className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
         active
           ? 'bg-red-50 text-red-700 border-l-2 border-red-700 pl-[10px] shadow-sm'
@@ -131,100 +132,119 @@ export default function Layout({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
   const hasSessionToken = Boolean(localStorage.getItem('authToken'));
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
   const handleLogout = () => {
     localStorage.removeItem('authToken');
     navigate('/login');
   };
 
+  // Shared sidebar content used in both desktop sidebar and mobile drawer
+  const SidebarInner = ({ onNavClick }: { onNavClick?: () => void }) => (
+    <>
+      {!isElectron && (
+        <div className="px-4 py-5 border-b" style={{ borderColor: 'hsl(214 32% 88%)' }}>
+          <BrandLogo withLabel size="md" />
+        </div>
+      )}
+      {isElectron && <div className="h-3" />}
+
+      <div className="px-3 pt-3 pb-2">
+        <Link
+          to="/setup"
+          onClick={onNavClick}
+          className="flex items-center justify-center gap-2 w-full py-2 px-3 rounded-xl bg-red-700 hover:bg-red-800 border border-slate-800 shadow-[2px_2px_0_0_#1f2937] transition-colors text-white text-sm font-semibold"
+        >
+          <IconPlus />
+          New Resource
+        </Link>
+      </div>
+
+      <nav className="flex-1 px-3 py-2 space-y-0.5 overflow-y-auto">
+        {PRIMARY_NAV.map((item) => (
+          <NavLink key={item.path} item={item} pathname={pathname} onClick={onNavClick} />
+        ))}
+        <div className="my-3 border-t" style={{ borderColor: 'hsl(214 32% 88%)' }} />
+        {SECONDARY_NAV.map((item) => (
+          <NavLink key={item.path} item={item} pathname={pathname} onClick={onNavClick} />
+        ))}
+      </nav>
+
+      <div className="px-4 py-4 border-t" style={{ borderColor: 'hsl(214 32% 88%)' }}>
+        {hasSessionToken ? (
+          <div className="space-y-2">
+            <Link
+              to="/team"
+              onClick={onNavClick}
+              className="block text-xs text-slate-600 hover:text-slate-900 transition-colors"
+            >
+              GitHub Connections
+            </Link>
+            <button
+              type="button"
+              onClick={() => { handleLogout(); onNavClick?.(); }}
+              className="block text-xs text-slate-600 hover:text-red-600 transition-colors"
+            >
+              Sign out
+            </button>
+          </div>
+        ) : (
+          <Link to="/login" onClick={onNavClick} className="block text-xs text-slate-600 hover:text-red-700 transition-colors">
+            Sign in with GitHub →
+          </Link>
+        )}
+        <p className="text-[10px] text-slate-500 mt-3">WatchTower Cloud Mesh v2.0.0</p>
+      </div>
+    </>
+  );
+
   return (
-    <div className="flex flex-col min-h-screen bg-transparent" style={{ height: '100vh', overflow: 'hidden' }}>
-      {/* ── Custom titlebar (Electron only) ── */}
+    <div className="flex flex-col bg-transparent" style={{ height: '100vh', overflow: 'hidden' }}>
       {isElectron && <TitleBar />}
 
-      {/* ── Body row: activity bar + sidebar + main ── */}
+      {/* Mobile drawer overlay */}
+      {mobileSidebarOpen && (
+        <div className="lg:hidden fixed inset-0 z-40 flex">
+          <div className="fixed inset-0 bg-black/40" onClick={() => setMobileSidebarOpen(false)} />
+          <aside
+            className="relative flex flex-col w-64 max-w-[85vw] border-r shadow-xl z-50"
+            style={{ background: 'hsl(214 55% 98%)', borderColor: 'hsl(214 32% 88%)' }}
+          >
+            <div className="flex items-center justify-between px-4 py-3 border-b" style={{ borderColor: 'hsl(214 32% 88%)' }}>
+              <BrandLogo withLabel size="md" />
+              <button
+                onClick={() => setMobileSidebarOpen(false)}
+                className="p-1.5 rounded hover:bg-slate-200 text-slate-500 transition-colors"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            </div>
+            <SidebarInner onNavClick={() => setMobileSidebarOpen(false)} />
+          </aside>
+        </div>
+      )}
+
+      {/* Body row */}
       <div className="flex flex-1 min-h-0 overflow-hidden">
+        {isElectron && <ActivityBar />}
 
-        {/* Activity bar — Electron only, always visible */}
-        {isElectron && (
-          <ActivityBar />
-        )}
-
-        {/* ── Sidebar ── */}
+        {/* Desktop sidebar */}
         {sidebarOpen && (
           <aside
-            className="shrink-0 flex flex-col border-r backdrop-blur-sm"
-            style={{
-              width: 224,
-              background: 'hsl(214 55% 98%)',
-              borderColor: 'hsl(214 32% 88%)',
-            }}
+            className="hidden lg:flex shrink-0 flex-col border-r backdrop-blur-sm"
+            style={{ width: 224, background: 'hsl(214 55% 98%)', borderColor: 'hsl(214 32% 88%)' }}
           >
-            {/* Brand (hidden in Electron — logo already in titlebar + activity bar) */}
-            {!isElectron && (
-              <div className="px-4 py-5 border-b" style={{ borderColor: 'hsl(214 32% 88%)' }}>
-                <BrandLogo withLabel size="md" />
-              </div>
-            )}
-            {isElectron && <div className="h-3" />}
-
-            {/* New Resource button */}
-            <div className="px-3 pt-3 pb-2">
-              <Link
-                to="/setup"
-                className="flex items-center justify-center gap-2 w-full py-2 px-3 rounded-xl bg-red-700 hover:bg-red-800 border border-slate-800 shadow-[2px_2px_0_0_#1f2937] transition-colors text-white text-sm font-semibold"
-              >
-                <IconPlus />
-                New Resource
-              </Link>
-            </div>
-
-            {/* Primary nav */}
-            <nav className="flex-1 px-3 py-2 space-y-0.5 overflow-y-auto">
-              {PRIMARY_NAV.map((item) => (
-                <NavLink key={item.path} item={item} pathname={pathname} />
-              ))}
-
-              <div className="my-3 border-t" style={{ borderColor: 'hsl(214 32% 88%)' }} />
-
-              {SECONDARY_NAV.map((item) => (
-                <NavLink key={item.path} item={item} pathname={pathname} />
-              ))}
-            </nav>
-
-            {/* User footer */}
-            <div className="px-4 py-4 border-t" style={{ borderColor: 'hsl(214 32% 88%)' }}>
-              {hasSessionToken ? (
-                <div className="space-y-2">
-                  <Link
-                    to="/team"
-                    className="block text-xs text-slate-600 hover:text-slate-900 transition-colors"
-                  >
-                    GitHub Connections
-                  </Link>
-                  <button
-                    type="button"
-                    onClick={handleLogout}
-                    className="block text-xs text-slate-600 hover:text-red-600 transition-colors"
-                  >
-                    Sign out
-                  </button>
-                </div>
-              ) : (
-                <Link to="/login" className="block text-xs text-slate-600 hover:text-red-700 transition-colors">
-                  Sign in with GitHub →
-                </Link>
-              )}
-              <p className="text-[10px] text-slate-500 mt-3">WatchTower Cloud Mesh v2.0.0</p>
-            </div>
+            <SidebarInner />
           </aside>
         )}
 
-        {/* Sidebar toggle button */}
+        {/* Desktop sidebar toggle */}
         <button
           title={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
           onClick={() => setSidebarOpen((v) => !v)}
-          className="absolute z-10 flex items-center justify-center w-4 h-10 bg-slate-100 border border-slate-200 hover:bg-slate-200 transition-colors text-slate-500"
+          className="hidden lg:flex absolute z-10 items-center justify-center w-4 h-10 bg-slate-100 border border-slate-200 hover:bg-slate-200 transition-colors text-slate-500"
           style={{
             left: isElectron ? (sidebarOpen ? 48 + 224 : 48) : (sidebarOpen ? 224 : 0),
             top: '50%',
@@ -241,8 +261,33 @@ export default function Layout({ children }: { children: ReactNode }) {
           </svg>
         </button>
 
-        {/* ── Main content ── */}
+        {/* Main content */}
         <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+          {/* Mobile top bar */}
+          <div
+            className="lg:hidden flex items-center gap-3 px-4 py-3 border-b shrink-0"
+            style={{ background: 'rgba(248, 251, 255, 0.95)', borderColor: 'hsl(214 32% 88%)' }}
+          >
+            <button
+              onClick={() => setMobileSidebarOpen(true)}
+              className="p-1.5 rounded hover:bg-slate-100 text-slate-600 transition-colors"
+              aria-label="Open menu"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="3" y1="6" x2="21" y2="6" />
+                <line x1="3" y1="12" x2="21" y2="12" />
+                <line x1="3" y1="18" x2="21" y2="18" />
+              </svg>
+            </button>
+            <BrandLogo withLabel size="sm" />
+            <Link
+              to="/setup"
+              className="ml-auto px-3 py-1.5 rounded-lg bg-red-700 hover:bg-red-800 text-white text-xs font-semibold border border-slate-800"
+            >
+              + New
+            </Link>
+          </div>
+
           <PageTransition>{children}</PageTransition>
         </div>
       </div>
