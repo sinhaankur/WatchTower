@@ -55,3 +55,10 @@ echo ""
 echo "Logs:"
 echo "- Backend:  /tmp/watchtower-api.log"
 echo "- Frontend: /tmp/watchtower-web.log"
+
+# Open the UI in the default browser
+if command -v xdg-open >/dev/null 2>&1; then
+  xdg-open "http://${WEB_HOST}:${WEB_PORT}" >/dev/null 2>&1 &
+elif command -v open >/dev/null 2>&1; then
+  open "http://${WEB_HOST}:${WEB_PORT}"
+fi

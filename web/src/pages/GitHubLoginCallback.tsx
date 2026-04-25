@@ -47,7 +47,14 @@ const GitHubLoginCallback = () => {
         const nextPath = data.redirect_to && data.redirect_to.startsWith('/') ? data.redirect_to : '/';
 
         setStatus('success');
-        setTimeout(() => navigate(nextPath, { replace: true }), 600);
+
+        // Inside Electron: close this popup and reload the main window.
+        const electron = (window as any).electronAPI;
+        if (electron?.oauthDone) {
+          setTimeout(() => electron.oauthDone(), 600);
+        } else {
+          setTimeout(() => navigate(nextPath, { replace: true }), 600);
+        }
       } catch {
         setStatus('error');
         setDetail('Failed to complete GitHub sign-in. Check API OAuth configuration and try again.');
