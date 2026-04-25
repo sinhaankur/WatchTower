@@ -6,6 +6,19 @@ const http = require('http');
 const net = require('net');
 const path = require('path');
 
+// ── Resolve npm binary ───────────────────────────────────────────────────────
+// Electron does not inherit the shell PATH on Linux/macOS, so plain 'npm'
+// may not be found when spawned as a child process.  Resolve it once at
+// startup: prefer the npm sitting next to the node binary that is running
+// this process (works for nvm, volta, system node), otherwise fall back to
+// the bare name and rely on whatever PATH is available.
+function resolveNpm() {
+  if (process.platform === 'win32') return 'npm.cmd';
+  const candidate = path.join(path.dirname(process.execPath), 'npm');
+  return fs.existsSync(candidate) ? candidate : 'npm';
+}
+const NPM_BIN = resolveNpm();
+
 // ── Auto-updater (GitHub Releases) ──────────────────────────────────────────
 // electron-updater checks the GitHub Release for a newer version and
 // downloads + installs it automatically. The publish config in package.json
@@ -483,7 +496,7 @@ async function startFrontend() {
   } else {
     // Fallback: Vite dev server (first-run / dev mode)
     frontendProcess = spawn(
-      process.platform === 'win32' ? 'npm.cmd' : 'npm',
+      NPM_BIN,
       ['run', 'dev', '--', '--host', HOST, '--port', String(FRONTEND_PORT), '--strictPort'],
       {
         cwd: webRoot,
