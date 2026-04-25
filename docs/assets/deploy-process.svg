@@ -1,71 +1,69 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" role="img" aria-label="WatchTower deployment process">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 380" role="img" aria-label="WatchTower deployment process">
   <defs>
-    <filter id="cs" x="-4%" y="-4%" width="112%" height="116%">
-      <feDropShadow dx="3" dy="3" stdDeviation="0" flood-color="#1f2937"/>
-    </filter>
-    <filter id="ps" x="-2%" y="-8%" width="108%" height="132%">
-      <feDropShadow dx="2" dy="2" stdDeviation="0" flood-color="#1f2937"/>
+    <filter id="sh" x="-5%" y="-10%" width="115%" height="130%">
+      <feDropShadow dx="0" dy="2" stdDeviation="5" flood-color="#0f172a" flood-opacity="0.10"/>
     </filter>
   </defs>
-  <rect width="1600" height="900" fill="#fbf6ea"/>
-  <circle cx="130" cy="130" r="120" fill="#fde68a" opacity="0.28"/>
-  <circle cx="1490" cy="160" r="160" fill="#dbeafe" opacity="0.35"/>
-  <text x="80" y="82" font-family="'Courier New', Courier, monospace" font-size="18" font-weight="700" fill="#b91c1c" letter-spacing="2">APP CENTER FLOW</text>
-  <text x="80" y="140" font-family="Arial, 'Helvetica Neue', Helvetica, sans-serif" font-size="44" font-weight="800" fill="#0f172a">Five visible steps from app choice to live service.</text>
-  <text x="80" y="180" font-family="Arial, 'Helvetica Neue', Helvetica, sans-serif" font-size="20" font-weight="500" fill="#475569">Each card answers one operator question: what goes in, what happens, and what comes out.</text>
-
-  <rect x="80" y="226" width="1440" height="72" rx="20" fill="#ffffff" stroke="#1f2937" stroke-width="2" filter="url(#cs)"/>
-  <rect x="108" y="244" width="780" height="34" rx="17" fill="#fde68a" stroke="#1f2937" stroke-width="1.5" filter="url(#ps)"/>
-  <text x="128" y="266" font-family="Arial, 'Helvetica Neue', Helvetica, sans-serif" font-size="16" font-weight="700" fill="#7f1d1d">Select app → Build artifact → Sync nodes → Activate release → Confirm health</text>
-
-  <rect x="80" y="344" width="244" height="262" rx="20" fill="#ffffff" stroke="#1f2937" stroke-width="2" filter="url(#cs)"/>
-  <rect x="104" y="364" width="102" height="30" rx="15" fill="#fde68a" stroke="#1f2937" stroke-width="1.5" filter="url(#ps)"/>
-  <text x="118" y="384" font-family="'Courier New', Courier, monospace" font-size="13" font-weight="700" fill="#7f1d1d">STEP 01</text>
-  <text x="104" y="432" font-family="Arial, 'Helvetica Neue', Helvetica, sans-serif" font-size="24" font-weight="800" fill="#0f172a">Choose app</text>
-  <text x="104" y="470" font-family="Arial, 'Helvetica Neue', Helvetica, sans-serif" font-size="16" font-weight="500" fill="#475569">Pick a named workload</text>
-  <text x="104" y="494" font-family="Arial, 'Helvetica Neue', Helvetica, sans-serif" font-size="16" font-weight="500" fill="#475569">from the registry or</text>
-  <text x="104" y="518" font-family="Arial, 'Helvetica Neue', Helvetica, sans-serif" font-size="16" font-weight="500" fill="#475569">dashboard.</text>
-
-  <rect x="372" y="344" width="244" height="262" rx="20" fill="#ffffff" stroke="#1f2937" stroke-width="2" filter="url(#cs)"/>
-  <rect x="396" y="364" width="102" height="30" rx="15" fill="#fde68a" stroke="#1f2937" stroke-width="1.5" filter="url(#ps)"/>
-  <text x="410" y="384" font-family="'Courier New', Courier, monospace" font-size="13" font-weight="700" fill="#7f1d1d">STEP 02</text>
-  <text x="396" y="432" font-family="Arial, 'Helvetica Neue', Helvetica, sans-serif" font-size="24" font-weight="800" fill="#0f172a">Build package</text>
-  <text x="396" y="470" font-family="Arial, 'Helvetica Neue', Helvetica, sans-serif" font-size="16" font-weight="500" fill="#475569">Create the tar.gz or zip</text>
-  <text x="396" y="494" font-family="Arial, 'Helvetica Neue', Helvetica, sans-serif" font-size="16" font-weight="500" fill="#475569">payload for this release.</text>
-
-  <rect x="664" y="344" width="244" height="262" rx="20" fill="#ffffff" stroke="#1f2937" stroke-width="2" filter="url(#cs)"/>
-  <rect x="688" y="364" width="102" height="30" rx="15" fill="#fde68a" stroke="#1f2937" stroke-width="1.5" filter="url(#ps)"/>
-  <text x="702" y="384" font-family="'Courier New', Courier, monospace" font-size="13" font-weight="700" fill="#7f1d1d">STEP 03</text>
-  <text x="688" y="432" font-family="Arial, 'Helvetica Neue', Helvetica, sans-serif" font-size="24" font-weight="800" fill="#0f172a">Sync nodes</text>
-  <text x="688" y="470" font-family="Arial, 'Helvetica Neue', Helvetica, sans-serif" font-size="16" font-weight="500" fill="#475569">Transfer artifact and</text>
-  <text x="688" y="494" font-family="Arial, 'Helvetica Neue', Helvetica, sans-serif" font-size="16" font-weight="500" fill="#475569">release metadata via SSH.</text>
-
-  <rect x="956" y="344" width="244" height="262" rx="20" fill="#ffffff" stroke="#1f2937" stroke-width="2" filter="url(#cs)"/>
-  <rect x="980" y="364" width="102" height="30" rx="15" fill="#fde68a" stroke="#1f2937" stroke-width="1.5" filter="url(#ps)"/>
-  <text x="994" y="384" font-family="'Courier New', Courier, monospace" font-size="13" font-weight="700" fill="#7f1d1d">STEP 04</text>
-  <text x="980" y="432" font-family="Arial, 'Helvetica Neue', Helvetica, sans-serif" font-size="24" font-weight="800" fill="#0f172a">Activate</text>
-  <text x="980" y="470" font-family="Arial, 'Helvetica Neue', Helvetica, sans-serif" font-size="16" font-weight="500" fill="#475569">Run hooks, switch the</text>
-  <text x="980" y="494" font-family="Arial, 'Helvetica Neue', Helvetica, sans-serif" font-size="16" font-weight="500" fill="#475569">target, and restart safely.</text>
-
-  <rect x="1248" y="344" width="272" height="262" rx="20" fill="#ffffff" stroke="#1f2937" stroke-width="2" filter="url(#cs)"/>
-  <rect x="1272" y="364" width="102" height="30" rx="15" fill="#ecfdf5" stroke="#10b981" stroke-width="1.5"/>
-  <text x="1286" y="384" font-family="'Courier New', Courier, monospace" font-size="13" font-weight="700" fill="#047857">STEP 05</text>
-  <text x="1272" y="432" font-family="Arial, 'Helvetica Neue', Helvetica, sans-serif" font-size="24" font-weight="800" fill="#0f172a">Verify health</text>
-  <text x="1272" y="470" font-family="Arial, 'Helvetica Neue', Helvetica, sans-serif" font-size="16" font-weight="500" fill="#475569">WatchTower reports</text>
-  <text x="1272" y="494" font-family="Arial, 'Helvetica Neue', Helvetica, sans-serif" font-size="16" font-weight="500" fill="#475569">service status back to</text>
-  <text x="1272" y="518" font-family="Arial, 'Helvetica Neue', Helvetica, sans-serif" font-size="16" font-weight="500" fill="#475569">the operator.</text>
-
-  <line x1="324" y1="476" x2="372" y2="476" stroke="#1f2937" stroke-width="4" stroke-linecap="round"/>
-  <polygon points="360,465 384,476 360,487" fill="#1f2937"/>
-  <line x1="616" y1="476" x2="664" y2="476" stroke="#1f2937" stroke-width="4" stroke-linecap="round"/>
-  <polygon points="652,465 676,476 652,487" fill="#1f2937"/>
-  <line x1="908" y1="476" x2="956" y2="476" stroke="#1f2937" stroke-width="4" stroke-linecap="round"/>
-  <polygon points="944,465 968,476 944,487" fill="#1f2937"/>
-  <line x1="1200" y1="476" x2="1248" y2="476" stroke="#1f2937" stroke-width="4" stroke-linecap="round"/>
-  <polygon points="1236,465 1260,476 1236,487" fill="#1f2937"/>
-
-  <rect x="80" y="676" width="1440" height="126" rx="20" fill="#fffdf7" stroke="#1f2937" stroke-width="2" filter="url(#cs)"/>
-  <text x="116" y="720" font-family="Arial, 'Helvetica Neue', Helvetica, sans-serif" font-size="21" font-weight="800" fill="#0f172a">Why this matters</text>
-  <text x="116" y="754" font-family="Arial, 'Helvetica Neue', Helvetica, sans-serif" font-size="17" font-weight="500" fill="#475569">The release path is explicit. Operators can tell what stage is running, where the artifact is,</text>
-  <text x="116" y="780" font-family="Arial, 'Helvetica Neue', Helvetica, sans-serif" font-size="17" font-weight="500" fill="#475569">and whether the deployment finished healthy without reading backend logs first.</text>
+  <rect width="900" height="380" rx="16" fill="#ffffff"/>
+  <rect x="0" y="0" width="900" height="60" rx="0" fill="#0f172a"/>
+  <rect x="0" y="0" width="900" height="16" rx="16" fill="#0f172a"/>
+  <text x="32" y="26" font-family="Arial,Helvetica,sans-serif" font-size="10" font-weight="700" fill="#94a3b8" letter-spacing="3">APP CENTER FLOW</text>
+  <text x="32" y="48" font-family="Arial,Helvetica,sans-serif" font-size="22" font-weight="800" fill="#ffffff">Five steps from app choice to live service</text>
+  <!-- Step cards -->
+  <!-- Step 1 -->
+  <rect x="24" y="88" width="158" height="260" rx="12" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1.5" filter="url(#sh)"/>
+  <rect x="24" y="88" width="158" height="5" rx="4" fill="#f59e0b"/>
+  <text x="44" y="118" font-family="Arial,Helvetica,sans-serif" font-size="10" font-weight="700" fill="#92400e" letter-spacing="2">STEP 1</text>
+  <text x="44" y="144" font-family="Arial,Helvetica,sans-serif" font-size="16" font-weight="800" fill="#0f172a">Choose</text>
+  <text x="44" y="162" font-family="Arial,Helvetica,sans-serif" font-size="16" font-weight="800" fill="#0f172a">App</text>
+  <text x="44" y="192" font-family="Arial,Helvetica,sans-serif" font-size="12" fill="#64748b">Pick a named</text>
+  <text x="44" y="208" font-family="Arial,Helvetica,sans-serif" font-size="12" fill="#64748b">workload from</text>
+  <text x="44" y="224" font-family="Arial,Helvetica,sans-serif" font-size="12" fill="#64748b">the registry or</text>
+  <text x="44" y="240" font-family="Arial,Helvetica,sans-serif" font-size="12" fill="#64748b">dashboard.</text>
+  <!-- Step 2 -->
+  <line x1="182" y1="218" x2="202" y2="218" stroke="#cbd5e1" stroke-width="2"/>
+  <polygon points="198,213 208,218 198,223" fill="#cbd5e1"/>
+  <rect x="208" y="88" width="158" height="260" rx="12" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1.5" filter="url(#sh)"/>
+  <rect x="208" y="88" width="158" height="5" rx="4" fill="#f59e0b"/>
+  <text x="228" y="118" font-family="Arial,Helvetica,sans-serif" font-size="10" font-weight="700" fill="#92400e" letter-spacing="2">STEP 2</text>
+  <text x="228" y="144" font-family="Arial,Helvetica,sans-serif" font-size="16" font-weight="800" fill="#0f172a">Build</text>
+  <text x="228" y="162" font-family="Arial,Helvetica,sans-serif" font-size="16" font-weight="800" fill="#0f172a">Package</text>
+  <text x="228" y="192" font-family="Arial,Helvetica,sans-serif" font-size="12" fill="#64748b">Create a tar.gz</text>
+  <text x="228" y="208" font-family="Arial,Helvetica,sans-serif" font-size="12" fill="#64748b">or zip artifact</text>
+  <text x="228" y="224" font-family="Arial,Helvetica,sans-serif" font-size="12" fill="#64748b">for this release.</text>
+  <!-- Step 3 -->
+  <line x1="366" y1="218" x2="386" y2="218" stroke="#cbd5e1" stroke-width="2"/>
+  <polygon points="382,213 392,218 382,223" fill="#cbd5e1"/>
+  <rect x="392" y="88" width="158" height="260" rx="12" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1.5" filter="url(#sh)"/>
+  <rect x="392" y="88" width="158" height="5" rx="4" fill="#f59e0b"/>
+  <text x="412" y="118" font-family="Arial,Helvetica,sans-serif" font-size="10" font-weight="700" fill="#92400e" letter-spacing="2">STEP 3</text>
+  <text x="412" y="144" font-family="Arial,Helvetica,sans-serif" font-size="16" font-weight="800" fill="#0f172a">Sync</text>
+  <text x="412" y="162" font-family="Arial,Helvetica,sans-serif" font-size="16" font-weight="800" fill="#0f172a">Nodes</text>
+  <text x="412" y="192" font-family="Arial,Helvetica,sans-serif" font-size="12" fill="#64748b">Transfer artifact</text>
+  <text x="412" y="208" font-family="Arial,Helvetica,sans-serif" font-size="12" fill="#64748b">and metadata to</text>
+  <text x="412" y="224" font-family="Arial,Helvetica,sans-serif" font-size="12" fill="#64748b">target nodes via</text>
+  <text x="412" y="240" font-family="Arial,Helvetica,sans-serif" font-size="12" fill="#64748b">SSH.</text>
+  <!-- Step 4 -->
+  <line x1="550" y1="218" x2="570" y2="218" stroke="#cbd5e1" stroke-width="2"/>
+  <polygon points="566,213 576,218 566,223" fill="#cbd5e1"/>
+  <rect x="576" y="88" width="158" height="260" rx="12" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1.5" filter="url(#sh)"/>
+  <rect x="576" y="88" width="158" height="5" rx="4" fill="#f59e0b"/>
+  <text x="596" y="118" font-family="Arial,Helvetica,sans-serif" font-size="10" font-weight="700" fill="#92400e" letter-spacing="2">STEP 4</text>
+  <text x="596" y="144" font-family="Arial,Helvetica,sans-serif" font-size="16" font-weight="800" fill="#0f172a">Activate</text>
+  <text x="596" y="162" font-family="Arial,Helvetica,sans-serif" font-size="16" font-weight="800" fill="#0f172a">Release</text>
+  <text x="596" y="192" font-family="Arial,Helvetica,sans-serif" font-size="12" fill="#64748b">Run hooks, switch</text>
+  <text x="596" y="208" font-family="Arial,Helvetica,sans-serif" font-size="12" fill="#64748b">the target, and</text>
+  <text x="596" y="224" font-family="Arial,Helvetica,sans-serif" font-size="12" fill="#64748b">restart safely.</text>
+  <!-- Step 5 -->
+  <line x1="734" y1="218" x2="754" y2="218" stroke="#10b981" stroke-width="2"/>
+  <polygon points="750,213 760,218 750,223" fill="#10b981"/>
+  <rect x="760" y="88" width="116" height="260" rx="12" fill="#ecfdf5" stroke="#10b981" stroke-width="1.5" filter="url(#sh)"/>
+  <rect x="760" y="88" width="116" height="5" rx="4" fill="#10b981"/>
+  <text x="780" y="118" font-family="Arial,Helvetica,sans-serif" font-size="10" font-weight="700" fill="#047857" letter-spacing="2">STEP 5</text>
+  <text x="780" y="144" font-family="Arial,Helvetica,sans-serif" font-size="16" font-weight="800" fill="#0f172a">Verify</text>
+  <text x="780" y="162" font-family="Arial,Helvetica,sans-serif" font-size="16" font-weight="800" fill="#0f172a">Health</text>
+  <text x="780" y="192" font-family="Arial,Helvetica,sans-serif" font-size="12" fill="#065f46">WatchTower</text>
+  <text x="780" y="208" font-family="Arial,Helvetica,sans-serif" font-size="12" fill="#065f46">reports service</text>
+  <text x="780" y="224" font-family="Arial,Helvetica,sans-serif" font-size="12" fill="#065f46">status back to</text>
+  <text x="780" y="240" font-family="Arial,Helvetica,sans-serif" font-size="12" fill="#065f46">the operator.</text>
 </svg>
