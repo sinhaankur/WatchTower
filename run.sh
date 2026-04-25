@@ -213,8 +213,25 @@ if [[ ! -f "$DIST_INDEX" ]]; then
   success "Frontend built."
 fi
 
+# ── Resolve mode early (before Step 4) so desktop mode can skip backend start ──
+if [[ "$MODE" == "auto" ]]; then
+  if [[ "$IS_ARM" == true ]]; then
+    # Raspberry Pi / ARM: default to browser mode.
+    info "ARM detected ($ARCH) — defaulting to browser mode."
+    info "To run the desktop app instead: ./run.sh desktop"
+    MODE=browser
+  elif [[ -n "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ]] && \
+       ( command -v electron >/dev/null 2>&1 || [[ -d "$ROOT/desktop/node_modules" ]] ); then
+    MODE=desktop
+  else
+    MODE=browser
+  fi
+fi
+
 # ── Step 4: Start backend ────────────────────────────────────────────────────
-if ! is_listening "$API_PORT"; then
+# In desktop mode, Electron manages the backend itself (with its own API token
+# for auto-login). Skip here so Electron can own the process from the start.
+if [[ "$MODE" != "desktop" ]] && ! is_listening "$API_PORT"; then
   free_port "$API_PORT"
   info "Starting backend on 127.0.0.1:$API_PORT..."
   # Load .env if present (non-secret dev config only)
@@ -233,28 +250,19 @@ if ! is_listening "$API_PORT"; then
   done
   is_listening "$API_PORT" || { error "Backend failed to start. Check: $LOG_API"; exit 1; }
   success "Backend ready."
+elif [[ "$MODE" == "desktop" ]]; then
+  # Desktop mode: Electron will start (and own) the backend with its own API token.
+  # Killing any stale backend now so Electron gets a clean port.
+  if is_listening "$API_PORT"; then
+    info "Stopping existing backend so Electron can own it..."
+    free_port "$API_PORT"
+  fi
 else
   success "Backend already running on port $API_PORT."
 fi
 
 # ── Step 5: Launch UI ────────────────────────────────────────────────────────
-# Detect best mode if auto
-if [[ "$MODE" == "auto" ]]; then
-  if [[ "$IS_ARM" == true ]]; then
-    # Raspberry Pi / ARM: default to browser mode.
-    # Electron can run on Pi 4/5 (arm64) but requires ~500 MB RAM and a
-    # connected display. Browser mode works on any Pi with just the backend.
-    # Override with: ./run.sh desktop
-    info "ARM detected ($ARCH) — defaulting to browser mode."
-    info "To run the desktop app instead: ./run.sh desktop"
-    MODE=browser
-  elif [[ -n "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ]] && \
-       ( command -v electron >/dev/null 2>&1 || [[ -d "$ROOT/desktop/node_modules" ]] ); then
-    MODE=desktop
-  else
-    MODE=browser
-  fi
-fi
+# (Mode already resolved above before Step 4)
 
 if [[ "$MODE" == "desktop" ]]; then
   info "Launching Electron desktop app..."
@@ -262,7 +270,7 @@ if [[ "$MODE" == "desktop" ]]; then
   pkill -f "electron \." 2>/dev/null || true
   sleep 0.3
   # npm run desktop uses the built-in static server — fast startup
-  npm --prefix "$ROOT" run desktop >/dev/null 2>&1 &
+  npm --prefix "$ROOT" run desktop >"$LOG_WEB" 2>&1 &
   success "Desktop app launched."
 
 elif [[ "$MODE" == "browser" ]]; then
