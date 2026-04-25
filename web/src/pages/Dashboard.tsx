@@ -219,6 +219,9 @@ const Dashboard = () => {
   useEffect(() => {
     void loadProjects();
     void loadRuntime();
+    // Poll every 15 seconds to refresh deployment statuses
+    const interval = setInterval(() => void loadProjects(), 15_000);
+    return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -484,14 +487,14 @@ const Dashboard = () => {
                   >
                     <div className="flex items-center gap-3 min-w-0">
                       <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${meta.dot}`} />
-                      <div className="min-w-0">
+                      <Link to={`/projects/${project.id}`} className="min-w-0 hover:underline">
                         <p className="text-sm font-semibold text-slate-900 truncate">{project.name}</p>
                         <div className="flex items-center gap-2 mt-1 flex-wrap">
                           <span className={`text-xs px-2 py-0.5 rounded-full border ${meta.color}`}>{meta.label}</span>
                           <span className="text-xs text-slate-600">{project.deployment_model === 'self_hosted' ? 'Self-hosted' : 'SaaS'}</span>
                           <span className="font-mono text-xs text-slate-500">{project.repo_branch}</span>
                         </div>
-                      </div>
+                      </Link>
                     </div>
 
                     <div className="flex items-center gap-2 shrink-0">
