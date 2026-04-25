@@ -6,6 +6,14 @@ Project goal: a decentralized, free-tier Vercel-style deployment model using loc
 
 This guide covers the hybrid model where your Podman nodes provide compute and rollout automation, while a managed cloud database provides durable storage.
 
+## Visual Overview
+
+![WatchTower hybrid stack](./assets/hybrid-stack.svg)
+
+![WatchTower application and web app surface](./assets/application-surface.svg)
+
+![WatchTower secure terminal command flow](./assets/secure-terminal-flow.svg)
+
 The intended fit is:
 
 - Node A and Node B run the same application image under Podman.
