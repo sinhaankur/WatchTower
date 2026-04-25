@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import apiClient from '@/lib/api';
 
 type IntegrationStatus = {
@@ -81,6 +82,26 @@ function StatusBadge({ ok, label }: { ok: boolean; label: string }) {
   );
 }
 
+function CopyButton({
+  copied,
+  onClick,
+  label = 'Copy',
+}: {
+  copied: boolean;
+  onClick: () => void;
+  label?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="shrink-0 rounded-md border border-slate-300 bg-white px-2.5 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-50"
+    >
+      {copied ? 'Copied' : label}
+    </button>
+  );
+}
+
 const TOOL_ORDER = [
   'podman',
   'docker',
@@ -89,6 +110,16 @@ const TOOL_ORDER = [
   'cloudflared',
   'nginx',
 ] as const;
+type ToolName = typeof TOOL_ORDER[number];
+
+const TOOL_LABELS: Record<ToolName, string> = {
+  podman: 'Podman',
+  docker: 'Docker',
+  coolify: 'Coolify',
+  tailscale: 'Tailscale',
+  cloudflared: 'Cloudflared',
+  nginx: 'Nginx',
+};
 
 const DATABASE_PROVIDERS = [
   { id: 'mongodb_atlas', label: 'MongoDB Atlas' },
@@ -100,12 +131,49 @@ const DATABASE_PROVIDERS = [
 const TABS = ['Tools', 'Domain', 'Database', 'Nginx', 'Terminal'] as const;
 type Tab = typeof TABS[number];
 
+const TAB_QUERY: Record<Tab, string> = {
+  Tools: 'tools',
+  Domain: 'domain',
+  Database: 'database',
+  Nginx: 'nginx',
+  Terminal: 'terminal',
+};
+
+const QUERY_TAB = Object.fromEntries(
+  Object.entries(TAB_QUERY).map(([tab, value]) => [value, tab as Tab]),
+) as Record<string, Tab>;
+
+const TAB_COPY: Record<Tab, { title: string; description: string }> = {
+  Tools: {
+    title: 'Prepare the host first',
+    description: 'Check runtime dependencies and copy exact install commands before you connect services or deploy apps.',
+  },
+  Domain: {
+    title: 'Expose an app safely',
+    description: 'Generate a Cloudflare Tunnel plan for a host that sits behind NAT, firewalls, or a home connection.',
+  },
+  Database: {
+    title: 'Provision app data next',
+    description: 'Create a managed database checklist and environment variables without leaving the current flow.',
+  },
+  Nginx: {
+    title: 'Front your app with a proxy',
+    description: 'Generate a ready-to-paste Nginx config once your app is already running on the host.',
+  },
+  Terminal: {
+    title: 'Verify the host safely',
+    description: 'Run allow-listed commands to inspect the machine without handing out unrestricted shell access.',
+  },
+};
+
 const HostConnect = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [loading, setLoading] = useState(true);
   const [integrations, setIntegrations] = useState<IntegrationsPayload | null>(null);
   const [commands, setCommands] = useState<InstallCommandsPayload | null>(null);
   const [error, setError] = useState<string>('');
   const [activeTab, setActiveTab] = useState<Tab>('Tools');
+  const [copiedKey, setCopiedKey] = useState('');
 
   const [domain, setDomain] = useState('example.com');
   const [subdomain, setSubdomain] = useState('app');
@@ -179,6 +247,13 @@ const HostConnect = () => {
     void loadAll();
   }, []);
 
+  useEffect(() => {
+    const requestedTab = QUERY_TAB[searchParams.get('tab') || ''];
+    if (requestedTab && requestedTab !== activeTab) {
+      setActiveTab(requestedTab);
+    }
+  }, [activeTab, searchParams]);
+
   const readiness = useMemo(() => {
     if (!integrations) return 0;
     const checks = [
@@ -192,7 +267,33 @@ const HostConnect = () => {
     return checks;
   }, [integrations]);
 
+  const missingTools = useMemo(
+    () => TOOL_ORDER.filter((name) => !Boolean((integrations?.[name] as IntegrationStatus | undefined)?.installed)),
+    [integrations],
+  );
+
+  const recommendedTab: Tab = missingTools.length > 0 ? 'Tools' : 'Domain';
+
+  const setTab = (tab: Tab) => {
+    setActiveTab(tab);
+    const next = new URLSearchParams(searchParams);
+    next.set('tab', TAB_QUERY[tab]);
+    setSearchParams(next, { replace: true });
+  };
+
+  const copyText = async (key: string, text: string) => {
+    await navigator.clipboard.writeText(text).catch(() => {});
+    setCopiedKey(key);
+    window.setTimeout(() => setCopiedKey((current) => (current === key ? '' : current)), 1800);
+  };
+
   const generateDatabasePlan = async () => {
+    if (!appName.trim() || !dbName.trim() || !dbUser.trim()) {
+      setTab('Database');
+      setError('Enter app name, database name, and username before generating a database plan.');
+      setDbPlan(null);
+      return;
+    }
     setDbPlanLoading(true);
     setError('');
     try {
@@ -213,6 +314,12 @@ const HostConnect = () => {
   };
 
   const generateNginxPlan = async () => {
+    if (!nginxServerName.trim() || !nginxUpstream.trim()) {
+      setTab('Nginx');
+      setError('Enter both the server name and upstream host before generating an Nginx config.');
+      setNginxPlan(null);
+      return;
+    }
     setNginxPlanLoading(true);
     setError('');
     try {
@@ -230,6 +337,12 @@ const HostConnect = () => {
   };
 
   const generateDomainPlan = async () => {
+    if (!domain.trim() || !subdomain.trim() || !targetHost.trim()) {
+      setTab('Domain');
+      setError('Enter a domain, subdomain, and target host before generating a Cloudflare plan.');
+      setDomainPlan(null);
+      return;
+    }
     setDomainLoading(true);
     setError('');
     try {
@@ -248,7 +361,29 @@ const HostConnect = () => {
   };
 
   const runSecureTerminalCommand = async () => {
-    if (!terminalCommand.trim()) return;
+    const trimmedCommand = terminalCommand.trim();
+    const allowedCommands = terminalPolicy?.allowed_commands || [];
+    const commandName = trimmedCommand.split(/\s+/)[0] || '';
+
+    if (!trimmedCommand) {
+      setTab('Terminal');
+      setError('Enter a command before running a secure terminal action.');
+      return;
+    }
+
+    if (allowedCommands.length > 0 && !allowedCommands.some((entry) => entry.command === commandName)) {
+      setTab('Terminal');
+      setError(`Command must start with one of the allow-listed tools: ${allowedCommands.map((entry) => entry.command).join(', ')}.`);
+      setTerminalResult(null);
+      return;
+    }
+
+    if (terminalTimeout < 1 || terminalTimeout > (terminalPolicy?.max_timeout_seconds ?? 120)) {
+      setTab('Terminal');
+      setError(`Timeout must be between 1 and ${terminalPolicy?.max_timeout_seconds ?? 120} seconds.`);
+      return;
+    }
+
     setTerminalRunning(true);
     setTerminalResult(null);
     setError('');
@@ -327,6 +462,76 @@ const HostConnect = () => {
           </div>
         )}
 
+        <section className="mb-6 rounded-2xl border border-border bg-gradient-to-br from-white to-amber-50 p-5">
+          <div className="grid gap-4 lg:grid-cols-[1.6fr_1fr]">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-red-700">Guided Host Setup</p>
+              <h2 className="mt-2 text-xl font-bold text-slate-900">{TAB_COPY[activeTab].title}</h2>
+              <p className="mt-1.5 max-w-2xl text-sm text-slate-600">{TAB_COPY[activeTab].description}</p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                {TABS.map((tab) => (
+                  <button
+                    key={tab}
+                    type="button"
+                    onClick={() => setTab(tab)}
+                    className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
+                      activeTab === tab
+                        ? 'border-red-700 bg-red-700 text-white'
+                        : 'border-slate-300 bg-white text-slate-700 hover:border-slate-400 hover:bg-slate-50'
+                    }`}
+                  >
+                    {tab}
+                  </button>
+                ))}
+              </div>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <Link
+                  to="/servers"
+                  className="rounded-lg border border-slate-800 bg-white px-3 py-2 text-xs font-semibold text-slate-900 shadow-[2px_2px_0_0_#1f2937] hover:bg-amber-50"
+                >
+                  Open Servers
+                </Link>
+                <Link
+                  to="/setup"
+                  className="rounded-lg border border-slate-800 bg-red-700 px-3 py-2 text-xs font-semibold text-white shadow-[2px_2px_0_0_#1f2937] hover:bg-red-800"
+                >
+                  Deploy an App
+                </Link>
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-amber-200 bg-white/80 p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Recommended Next Step</p>
+              <p className="mt-2 text-sm font-semibold text-slate-900">
+                {missingTools.length > 0
+                  ? `Install ${TOOL_LABELS[missingTools[0]]} first`
+                  : 'Your host is ready to connect apps'}
+              </p>
+              <p className="mt-1 text-xs text-slate-600">
+                {missingTools.length > 0
+                  ? `${missingTools.length} dependency${missingTools.length === 1 ? '' : 'ies'} still missing. Finish the tools tab, then connect a domain or deploy an app.`
+                  : 'Move on to Domain, Nginx, or Deploy an App depending on how you want traffic to reach the host.'}
+              </p>
+              <button
+                type="button"
+                onClick={() => setTab(recommendedTab)}
+                className="mt-3 rounded-lg border border-slate-800 bg-white px-3 py-2 text-xs font-semibold text-slate-900 shadow-[2px_2px_0_0_#1f2937] hover:bg-slate-50"
+              >
+                Open {recommendedTab}
+              </button>
+              {missingTools.length > 0 && (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {missingTools.map((name) => (
+                    <span key={name} className="rounded-full border border-amber-300 bg-amber-50 px-2 py-1 text-[11px] font-medium text-amber-800">
+                      {TOOL_LABELS[name]}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </section>
+
         {/* ── Tools tab ── */}
         {activeTab === 'Tools' && (
           <div className="space-y-6">
@@ -349,6 +554,11 @@ const HostConnect = () => {
                 <p className="text-xs text-slate-600 mt-2">
                   No tools detected. Use the <strong>Install Commands</strong> below to get started.
                 </p>
+              )}
+              {missingTools.length > 0 && !loading && (
+                <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                  Missing now: {missingTools.map((tool) => TOOL_LABELS[tool]).join(', ')}.
+                </div>
               )}
             </section>
 
@@ -386,7 +596,13 @@ const HostConnect = () => {
                 <div className="space-y-3 max-h-[420px] overflow-y-auto pr-1">
                   {TOOL_ORDER.map((name) => (
                     <div key={name} className="rounded-lg border border-border bg-muted/30 p-3">
-                      <p className="text-xs font-semibold text-slate-700 uppercase tracking-wider mb-2">{name}</p>
+                      <div className="mb-2 flex items-center justify-between gap-2">
+                        <p className="text-xs font-semibold uppercase tracking-wider text-slate-700">{name}</p>
+                        <CopyButton
+                          copied={copiedKey === `install-${name}`}
+                          onClick={() => void copyText(`install-${name}`, (commands?.commands?.[name] || ['No command recipe available.']).join('\n'))}
+                        />
+                      </div>
                       <pre className="text-xs text-slate-700 whitespace-pre-wrap break-words">
                         {(commands?.commands?.[name] || ['No command recipe available.']).join('\n')}
                       </pre>
@@ -415,7 +631,10 @@ const HostConnect = () => {
                   Domain
                   <input
                     value={domain}
-                    onChange={(e) => setDomain(e.target.value)}
+                    onChange={(e) => {
+                      setDomain(e.target.value);
+                      setDomainPlan(null);
+                    }}
                     className="mt-1.5 w-full bg-white border border-border rounded-md px-3 py-2 text-slate-900"
                     placeholder="example.com"
                   />
@@ -424,7 +643,10 @@ const HostConnect = () => {
                   Subdomain
                   <input
                     value={subdomain}
-                    onChange={(e) => setSubdomain(e.target.value)}
+                    onChange={(e) => {
+                      setSubdomain(e.target.value);
+                      setDomainPlan(null);
+                    }}
                     className="mt-1.5 w-full bg-white border border-border rounded-md px-3 py-2 text-slate-900"
                     placeholder="app"
                   />
@@ -433,7 +655,10 @@ const HostConnect = () => {
                   Target Host
                   <input
                     value={targetHost}
-                    onChange={(e) => setTargetHost(e.target.value)}
+                    onChange={(e) => {
+                      setTargetHost(e.target.value);
+                      setDomainPlan(null);
+                    }}
                     className="mt-1.5 w-full bg-white border border-border rounded-md px-3 py-2 text-slate-900"
                     placeholder="localhost:3000"
                   />
@@ -455,7 +680,13 @@ const HostConnect = () => {
                     <p className="text-sm text-slate-900 font-medium">{domainPlan.hostname}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-slate-600 mb-1">Commands</p>
+                    <div className="mb-1 flex items-center justify-between gap-2">
+                      <p className="text-xs text-slate-600">Commands</p>
+                      <CopyButton
+                        copied={copiedKey === 'domain-commands'}
+                        onClick={() => void copyText('domain-commands', domainPlan.commands.join('\n'))}
+                      />
+                    </div>
                     <pre className="text-xs text-slate-800 whitespace-pre-wrap break-words">
                       {domainPlan.commands.join('\n')}
                     </pre>
@@ -491,7 +722,10 @@ const HostConnect = () => {
                   Provider
                   <select
                     value={provider}
-                    onChange={(e) => setProvider(e.target.value)}
+                    onChange={(e) => {
+                      setProvider(e.target.value);
+                      setDbPlan(null);
+                    }}
                     className="mt-1.5 w-full bg-white border border-border rounded-md px-3 py-2 text-slate-900"
                   >
                     {DATABASE_PROVIDERS.map((p) => (
@@ -503,7 +737,10 @@ const HostConnect = () => {
                   App Name
                   <input
                     value={appName}
-                    onChange={(e) => setAppName(e.target.value)}
+                    onChange={(e) => {
+                      setAppName(e.target.value);
+                      setDbPlan(null);
+                    }}
                     className="mt-1.5 w-full bg-white border border-border rounded-md px-3 py-2 text-slate-900"
                   />
                 </label>
@@ -511,7 +748,10 @@ const HostConnect = () => {
                   DB Name
                   <input
                     value={dbName}
-                    onChange={(e) => setDbName(e.target.value)}
+                    onChange={(e) => {
+                      setDbName(e.target.value);
+                      setDbPlan(null);
+                    }}
                     className="mt-1.5 w-full bg-white border border-border rounded-md px-3 py-2 text-slate-900"
                   />
                 </label>
@@ -519,7 +759,10 @@ const HostConnect = () => {
                   Username
                   <input
                     value={dbUser}
-                    onChange={(e) => setDbUser(e.target.value)}
+                    onChange={(e) => {
+                      setDbUser(e.target.value);
+                      setDbPlan(null);
+                    }}
                     className="mt-1.5 w-full bg-white border border-border rounded-md px-3 py-2 text-slate-900"
                   />
                 </label>
@@ -527,7 +770,10 @@ const HostConnect = () => {
                   Region (for AWS RDS plans)
                   <input
                     value={dbRegion}
-                    onChange={(e) => setDbRegion(e.target.value)}
+                    onChange={(e) => {
+                      setDbRegion(e.target.value);
+                      setDbPlan(null);
+                    }}
                     className="mt-1.5 w-full bg-white border border-border rounded-md px-3 py-2 text-slate-900"
                   />
                 </label>
@@ -554,12 +800,29 @@ const HostConnect = () => {
                   </div>
                   <div>
                     <p className="text-xs text-slate-600 mb-1">Connection Example</p>
+                    <div className="mb-1 flex items-center justify-end">
+                      <CopyButton
+                        copied={copiedKey === 'db-connection'}
+                        onClick={() => void copyText('db-connection', dbPlan.connection_example)}
+                      />
+                    </div>
                     <pre className="text-xs text-slate-800 whitespace-pre-wrap break-words">
                       {dbPlan.connection_example}
                     </pre>
                   </div>
                   <div>
-                    <p className="text-xs text-slate-600 mb-1">Env Variables</p>
+                    <div className="mb-1 flex items-center justify-between gap-2">
+                      <p className="text-xs text-slate-600">Env Variables</p>
+                      <CopyButton
+                        copied={copiedKey === 'db-env'}
+                        onClick={() => void copyText(
+                          'db-env',
+                          Object.entries(dbPlan.env)
+                            .map(([k, v]) => `${k}=${v}`)
+                            .join('\n'),
+                        )}
+                      />
+                    </div>
                     <pre className="text-xs text-slate-800 whitespace-pre-wrap break-words">
                       {Object.entries(dbPlan.env)
                         .map(([k, v]) => `${k}=${v}`)
@@ -589,7 +852,10 @@ const HostConnect = () => {
                   Server Name (domain)
                   <input
                     value={nginxServerName}
-                    onChange={(e) => setNginxServerName(e.target.value)}
+                    onChange={(e) => {
+                      setNginxServerName(e.target.value);
+                      setNginxPlan(null);
+                    }}
                     className="mt-1.5 w-full bg-white border border-border rounded-md px-3 py-2 text-slate-900"
                     placeholder="app.example.com"
                   />
@@ -598,7 +864,10 @@ const HostConnect = () => {
                   Upstream Host (where your app runs)
                   <input
                     value={nginxUpstream}
-                    onChange={(e) => setNginxUpstream(e.target.value)}
+                    onChange={(e) => {
+                      setNginxUpstream(e.target.value);
+                      setNginxPlan(null);
+                    }}
                     className="mt-1.5 w-full bg-white border border-border rounded-md px-3 py-2 text-slate-900"
                     placeholder="127.0.0.1:3000"
                   />
@@ -616,7 +885,13 @@ const HostConnect = () => {
               {nginxPlan && (
                 <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-3">
                   <div>
-                    <p className="text-xs text-slate-600 mb-1">Config file — copy to <code className="font-mono bg-slate-100 px-1 rounded">/etc/nginx/sites-available/{nginxServerName}</code></p>
+                    <div className="mb-1 flex items-center justify-between gap-2">
+                      <p className="text-xs text-slate-600">Config file — copy to <code className="font-mono bg-slate-100 px-1 rounded">/etc/nginx/sites-available/{nginxServerName}</code></p>
+                      <CopyButton
+                        copied={copiedKey === 'nginx-config'}
+                        onClick={() => void copyText('nginx-config', nginxPlan.config)}
+                      />
+                    </div>
                     <pre className="text-xs text-slate-800 whitespace-pre-wrap break-words max-h-72 overflow-y-auto">
                       {nginxPlan.config}
                     </pre>
@@ -684,7 +959,10 @@ const HostConnect = () => {
                   Command
                   <input
                     value={terminalCommand}
-                    onChange={(e) => setTerminalCommand(e.target.value)}
+                    onChange={(e) => {
+                      setTerminalCommand(e.target.value);
+                      setTerminalResult(null);
+                    }}
                     className="mt-1.5 w-full bg-white border border-border rounded-md px-3 py-2 text-slate-900"
                     placeholder="docker ps"
                   />
@@ -696,7 +974,10 @@ const HostConnect = () => {
                     min={1}
                     max={terminalPolicy?.max_timeout_seconds ?? 120}
                     value={terminalTimeout}
-                    onChange={(e) => setTerminalTimeout(Number(e.target.value || 20))}
+                    onChange={(e) => {
+                      setTerminalTimeout(Number(e.target.value || 20));
+                      setTerminalResult(null);
+                    }}
                     className="mt-1.5 w-full bg-white border border-border rounded-md px-3 py-2 text-slate-900"
                   />
                 </label>
@@ -705,7 +986,10 @@ const HostConnect = () => {
                     <input
                       type="checkbox"
                       checked={terminalRequireSudo}
-                      onChange={(e) => setTerminalRequireSudo(e.target.checked)}
+                      onChange={(e) => {
+                        setTerminalRequireSudo(e.target.checked);
+                        setTerminalResult(null);
+                      }}
                       className="accent-red-700"
                     />
                     Require sudo
@@ -728,7 +1012,13 @@ const HostConnect = () => {
                   </p>
                   {terminalResult.stdout && (
                     <div>
-                      <p className="text-xs text-slate-600 mb-1">Output</p>
+                      <div className="mb-1 flex items-center justify-between gap-2">
+                        <p className="text-xs text-slate-600">Output</p>
+                        <CopyButton
+                          copied={copiedKey === 'terminal-stdout'}
+                          onClick={() => void copyText('terminal-stdout', terminalResult.stdout)}
+                        />
+                      </div>
                       <pre className="text-xs text-slate-800 whitespace-pre-wrap break-words max-h-48 overflow-y-auto">
                         {terminalResult.stdout}
                       </pre>
@@ -736,7 +1026,13 @@ const HostConnect = () => {
                   )}
                   {terminalResult.stderr && (
                     <div>
-                      <p className="text-xs text-slate-600 mb-1">Errors</p>
+                      <div className="mb-1 flex items-center justify-between gap-2">
+                        <p className="text-xs text-slate-600">Errors</p>
+                        <CopyButton
+                          copied={copiedKey === 'terminal-stderr'}
+                          onClick={() => void copyText('terminal-stderr', terminalResult.stderr)}
+                        />
+                      </div>
                       <pre className="text-xs text-red-700 whitespace-pre-wrap break-words max-h-32 overflow-y-auto">
                         {terminalResult.stderr}
                       </pre>
