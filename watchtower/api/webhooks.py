@@ -6,13 +6,14 @@ import hmac
 import hashlib
 import json
 import logging
-from fastapi import APIRouter, Request, Header, HTTPException, status, Depends
+from fastapi import APIRouter, BackgroundTasks, Request, Header, HTTPException, status, Depends
 from sqlalchemy.orm import Session
 
 from watchtower.database import (
     get_db, Project, Deployment, DeploymentStatus, 
     DeploymentTrigger
 )
+from watchtower import builder as build_runner
 
 router = APIRouter(prefix="/api/webhooks", tags=["Webhooks"])
 logger = logging.getLogger(__name__)
@@ -42,6 +43,7 @@ def verify_webhook_signature(
 async def github_webhook(
     project_id: str,
     request: Request,
+    background_tasks: BackgroundTasks,
     x_hub_signature_256: str = Header(None),
     db: Session = Depends(get_db)
 ):
@@ -96,9 +98,9 @@ async def github_webhook(
             db.add(deployment)
             db.commit()
             db.refresh(deployment)
-            
-            # TODO: Queue build job
-            
+
+            background_tasks.add_task(build_runner.run_build_async, str(deployment.id))
+
             return {
                 "message": "Deployment queued",
                 "deployment_id": str(deployment.id)
@@ -127,9 +129,9 @@ async def github_webhook(
             db.add(deployment)
             db.commit()
             db.refresh(deployment)
-            
-            # TODO: Queue preview deployment job
-            
+
+            background_tasks.add_task(build_runner.run_build_async, str(deployment.id))
+
             return {
                 "message": "Preview deployment queued",
                 "deployment_id": str(deployment.id),

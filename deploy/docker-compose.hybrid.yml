@@ -4,6 +4,13 @@ services:
   app-server:
     image: ${APP_IMAGE:?set APP_IMAGE in .env}
     container_name: wt-app-${NODE_NAME:-node}
+    init: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    tmpfs:
+      - /tmp
     environment:
       NODE_ENV: ${NODE_ENV:-production}
       MONGODB_URI: ${MONGODB_URI:-}
@@ -20,14 +27,22 @@ services:
       WATCHTOWER_API_TOKEN: ${WATCHTOWER_API_TOKEN:-}
       WATCHTOWER_SECRET_KEY: ${WATCHTOWER_SECRET_KEY:-}
     ports:
-      - "${APP_PORT:-8080}:80"
+      - "${APP_PORT:-8080}:${APP_CONTAINER_PORT:-8000}"
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
     restart: always
+    stop_grace_period: 25s
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   watchtower:
     image: docker.io/containrrr/watchtower:latest
     container_name: wt-updater-${NODE_NAME:-node}
+    init: true
+    security_opt:
+      - no-new-privileges:true
     volumes:
       - ${XDG_RUNTIME_DIR}/podman/podman.sock:/var/run/docker.sock
     environment:
@@ -41,3 +56,8 @@ services:
       REPO_PASS: ${GH_PAT_TOKEN:-}
     command: --interval ${WATCHTOWER_POLL_INTERVAL:-30} --label-enable
     restart: always
+    stop_grace_period: 20s
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
