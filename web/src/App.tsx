@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, type ReactElement } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { trackPageView } from '@/lib/analytics';
 import { QueryClientProvider, QueryClient } from '@tanstack/react-query';
@@ -31,7 +31,7 @@ function RouteTracker() {
   return null;
 }
 
-function RequireAuth({ children }: { children: JSX.Element }) {
+function RequireAuth({ children }: { children: ReactElement }) {
   const location = useLocation();
   const envToken = (import.meta as any).env?.VITE_API_TOKEN;
   const token = localStorage.getItem('authToken') || envToken;
