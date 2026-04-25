@@ -28,26 +28,27 @@
     /* Logo mark */
     .logo-wrap {
       position: relative;
-      width: 96px;
-      height: 96px;
+      width: 108px;
+      height: 108px;
       margin-bottom: 24px;
-    }
-    .logo-box {
-      width: 96px;
-      height: 96px;
-      border-radius: 22px;
-      background: #fde68a;
-      border: 3px solid #1f2937;
-      box-shadow: 4px 4px 0 0 #1f2937;
       display: flex;
       align-items: center;
       justify-content: center;
     }
-    .logo-box span {
-      font-size: 36px;
-      font-weight: 800;
-      color: #b91c1c;
-      letter-spacing: -1px;
+    .logo-wrap::before {
+      content: '';
+      position: absolute;
+      inset: 10px;
+      border-radius: 28px;
+      background: rgba(253, 230, 138, 0.32);
+      filter: blur(10px);
+    }
+    .logo-mark {
+      position: relative;
+      width: 96px;
+      height: 96px;
+      display: block;
+      filter: drop-shadow(4px 4px 0 #1f2937);
     }
 
     /* Name */
@@ -121,9 +122,7 @@
 <body>
   <div class="shell">
     <div class="logo-wrap">
-      <div class="logo-box">
-        <span>Wt</span>
-      </div>
+      <img class="logo-mark" src="../assets/wt-logo.svg" alt="WatchTower logo" />
     </div>
 
     <div class="app-name">WatchTower</div>

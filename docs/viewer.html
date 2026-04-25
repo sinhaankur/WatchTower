@@ -4,7 +4,10 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>WatchTower Docs Viewer</title>
+  <link rel="icon" type="image/x-icon" href="./favicon.ico">
+  <link rel="icon" type="image/png" sizes="32x32" href="./favicon-32x32.png">
   <link rel="icon" type="image/svg+xml" href="./wt-logo.svg">
+  <link rel="apple-touch-icon" sizes="152x152" href="./apple-touch-icon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
@@ -54,14 +57,14 @@
       flex-direction: column;
       background: rgba(248, 251, 255, 0.9);
       backdrop-filter: blur(8px);
-      border-right: 1px solid var(--wt-border-soft);
+      border-right: 2px solid var(--wt-border);
       position: sticky;
       top: 0;
       height: 100vh;
     }
     .brand-block {
       padding: 20px 16px;
-      border-bottom: 1px solid var(--wt-border-soft);
+      border-bottom: 2px solid var(--wt-border);
     }
     .brand {
       display: flex;
@@ -114,22 +117,29 @@
     }
     .primary-button {
       width: 100%;
-      border: 1px solid var(--wt-border);
+      border: 2px solid var(--wt-border);
       color: #ffffff;
       background: var(--wt-accent);
-      box-shadow: 2px 2px 0 0 var(--wt-border);
+      box-shadow: 3px 3px 0 0 var(--wt-border);
+      border-radius: 0;
     }
     .secondary-button,
     .ghost-button {
-      border: 1px solid var(--wt-border);
+      border: 2px solid var(--wt-border);
       background: #ffffff;
       color: #0f172a;
-      box-shadow: 2px 2px 0 0 rgba(31, 41, 55, 0.08);
+      box-shadow: 3px 3px 0 0 var(--wt-border);
+      border-radius: 0;
     }
-    .primary-button:hover,
-    .secondary-button:hover,
-    .ghost-button:hover { transform: translateY(-1px); }
     .primary-button:hover { background: #991b1b; }
+    .secondary-button:hover,
+    .ghost-button:hover { background: #fef9ee; }
+    .primary-button:active,
+    .secondary-button:active,
+    .ghost-button:active {
+      transform: translate(2px, 2px);
+      box-shadow: none;
+    }
     .sidebar-nav {
       padding: 10px 12px 16px;
       display: flex;
@@ -155,7 +165,7 @@
       background: #fef2f2;
       color: var(--wt-accent-strong);
       border-left-color: var(--wt-accent-strong);
-      box-shadow: 0 1px 0 rgba(15, 23, 42, 0.06);
+      border-left-width: 3px;
     }
     .nav-dot {
       width: 8px;
@@ -189,7 +199,7 @@
       justify-content: space-between;
       gap: 16px;
       padding: 20px 32px;
-      border-bottom: 1px solid var(--wt-border-soft);
+      border-bottom: 2px solid var(--wt-border);
       background: rgba(248, 251, 255, 0.9);
       backdrop-filter: blur(8px);
     }
@@ -347,19 +357,7 @@
     }
     .loading,
     .error-box {
-      padding: 18px;
-      border-radius: 14px;
-      border: 1px solid var(--wt-border-soft);
-      background: var(--wt-panel-soft);
-      color: var(--wt-text-dim);
-    }
-    .error-box { color: #991b1b; }
-
-    .markdown-body {
-      color: #1f2937;
-      line-height: 1.75;
-      font-size: 0.96rem;
-    }
+      padding: 18px;\n      border: 2px solid var(--wt-border-soft);\n      background: var(--wt-panel-soft);\n      color: var(--wt-text-dim);\n    }\n    .error-box { color: #991b1b; }\n\n    @keyframes fadeInUp {\n      from { opacity: 0; transform: translateY(14px); }\n      to   { opacity: 1; transform: translateY(0); }\n    }\n\n    .markdown-body {\n      color: #1f2937;\n      line-height: 1.75;\n      font-size: 0.96rem;\n      animation: fadeInUp 0.28s ease both;\n    }
     .markdown-body > *:first-child { margin-top: 0; }
     .markdown-body h1,
     .markdown-body h2,
