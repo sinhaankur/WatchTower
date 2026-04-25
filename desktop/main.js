@@ -1,8 +1,9 @@
 const { app, BrowserWindow, dialog, ipcMain, Menu, Tray, nativeImage } = require('electron');
-const { spawn } = require('child_process');
+const { spawn, execSync, execFileSync } = require('child_process');
 const crypto = require('crypto');
 const fs = require('fs');
 const http = require('http');
+const net = require('net');
 const path = require('path');
 
 // ── GPU / Renderer stability flags ──────────────────────────────────────────
@@ -58,7 +59,6 @@ const BACKEND_PORT = 8000;
  * Safe no-op if nothing is on the port.
  */
 async function killPortProcesses(port) {
-  const { execSync, execFileSync } = require('child_process');
 
   /** Return an array of integer PIDs listening on the given port. */
   function findPids(p) {
@@ -117,7 +117,6 @@ async function killPortProcesses(port) {
   }
 
   // Wait for the OS to release the port (up to 3 s).
-  const net = require('net');
   const deadline = Date.now() + 3000;
   await new Promise(resolve => {
     const poll = () => {
@@ -236,19 +235,44 @@ function startStaticServer(distDir) {
       }
 
       // Static files with SPA fallback
-      let filePath = path.join(distDir, urlPath);
+      // Resolve and guard against path traversal (e.g. /../../../etc/passwd)
+      const resolved = path.resolve(distDir, urlPath.replace(/^\//, ''));
+      let filePath = resolved.startsWith(distDir + path.sep) || resolved === distDir
+        ? resolved
+        : path.join(distDir, 'index.html');
       if (!fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) {
         filePath = path.join(distDir, 'index.html');
       }
+
       const ext = path.extname(filePath).toLowerCase();
       const mime = MIME_TYPES[ext] || 'application/octet-stream';
-      try {
-        res.writeHead(200, { 'Content-Type': mime });
-        res.end(fs.readFileSync(filePath));
-      } catch {
-        res.writeHead(404);
+      const isIndex = filePath.endsWith('index.html');
+
+      // Security headers on every response
+      const securityHeaders = {
+        'Content-Type': mime,
+        'X-Content-Type-Options': 'nosniff',
+        'X-Frame-Options': 'DENY',
+        // Tight CSP: same-origin only; connect-src allows localhost API
+        'Content-Security-Policy':
+          "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; " +
+          `connect-src 'self' http://${HOST}:${BACKEND_PORT}; img-src 'self' data:; font-src 'self' data:;`,
+        // No caching for index.html (always re-check); long-lived cache for hashed assets
+        'Cache-Control': isIndex
+          ? 'no-store'
+          : 'public, max-age=31536000, immutable',
+      };
+
+      let stat;
+      try { stat = fs.statSync(filePath); } catch {
+        res.writeHead(404, securityHeaders);
         res.end('Not found');
+        return;
       }
+
+      res.writeHead(200, { ...securityHeaders, 'Content-Length': stat.size });
+      if (req.method === 'HEAD') { res.end(); return; }
+      fs.createReadStream(filePath).pipe(res);
     });
 
     server.listen(FRONTEND_PORT, HOST, () => resolve(server));
@@ -273,14 +297,14 @@ function waitForUrl(url, timeoutMs = 45000) {
           reject(new Error(`Service check failed at ${url} (status ${res.statusCode})`));
           return;
         }
-        setTimeout(attempt, 700);
+        setTimeout(attempt, 300);
       });
       req.on('error', () => {
         if (Date.now() - startedAt > timeoutMs) {
           reject(new Error(`Timed out waiting for ${url}`));
           return;
         }
-        setTimeout(attempt, 700);
+        setTimeout(attempt, 300);
       });
     };
     attempt();
@@ -307,7 +331,8 @@ async function startBackend() {
       env: {
         ...process.env,
         WATCHTOWER_API_TOKEN: runtimeApiToken,
-        WATCHTOWER_ALLOW_INSECURE_DEV_AUTH: 'true',
+        // Do NOT propagate dev-only overrides into the desktop process.
+        WATCHTOWER_ALLOW_INSECURE_DEV_AUTH: undefined,
       },
       stdio: 'inherit',
     }
@@ -405,7 +430,20 @@ ipcMain.handle('wt:isMaximized', () => mainWindow?.isMaximized() ?? false);
 // ── GitHub OAuth popup ───────────────────────────────────────────────────────
 let oauthPopup = null;
 
+// Allowlisted GitHub OAuth origins — reject anything the renderer sends that
+// isn't a real GitHub login URL (prevents open-redirect / XSS via IPC).
+const OAUTH_ALLOWED_ORIGINS = new Set(['https://github.com']);
+
 ipcMain.on('wt:openOAuth', (_event, url) => {
+  // Validate before opening any window.
+  let parsed;
+  try { parsed = new URL(url); } catch { return; }
+  const origin = `${parsed.protocol}//${parsed.hostname}`;
+  if (!OAUTH_ALLOWED_ORIGINS.has(origin)) {
+    console.warn(`[WatchTower] Blocked OAuth popup to untrusted origin: ${origin}`);
+    return;
+  }
+
   if (oauthPopup && !oauthPopup.isDestroyed()) {
     oauthPopup.focus();
     return;
@@ -421,6 +459,7 @@ ipcMain.on('wt:openOAuth', (_event, url) => {
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
+      sandbox: true,
       // Use the same session as the main window so localStorage is shared.
       session: mainWindow?.webContents.session,
     },
