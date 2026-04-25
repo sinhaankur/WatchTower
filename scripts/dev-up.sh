@@ -4,6 +4,14 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DEV_DIR="$ROOT_DIR/.dev"
 VENV_DIR="$ROOT_DIR/.venv"
+
+# ── Load .env if present ──────────────────────────────────────────────────────
+if [[ -f "$ROOT_DIR/.env" ]]; then
+  set -a
+  # shellcheck disable=SC1090
+  source "$ROOT_DIR/.env"
+  set +a
+fi
 API_LOG="$DEV_DIR/api.log"
 WEB_LOG="$DEV_DIR/web.log"
 COMPOSE_LOG="$DEV_DIR/compose.log"
@@ -120,6 +128,12 @@ else
   fi
 
   DATABASE_URL="$API_DATABASE_URL" \
+    WATCHTOWER_ALLOW_INSECURE_DEV_AUTH="${WATCHTOWER_ALLOW_INSECURE_DEV_AUTH:-true}" \
+    WATCHTOWER_API_TOKEN="${WATCHTOWER_API_TOKEN:-}" \
+    GITHUB_OAUTH_CLIENT_ID="${GITHUB_OAUTH_CLIENT_ID:-}" \
+    GITHUB_OAUTH_CLIENT_SECRET="${GITHUB_OAUTH_CLIENT_SECRET:-}" \
+    GH_USERNAME="${GH_USERNAME:-}" \
+    GH_PAT_TOKEN="${GH_PAT_TOKEN:-}" \
     CORS_ORIGINS="http://127.0.0.1:5173,http://localhost:5173,http://localhost:3000" \
     nohup "$PYTHON_BIN" -m uvicorn watchtower.api:app --host 127.0.0.1 --port 8000 >"$API_LOG" 2>&1 &
   echo $! > "$API_PID_FILE"

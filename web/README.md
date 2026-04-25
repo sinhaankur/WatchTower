@@ -1,5 +1,7 @@
 # WatchTower Frontend
 
+![Wt Logo](../assets/wt-logo.svg)
+
 React + TypeScript dashboard for WatchTower deployment platform.
 
 ## Project Structure

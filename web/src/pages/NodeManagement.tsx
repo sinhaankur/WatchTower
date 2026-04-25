@@ -121,6 +121,8 @@ const NodeManagement = () => {
 
   useEffect(() => {
     void loadContext();
+    // Initial page bootstrap should run once on mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const setField = (key: string, value: string | number | boolean) => {
@@ -180,8 +182,8 @@ const NodeManagement = () => {
       <header className="electron-card-solid electron-divider border-b">
         <div className="px-8 py-5 flex items-center justify-between">
           <div>
-            <h1 className="text-base font-semibold text-gray-900">Nodes</h1>
-            <p className="text-xs text-gray-400 mt-0.5">
+            <h1 className="text-base font-semibold text-slate-900">Nodes</h1>
+            <p className="text-xs text-slate-600 mt-0.5">
               {loading ? 'Loading…' : orgName ? `Organization: ${orgName}` : offlineMode ? 'Server offline — some features unavailable' : 'Manage deployment nodes'}
             </p>
           </div>
@@ -189,7 +191,7 @@ const NodeManagement = () => {
             <Button
               variant="outline"
               onClick={() => void loadContext()}
-              className="rounded-md border-gray-300 text-sm"
+              className="text-sm"
             >
               ↺ Retry Connection
             </Button>
@@ -239,20 +241,20 @@ const NodeManagement = () => {
                     type="button"
                     onClick={() => i < step && setStep(i)}
                     className={`flex items-center gap-2 text-sm font-medium transition-colors ${
-                      i === step ? 'text-gray-900' : i < step ? 'text-gray-500 cursor-pointer hover:text-gray-700' : 'text-gray-300 cursor-default'
+                      i === step ? 'text-slate-900' : i < step ? 'text-slate-600 cursor-pointer hover:text-red-800' : 'text-slate-400 cursor-default'
                     }`}
                   >
                     <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs border ${
-                      i < step ? 'bg-gray-900 border-gray-900 text-white' :
-                      i === step ? 'border-gray-900 text-gray-900' :
-                      'border-gray-200 text-gray-300'
+                      i < step ? 'bg-red-700 border-red-700 text-white' :
+                      i === step ? 'border-red-700 text-red-700 bg-red-50' :
+                      'border-slate-300 text-slate-400'
                     }`}>
                       {i < step ? '✓' : i + 1}
                     </span>
                     {label}
                   </button>
                   {i < STEP_LABELS.length - 1 && (
-                    <div className={`flex-1 h-px mx-3 ${i < step ? 'bg-gray-900' : 'bg-gray-200'}`} />
+                    <div className={`flex-1 h-px mx-3 ${i < step ? 'bg-red-700' : 'bg-slate-300'}`} />
                   )}
                 </div>
               ))}
@@ -261,7 +263,7 @@ const NodeManagement = () => {
             {/* Step 0: Basic Info */}
             {step === 0 && (
               <div className="space-y-4">
-                <p className="text-xs text-gray-500 mb-2">Give this node a recognizable name and enter its hostname or IP address.</p>
+                <p className="text-xs text-slate-600 mb-2">Give this node a recognizable name and enter its hostname or IP address.</p>
                 <div className="grid sm:grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="name">Node Name <span className="text-red-400">*</span></Label>
@@ -270,7 +272,7 @@ const NodeManagement = () => {
                       placeholder="e.g. web-node-1"
                       value={form.name}
                       onChange={(e) => setField('name', e.target.value)}
-                      className="mt-1.5 rounded-md border-gray-300"
+                      className="mt-1.5 rounded-md"
                     />
                   </div>
                   <div>
@@ -280,11 +282,11 @@ const NodeManagement = () => {
                       placeholder="e.g. 192.168.1.101 or server.example.com"
                       value={form.host}
                       onChange={(e) => setField('host', e.target.value)}
-                      className="mt-1.5 rounded-md border-gray-300"
+                      className="mt-1.5 rounded-md"
                     />
                   </div>
                 </div>
-                <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer mt-2">
+                <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer mt-2">
                   <input
                     type="checkbox"
                     checked={form.is_primary}
@@ -299,7 +301,7 @@ const NodeManagement = () => {
             {/* Step 1: SSH Access */}
             {step === 1 && (
               <div className="space-y-4">
-                <p className="text-xs text-gray-500 mb-2">How should WatchTower connect to this node via SSH?</p>
+                <p className="text-xs text-slate-600 mb-2">How should WatchTower connect to this node via SSH?</p>
                 <div className="grid sm:grid-cols-3 gap-4">
                   <div>
                     <Label htmlFor="user">SSH User</Label>
@@ -307,7 +309,7 @@ const NodeManagement = () => {
                       id="user"
                       value={form.user}
                       onChange={(e) => setField('user', e.target.value)}
-                      className="mt-1.5 rounded-md border-gray-300"
+                      className="mt-1.5 rounded-md"
                     />
                   </div>
                   <div>
@@ -317,7 +319,7 @@ const NodeManagement = () => {
                       type="number"
                       value={form.port}
                       onChange={(e) => setField('port', Number(e.target.value || 22))}
-                      className="mt-1.5 rounded-md border-gray-300"
+                      className="mt-1.5 rounded-md"
                     />
                   </div>
                   <div>
@@ -327,18 +329,18 @@ const NodeManagement = () => {
                       placeholder="~/.ssh/id_rsa"
                       value={form.ssh_key_path}
                       onChange={(e) => setField('ssh_key_path', e.target.value)}
-                      className="mt-1.5 rounded-md border-gray-300"
+                      className="mt-1.5 rounded-md"
                     />
                   </div>
                 </div>
-                <p className="text-xs text-gray-400">The SSH key must be accessible on the WatchTower server, not your local machine.</p>
+                <p className="text-xs text-slate-600">The SSH key must be accessible on the WatchTower server, not your local machine.</p>
               </div>
             )}
 
             {/* Step 2: Deployment Config */}
             {step === 2 && (
               <div className="space-y-4">
-                <p className="text-xs text-gray-500 mb-2">Configure deployment paths and the command that reloads your service.</p>
+                <p className="text-xs text-slate-600 mb-2">Configure deployment paths and the command that reloads your service.</p>
                 <div className="grid sm:grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="remote_path">Remote Deploy Path</Label>
@@ -346,7 +348,7 @@ const NodeManagement = () => {
                       id="remote_path"
                       value={form.remote_path}
                       onChange={(e) => setField('remote_path', e.target.value)}
-                      className="mt-1.5 rounded-md border-gray-300"
+                      className="mt-1.5 rounded-md"
                     />
                   </div>
                   <div>
@@ -357,7 +359,7 @@ const NodeManagement = () => {
                       min={1}
                       value={form.max_concurrent_deployments}
                       onChange={(e) => setField('max_concurrent_deployments', Number(e.target.value || 1))}
-                      className="mt-1.5 rounded-none border-gray-300"
+                      className="mt-1.5 rounded-md"
                     />
                   </div>
                   <div className="sm:col-span-2">
@@ -367,21 +369,21 @@ const NodeManagement = () => {
                       placeholder="e.g. sudo systemctl reload nginx"
                       value={form.reload_command}
                       onChange={(e) => setField('reload_command', e.target.value)}
-                      className="mt-1.5 rounded-none border-gray-300"
+                      className="mt-1.5 rounded-md"
                     />
-                    <p className="text-xs text-gray-400 mt-1">Run after each deployment to apply the new build.</p>
+                    <p className="text-xs text-slate-600 mt-1">Run after each deployment to apply the new build.</p>
                   </div>
                 </div>
               </div>
             )}
 
             {/* Navigation */}
-            <div className="flex items-center justify-between mt-6 pt-4 border-t border-gray-100">
+            <div className="flex items-center justify-between mt-6 pt-4 border-t border-slate-200">
               <Button
                 variant="outline"
                 disabled={step === 0}
                 onClick={() => setStep((s) => s - 1)}
-                className="rounded-md border-gray-300 text-sm"
+                className="text-sm"
               >
                 ← Back
               </Button>
@@ -389,7 +391,7 @@ const NodeManagement = () => {
                 <Button
                   onClick={() => isStepValid(step) && setStep((s) => s + 1)}
                   disabled={!isStepValid(step)}
-                  className="bg-black text-white hover:bg-gray-900 rounded-md text-sm"
+                  className="text-sm"
                 >
                   Continue →
                 </Button>
@@ -397,7 +399,7 @@ const NodeManagement = () => {
                 <Button
                   onClick={() => void addNode()}
                   disabled={addingNode || offlineMode || !orgId}
-                  className="bg-black text-white hover:bg-gray-900 rounded-md text-sm"
+                  className="text-sm"
                 >
                   {addingNode ? 'Adding…' : offlineMode ? 'Server offline' : 'Add Node'}
                 </Button>
@@ -416,16 +418,16 @@ const NodeManagement = () => {
           </CardHeader>
           <CardContent>
             {loading && (
-              <div className="flex items-center gap-2 py-6 text-sm text-gray-400">
+              <div className="flex items-center gap-2 py-6 text-sm text-slate-600">
                 <span className="animate-spin">⌛</span> Loading nodes…
               </div>
             )}
 
             {!loading && nodes.length === 0 && (
-              <div className="py-10 text-center border border-dashed border-gray-200 text-gray-400">
+              <div className="py-10 text-center border border-dashed border-slate-300 text-slate-600">
                 <p className="text-3xl mb-2">🖥</p>
-                <p className="text-sm font-medium text-gray-600">No nodes registered yet</p>
-                <p className="text-xs text-gray-400 mt-1">Use the form above to add your first deployment node.</p>
+                <p className="text-sm font-medium text-slate-700">No nodes registered yet</p>
+                <p className="text-xs text-slate-600 mt-1">Use the form above to add your first deployment node.</p>
               </div>
             )}
 
@@ -438,7 +440,7 @@ const NodeManagement = () => {
                       <div className="flex-1 min-w-0">
                         {/* Title row */}
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-semibold text-sm text-gray-900">{node.name}</span>
+                          <span className="font-semibold text-sm text-slate-900">{node.name}</span>
                           <span className={`inline-flex items-center gap-1.5 text-xs px-2 py-0.5 border rounded-full ${s.badge}`}>
                             <span className={`w-1.5 h-1.5 rounded-full ${s.dot}`} />
                             {s.label}
@@ -449,7 +451,7 @@ const NodeManagement = () => {
                         </div>
 
                         {/* Connection info */}
-                        <p className="text-xs text-gray-500 mt-1 font-mono">
+                        <p className="text-xs text-slate-600 mt-1 font-mono">
                           {node.user}@{node.host}:{node.port} · {node.remote_path}
                         </p>
 
@@ -461,13 +463,13 @@ const NodeManagement = () => {
                         </div>
 
                         {node.last_health_check && (
-                          <p className="text-xs text-gray-400 mt-2">Last checked: {node.last_health_check}</p>
+                          <p className="text-xs text-slate-600 mt-2">Last checked: {node.last_health_check}</p>
                         )}
                       </div>
 
                       <Button
                         variant="outline"
-                        className="rounded-md border-gray-300 text-xs shrink-0"
+                        className="text-xs shrink-0"
                         onClick={() => void checkHealth(node.id)}
                         disabled={healthLoading === node.id}
                       >
@@ -484,8 +486,8 @@ const NodeManagement = () => {
         {/* Help section */}
         <Card className="electron-card rounded-xl shadow-none">
           <CardContent className="py-4">
-            <p className="text-xs text-gray-500 font-medium mb-2">Quick tips</p>
-            <ul className="text-xs text-gray-400 space-y-1 list-disc list-inside">
+            <p className="text-xs text-slate-700 font-medium mb-2">Quick tips</p>
+            <ul className="text-xs text-slate-600 space-y-1 list-disc list-inside">
               <li>The WatchTower server must have SSH access to each node using the key path you provide.</li>
               <li>Use <code className="bg-gray-100 px-1">sudo systemctl reload &lt;service&gt;</code> as the reload command for zero-downtime reloads.</li>
               <li>Run a <strong>Health Check</strong> after adding a node to verify SSH connectivity.</li>

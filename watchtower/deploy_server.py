@@ -188,7 +188,7 @@ def reload_node(node: Node, ssh_key: str | None) -> None:
 
 def deploy(branch: str, source_path: Path | None = None) -> dict[str, Any]:
     repo_dir = Path(os.getenv("WATCHTOWER_REPO_DIR", "/opt/website"))
-    inventory_path = Path(os.getenv("WATCHTOWER_NODES_FILE", "./nodes.json"))
+    inventory_path = Path(os.getenv("WATCHTOWER_NODES_FILE", "./config/nodes.json"))
 
     return deploy_with_paths(
         branch=branch,
@@ -250,14 +250,14 @@ def deploy_with_paths(
 def deploy_registered_app(
     app_name: str, branch: str | None = None
 ) -> dict[str, Any]:
-    apps_path = Path(os.getenv("WATCHTOWER_APPS_FILE", "./apps.json"))
+    apps_path = Path(os.getenv("WATCHTOWER_APPS_FILE", "./config/apps.json"))
     registry = load_apps_registry(apps_path)
     app_config = registry.get(app_name)
     if app_config is None:
         raise ValueError(f"Unknown app '{app_name}' in {apps_path}")
 
     app_repo_dir = Path(app_config["repo_dir"])
-    app_inventory_path = Path(app_config.get("nodes_file", "./nodes.json"))
+    app_inventory_path = Path(app_config.get("nodes_file", "./config/nodes.json"))
     app_branch = branch or app_config.get(
         "branch", os.getenv("WATCHTOWER_DEFAULT_BRANCH", "main")
     )
@@ -535,8 +535,8 @@ DASHBOARD_HTML = """
 
 
 def build_ui_data() -> dict[str, Any]:
-    apps_path = Path(os.getenv("WATCHTOWER_APPS_FILE", "./apps.json"))
-    inventory_path = Path(os.getenv("WATCHTOWER_NODES_FILE", "./nodes.json"))
+    apps_path = Path(os.getenv("WATCHTOWER_APPS_FILE", "./config/apps.json"))
+    inventory_path = Path(os.getenv("WATCHTOWER_NODES_FILE", "./config/nodes.json"))
 
     apps_registry = load_apps_registry(apps_path)
     nodes, _ = load_inventory(inventory_path)
@@ -648,7 +648,7 @@ def list_apps(
     validate_token(x_watchtower_token)
 
     try:
-        apps_path = Path(os.getenv("WATCHTOWER_APPS_FILE", "./apps.json"))
+        apps_path = Path(os.getenv("WATCHTOWER_APPS_FILE", "./config/apps.json"))
         registry = load_apps_registry(apps_path)
         return {
             "apps_file": str(apps_path),
