@@ -3,9 +3,12 @@
 import os
 import logging
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 from watchtower.database import init_db
 
@@ -77,8 +80,12 @@ app.add_middleware(
 )
 
 
-@app.get("/", tags=["Health"])
+@app.get("/", tags=["Health"], include_in_schema=False)
 async def root():
+    """Serve the React SPA, or a JSON fallback if web/dist is not built."""
+    index = Path(__file__).resolve().parents[2] / "web" / "dist" / "index.html"
+    if index.is_file():
+        return FileResponse(str(index))
     return {"message": "WatchTower API", "version": "2.0.0", "docs": "/docs"}
 
 
@@ -102,3 +109,19 @@ app.include_router(enterprise.router)
 app.include_router(runtime.router)
 app.include_router(envvars.router)
 app.include_router(notifications.router)
+
+# ── Serve React SPA from web/dist (same-origin, no proxy needed) ──────────────
+_WEB_DIST = Path(__file__).resolve().parents[2] / "web" / "dist"
+
+if _WEB_DIST.is_dir():
+    # Static assets (JS/CSS/images) served under /assets
+    app.mount("/assets", StaticFiles(directory=str(_WEB_DIST / "assets")), name="assets")
+
+    # Public root files (favicon, etc.) — serve any file that exists
+    @app.get("/{filename:path}", include_in_schema=False)
+    async def spa_fallback(filename: str):
+        """Serve static files or fall back to index.html for SPA routing."""
+        candidate = _WEB_DIST / filename
+        if candidate.is_file():
+            return FileResponse(str(candidate))
+        return FileResponse(str(_WEB_DIST / "index.html"))
