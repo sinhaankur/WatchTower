@@ -1,5 +1,33 @@
 # WatchTower
 
+## Get Running in 30 Seconds
+
+```bash
+git clone https://github.com/sinhaankur/WatchTower.git
+cd WatchTower
+./run.sh
+```
+
+That's it. `run.sh` will:
+- Create a Python virtualenv and install dependencies (first run only)
+- Install Node packages (first run only)
+- Build the frontend (first run only)
+- Start the backend API on `127.0.0.1:8000`
+- Launch the **Electron desktop app** if a display is available, otherwise open the browser at `http://127.0.0.1:5222`
+
+**Other commands:**
+
+| Command | What it does |
+|---|---|
+| `./run.sh desktop` | Force Electron desktop app |
+| `./run.sh browser` | Force browser mode |
+| `./run.sh stop` | Kill all WatchTower processes |
+| `./run.sh logs` | Tail backend + frontend logs |
+
+> **Requirements:** Python 3.8+, Node.js 18+, npm. Podman optional (only needed for container auto-update mode).
+
+---
+
 WatchTower is an operator-facing tool for two adjacent jobs:
 
 1. **Keep existing Podman workloads current** with health-aware image updates.
