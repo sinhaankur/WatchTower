@@ -20,4 +20,29 @@ apiClient.interceptors.request.use((config) => {
   return config;
 });
 
+// Centralised response handling: surface auth failures consistently and
+// avoid silent UI hangs. We only redirect on 401 when there's actually a
+// session token in localStorage (so anonymous /login page calls don't loop).
+apiClient.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    const status = error?.response?.status;
+    if (status === 401) {
+      const hadSession = !!localStorage.getItem('authToken');
+      if (hadSession) {
+        try {
+          localStorage.removeItem('authToken');
+        } catch {
+          /* ignore */
+        }
+        if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
+          const next = encodeURIComponent(window.location.pathname + window.location.search);
+          window.location.replace(`/login?next=${next}`);
+        }
+      }
+    }
+    return Promise.reject(error);
+  },
+);
+
 export default apiClient;
