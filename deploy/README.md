@@ -2,6 +2,29 @@
 
 Docker Compose files for each WatchTower deployment topology.
 
+## 🔗 Complete Integration Stack
+
+All deployments work best with the full integration stack:
+
+**Podman → Nginx → Tailscale → Cloudflare → Coolify → WatchTower Watchdog**
+
+- **Podman** runs your containerized workloads
+- **Nginx** proxies traffic and handles SSL
+- **Tailscale** secures node-to-node SSH tunnels
+- **Cloudflare** exposes apps to the internet
+- **Coolify** provides the app management UI
+- **WatchTower Watchdog** auto-restarts containers after reboots or crashes
+
+See the **Integrations** page in WatchTower (`/integrations`) for:
+- Live connection status for all 6 tools
+- Toggle the Podman Watchdog (auto-restart on reboot)
+- View install commands for each tool
+- Understand dependencies and connections
+
+---
+
+## Available Topologies
+
 | File | Topology |
 |------|----------|
 | `docker-compose.yml` (root) | Standard single-node |

@@ -392,6 +392,27 @@ def _ensure_owner_membership(db: Session, user: User):
 
 
 def _perform_ssh_health_check(node: OrgNode):
+    # For local nodes, check via HTTP instead of SSH
+    if node.host in ("127.0.0.1", "localhost", "::1"):
+        import urllib.request
+        try:
+            with urllib.request.urlopen("http://127.0.0.1:8000/health", timeout=5) as resp:
+                if resp.status == 200:
+                    return {
+                        "status": NodeStatus.HEALTHY,
+                        "cpu_usage": None,
+                        "memory_usage": None,
+                        "disk_usage": None,
+                    }
+        except Exception:
+            pass
+        return {
+            "status": NodeStatus.OFFLINE,
+            "cpu_usage": None,
+            "memory_usage": None,
+            "disk_usage": None,
+        }
+
     if not node.ssh_key_path:
         raise RuntimeError("SSH key path is not configured")
 
@@ -1200,6 +1221,31 @@ async def check_node_health(
         "memory_usage": node.memory_usage,
         "disk_usage": node.disk_usage
     }
+
+
+@router.delete("/org-nodes/{node_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_org_node(
+    node_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(util.get_current_user)
+):
+    """Delete a deployment node"""
+    user_id = _current_user_uuid(current_user)
+    _ensure_user_org_member(db, current_user)
+    node = db.query(OrgNode).filter(OrgNode.id == node_id).first()
+
+    if not node:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Node not found")
+
+    member = db.query(TeamMember).filter(
+        TeamMember.org_id == node.org_id,
+        TeamMember.user_id == user_id,
+    ).first()
+    if not member or not member.can_manage_nodes:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied")
+
+    db.delete(node)
+    db.commit()
 
 
 # ============================================================================

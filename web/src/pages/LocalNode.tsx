@@ -123,6 +123,16 @@ export default function LocalNode() {
     setSubmitting(true);
     setError('');
     try {
+      // Check for existing local node to avoid duplicates
+      const existing = await apiClient.get(`/orgs/${orgId}/nodes`);
+      const nodes: Array<{ id: string; host: string }> = (existing.data as any[]) ?? [];
+      const localNode = nodes.find((n) => n.host === '127.0.0.1' || n.host === 'localhost');
+      if (localNode) {
+        setNodeId(localNode.id);
+        setStep(3);
+        return;
+      }
+
       const payload = {
         name: nodeName || 'local-pc',
         host: '127.0.0.1',
