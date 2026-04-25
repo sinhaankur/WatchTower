@@ -10,57 +10,55 @@
   <rect width="1600" height="900" fill="#fbf6ea"/>
   <circle cx="130" cy="130" r="120" fill="#fde68a" opacity="0.28"/>
   <circle cx="1490" cy="160" r="160" fill="#dbeafe" opacity="0.35"/>
-    <text x="80" y="82" font-family="'Space Mono', monospace" font-size="18" font-weight="700" fill="#b91c1c" letter-spacing="2">APPLICATION SURFACE</text>
-    <text x="80" y="140" font-family="'DM Sans', Arial, sans-serif" font-size="42" font-weight="800" fill="#0f172a">Show projects, web apps, and deploy paths in one product view.</text>
-    <text x="80" y="180" font-family="'DM Sans', Arial, sans-serif" font-size="21" font-weight="500" fill="#475569">Project registry, dashboard actions, and the public surface that users actually reach.</text>
-  <!-- Dashboard panel (left tall) -->
-    <rect x="80" y="258" width="500" height="556" rx="20" fill="#ffffff" stroke="#1f2937" stroke-width="2" filter="url(#cs)"/>
-    <rect x="104" y="278" width="220" height="28" rx="14" fill="#fde68a" stroke="#1f2937" stroke-width="1.5" filter="url(#ps)"/>
-  <text x="116" y="297" font-family="'Space Mono', monospace" font-size="12" font-weight="700" fill="#7f1d1d">WATCHTOWER DASHBOARD</text>
-    <text x="104" y="360" font-family="'DM Sans', Arial, sans-serif" font-size="22" font-weight="800" fill="#0f172a">Applications and Projects</text>
-    <text x="104" y="398" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">Track app records, project types,</text>
-    <text x="104" y="422" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">deployment state, runtime status,</text>
-    <text x="104" y="446" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">and quick actions from one plane.</text>
-  <rect x="104" y="476" width="428" height="72" rx="14" fill="#f8fafc" stroke="#1f2937" stroke-width="2"/>
-    <text x="130" y="512" font-family="'Space Mono', monospace" font-size="14" font-weight="700" fill="#0f172a">PROJECT REGISTRY</text>
-    <text x="130" y="534" font-family="'DM Sans', Arial, sans-serif" font-size="15" font-weight="500" fill="#475569">Named workloads, types, and metadata.</text>
-  <rect x="104" y="566" width="428" height="72" rx="14" fill="#f8fafc" stroke="#1f2937" stroke-width="2"/>
-    <text x="130" y="602" font-family="'Space Mono', monospace" font-size="14" font-weight="700" fill="#0f172a">DEPLOY ACTIONS</text>
-    <text x="130" y="624" font-family="'DM Sans', Arial, sans-serif" font-size="15" font-weight="500" fill="#475569">Package, push, preview, and activate.</text>
-  <rect x="104" y="656" width="428" height="72" rx="14" fill="#f8fafc" stroke="#1f2937" stroke-width="2"/>
-    <text x="130" y="692" font-family="'Space Mono', monospace" font-size="14" font-weight="700" fill="#0f172a">HEALTH FEEDBACK</text>
-    <text x="130" y="714" font-family="'DM Sans', Arial, sans-serif" font-size="15" font-weight="500" fill="#475569">Runtime status and operator alerts.</text>
-  <rect x="104" y="746" width="428" height="44" rx="22" fill="#fde68a" stroke="#1f2937" stroke-width="2" filter="url(#ps)"/>
-    <text x="140" y="774" font-family="'Space Mono', monospace" font-size="14" font-weight="700" fill="#7f1d1d">watchtower.local / dashboard</text>
-  <!-- Build artifact (centre) -->
-    <rect x="648" y="318" width="280" height="200" rx="20" fill="#ffffff" stroke="#1f2937" stroke-width="2" filter="url(#cs)"/>
-    <rect x="672" y="338" width="120" height="28" rx="14" fill="#fde68a" stroke="#1f2937" stroke-width="1.5" filter="url(#ps)"/>
-  <text x="690" y="357" font-family="'Space Mono', monospace" font-size="12" font-weight="700" fill="#7f1d1d">ARTIFACT</text>
-    <text x="672" y="414" font-family="'DM Sans', Arial, sans-serif" font-size="22" font-weight="800" fill="#0f172a">Build Output</text>
-    <text x="672" y="452" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">Static site, SSR app,</text>
-    <text x="672" y="476" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">or Docker package.</text>
-  <!-- Public web surface -->
-    <rect x="996" y="258" width="524" height="280" rx="20" fill="#ffffff" stroke="#1f2937" stroke-width="2" filter="url(#cs)"/>
-    <rect x="1020" y="278" width="164" height="28" rx="14" fill="#fde68a" stroke="#1f2937" stroke-width="1.5" filter="url(#ps)"/>
-  <text x="1032" y="297" font-family="'Space Mono', monospace" font-size="12" font-weight="700" fill="#7f1d1d">PUBLIC EXPERIENCE</text>
-    <text x="1020" y="360" font-family="'DM Sans', Arial, sans-serif" font-size="22" font-weight="800" fill="#0f172a">Web Application Surface</text>
-    <text x="1020" y="398" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">Users reach a deployed URL through</text>
-    <text x="1020" y="422" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">the edge layer, while WatchTower</text>
-    <text x="1020" y="446" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">keeps the release path operator-friendly.</text>
-  <rect x="1020" y="474" width="460" height="36" rx="18" fill="#fde68a" stroke="#1f2937" stroke-width="1.5" filter="url(#ps)"/>
-    <text x="1052" y="498" font-family="'Space Mono', monospace" font-size="13" font-weight="700" fill="#7f1d1d">HTTPS · custom domain · preview URL</text>
-  <!-- Project types panel -->
-    <rect x="996" y="598" width="524" height="216" rx="20" fill="#ffffff" stroke="#1f2937" stroke-width="2" filter="url(#cs)"/>
-    <text x="1028" y="644" font-family="'DM Sans', Arial, sans-serif" font-size="20" font-weight="800" fill="#0f172a">Project types supported</text>
-    <text x="1028" y="682" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">Static sites, web applications, APIs, and</text>
-    <text x="1028" y="706" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">container-based services — all fit the same</text>
-    <text x="1028" y="730" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">visual delivery model.</text>
-    <text x="1028" y="758" font-family="'DM Sans', Arial, sans-serif" font-size="15" font-weight="500" fill="#475569">Documentation, UI, and releases stay aligned.</text>
-  <!-- Arrows -->
-  <line x1="580" y1="460" x2="646" y2="430" stroke="#1f2937" stroke-width="4" stroke-linecap="round"/>
-  <polygon points="631,423 655,425 641,443" fill="#1f2937"/>
-  <line x1="930" y1="398" x2="992" y2="380" stroke="#1f2937" stroke-width="4" stroke-linecap="round"/>
-  <polygon points="979,370 1004,378 981,392" fill="#1f2937"/>
-  <line x1="930" y1="460" x2="990" y2="650" stroke="#1f2937" stroke-width="4" stroke-linecap="round"/>
-  <polygon points="975,638 998,656 970,658" fill="#1f2937"/>
+  <text x="80" y="82" font-family="'Space Mono', monospace" font-size="18" font-weight="700" fill="#b91c1c" letter-spacing="2">APPLICATION SURFACE</text>
+  <text x="80" y="140" font-family="'DM Sans', Arial, sans-serif" font-size="42" font-weight="800" fill="#0f172a">One place to manage apps, one path to deliver them.</text>
+  <text x="80" y="180" font-family="'DM Sans', Arial, sans-serif" font-size="20" font-weight="500" fill="#475569">This view links the operator dashboard, the release artifact, and the public URL users finally reach.</text>
+
+  <rect x="80" y="258" width="480" height="560" rx="20" fill="#ffffff" stroke="#1f2937" stroke-width="2" filter="url(#cs)"/>
+  <rect x="106" y="282" width="228" height="30" rx="15" fill="#fde68a" stroke="#1f2937" stroke-width="1.5" filter="url(#ps)"/>
+  <text x="120" y="302" font-family="'Space Mono', monospace" font-size="12" font-weight="700" fill="#7f1d1d">WATCHTOWER DASHBOARD</text>
+  <text x="106" y="364" font-family="'DM Sans', Arial, sans-serif" font-size="26" font-weight="800" fill="#0f172a">Operator workspace</text>
+  <text x="106" y="402" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">Teams register apps, inspect deploy state,</text>
+  <text x="106" y="426" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">and trigger releases from one surface.</text>
+
+  <rect x="106" y="470" width="428" height="82" rx="16" fill="#f8fafc" stroke="#1f2937" stroke-width="2"/>
+  <text x="132" y="504" font-family="'Space Mono', monospace" font-size="13" font-weight="700" fill="#0f172a">1. REGISTRY</text>
+  <text x="132" y="530" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">Apps, types, targets, and metadata.</text>
+
+  <rect x="106" y="572" width="428" height="82" rx="16" fill="#f8fafc" stroke="#1f2937" stroke-width="2"/>
+  <text x="132" y="606" font-family="'Space Mono', monospace" font-size="13" font-weight="700" fill="#0f172a">2. ACTIONS</text>
+  <text x="132" y="632" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">Build, deploy, preview, promote, or retry.</text>
+
+  <rect x="106" y="674" width="428" height="82" rx="16" fill="#f8fafc" stroke="#1f2937" stroke-width="2"/>
+  <text x="132" y="708" font-family="'Space Mono', monospace" font-size="13" font-weight="700" fill="#0f172a">3. FEEDBACK</text>
+  <text x="132" y="734" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">Health, rollout status, and operator alerts.</text>
+
+  <rect x="650" y="334" width="294" height="214" rx="20" fill="#ffffff" stroke="#1f2937" stroke-width="2" filter="url(#cs)"/>
+  <rect x="676" y="356" width="124" height="30" rx="15" fill="#fde68a" stroke="#1f2937" stroke-width="1.5" filter="url(#ps)"/>
+  <text x="692" y="376" font-family="'Space Mono', monospace" font-size="12" font-weight="700" fill="#7f1d1d">RELEASE ARTIFACT</text>
+  <text x="676" y="432" font-family="'DM Sans', Arial, sans-serif" font-size="24" font-weight="800" fill="#0f172a">Built output</text>
+  <text x="676" y="470" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">Static site, API package,</text>
+  <text x="676" y="494" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">or container-ready payload.</text>
+
+  <rect x="1020" y="258" width="500" height="270" rx="20" fill="#ffffff" stroke="#1f2937" stroke-width="2" filter="url(#cs)"/>
+  <rect x="1046" y="282" width="172" height="30" rx="15" fill="#fde68a" stroke="#1f2937" stroke-width="1.5" filter="url(#ps)"/>
+  <text x="1060" y="302" font-family="'Space Mono', monospace" font-size="12" font-weight="700" fill="#7f1d1d">PUBLIC EXPERIENCE</text>
+  <text x="1046" y="364" font-family="'DM Sans', Arial, sans-serif" font-size="26" font-weight="800" fill="#0f172a">What end users open</text>
+  <text x="1046" y="402" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">A deployed URL, custom domain, or preview link</text>
+  <text x="1046" y="426" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">served after WatchTower finishes the rollout.</text>
+  <rect x="1046" y="462" width="438" height="38" rx="19" fill="#fde68a" stroke="#1f2937" stroke-width="1.5" filter="url(#ps)"/>
+  <text x="1076" y="487" font-family="'Space Mono', monospace" font-size="13" font-weight="700" fill="#7f1d1d">HTTPS · custom domain · preview URL</text>
+
+  <rect x="1020" y="586" width="500" height="232" rx="20" fill="#ffffff" stroke="#1f2937" stroke-width="2" filter="url(#cs)"/>
+  <text x="1052" y="636" font-family="'DM Sans', Arial, sans-serif" font-size="22" font-weight="800" fill="#0f172a">What fits this model</text>
+  <text x="1052" y="676" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">Static sites, APIs, SSR apps, and container-backed services</text>
+  <text x="1052" y="700" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">all share the same operator flow: register, build, deploy, verify.</text>
+  <text x="1052" y="740" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">The UI stays consistent even when the runtime target changes.</text>
+
+  <line x1="560" y1="474" x2="650" y2="440" stroke="#1f2937" stroke-width="4" stroke-linecap="round"/>
+  <polygon points="636,432 662,436 643,453" fill="#1f2937"/>
+  <line x1="944" y1="440" x2="1020" y2="392" stroke="#1f2937" stroke-width="4" stroke-linecap="round"/>
+  <polygon points="1006,385 1032,384 1018,405" fill="#1f2937"/>
+  <line x1="944" y1="470" x2="1020" y2="662" stroke="#1f2937" stroke-width="4" stroke-linecap="round"/>
+  <polygon points="1004,648 1024,674 998,656" fill="#1f2937"/>
 </svg>

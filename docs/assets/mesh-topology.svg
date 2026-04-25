@@ -10,63 +10,62 @@
   <rect width="1600" height="900" fill="#fbf6ea"/>
   <circle cx="130" cy="130" r="120" fill="#fde68a" opacity="0.28"/>
   <circle cx="1490" cy="160" r="160" fill="#dbeafe" opacity="0.35"/>
-    <text x="80" y="82" font-family="'Space Mono', monospace" font-size="18" font-weight="700" fill="#b91c1c" letter-spacing="2">MESH TOPOLOGY</text>
-    <text x="80" y="140" font-family="'DM Sans', Arial, sans-serif" font-size="44" font-weight="800" fill="#0f172a">Control previews, live traffic, and fleet edges in one map.</text>
-    <text x="80" y="180" font-family="'DM Sans', Arial, sans-serif" font-size="21" font-weight="500" fill="#475569">Operator entrypoint, control plane decisions, and staged traffic across edge nodes.</text>
-  <!-- Control Plane (centre) -->
-    <rect x="630" y="290" width="340" height="180" rx="20" fill="#ffffff" stroke="#1f2937" stroke-width="2" filter="url(#cs)"/>
-    <rect x="660" y="308" width="140" height="28" rx="14" fill="#fde68a" stroke="#1f2937" stroke-width="1.5" filter="url(#ps)"/>
-  <text x="672" y="327" font-family="'Space Mono', monospace" font-size="13" font-weight="700" fill="#7f1d1d">CONTROL PLANE</text>
-    <text x="660" y="368" font-family="'DM Sans', Arial, sans-serif" font-size="22" font-weight="800" fill="#0f172a">WatchTower API</text>
-    <text x="660" y="402" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">Dashboard, deploy decisions,</text>
-    <text x="660" y="424" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">and node coordination.</text>
-  <!-- Developer (left) -->
-    <rect x="130" y="300" width="280" height="160" rx="20" fill="#ffffff" stroke="#1f2937" stroke-width="2" filter="url(#cs)"/>
-    <rect x="152" y="318" width="100" height="28" rx="14" fill="#fde68a" stroke="#1f2937" stroke-width="1.5" filter="url(#ps)"/>
-  <text x="164" y="337" font-family="'Space Mono', monospace" font-size="13" font-weight="700" fill="#7f1d1d">DEVELOPER</text>
-    <text x="152" y="376" font-family="'DM Sans', Arial, sans-serif" font-size="22" font-weight="800" fill="#0f172a">Operator</text>
-    <text x="152" y="410" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">Triggers deploys, reads</text>
-    <text x="152" y="432" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">rollout status.</text>
-  <!-- Traffic Layer (top right) -->
-    <rect x="1170" y="220" width="310" height="160" rx="20" fill="#ffffff" stroke="#1f2937" stroke-width="2" filter="url(#cs)"/>
-    <rect x="1190" y="238" width="128" height="28" rx="14" fill="#fde68a" stroke="#1f2937" stroke-width="1.5" filter="url(#ps)"/>
-  <text x="1202" y="257" font-family="'Space Mono', monospace" font-size="13" font-weight="700" fill="#7f1d1d">TRAFFIC LAYER</text>
-    <text x="1190" y="296" font-family="'DM Sans', Arial, sans-serif" font-size="22" font-weight="800" fill="#0f172a">Caddy / Cloudflare</text>
-    <text x="1190" y="330" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">Routes domain to active</text>
-    <text x="1190" y="352" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">live or preview slot.</text>
-  <!-- Live Nodes (bottom right) -->
-    <rect x="1130" y="520" width="330" height="160" rx="20" fill="#ffffff" stroke="#1f2937" stroke-width="2" filter="url(#cs)"/>
-    <rect x="1152" y="540" width="100" height="28" rx="14" fill="#ecfdf5" stroke="#10b981" stroke-width="1.5"/>
-  <text x="1164" y="559" font-family="'Space Mono', monospace" font-size="13" font-weight="700" fill="#047857">LIVE</text>
-    <text x="1152" y="604" font-family="'DM Sans', Arial, sans-serif" font-size="22" font-weight="800" fill="#0f172a">Live Nodes</text>
-    <text x="1152" y="638" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">Stable public traffic.</text>
-    <text x="1152" y="660" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">Current production set.</text>
-  <!-- Preview Nodes (bottom left) -->
-    <rect x="140" y="560" width="330" height="160" rx="20" fill="#ffffff" stroke="#1f2937" stroke-width="2" filter="url(#cs)"/>
-    <rect x="162" y="580" width="128" height="28" rx="14" fill="#eff6ff" stroke="#2563eb" stroke-width="1.5"/>
-  <text x="174" y="599" font-family="'Space Mono', monospace" font-size="13" font-weight="700" fill="#1d4ed8">PREVIEW</text>
-    <text x="162" y="644" font-family="'DM Sans', Arial, sans-serif" font-size="22" font-weight="800" fill="#0f172a">Preview Nodes</text>
-    <text x="162" y="678" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">Branch and candidate builds.</text>
-  <!-- Arrows -->
-  <!-- Dev → Control -->
-  <line x1="410" y1="380" x2="628" y2="380" stroke="#1f2937" stroke-width="4" stroke-linecap="round"/>
-  <polygon points="617,369 641,380 617,391" fill="#1f2937"/>
-  <!-- Control → Traffic -->
-  <line x1="970" y1="360" x2="1168" y2="310" stroke="#1f2937" stroke-width="4" stroke-linecap="round"/>
-  <polygon points="1155,302 1178,308 1160,322" fill="#1f2937"/>
-  <!-- Control → Live -->
-  <line x1="880" y1="470" x2="1128" y2="540" stroke="#1f2937" stroke-width="4" stroke-linecap="round"/>
-  <polygon points="1114,530 1138,543 1113,553" fill="#1f2937"/>
-  <!-- Control → Preview -->
-  <line x1="720" y1="470" x2="410" y2="560" stroke="#1f2937" stroke-width="4" stroke-linecap="round"/>
-  <polygon points="421,543 399,562 428,564" fill="#1f2937"/>
-  <!-- Traffic → Live dashed -->
-  <line x1="1290" y1="380" x2="1290" y2="518" stroke="#10b981" stroke-width="5" stroke-dasharray="10 10" stroke-linecap="round"/>
-  <!-- Preview vertical dashed -->
-  <line x1="300" y1="558" x2="300" y2="460" stroke="#2563eb" stroke-width="5" stroke-dasharray="10 10" stroke-linecap="round"/>
-  <!-- Legend -->
-    <rect x="1110" y="752" width="174" height="28" rx="14" fill="#ecfdf5" stroke="#10b981" stroke-width="1.5"/>
-  <text x="1122" y="771" font-family="'Space Mono', monospace" font-size="13" font-weight="700" fill="#047857">Stable traffic path</text>
-    <rect x="130" y="752" width="204" height="28" rx="14" fill="#eff6ff" stroke="#2563eb" stroke-width="1.5"/>
-  <text x="142" y="771" font-family="'Space Mono', monospace" font-size="13" font-weight="700" fill="#1d4ed8">Preview and branch path</text>
+  <text x="80" y="82" font-family="'Space Mono', monospace" font-size="18" font-weight="700" fill="#b91c1c" letter-spacing="2">MESH TOPOLOGY</text>
+  <text x="80" y="140" font-family="'DM Sans', Arial, sans-serif" font-size="44" font-weight="800" fill="#0f172a">Preview traffic and live traffic share one control plane.</text>
+  <text x="80" y="180" font-family="'DM Sans', Arial, sans-serif" font-size="20" font-weight="500" fill="#475569">This map shows who triggers a rollout, where decisions happen, and how traffic is routed after a promotion.</text>
+
+  <rect x="140" y="300" width="300" height="170" rx="20" fill="#ffffff" stroke="#1f2937" stroke-width="2" filter="url(#cs)"/>
+  <rect x="164" y="322" width="120" height="30" rx="15" fill="#fde68a" stroke="#1f2937" stroke-width="1.5" filter="url(#ps)"/>
+  <text x="178" y="342" font-family="'Space Mono', monospace" font-size="13" font-weight="700" fill="#7f1d1d">OPERATOR</text>
+  <text x="164" y="390" font-family="'DM Sans', Arial, sans-serif" font-size="24" font-weight="800" fill="#0f172a">Team or CI</text>
+  <text x="164" y="428" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">Starts deployments and</text>
+  <text x="164" y="452" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">reads rollout status.</text>
+
+  <rect x="630" y="284" width="340" height="200" rx="22" fill="#ffffff" stroke="#1f2937" stroke-width="2" filter="url(#cs)"/>
+  <rect x="660" y="308" width="148" height="30" rx="15" fill="#fde68a" stroke="#1f2937" stroke-width="1.5" filter="url(#ps)"/>
+  <text x="674" y="328" font-family="'Space Mono', monospace" font-size="13" font-weight="700" fill="#7f1d1d">CONTROL PLANE</text>
+  <text x="660" y="378" font-family="'DM Sans', Arial, sans-serif" font-size="24" font-weight="800" fill="#0f172a">WatchTower API</text>
+  <text x="660" y="416" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">Stores rollout intent, coordinates nodes,</text>
+  <text x="660" y="440" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">and decides which target should receive traffic.</text>
+
+  <rect x="1160" y="220" width="320" height="170" rx="20" fill="#ffffff" stroke="#1f2937" stroke-width="2" filter="url(#cs)"/>
+  <rect x="1186" y="242" width="136" height="30" rx="15" fill="#fde68a" stroke="#1f2937" stroke-width="1.5" filter="url(#ps)"/>
+  <text x="1200" y="262" font-family="'Space Mono', monospace" font-size="13" font-weight="700" fill="#7f1d1d">TRAFFIC EDGE</text>
+  <text x="1186" y="310" font-family="'DM Sans', Arial, sans-serif" font-size="24" font-weight="800" fill="#0f172a">Caddy or Cloudflare</text>
+  <text x="1186" y="348" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">Routes public requests to the active</text>
+  <text x="1186" y="372" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">slot selected by WatchTower.</text>
+
+  <rect x="130" y="560" width="360" height="176" rx="20" fill="#ffffff" stroke="#1f2937" stroke-width="2" filter="url(#cs)"/>
+  <rect x="156" y="584" width="132" height="30" rx="15" fill="#eff6ff" stroke="#2563eb" stroke-width="1.5"/>
+  <text x="170" y="604" font-family="'Space Mono', monospace" font-size="13" font-weight="700" fill="#1d4ed8">PREVIEW SLOT</text>
+  <text x="156" y="654" font-family="'DM Sans', Arial, sans-serif" font-size="24" font-weight="800" fill="#0f172a">Preview nodes</text>
+  <text x="156" y="692" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">Receive branch builds and candidate</text>
+  <text x="156" y="716" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">releases before promotion.</text>
+
+  <rect x="1110" y="560" width="360" height="176" rx="20" fill="#ffffff" stroke="#1f2937" stroke-width="2" filter="url(#cs)"/>
+  <rect x="1136" y="584" width="120" height="30" rx="15" fill="#ecfdf5" stroke="#10b981" stroke-width="1.5"/>
+  <text x="1150" y="604" font-family="'Space Mono', monospace" font-size="13" font-weight="700" fill="#047857">LIVE SLOT</text>
+  <text x="1136" y="654" font-family="'DM Sans', Arial, sans-serif" font-size="24" font-weight="800" fill="#0f172a">Live nodes</text>
+  <text x="1136" y="692" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">Handle stable public traffic after</text>
+  <text x="1136" y="716" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">a successful promotion.</text>
+
+  <line x1="440" y1="386" x2="630" y2="386" stroke="#1f2937" stroke-width="4" stroke-linecap="round"/>
+  <polygon points="618,375 642,386 618,397" fill="#1f2937"/>
+
+  <path d="M 970 384 C 1060 384, 1084 306, 1160 306" fill="none" stroke="#1f2937" stroke-width="4" stroke-linecap="round"/>
+  <polygon points="1148,295 1172,306 1148,317" fill="#1f2937"/>
+
+  <path d="M 712 484 C 650 534, 590 590, 490 648" fill="none" stroke="#2563eb" stroke-width="5" stroke-linecap="round" stroke-dasharray="12 12"/>
+  <polygon points="497,630 476,656 508,651" fill="#2563eb"/>
+
+  <path d="M 888 484 C 978 528, 1040 574, 1110 648" fill="none" stroke="#10b981" stroke-width="5" stroke-linecap="round" stroke-dasharray="12 12"/>
+  <polygon points="1094,640 1122,657 1100,630" fill="#10b981"/>
+
+  <path d="M 1320 390 C 1320 468, 1320 510, 1320 560" fill="none" stroke="#10b981" stroke-width="4" stroke-linecap="round"/>
+  <polygon points="1309,548 1320,572 1331,548" fill="#10b981"/>
+
+  <rect x="120" y="774" width="260" height="34" rx="17" fill="#eff6ff" stroke="#2563eb" stroke-width="1.5"/>
+  <text x="138" y="796" font-family="'Space Mono', monospace" font-size="13" font-weight="700" fill="#1d4ed8">Dashed blue = preview path</text>
+  <rect x="1220" y="774" width="248" height="34" rx="17" fill="#ecfdf5" stroke="#10b981" stroke-width="1.5"/>
+  <text x="1238" y="796" font-family="'Space Mono', monospace" font-size="13" font-weight="700" fill="#047857">Dashed green = promoted path</text>
 </svg>

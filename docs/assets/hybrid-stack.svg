@@ -10,59 +10,52 @@
   <rect width="1600" height="900" fill="#fbf6ea"/>
   <circle cx="130" cy="130" r="120" fill="#fde68a" opacity="0.28"/>
   <circle cx="1490" cy="160" r="160" fill="#dbeafe" opacity="0.35"/>
-    <text x="80" y="82" font-family="'Space Mono', monospace" font-size="18" font-weight="700" fill="#b91c1c" letter-spacing="2">HYBRID RUNTIME MAP</text>
-    <text x="80" y="140" font-family="'DM Sans', Arial, sans-serif" font-size="42" font-weight="800" fill="#0f172a">Connect local control, remote services, and managed data paths.</text>
-    <text x="80" y="180" font-family="'DM Sans', Arial, sans-serif" font-size="21" font-weight="500" fill="#475569">Local-first while still orchestrating remote databases, services, and edge-facing applications.</text>
-  <!-- Row 1: 3 boxes -->
-  <!-- Operator Workspace -->
-    <rect x="80" y="258" width="440" height="220" rx="20" fill="#ffffff" stroke="#1f2937" stroke-width="2" filter="url(#cs)"/>
-    <rect x="104" y="276" width="196" height="28" rx="14" fill="#fde68a" stroke="#1f2937" stroke-width="1.5" filter="url(#ps)"/>
-  <text x="116" y="295" font-family="'Space Mono', monospace" font-size="12" font-weight="700" fill="#7f1d1d">OPERATOR WORKSPACE</text>
-    <text x="104" y="352" font-family="'DM Sans', Arial, sans-serif" font-size="22" font-weight="800" fill="#0f172a">Local Control Plane</text>
-    <text x="104" y="390" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">Dashboard, CLI, package build,</text>
-    <text x="104" y="414" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">GitHub workflows, and release intent.</text>
-    <text x="104" y="438" font-family="'DM Sans', Arial, sans-serif" font-size="15" font-weight="500" fill="#475569">No cloud dependency for authoring.</text>
-  <!-- WatchTower API -->
-    <rect x="580" y="258" width="440" height="220" rx="20" fill="#ffffff" stroke="#1f2937" stroke-width="2" filter="url(#cs)"/>
-    <rect x="604" y="276" width="160" height="28" rx="14" fill="#fde68a" stroke="#1f2937" stroke-width="1.5" filter="url(#ps)"/>
-  <text x="616" y="295" font-family="'Space Mono', monospace" font-size="12" font-weight="700" fill="#7f1d1d">WATCHTOWER API</text>
-    <text x="604" y="352" font-family="'DM Sans', Arial, sans-serif" font-size="22" font-weight="800" fill="#0f172a">Auth and Deploy Engine</text>
-    <text x="604" y="390" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">Auth, deployment plans, runtime</text>
-    <text x="604" y="414" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">inspection, and secure actions.</text>
-    <text x="604" y="438" font-family="'DM Sans', Arial, sans-serif" font-size="15" font-weight="500" fill="#475569">REST API + WebSocket terminal.</text>
-  <!-- Managed Services -->
-    <rect x="1080" y="258" width="440" height="220" rx="20" fill="#ffffff" stroke="#1f2937" stroke-width="2" filter="url(#cs)"/>
-    <rect x="1104" y="276" width="160" height="28" rx="14" fill="#fde68a" stroke="#1f2937" stroke-width="1.5" filter="url(#ps)"/>
-  <text x="1116" y="295" font-family="'Space Mono', monospace" font-size="12" font-weight="700" fill="#7f1d1d">MANAGED SERVICES</text>
-    <text x="1104" y="352" font-family="'DM Sans', Arial, sans-serif" font-size="22" font-weight="800" fill="#0f172a">Cloud Backends</text>
-    <text x="1104" y="390" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">Cloud databases, tunnels, DNS,</text>
-    <text x="1104" y="414" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">object storage, and auth providers.</text>
-    <text x="1104" y="438" font-family="'DM Sans', Arial, sans-serif" font-size="15" font-weight="500" fill="#475569">Pluggable — Atlas, PlanetScale…</text>
-  <!-- Arrows row 1 -->
-  <line x1="522" y1="368" x2="578" y2="368" stroke="#1f2937" stroke-width="4" stroke-linecap="round"/>
-  <polygon points="566,357 590,368 566,379" fill="#1f2937"/>
-  <line x1="1022" y1="368" x2="1078" y2="368" stroke="#1f2937" stroke-width="4" stroke-linecap="round"/>
-  <polygon points="1066,357 1090,368 1066,379" fill="#1f2937"/>
-  <!-- Row 2: 2 boxes -->
-  <!-- App Nodes -->
-    <rect x="200" y="570" width="500" height="230" rx="20" fill="#ffffff" stroke="#1f2937" stroke-width="2" filter="url(#cs)"/>
-    <rect x="230" y="590" width="104" height="28" rx="14" fill="#fde68a" stroke="#1f2937" stroke-width="1.5" filter="url(#ps)"/>
-  <text x="242" y="609" font-family="'Space Mono', monospace" font-size="12" font-weight="700" fill="#7f1d1d">APP NODES</text>
-    <text x="230" y="666" font-family="'DM Sans', Arial, sans-serif" font-size="22" font-weight="800" fill="#0f172a">Target Fleet</text>
-    <text x="230" y="704" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">Podman hosts running application images.</text>
-    <text x="230" y="728" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">Receive synced artifacts via SSH.</text>
-    <text x="230" y="752" font-family="'DM Sans', Arial, sans-serif" font-size="15" font-weight="500" fill="#475569">Health checks and service reload on activate.</text>
-  <!-- Data Plane -->
-    <rect x="900" y="570" width="500" height="230" rx="20" fill="#ffffff" stroke="#1f2937" stroke-width="2" filter="url(#cs)"/>
-    <rect x="930" y="590" width="104" height="28" rx="14" fill="#fde68a" stroke="#1f2937" stroke-width="1.5" filter="url(#ps)"/>
-  <text x="942" y="609" font-family="'Space Mono', monospace" font-size="12" font-weight="700" fill="#7f1d1d">DATA PLANE</text>
-    <text x="930" y="666" font-family="'DM Sans', Arial, sans-serif" font-size="22" font-weight="800" fill="#0f172a">Persistence Layer</text>
-    <text x="930" y="704" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">MongoDB Atlas or local database.</text>
-    <text x="930" y="728" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">Shared source of truth across nodes.</text>
-    <text x="930" y="752" font-family="'DM Sans', Arial, sans-serif" font-size="15" font-weight="500" fill="#475569">Separate from compute — survives rollouts.</text>
-  <!-- Arrows row 2 from API -->
-  <line x1="800" y1="478" x2="450" y2="568" stroke="#1f2937" stroke-width="4" stroke-linecap="round"/>
-  <polygon points="461,551 441,571 469,573" fill="#1f2937"/>
-  <line x1="1000" y1="478" x2="1150" y2="568" stroke="#1f2937" stroke-width="4" stroke-linecap="round"/>
-  <polygon points="1136,558 1160,571 1135,581" fill="#1f2937"/>
+  <text x="80" y="82" font-family="'Space Mono', monospace" font-size="18" font-weight="700" fill="#b91c1c" letter-spacing="2">HYBRID RUNTIME MAP</text>
+  <text x="80" y="140" font-family="'DM Sans', Arial, sans-serif" font-size="42" font-weight="800" fill="#0f172a">Local control can still manage remote services and cloud data.</text>
+  <text x="80" y="180" font-family="'DM Sans', Arial, sans-serif" font-size="20" font-weight="500" fill="#475569">The hybrid model keeps the operator workflow close to the team while letting runtime pieces live elsewhere.</text>
+
+  <rect x="80" y="258" width="420" height="220" rx="20" fill="#ffffff" stroke="#1f2937" stroke-width="2" filter="url(#cs)"/>
+  <rect x="106" y="282" width="198" height="30" rx="15" fill="#fde68a" stroke="#1f2937" stroke-width="1.5" filter="url(#ps)"/>
+  <text x="120" y="302" font-family="'Space Mono', monospace" font-size="12" font-weight="700" fill="#7f1d1d">LOCAL WORKSPACE</text>
+  <text x="106" y="362" font-family="'DM Sans', Arial, sans-serif" font-size="24" font-weight="800" fill="#0f172a">Operator tools</text>
+  <text x="106" y="400" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">Dashboard, CLI, package build,</text>
+  <text x="106" y="424" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">and release intent start here.</text>
+
+  <rect x="590" y="258" width="420" height="220" rx="20" fill="#ffffff" stroke="#1f2937" stroke-width="2" filter="url(#cs)"/>
+  <rect x="616" y="282" width="168" height="30" rx="15" fill="#fde68a" stroke="#1f2937" stroke-width="1.5" filter="url(#ps)"/>
+  <text x="630" y="302" font-family="'Space Mono', monospace" font-size="12" font-weight="700" fill="#7f1d1d">WATCHTOWER API</text>
+  <text x="616" y="362" font-family="'DM Sans', Arial, sans-serif" font-size="24" font-weight="800" fill="#0f172a">Deploy engine</text>
+  <text x="616" y="400" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">Handles auth, rollout plans,</text>
+  <text x="616" y="424" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">inspection, and secure actions.</text>
+
+  <rect x="1100" y="258" width="420" height="220" rx="20" fill="#ffffff" stroke="#1f2937" stroke-width="2" filter="url(#cs)"/>
+  <rect x="1126" y="282" width="176" height="30" rx="15" fill="#fde68a" stroke="#1f2937" stroke-width="1.5" filter="url(#ps)"/>
+  <text x="1140" y="302" font-family="'Space Mono', monospace" font-size="12" font-weight="700" fill="#7f1d1d">MANAGED SERVICES</text>
+  <text x="1126" y="362" font-family="'DM Sans', Arial, sans-serif" font-size="24" font-weight="800" fill="#0f172a">Cloud dependencies</text>
+  <text x="1126" y="400" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">DNS, tunnels, auth providers,</text>
+  <text x="1126" y="424" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">storage, and hosted databases.</text>
+
+  <line x1="500" y1="370" x2="590" y2="370" stroke="#1f2937" stroke-width="4" stroke-linecap="round"/>
+  <polygon points="578,359 602,370 578,381" fill="#1f2937"/>
+  <line x1="1010" y1="370" x2="1100" y2="370" stroke="#1f2937" stroke-width="4" stroke-linecap="round"/>
+  <polygon points="1088,359 1112,370 1088,381" fill="#1f2937"/>
+
+  <rect x="190" y="570" width="520" height="220" rx="20" fill="#ffffff" stroke="#1f2937" stroke-width="2" filter="url(#cs)"/>
+  <rect x="220" y="594" width="112" height="30" rx="15" fill="#fde68a" stroke="#1f2937" stroke-width="1.5" filter="url(#ps)"/>
+  <text x="236" y="614" font-family="'Space Mono', monospace" font-size="12" font-weight="700" fill="#7f1d1d">APP NODES</text>
+  <text x="220" y="674" font-family="'DM Sans', Arial, sans-serif" font-size="24" font-weight="800" fill="#0f172a">Compute targets</text>
+  <text x="220" y="712" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">Remote hosts receive artifacts, run services,</text>
+  <text x="220" y="736" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">and expose application traffic.</text>
+
+  <rect x="890" y="570" width="520" height="220" rx="20" fill="#ffffff" stroke="#1f2937" stroke-width="2" filter="url(#cs)"/>
+  <rect x="920" y="594" width="112" height="30" rx="15" fill="#fde68a" stroke="#1f2937" stroke-width="1.5" filter="url(#ps)"/>
+  <text x="936" y="614" font-family="'Space Mono', monospace" font-size="12" font-weight="700" fill="#7f1d1d">DATA PLANE</text>
+  <text x="920" y="674" font-family="'DM Sans', Arial, sans-serif" font-size="24" font-weight="800" fill="#0f172a">Persistence layer</text>
+  <text x="920" y="712" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">Hosted or local databases keep state outside</text>
+  <text x="920" y="736" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">the application compute path.</text>
+
+  <path d="M 770 478 C 690 520, 620 566, 520 624" fill="none" stroke="#1f2937" stroke-width="4" stroke-linecap="round"/>
+  <polygon points="530,607 506,632 538,627" fill="#1f2937"/>
+  <path d="M 850 478 C 960 520, 1030 566, 1090 624" fill="none" stroke="#1f2937" stroke-width="4" stroke-linecap="round"/>
+  <polygon points="1075,617 1103,633 1082,606" fill="#1f2937"/>
 </svg>
