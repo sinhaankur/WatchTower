@@ -6,23 +6,43 @@ const http = require('http');
 const path = require('path');
 
 // ── GPU / Renderer stability flags ──────────────────────────────────────────
-// Required on Linux with NVIDIA driver 500+ and kernel 6.x.
-// The GPU sandbox crashes Chromium's GPU process on new NVIDIA open drivers,
-// which also brings down other Electron apps (e.g. VS Code) sharing the GPU.
+// Must be set before app.whenReady().
 //
-// These flags MUST be set before app.whenReady().
+// On Linux the correct flags depend on the display server:
+//
+//   Wayland  — each app has an isolated GPU context; no sandbox workarounds
+//              needed. Enable native Wayland window decorations and let
+//              Chromium auto-select the best platform backend.
+//
+//   X11      — Electron apps share the GPU compositor. NVIDIA driver 500+
+//              with kernel 6.x causes the Chromium GPU sandbox process to
+//              crash with SIGSEGV, which also kills other Electron apps
+//              (e.g. VS Code) that share the same GPU compositor.
+//              Work around by running GPU in-process with no sandbox.
+//
+// Software-rendering fallback: set env WATCHTOWER_NO_GPU=1 or pass --no-gpu
+// on the command line to force CPU rendering (safe on any GPU/driver).
 if (process.platform === 'linux') {
-  // Keep hardware acceleration but run GPU in the browser process
-  // (avoids the sandbox fork that crashes with new NVIDIA drivers).
-  app.commandLine.appendSwitch('in-process-gpu');
-  // Use desktop GL (EGL via NVIDIA) instead of SwiftShader.
-  app.commandLine.appendSwitch('use-gl', 'desktop');
-  // Disable GPU sandbox — causes SIGSEGV on NVIDIA 500+ / kernel 6.x.
-  app.commandLine.appendSwitch('disable-gpu-sandbox');
-  // Prevent Chromium from using ANGLE (causes black windows on some NVIDIA X11 setups).
-  app.commandLine.appendSwitch('use-angle', 'gl');
-  // Reduce GPU memory pressure during startup.
-  app.commandLine.appendSwitch('disable-features', 'VizDisplayCompositor');
+  if (process.argv.includes('--no-gpu') || process.env.WATCHTOWER_NO_GPU === '1') {
+    // Explicit software-rendering fallback for broken/headless environments.
+    app.disableHardwareAcceleration();
+  } else if (process.env.WAYLAND_DISPLAY) {
+    // Wayland: native GPU isolation — no sandbox workarounds needed.
+    app.commandLine.appendSwitch('enable-features', 'WaylandWindowDecorations');
+    app.commandLine.appendSwitch('ozone-platform-hint', 'auto');
+  } else {
+    // X11 fallback: guard against NVIDIA 500+ / kernel 6.x sandbox crash.
+    // Run GPU in the browser process — avoids the sandbox fork that segfaults.
+    app.commandLine.appendSwitch('in-process-gpu');
+    // Use desktop EGL/OpenGL via NVIDIA instead of SwiftShader.
+    app.commandLine.appendSwitch('use-gl', 'desktop');
+    // Disable GPU sandbox — causes SIGSEGV on new NVIDIA open drivers.
+    app.commandLine.appendSwitch('disable-gpu-sandbox');
+    // Avoid ANGLE black-window bug on NVIDIA + X11.
+    app.commandLine.appendSwitch('use-angle', 'gl');
+    // Reduce GPU memory pressure during startup.
+    app.commandLine.appendSwitch('disable-features', 'VizDisplayCompositor');
+  }
 }
 
 const HOST = '127.0.0.1';
