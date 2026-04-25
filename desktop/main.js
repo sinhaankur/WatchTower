@@ -1,8 +1,9 @@
-const { app, BrowserWindow, dialog, ipcMain, Menu, Tray, nativeImage } = require('electron');
+const { app, BrowserWindow, dialog, ipcMain, Menu, shell, Tray, nativeImage } = require('electron');
 const { spawn, execSync, execFileSync } = require('child_process');
 const crypto = require('crypto');
 const fs = require('fs');
 const http = require('http');
+const https = require('https');
 const net = require('net');
 const path = require('path');
 
@@ -37,46 +38,176 @@ try {
 /**
  * Fire-and-forget update check called once after the main window is shown.
  * Shows a non-blocking notification dialog; never interrupts the user mid-task.
+ *
+ * Strategy:
+ *  - Packaged build with electron-updater: use autoUpdater (downloads + installs).
+ *  - Dev / unpackaged build: fall back to GitHub Releases API — compare versions
+ *    and show a dialog with a link to the release page. No auto-install in dev.
  */
 function checkForAppUpdates(win) {
-  if (!autoUpdater) return;
-  // Skip when running from source (not packaged) — no installer artifacts exist.
-  if (!app.isPackaged) return;
+  if (!win || win.isDestroyed()) return;
 
-  autoUpdater.on('update-available', (info) => {
-    dialog.showMessageBox(win, {
-      type: 'info',
-      title: 'Update Available',
-      message: `WatchTower ${info.version} is available`,
-      detail: "Downloading in the background. You'll be prompted to restart when it's ready.",
-      buttons: ['OK'],
+  // ── Packaged path: electron-updater handles download + install ─────────────
+  if (autoUpdater && app.isPackaged) {
+    autoUpdater.on('update-available', (info) => {
+      if (win.isDestroyed()) return;
+      dialog.showMessageBox(win, {
+        type: 'info',
+        title: 'Update Available',
+        message: `WatchTower ${info.version} is available`,
+        detail: "Downloading in the background. You'll be prompted to restart when it's ready.",
+        buttons: ['OK'],
+      });
     });
-  });
 
-  autoUpdater.on('update-downloaded', (info) => {
-    dialog.showMessageBox(win, {
-      type: 'info',
-      title: 'Update Ready',
-      message: `WatchTower ${info.version} is ready to install`,
-      detail: 'Restart WatchTower now to apply the update, or do it later from the tray menu.',
-      buttons: ['Restart Now', 'Later'],
-      defaultId: 0,
-      cancelId: 1,
-    }).then(({ response }) => {
-      if (response === 0) {
-        autoUpdater.quitAndInstall(false, true);
+    autoUpdater.on('update-downloaded', (info) => {
+      if (win.isDestroyed()) return;
+      dialog.showMessageBox(win, {
+        type: 'info',
+        title: 'Update Ready',
+        message: `WatchTower ${info.version} is ready to install`,
+        detail: 'Restart WatchTower now to apply the update, or do it later from the tray menu.',
+        buttons: ['Restart Now', 'Later'],
+        defaultId: 0,
+        cancelId: 1,
+      }).then(({ response }) => {
+        if (response === 0) autoUpdater.quitAndInstall(false, true);
+      });
+    });
+
+    autoUpdater.on('error', (err) => {
+      console.warn('[WatchTower] Auto-update check failed:', err.message);
+    });
+
+    autoUpdater.checkForUpdates().catch((err) => {
+      console.warn('[WatchTower] Auto-update check error:', err.message);
+      // Fall through to GitHub API check on electron-updater failure
+      checkForUpdatesViaGitHubAPI(win, false);
+    });
+    return;
+  }
+
+  // ── Unpackaged / dev path: GitHub Releases API ─────────────────────────────
+  checkForUpdatesViaGitHubAPI(win, false);
+}
+
+/**
+ * Check for a newer release on GitHub using the public API.
+ * @param {BrowserWindow} win   - Parent window for dialogs.
+ * @param {boolean} interactive - If true, always show a result dialog (manual check).
+ *                                If false, only show a dialog when an update is found.
+ */
+function checkForUpdatesViaGitHubAPI(win, interactive) {
+  if (!win || win.isDestroyed()) return;
+
+  const currentVersion = app.getVersion(); // from desktop/package.json
+  const apiUrl = 'https://api.github.com/repos/sinhaankur/WatchTower/releases/latest';
+
+  const options = {
+    hostname: 'api.github.com',
+    path: '/repos/sinhaankur/WatchTower/releases/latest',
+    headers: {
+      'User-Agent': `WatchTower-Desktop/${currentVersion}`,
+      'Accept': 'application/vnd.github+json',
+    },
+    timeout: 10000,
+  };
+
+  const req = https.get(options, (res) => {
+    let body = '';
+    res.on('data', (chunk) => { body += chunk; });
+    res.on('end', () => {
+      try {
+        if (res.statusCode !== 200) {
+          console.warn(`[WatchTower] GitHub update check returned ${res.statusCode}`);
+          if (interactive && !win.isDestroyed()) {
+            dialog.showMessageBox(win, {
+              type: 'info',
+              title: 'Update Check',
+              message: 'Could not reach GitHub to check for updates.',
+              detail: 'Check your internet connection and try again.',
+              buttons: ['OK'],
+            });
+          }
+          return;
+        }
+        const data = JSON.parse(body);
+        const latestTag = (data.tag_name || '').replace(/^v/, '');
+        const releaseUrl = data.html_url || 'https://github.com/sinhaankur/WatchTower/releases';
+        const releaseNotes = (data.body || '').slice(0, 400) || 'See release page for details.';
+
+        if (!latestTag) return;
+
+        const isNewer = compareVersions(latestTag, currentVersion) > 0;
+
+        if (isNewer) {
+          if (win.isDestroyed()) return;
+          dialog.showMessageBox(win, {
+            type: 'info',
+            title: 'Update Available',
+            message: `WatchTower ${latestTag} is available (you have ${currentVersion})`,
+            detail: `${releaseNotes}\n\nVisit the release page to download the latest installer.`,
+            buttons: ['Open Release Page', 'Later'],
+            defaultId: 0,
+            cancelId: 1,
+          }).then(({ response }) => {
+            if (response === 0) shell.openExternal(releaseUrl);
+          });
+        } else if (interactive) {
+          if (win.isDestroyed()) return;
+          dialog.showMessageBox(win, {
+            type: 'info',
+            title: 'No Update Found',
+            message: `WatchTower ${currentVersion} is already up to date.`,
+            buttons: ['OK'],
+          });
+        }
+      } catch (e) {
+        console.warn('[WatchTower] GitHub update parse error:', e.message);
+        if (interactive && !win.isDestroyed()) {
+          dialog.showMessageBox(win, {
+            type: 'info',
+            title: 'Update Check',
+            message: 'Could not parse update response from GitHub.',
+            buttons: ['OK'],
+          });
+        }
       }
     });
   });
 
-  autoUpdater.on('error', (err) => {
-    // Log only — never show an error dialog for a background update failure.
-    console.warn('[WatchTower] Auto-update check failed:', err.message);
+  req.on('error', (err) => {
+    console.warn('[WatchTower] GitHub update check network error:', err.message);
+    if (interactive && !win.isDestroyed()) {
+      dialog.showMessageBox(win, {
+        type: 'info',
+        title: 'Update Check',
+        message: 'Could not reach GitHub to check for updates.',
+        detail: 'Check your internet connection and try again.',
+        buttons: ['OK'],
+      });
+    }
   });
 
-  autoUpdater.checkForUpdates().catch((err) => {
-    console.warn('[WatchTower] Auto-update check error:', err.message);
+  req.on('timeout', () => {
+    req.destroy();
+    console.warn('[WatchTower] GitHub update check timed out.');
   });
+}
+
+/**
+ * Simple semver comparison. Returns 1 if a > b, -1 if a < b, 0 if equal.
+ * Handles versions like "1.2.3", "1.2.3-beta.1".
+ */
+function compareVersions(a, b) {
+  const parse = (v) => v.replace(/[^0-9.]/g, '').split('.').map(Number);
+  const [aParts, bParts] = [parse(a), parse(b)];
+  const len = Math.max(aParts.length, bParts.length);
+  for (let i = 0; i < len; i++) {
+    const diff = (aParts[i] || 0) - (bParts[i] || 0);
+    if (diff !== 0) return diff > 0 ? 1 : -1;
+  }
+  return 0;
 }
 
 
@@ -709,17 +840,16 @@ function createTray() {
     { type: 'separator' },
     {
       label: 'Check for Updates…',
-      enabled: Boolean(autoUpdater) && app.isPackaged,
+      enabled: true,
       click: () => {
-        if (autoUpdater && app.isPackaged && mainWindow) {
-          autoUpdater.checkForUpdates().catch((err) => {
-            dialog.showMessageBox(mainWindow, {
-              type: 'info',
-              title: 'No Update Found',
-              message: 'WatchTower is already up to date.',
-              buttons: ['OK'],
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          if (autoUpdater && app.isPackaged) {
+            autoUpdater.checkForUpdates().catch(() => {
+              checkForUpdatesViaGitHubAPI(mainWindow, true);
             });
-          });
+          } else {
+            checkForUpdatesViaGitHubAPI(mainWindow, true);
+          }
         }
       },
     },
@@ -752,7 +882,14 @@ app.whenReady().then(async () => {
     createTray();
 
     // Check for updates a few seconds after startup (non-blocking).
-    if (mainWindow) setTimeout(() => checkForAppUpdates(mainWindow), 5000);
+    if (mainWindow) {
+      // Initial check 5 s after startup.
+      setTimeout(() => checkForAppUpdates(mainWindow), 5000);
+      // Periodic background re-check every 4 hours.
+      setInterval(() => {
+        if (mainWindow && !mainWindow.isDestroyed()) checkForAppUpdates(mainWindow);
+      }, 4 * 60 * 60 * 1000);
+    }
 
     // Hide to tray instead of quitting when the window X is clicked.
     mainWindow?.on('close', (event) => {
