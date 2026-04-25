@@ -28,6 +28,14 @@
     --secondary-foreground: 0 0% 10%;
     --sidebar: 45 18% 93%;
     --sidebar-border: 0 0% 16%;
+    /* Archetype-level motion + shadow tokens */
+    --shadow: 4px 4px 0 0 hsl(0 0% 0% / 1);
+    --shadow-hover: 6px 6px 0 0 hsl(0 0% 0% / 1);
+    --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+    --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+    --dur-fast: 140ms;
+    --dur-base: 240ms;
+    --dur-slow: 400ms;
   }
 }
 
