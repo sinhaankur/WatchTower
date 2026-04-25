@@ -1016,13 +1016,16 @@ async def add_org_node(
 ):
     """Add deployment node to organization"""
     user_id = _current_user_uuid(current_user)
-    _ensure_user_org_member(db, current_user)
-    # Check permissions
-    member = db.query(TeamMember).filter(
-        TeamMember.org_id == org_id,
-        TeamMember.user_id == user_id
-    ).first()
-    
+    _user, canonical_org, member = _ensure_user_org_member(db, current_user)
+
+    # Resolve the target org: if the caller passed their canonical org_id use
+    # the member we already resolved; otherwise look up a separate membership.
+    if org_id != canonical_org.id:
+        member = db.query(TeamMember).filter(
+            TeamMember.org_id == org_id,
+            TeamMember.user_id == _user.id,
+        ).first()
+
     if not member or not member.can_manage_nodes:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied")
     
@@ -1045,9 +1048,20 @@ async def add_org_node(
         db.add(node)
         db.commit()
         db.refresh(node)
-        
-        # TODO: Test SSH connection & health check
-        
+
+        # Test SSH connectivity and record initial health status
+        from watchtower.builder import check_ssh_connectivity
+        from watchtower.database import NodeStatus
+        ssh_ok, ssh_msg = check_ssh_connectivity(node)
+        if ssh_ok:
+            node.status = NodeStatus.HEALTHY
+        else:
+            node.status = NodeStatus.UNREACHABLE
+            logger.warning("SSH health check failed for new node %s: %s", node.host, ssh_msg)
+        node.status_message = ssh_msg
+        db.commit()
+        db.refresh(node)
+
         return node
     except Exception:
         db.rollback()

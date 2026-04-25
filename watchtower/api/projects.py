@@ -35,22 +35,11 @@ async def create_project(
 ):
     """Create a new project"""
     try:
-        user_id = UUID(str(current_user["user_id"]))
-        # Get or create default organization for user
-        org = db.query(Organization).filter(
-            Organization.owner_id == user_id
-        ).first()
-        
-        if not org:
-            # Create default organization
-            user = db.query(User).filter(User.id == user_id).first()
-            org = Organization(
-                name=f"{user.name}'s Organization" if user else "Default Organization",
-                owner_id=user_id
-            )
-            db.add(org)
-            db.flush()
-        
+        # Use canonical org resolution to avoid org fragmentation.
+        from watchtower.api.enterprise import _ensure_user_org_member
+        user, org, _member = _ensure_user_org_member(db, current_user)
+        user_id = user.id
+
         # Generate webhook secret
         webhook_secret = util.generate_webhook_secret()
         
