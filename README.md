@@ -77,63 +77,74 @@ These diagrams are the fastest way to understand WatchTower before reading setup
 
 ### Modes Overview
 
-<p align="center">
-  <a href="https://sinhaankur.github.io/WatchTower/" target="_blank" rel="noreferrer">
-    <img src="docs/assets/modes-overview.svg" width="860" alt="WatchTower modes overview — Podman auto-update service vs App Center control plane" />
-  </a>
-</p>
+> Two operating modes — keep existing containers current, or run a full app delivery pipeline.
 
-> Start here. Two operating modes — keep existing containers current, or run a full app delivery pipeline.
+```mermaid
+flowchart LR
+    subgraph M1["MODE 1 — Podman Auto-Update"]
+        A[Podman Host] --> B[Poll + Restart] --> C([Healthy Container])
+    end
+    subgraph M2["MODE 2 — App Center"]
+        D[App Registry] --> E[SSH Rollout] --> F([Live App])
+    end
+    CP{{WatchTower Control Plane}} --> M1 & M2
+```
 
 ### Deployment Process
 
-<p align="center">
-  <a href="https://sinhaankur.github.io/WatchTower/viewer.html?doc=deploy" target="_blank" rel="noreferrer">
-    <img src="docs/assets/deploy-process.svg" width="860" alt="WatchTower deployment process — app selection, packaging, SSH transfer, remote activation, health verification" />
-  </a>
-</p>
-
 > The App Center release path: choose an app, build an artifact, sync to nodes, activate, confirm health.
+
+```mermaid
+flowchart LR
+    A[Choose App] --> B[Build Package\ntar.gz / zip] --> C[SSH Transfer\nto Nodes] --> D[Activate\nContainer] --> E([Health Check\nPassed])
+```
 
 ### Mesh Topology
 
-<p align="center">
-  <a href="https://sinhaankur.github.io/WatchTower/viewer.html?doc=mesh" target="_blank" rel="noreferrer">
-    <img src="docs/assets/mesh-topology.svg" width="860" alt="WatchTower mesh topology — control plane, preview nodes, live nodes, and traffic routing" />
-  </a>
-</p>
-
 > Preview traffic, live traffic, and mesh routing decisions at a glance.
+
+```mermaid
+flowchart TD
+    OP[Operator / CI] --> CP[WatchTower API\nControl Plane]
+    CP --> PRV[Preview Slot\nNode]
+    CP --> LIVE[Live Slot\nNode]
+    EDGE[Caddy / CF\nTraffic Edge] -->|active slot| LIVE
+    EDGE -.->|preview traffic| PRV
+```
 
 ### Hybrid Stack
 
-<p align="center">
-  <a href="https://sinhaankur.github.io/WatchTower/viewer.html?doc=hybrid" target="_blank" rel="noreferrer">
-    <img src="docs/assets/hybrid-stack.svg" width="860" alt="WatchTower hybrid stack — local operator workspace, WatchTower API, managed services, app nodes, data plane" />
-  </a>
-</p>
-
 > Your control plane stays local; data and services live where you put them.
+
+```mermaid
+flowchart LR
+    LOCAL[Local Workstation\nDashboard · CLI · Packager] --> API[WatchTower API]
+    API --> SVC[Managed Services\nPostgres · Redis · S3]
+    API --> NODES[App Nodes\nLinux Hosts]
+    NODES --> DATA[Data Plane]
+```
 
 ### Application & Web App Surface
 
-<p align="center">
-  <a href="https://sinhaankur.github.io/WatchTower/" target="_blank" rel="noreferrer">
-    <img src="docs/assets/application-surface.svg" width="860" alt="WatchTower application surface — dashboard, artifact build, and public web app delivery" />
-  </a>
-</p>
-
 > How a dashboard-registered app record becomes a URL your users can open.
+
+```mermaid
+flowchart LR
+    R[Register\nDashboard Record] --> B[Build Artifact\nwatchtower-package] --> D[Deploy\nto Nodes] --> P[Promote\nto Live] --> U([Public URL])
+```
 
 ### Secure Terminal Command Flow
 
-<p align="center">
-  <a href="https://sinhaankur.github.io/WatchTower/viewer.html?doc=terminal" target="_blank" rel="noreferrer">
-    <img src="docs/assets/secure-terminal-flow.svg" width="860" alt="WatchTower secure terminal command flow — Host Connect request, policy gate, execution path, encrypted audit, operator result" />
-  </a>
-</p>
-
 > How guided host operations stay useful without exposing a raw shell.
+
+```mermaid
+flowchart LR
+    OP[Operator\nPicks Command] --> PG{Policy Gate\nAllowlist Check}
+    PG -->|allowed| EX[Execute\non Host]
+    PG -->|blocked| BL([Rejected])
+    EX --> AU[Encrypted Audit Log]
+    AU --> RES([Result to Operator])
+```
 
 ---
 
