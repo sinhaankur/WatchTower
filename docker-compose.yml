@@ -4,6 +4,9 @@ services:
   # PostgreSQL Database
   postgres:
     image: docker.io/library/postgres:16-alpine
+    init: true
+    security_opt:
+      - no-new-privileges:true
     ports:
       - "5432:5432"
     environment:
@@ -17,10 +20,19 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 15s
+    stop_grace_period: 30s
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   # Redis (for Celery task queue)
   redis:
     image: docker.io/library/redis:7-alpine
+    init: true
+    security_opt:
+      - no-new-privileges:true
     ports:
       - "6379:6379"
     healthcheck:
@@ -28,12 +40,25 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 10s
+    stop_grace_period: 20s
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   # WatchTower API
   api:
     build:
       context: .
       dockerfile: Dockerfile
+    init: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    tmpfs:
+      - /tmp
     ports:
       - "8000:8000"
     environment:
@@ -56,10 +81,24 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 20s
+    restart: unless-stopped
+    stop_grace_period: 30s
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   # WatchTower Web UI
   web:
     image: docker.io/library/node:20-alpine
+    init: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    tmpfs:
+      - /tmp
     working_dir: /app/web
     command: sh -c "npm ci --legacy-peer-deps && npm run dev -- --host 0.0.0.0 --port 5173"
     ports:
@@ -74,6 +113,12 @@ services:
     depends_on:
       api:
         condition: service_healthy
+    restart: unless-stopped
+    stop_grace_period: 20s
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 volumes:
   postgres_data:

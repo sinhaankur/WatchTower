@@ -22,6 +22,19 @@ type AuthStatus = {
   recommended?: 'oauth' | 'api_token';
 };
 
+type ContextResponse = {
+  user?: {
+    name?: string | null;
+    email?: string | null;
+  };
+};
+
+type LoggedInUser = {
+  name?: string;
+  email?: string;
+  isTest?: boolean;
+};
+
 const Login = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -33,24 +46,50 @@ const Login = () => {
   const [statusLoading, setStatusLoading] = useState(true);
   const oauthReady = Boolean(authStatus?.oauth?.github_configured);
 
-  const [loggedInUser, setLoggedInUser] = useState<{ name?: string; avatar?: string } | null>(null);
+  const [loggedInUser, setLoggedInUser] = useState<LoggedInUser | null>(null);
+
+  const showSuccessAndRedirect = (user: LoggedInUser, delayMs = 1600) => {
+    setLoggedInUser(user);
+    window.setTimeout(() => navigate('/', { replace: true }), delayMs);
+  };
+
+  const resolveUserFromContext = async (): Promise<LoggedInUser> => {
+    try {
+      const resp = await apiClient.get<ContextResponse>('/context');
+      const name = resp.data?.user?.name || undefined;
+      const email = resp.data?.user?.email || undefined;
+      return { name, email };
+    } catch {
+      return { name: 'Authenticated user' };
+    }
+  };
+
   useEffect(() => {
+    const testLoginEnabled = searchParams.get('test_login') === '1';
+    if (testLoginEnabled) {
+      setLoggedInUser({ name: 'Test User', email: 'test@example.com', isTest: true });
+      return;
+    }
+
+    const hydrateExistingSession = async (token: string) => {
+      localStorage.setItem('authToken', token);
+      const user = await resolveUserFromContext();
+      showSuccessAndRedirect(user, 1800);
+    };
+
     // Auto-login: Electron injects VITE_API_TOKEN into the Vite process at launch.
     // If present, store it and go straight to the dashboard.
     const injectedToken = (import.meta as any).env?.VITE_API_TOKEN as string | undefined;
     if (injectedToken && injectedToken.trim()) {
-      localStorage.setItem('authToken', injectedToken.trim());
-      navigate('/', { replace: true });
+      void hydrateExistingSession(injectedToken.trim());
       return;
     }
+
     const existing = localStorage.getItem('authToken');
     if (existing) {
-      // Show logged-in state before redirecting
-      const user = localStorage.getItem('user') ? JSON.parse(localStorage.getItem('user')!) : { name: 'User' };
-      setLoggedInUser(user);
-      setTimeout(() => navigate('/', { replace: true }), 2000);
+      void hydrateExistingSession(existing);
     }
-  }, [navigate]);
+  }, [navigate, searchParams]);
 
   useEffect(() => {
     const loadAuthStatus = async () => {
@@ -80,10 +119,9 @@ const Login = () => {
     setError('');
     try {
       localStorage.setItem('authToken', trimmed);
-      await apiClient.get('/context');
+      const user = await resolveUserFromContext();
       trackEvent('login', { method: 'api_token' });
-      setLoggedInUser({ name: 'Authenticated' });
-      setTimeout(() => navigate('/', { replace: true }), 1500);
+      showSuccessAndRedirect(user);
     } catch {
       localStorage.removeItem('authToken');
       setError('Authentication failed. If installation ownership is enabled, your account must be invited by an owner/admin before access is granted.');
@@ -130,6 +168,20 @@ const Login = () => {
     }
   };
 
+  const openGitHubTokenGenerator = () => {
+    trackEvent('login', { method: 'token_generator_opened', type: 'fine_grained' });
+    window.open('https://github.com/settings/personal-access-tokens/new', '_blank', 'noopener,noreferrer');
+  };
+
+  const openClassicPATGenerator = () => {
+    trackEvent('login', { method: 'token_generator_opened', type: 'classic' });
+    window.open(
+      'https://github.com/settings/tokens/new?scopes=repo,read%3Apackages&description=WatchTower+API+Token',
+      '_blank',
+      'noopener,noreferrer'
+    );
+  };
+
   // Determine if the server has anything configured at all
   const apiTokenConfigured = Boolean(authStatus?.api_token?.configured);
   const nothingConfigured = !statusLoading && authStatus && !oauthReady && !apiTokenConfigured && !authStatus?.dev_auth?.allow_insecure;
@@ -151,10 +203,36 @@ const Login = () => {
               <p className="text-sm text-slate-600">
                 {loggedInUser.name ? `Welcome, ${loggedInUser.name}!` : 'Successfully authenticated with GitHub'}
               </p>
+              {loggedInUser.email && (
+                <p className="text-xs text-slate-500 mt-1">{loggedInUser.email}</p>
+              )}
             </div>
-            <div className="text-xs text-slate-500">
-              Redirecting to dashboard...
-            </div>
+            {loggedInUser.isTest ? (
+              <div className="space-y-3">
+                <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
+                  Test mode enabled. This confirms the post-login success UI without redirect.
+                </p>
+                <div className="flex gap-2 justify-center">
+                  <Button
+                    onClick={() => setLoggedInUser(null)}
+                    variant="outline"
+                    className="rounded-lg"
+                  >
+                    Back to Sign In
+                  </Button>
+                  <Button
+                    onClick={() => navigate('/', { replace: true })}
+                    className="rounded-lg bg-slate-900 hover:bg-slate-800 text-white"
+                  >
+                    Continue to Dashboard
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="text-xs text-slate-500">
+                Redirecting to dashboard...
+              </div>
+            )}
           </div>
         ) : (
           <>
@@ -165,6 +243,15 @@ const Login = () => {
             <p className="text-sm text-slate-600 mb-6">
               Use GitHub to authenticate, or enter an API token below.
             </p>
+            <div className="mb-4">
+              <button
+                type="button"
+                onClick={() => setLoggedInUser({ name: 'Test User', email: 'test@example.com', isTest: true })}
+                className="text-[11px] text-slate-500 hover:text-slate-800 underline underline-offset-2"
+              >
+                Test logged-in success screen
+              </button>
+            </div>
 
         {/* Server not configured at all */}
         {nothingConfigured && (
@@ -251,6 +338,27 @@ const Login = () => {
               <p className="text-xs text-slate-500 mb-2 text-center">
                 Paste a <code className="font-mono bg-slate-100 px-1 rounded">WATCHTOWER_API_TOKEN</code> from your server
               </p>
+              <div className="mb-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                <p className="text-[11px] text-slate-700 mb-2">
+                  Need a GitHub token? Generate one with <span className="font-semibold">Contents: Read</span> and <span className="font-semibold">Packages: Read</span> (for private GHCR images).
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={openGitHubTokenGenerator}
+                    className="flex-1 text-[11px] bg-red-700 hover:bg-red-800 text-white rounded px-2 py-1 transition-colors"
+                  >
+                    Fine-grained <span className="opacity-75">(recommended)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={openClassicPATGenerator}
+                    className="flex-1 text-[11px] border border-slate-300 hover:border-slate-400 text-slate-600 hover:text-slate-800 rounded px-2 py-1 transition-colors"
+                  >
+                    Classic PAT
+                  </button>
+                </div>
+              </div>
               <input
                 id="api-token"
                 type="password"

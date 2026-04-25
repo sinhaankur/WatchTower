@@ -1,3 +1,12 @@
+FROM node:20-alpine AS web-builder
+
+WORKDIR /web
+COPY web/package*.json ./
+RUN npm ci --legacy-peer-deps
+COPY web/ ./
+RUN npm run build
+
+
 FROM python:3.12-slim-bookworm
 
 LABEL org.opencontainers.image.title="Wt" \
@@ -10,19 +19,16 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     git \
-    nodejs \
-    npm \
     rsync \
     openssh-client \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 COPY . /app
+COPY --from=web-builder /web/dist /app/web/dist
 
 RUN pip install --no-cache-dir --upgrade pip \
-    && pip install --no-cache-dir . \
-    && npm --prefix /app/web ci \
-    && npm --prefix /app/web run build
+    && pip install --no-cache-dir .
 
 EXPOSE 8000
 
