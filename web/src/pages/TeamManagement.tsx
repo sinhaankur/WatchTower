@@ -15,6 +15,13 @@ type ContextResponse = {
     id: string;
     name: string;
   };
+  membership?: {
+    id: string;
+    role: string;
+    can_manage_team: boolean;
+    can_manage_nodes: boolean;
+    can_manage_deployments: boolean;
+  };
   installation?: {
     owner_mode_enabled?: boolean;
     is_claimed?: boolean;
@@ -73,6 +80,10 @@ const TeamManagement = () => {
   const [actionSuccess, setActionSuccess] = useState('');
   const [inviting, setInviting] = useState(false);
   const [context, setContext] = useState<ContextResponse | null>(null);
+  const [canManageTeam, setCanManageTeam] = useState(false);
+  const [currentUserEmail, setCurrentUserEmail] = useState('');
+  const [updatingMember, setUpdatingMember] = useState<string | null>(null);
+  const [removingMember, setRemovingMember] = useState<string | null>(null);
 
   const ownerCount = useMemo(() => members.filter((m) => m.role === 'owner').length, [members]);
 
@@ -99,6 +110,8 @@ const TeamManagement = () => {
       setContext(context);
       setOrgId(context.organization.id);
       setOrgName(context.organization.name);
+      setCurrentUserEmail(context.user.email);
+      setCanManageTeam(context.membership?.can_manage_team ?? true);
       await refreshData(context.organization.id);
     } catch {
       setOfflineMode(true);
@@ -139,6 +152,37 @@ const TeamManagement = () => {
     }
   };
 
+  const updateMemberRole = async (memberId: string, newRole: TeamMember['role']) => {
+    setUpdatingMember(memberId);
+    setActionError('');
+    setActionSuccess('');
+    try {
+      await apiClient.put(`/team-members/${memberId}`, { role: newRole });
+      setActionSuccess('Role updated.');
+      await refreshData(orgId);
+    } catch {
+      setActionError('Failed to update role. Check your permissions.');
+    } finally {
+      setUpdatingMember(null);
+    }
+  };
+
+  const deactivateMember = async (memberId: string, memberEmail: string) => {
+    if (!window.confirm(`Remove ${memberEmail} from the team?`)) return;
+    setRemovingMember(memberId);
+    setActionError('');
+    setActionSuccess('');
+    try {
+      await apiClient.put(`/team-members/${memberId}`, { is_active: false });
+      setActionSuccess(`${memberEmail} has been removed.`);
+      await refreshData(orgId);
+    } catch {
+      setActionError('Failed to remove member.');
+    } finally {
+      setRemovingMember(null);
+    }
+  };
+
   const startOAuth = async (provider: 'github_com' | 'github_enterprise') => {
     if (!orgId) return;
     setActionError('');
@@ -155,7 +199,7 @@ const TeamManagement = () => {
 
   return (
     <div className="flex-1 overflow-auto">
-      <header className="electron-card-solid electron-divider border-b">
+      <header className="electron-card-solid electron-divider border-b sticky top-0 z-10 backdrop-blur-sm">
         <div className="px-8 py-5 flex items-center justify-between">
           <div>
             <h1 className="text-base font-semibold text-gray-900">Team</h1>
@@ -163,11 +207,22 @@ const TeamManagement = () => {
               {loading ? 'Loading…' : orgName ? `Organization: ${orgName}` : offlineMode ? 'Server offline — showing cached data' : ''}
             </p>
           </div>
-          {offlineMode && (
-            <Button variant="outline" onClick={() => void loadContext()} className="text-sm">
-              ↺ Retry Connection
-            </Button>
-          )}
+          <div className="flex items-center gap-2">
+            {offlineMode && (
+              <Button variant="outline" onClick={() => void loadContext()} className="text-sm">
+                ↺ Retry
+              </Button>
+            )}
+            {!offlineMode && (
+              <button
+                onClick={() => { void loadContext(); }}
+                disabled={loading}
+                className="px-3 py-1.5 rounded-lg border border-border text-xs text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+              >
+                {loading ? 'Loading…' : 'Refresh'}
+              </button>
+            )}
+          </div>
         </div>
       </header>
 
@@ -236,9 +291,9 @@ const TeamManagement = () => {
                 </select>
               </div>
               <Button onClick={() => void inviteMember()}
-                disabled={inviting || offlineMode || !orgId || !email.trim()}
+                disabled={inviting || offlineMode || !orgId || !email.trim() || !canManageTeam}
                 className="w-full bg-red-700 text-white hover:bg-red-800 rounded-md">
-                {inviting ? 'Sending invite…' : offlineMode ? 'Server offline' : 'Send Invite'}
+                {inviting ? 'Sending invite…' : offlineMode ? 'Server offline' : !canManageTeam ? 'No permission to invite' : 'Send Invite'}
               </Button>
             </CardContent>
           </Card>
@@ -288,14 +343,14 @@ const TeamManagement = () => {
               <div className="space-y-2">
                 {connections.map((conn) => (
                   <div key={conn.id} className="electron-card-solid rounded-md px-3 py-2.5 flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-semibold text-gray-900">@{conn.github_username}</p>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-semibold text-gray-900 truncate" title={`@${conn.github_username}`}>@{conn.github_username}</p>
                       <p className="text-xs text-gray-500 mt-0.5">
                         {conn.provider === 'github_enterprise' ? (conn.enterprise_name ?? 'GitHub Enterprise') : 'GitHub.com'}
                         {conn.is_primary && <span className="ml-2 text-blue-600">· Primary</span>}
                       </p>
                     </div>
-                    <span className={`text-xs px-2 py-0.5 border rounded-full ${conn.is_active ? 'bg-green-50 text-green-700 border-green-200' : 'bg-gray-100 text-gray-400 border-gray-200'}`}>
+                    <span className={`text-xs px-2 py-0.5 border rounded-full shrink-0 ${conn.is_active ? 'bg-green-50 text-green-700 border-green-200' : 'bg-gray-100 text-gray-400 border-gray-200'}`}>
                       {conn.is_active ? 'Active' : 'Inactive'}
                     </span>
                   </div>
@@ -324,20 +379,57 @@ const TeamManagement = () => {
             <div className="space-y-2">
               {members.map((member) => {
                 const roleMeta = ROLE_META[member.role];
+                const isCurrentUser = member.email === currentUserEmail;
+                const canEdit = canManageTeam && !isCurrentUser;
                 return (
-                  <div key={member.id} className="electron-card-solid rounded-md px-4 py-3 flex items-center justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-semibold text-gray-900">{member.email}</p>
-                      <div className="flex items-center gap-2 mt-1 flex-wrap">
-                        <span className={`text-xs px-2 py-0.5 border rounded-full ${roleMeta.color}`}>{roleMeta.label}</span>
-                        {member.can_create_projects && <span className="text-xs text-gray-400">Projects</span>}
-                        {member.can_manage_deployments && <span className="text-xs text-gray-400">Deploy</span>}
-                        {member.can_manage_nodes && <span className="text-xs text-gray-400">Nodes</span>}
+                  <div key={member.id} className={`electron-card-solid rounded-md px-4 py-3 flex items-center justify-between gap-3 ${isCurrentUser ? 'ring-1 ring-blue-200' : ''}`}>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="text-sm font-semibold text-gray-900 truncate" title={member.email}>{member.email}</p>
+                        {isCurrentUser && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded border border-blue-200 bg-blue-50 text-blue-700 shrink-0">You</span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                        {canEdit ? (
+                          <select
+                            value={member.role}
+                            onChange={(e) => void updateMemberRole(member.id, e.target.value as TeamMember['role'])}
+                            disabled={updatingMember === member.id}
+                            className={`text-xs border rounded-full px-2 py-0.5 cursor-pointer focus:outline-none focus:ring-1 focus:ring-red-600 disabled:opacity-50 ${roleMeta.color}`}
+                          >
+                            {(['owner', 'admin', 'developer', 'viewer'] as TeamMember['role'][]).map((r) => (
+                              <option key={r} value={r}>{ROLE_META[r].label}</option>
+                            ))}
+                          </select>
+                        ) : (
+                          <span className={`text-xs px-2 py-0.5 border rounded-full ${roleMeta.color}`}>{roleMeta.label}</span>
+                        )}
+                        {member.can_create_projects && (
+                          <span className="text-[11px] px-1.5 py-0.5 rounded border border-gray-200 bg-gray-50 text-gray-500">Projects</span>
+                        )}
+                        {member.can_manage_deployments && (
+                          <span className="text-[11px] px-1.5 py-0.5 rounded border border-gray-200 bg-gray-50 text-gray-500">Deploy</span>
+                        )}
+                        {member.can_manage_nodes && (
+                          <span className="text-[11px] px-1.5 py-0.5 rounded border border-gray-200 bg-gray-50 text-gray-500">Nodes</span>
+                        )}
                       </div>
                     </div>
-                    <span className={`text-xs px-2 py-0.5 border rounded-full shrink-0 ${member.is_active ? 'bg-green-50 text-green-700 border-green-200' : 'bg-gray-50 text-gray-400 border-gray-200'}`}>
-                      {member.is_active ? 'Active' : 'Inactive'}
-                    </span>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className={`text-xs px-2 py-0.5 border rounded-full ${member.is_active ? 'bg-green-50 text-green-700 border-green-200' : 'bg-gray-50 text-gray-400 border-gray-200'}`}>
+                        {member.is_active ? 'Active' : 'Inactive'}
+                      </span>
+                      {canEdit && member.is_active && (
+                        <button
+                          onClick={() => void deactivateMember(member.id, member.email)}
+                          disabled={removingMember === member.id}
+                          className="text-xs px-2 py-1 rounded border border-red-200 text-red-600 hover:bg-red-50 disabled:opacity-50 transition-colors"
+                        >
+                          {removingMember === member.id ? '…' : 'Remove'}
+                        </button>
+                      )}
+                    </div>
                   </div>
                 );
               })}
