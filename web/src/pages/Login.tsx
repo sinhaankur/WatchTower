@@ -54,12 +54,6 @@ const Login = () => {
         const resp = await apiClient.get('/auth/status');
         const status = resp.data as AuthStatus;
         setAuthStatus(status);
-        // Auto-login when running locally with insecure dev auth enabled (browser/script mode)
-        if (status?.dev_auth?.allow_insecure && !localStorage.getItem('authToken')) {
-          const devToken = `dev-local-${Date.now()}`;
-          localStorage.setItem('authToken', devToken);
-          navigate('/', { replace: true });
-        }
       } catch {
         setAuthStatus(null);
       } finally {
