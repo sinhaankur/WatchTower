@@ -1,76 +1,84 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" role="img" aria-label="WatchTower modes overview">
   <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#fffaf0" />
-      <stop offset="100%" stop-color="#f8fbff" />
-    </linearGradient>
-    <linearGradient id="hero" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#ffffff" />
-      <stop offset="100%" stop-color="#fff0bd" />
-    </linearGradient>
-    <style>
-      .title { font: 800 52px 'DM Sans', Arial, sans-serif; fill: #0f172a; }
-      .subtitle { font: 500 24px 'DM Sans', Arial, sans-serif; fill: #475569; }
-      .eyebrow { font: 700 20px 'Space Mono', monospace; letter-spacing: 2px; fill: #b91c1c; }
-      .card-title { font: 800 30px 'DM Sans', Arial, sans-serif; fill: #0f172a; }
-      .card-copy { font: 500 21px 'DM Sans', Arial, sans-serif; fill: #475569; }
-      .chip { font: 700 18px 'DM Sans', Arial, sans-serif; fill: #7f1d1d; }
-      .label { font: 700 18px 'Space Mono', monospace; fill: #0f172a; }
-      .metric { font: 700 20px 'DM Sans', Arial, sans-serif; fill: #0f172a; }
-    </style>
+    <filter id="cs" x="-4%" y="-4%" width="112%" height="116%">
+      <feDropShadow dx="3" dy="3" stdDeviation="0" flood-color="#1f2937"/>
+    </filter>
+    <filter id="ps" x="-2%" y="-8%" width="108%" height="132%">
+      <feDropShadow dx="2" dy="2" stdDeviation="0" flood-color="#1f2937"/>
+    </filter>
   </defs>
-  <rect width="1600" height="900" fill="url(#bg)" />
-  <circle cx="180" cy="140" r="180" fill="#fde68a" opacity="0.22" />
-  <circle cx="1450" cy="90" r="140" fill="#dbeafe" opacity="0.45" />
+  <rect width="1600" height="900" fill="#fbf6ea"/>
+  <circle cx="128" cy="124" r="118" fill="#fde68a" opacity="0.28"/>
+  <circle cx="1480" cy="152" r="156" fill="#dbeafe" opacity="0.32"/>
 
-  <rect x="70" y="55" width="1460" height="180" rx="34" fill="url(#hero)" stroke="#1f2937" stroke-width="3" />
-  <rect x="110" y="95" width="58" height="58" rx="14" fill="#fde68a" stroke="#0f172a" stroke-width="3" />
-  <text x="128" y="132" font-family="DM Sans, Arial, sans-serif" font-size="28" font-weight="800" fill="#b91c1c">Wt</text>
-  <text x="200" y="110" class="eyebrow">WATCHTOWER BLUEPRINT</text>
-  <text x="110" y="170" class="title">Two operating modes, one control plane.</text>
-  <text x="110" y="208" class="subtitle">Use the same project for scheduled Podman updates or multi-node application delivery over SSH.</text>
+  <rect x="64" y="52" width="1472" height="164" rx="24" fill="#ffffff" stroke="#1f2937" stroke-width="2" filter="url(#cs)"/>
+  <rect x="96" y="84" width="64" height="64" rx="16" fill="#fde68a" stroke="#1f2937" stroke-width="2" filter="url(#ps)"/>
+  <text x="116" y="124" font-family="'DM Sans', Arial, sans-serif" font-size="28" font-weight="800" fill="#b91c1c">Wt</text>
+  <text x="186" y="106" font-family="'Space Mono', monospace" font-size="18" font-weight="700" fill="#b91c1c" letter-spacing="2">WATCHTOWER MODES</text>
+  <text x="96" y="162" font-family="'DM Sans', Arial, sans-serif" font-size="44" font-weight="800" fill="#0f172a">Choose between host upkeep and application delivery.</text>
+  <text x="96" y="194" font-family="'DM Sans', Arial, sans-serif" font-size="20" font-weight="500" fill="#475569">Both modes share the same control plane, but solve different operator jobs.</text>
 
-  <rect x="90" y="290" width="680" height="510" rx="28" fill="#ffffff" stroke="#1f2937" stroke-width="3" />
-  <rect x="830" y="290" width="680" height="510" rx="28" fill="#ffffff" stroke="#1f2937" stroke-width="3" />
+  <rect x="64" y="270" width="708" height="564" rx="22" fill="#ffffff" stroke="#1f2937" stroke-width="2" filter="url(#cs)"/>
+  <rect x="98" y="302" width="292" height="32" rx="16" fill="#fde68a" stroke="#1f2937" stroke-width="1.5" filter="url(#ps)"/>
+  <text x="112" y="323" font-family="'DM Sans', Arial, sans-serif" font-size="15" font-weight="700" fill="#7f1d1d">Mode 1 · Podman Auto-Update</text>
+  <text x="98" y="388" font-family="'DM Sans', Arial, sans-serif" font-size="30" font-weight="800" fill="#0f172a">Keep existing hosts current.</text>
+  <text x="98" y="426" font-family="'DM Sans', Arial, sans-serif" font-size="17" font-weight="500" fill="#475569">WatchTower checks running containers, pulls newer images,</text>
+  <text x="98" y="452" font-family="'DM Sans', Arial, sans-serif" font-size="17" font-weight="500" fill="#475569">restarts safely, and confirms health before it settles.</text>
 
-  <rect x="120" y="325" width="250" height="42" rx="21" fill="#fde68a" stroke="#1f2937" stroke-width="2" />
-  <text x="145" y="353" class="chip">Mode 1 · Podman Auto-Update</text>
-  <text x="120" y="415" class="card-title">Container Service</text>
-  <text x="120" y="453" class="card-copy">Poll running containers, compare images, roll forward safely, and keep hosts current without touching app release workflows.</text>
+  <rect x="98" y="500" width="176" height="108" rx="18" fill="#f8fafc" stroke="#1f2937" stroke-width="2"/>
+  <text x="124" y="540" font-family="'Space Mono', monospace" font-size="13" font-weight="700" fill="#0f172a">INPUT</text>
+  <text x="124" y="570" font-family="'DM Sans', Arial, sans-serif" font-size="18" font-weight="700" fill="#0f172a">Podman host</text>
+  <text x="124" y="594" font-family="'DM Sans', Arial, sans-serif" font-size="15" font-weight="500" fill="#475569">Running containers</text>
 
-  <rect x="120" y="505" width="180" height="86" rx="18" fill="#f8fafc" stroke="#1f2937" stroke-width="2.5" />
-  <text x="145" y="540" class="label">PODMAN</text>
-  <text x="145" y="572" class="metric">Running containers</text>
-  <rect x="360" y="505" width="180" height="86" rx="18" fill="#f8fafc" stroke="#1f2937" stroke-width="2.5" />
-  <text x="385" y="540" class="label">SCHEDULE</text>
-  <text x="385" y="572" class="metric">Interval checks</text>
-  <rect x="600" y="505" width="120" height="86" rx="18" fill="#ecfdf5" stroke="#10b981" stroke-width="2.5" />
-  <text x="630" y="540" class="label">SAFE</text>
-  <text x="622" y="572" class="metric">Health gate</text>
+  <rect x="330" y="500" width="176" height="108" rx="18" fill="#f8fafc" stroke="#1f2937" stroke-width="2"/>
+  <text x="356" y="540" font-family="'Space Mono', monospace" font-size="13" font-weight="700" fill="#0f172a">ENGINE</text>
+  <text x="356" y="570" font-family="'DM Sans', Arial, sans-serif" font-size="18" font-weight="700" fill="#0f172a">Poll + restart</text>
+  <text x="356" y="594" font-family="'DM Sans', Arial, sans-serif" font-size="15" font-weight="500" fill="#475569">Scheduled update loop</text>
 
-  <line x1="210" y1="640" x2="630" y2="640" stroke="#1f2937" stroke-width="3" stroke-dasharray="8 10" />
-  <rect x="150" y="670" width="530" height="92" rx="18" fill="#fffdf7" stroke="#1f2937" stroke-width="2.5" />
-  <text x="180" y="710" class="metric">Best for host maintenance, unattended rollouts, and service-level drift control.</text>
-  <text x="180" y="742" class="card-copy">One config file, one updater loop, clear operator ergonomics.</text>
+  <rect x="562" y="500" width="176" height="108" rx="18" fill="#ecfdf5" stroke="#10b981" stroke-width="2"/>
+  <text x="588" y="540" font-family="'Space Mono', monospace" font-size="13" font-weight="700" fill="#047857">SAFE EXIT</text>
+  <text x="588" y="570" font-family="'DM Sans', Arial, sans-serif" font-size="18" font-weight="700" fill="#0f172a">Healthy service</text>
+  <text x="588" y="594" font-family="'DM Sans', Arial, sans-serif" font-size="15" font-weight="500" fill="#475569">Rollback on failure</text>
 
-  <rect x="860" y="325" width="260" height="42" rx="21" fill="#fde68a" stroke="#1f2937" stroke-width="2" />
-  <text x="886" y="353" class="chip">Mode 2 · App Center</text>
-  <text x="860" y="415" class="card-title">Deployment Control Plane</text>
-  <text x="860" y="453" class="card-copy">Register apps once, package from a dev machine, push to multiple nodes, and manage previews, blue-green, and runtime updates from one place.</text>
+  <line x1="274" y1="554" x2="330" y2="554" stroke="#1f2937" stroke-width="4" stroke-linecap="round"/>
+  <polygon points="318,543 342,554 318,565" fill="#1f2937"/>
+  <line x1="506" y1="554" x2="562" y2="554" stroke="#1f2937" stroke-width="4" stroke-linecap="round"/>
+  <polygon points="550,543 574,554 550,565" fill="#1f2937"/>
 
-  <rect x="860" y="505" width="180" height="86" rx="18" fill="#f8fafc" stroke="#1f2937" stroke-width="2.5" />
-  <text x="890" y="540" class="label">APPS.JSON</text>
-  <text x="892" y="572" class="metric">Named workloads</text>
-  <rect x="1100" y="505" width="180" height="86" rx="18" fill="#f8fafc" stroke="#1f2937" stroke-width="2.5" />
-  <text x="1128" y="540" class="label">SSH NODES</text>
-  <text x="1134" y="572" class="metric">Target fleet</text>
-  <rect x="1340" y="505" width="140" height="86" rx="18" fill="#eff6ff" stroke="#2563eb" stroke-width="2.5" />
-  <text x="1373" y="540" class="label">UI/API</text>
-  <text x="1366" y="572" class="metric">Triggers</text>
+  <rect x="98" y="656" width="640" height="146" rx="18" fill="#fffdf7" stroke="#1f2937" stroke-width="2"/>
+  <text x="130" y="696" font-family="'DM Sans', Arial, sans-serif" font-size="20" font-weight="800" fill="#0f172a">When to use it</text>
+  <text x="130" y="728" font-family="'DM Sans', Arial, sans-serif" font-size="17" font-weight="500" fill="#475569">Use this when your release process already exists and you only want</text>
+  <text x="130" y="754" font-family="'DM Sans', Arial, sans-serif" font-size="17" font-weight="500" fill="#475569">container image updates, health checks, and low-touch host maintenance.</text>
 
-  <polyline points="930,638 1050,638 1050,690 1170,690" fill="none" stroke="#1f2937" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
-  <polyline points="1170,638 1290,638 1290,690 1410,690" fill="none" stroke="#1f2937" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
-  <rect x="900" y="670" width="530" height="92" rx="18" fill="#fffdf7" stroke="#1f2937" stroke-width="2.5" />
-  <text x="928" y="710" class="metric">Best for website and API releases, dashboards, previews, and multi-node deployments.</text>
-  <text x="928" y="742" class="card-copy">Dev-machine driven packages, remote activation, and operator-visible flow.</text>
+  <rect x="828" y="270" width="708" height="564" rx="22" fill="#ffffff" stroke="#1f2937" stroke-width="2" filter="url(#cs)"/>
+  <rect x="862" y="302" width="210" height="32" rx="16" fill="#fde68a" stroke="#1f2937" stroke-width="1.5" filter="url(#ps)"/>
+  <text x="876" y="323" font-family="'DM Sans', Arial, sans-serif" font-size="15" font-weight="700" fill="#7f1d1d">Mode 2 · App Center</text>
+  <text x="862" y="388" font-family="'DM Sans', Arial, sans-serif" font-size="30" font-weight="800" fill="#0f172a">Ship apps across multiple nodes.</text>
+  <text x="862" y="426" font-family="'DM Sans', Arial, sans-serif" font-size="17" font-weight="500" fill="#475569">Register workloads once, package them from a workstation,</text>
+  <text x="862" y="452" font-family="'DM Sans', Arial, sans-serif" font-size="17" font-weight="500" fill="#475569">then deploy, preview, and promote from one operator view.</text>
+
+  <rect x="862" y="500" width="176" height="108" rx="18" fill="#f8fafc" stroke="#1f2937" stroke-width="2"/>
+  <text x="888" y="540" font-family="'Space Mono', monospace" font-size="13" font-weight="700" fill="#0f172a">INPUT</text>
+  <text x="888" y="570" font-family="'DM Sans', Arial, sans-serif" font-size="18" font-weight="700" fill="#0f172a">Apps registry</text>
+  <text x="888" y="594" font-family="'DM Sans', Arial, sans-serif" font-size="15" font-weight="500" fill="#475569">Named workloads</text>
+
+  <rect x="1094" y="500" width="176" height="108" rx="18" fill="#f8fafc" stroke="#1f2937" stroke-width="2"/>
+  <text x="1120" y="540" font-family="'Space Mono', monospace" font-size="13" font-weight="700" fill="#0f172a">ENGINE</text>
+  <text x="1120" y="570" font-family="'DM Sans', Arial, sans-serif" font-size="18" font-weight="700" fill="#0f172a">Package + sync</text>
+  <text x="1120" y="594" font-family="'DM Sans', Arial, sans-serif" font-size="15" font-weight="500" fill="#475569">SSH-based rollout</text>
+
+  <rect x="1326" y="500" width="176" height="108" rx="18" fill="#eff6ff" stroke="#2563eb" stroke-width="2"/>
+  <text x="1352" y="540" font-family="'Space Mono', monospace" font-size="13" font-weight="700" fill="#1d4ed8">OUTCOME</text>
+  <text x="1352" y="570" font-family="'DM Sans', Arial, sans-serif" font-size="18" font-weight="700" fill="#0f172a">Live app</text>
+  <text x="1352" y="594" font-family="'DM Sans', Arial, sans-serif" font-size="15" font-weight="500" fill="#475569">Preview or production</text>
+
+  <line x1="1038" y1="554" x2="1094" y2="554" stroke="#1f2937" stroke-width="4" stroke-linecap="round"/>
+  <polygon points="1082,543 1106,554 1082,565" fill="#1f2937"/>
+  <line x1="1270" y1="554" x2="1326" y2="554" stroke="#1f2937" stroke-width="4" stroke-linecap="round"/>
+  <polygon points="1314,543 1338,554 1314,565" fill="#1f2937"/>
+
+  <rect x="862" y="656" width="640" height="146" rx="18" fill="#fffdf7" stroke="#1f2937" stroke-width="2"/>
+  <text x="894" y="696" font-family="'DM Sans', Arial, sans-serif" font-size="20" font-weight="800" fill="#0f172a">When to use it</text>
+  <text x="894" y="728" font-family="'DM Sans', Arial, sans-serif" font-size="17" font-weight="500" fill="#475569">Use this when WatchTower should behave like a lightweight deployment</text>
+  <text x="894" y="754" font-family="'DM Sans', Arial, sans-serif" font-size="17" font-weight="500" fill="#475569">control plane for websites, APIs, previews, blue-green slots, and teams.</text>
 </svg>

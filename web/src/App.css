@@ -1,3 +1,28 @@
 .app {
   min-height: 100vh;
 }
+
+/* Coolify-style stat card hover */
+.stat-card {
+  @apply rounded-xl border border-border bg-card p-5 transition-colors hover:border-violet-500/40 cursor-default;
+}
+
+/* Sidebar nav active item */
+.nav-item-active {
+  @apply bg-violet-600/15 text-violet-400 border-l-2 border-violet-500;
+}
+
+.nav-item {
+  @apply text-muted-foreground hover:bg-muted hover:text-foreground transition-colors border-l-2 border-transparent;
+}
+
+/* Resource status badges */
+.badge-running  { @apply bg-emerald-500/15 text-emerald-400 border border-emerald-500/30; }
+.badge-stopped  { @apply bg-red-500/15 text-red-400 border border-red-500/30; }
+.badge-building { @apply bg-amber-500/15 text-amber-400 border border-amber-500/30; }
+.badge-unknown  { @apply bg-muted text-muted-foreground border border-border; }
+
+/* Deployment activity row */
+.activity-row {
+  @apply flex items-center gap-3 py-2.5 px-3 rounded-lg hover:bg-muted/60 transition-colors cursor-default;
+}

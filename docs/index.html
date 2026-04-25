@@ -4,7 +4,10 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>WatchTower Docs</title>
+  <link rel="icon" type="image/x-icon" href="./favicon.ico">
+  <link rel="icon" type="image/png" sizes="32x32" href="./favicon-32x32.png">
   <link rel="icon" type="image/svg+xml" href="./wt-logo.svg">
+  <link rel="apple-touch-icon" sizes="152x152" href="./apple-touch-icon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
@@ -24,6 +27,15 @@
       --wt-ok-bg: rgba(16, 185, 129, 0.12);
       --wt-ok-text: #047857;
       --wt-ok-border: rgba(16, 185, 129, 0.28);
+      /* Archetype-level motion + shadow tokens */
+      --shadow: 4px 4px 0 0 hsl(0 0% 0% / 1);
+      --shadow-hover: 6px 6px 0 0 hsl(0 0% 0% / 1);
+      --shadow-soft: 8px 8px 0 0 hsl(0 0% 0% / 0.18);
+      --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+      --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+      --dur-fast: 140ms;
+      --dur-base: 240ms;
+      --dur-slow: 400ms;
     }
 
     * {
@@ -66,7 +78,7 @@
       flex-direction: column;
       background: rgba(248, 251, 255, 0.9);
       backdrop-filter: blur(8px);
-      border-right: 1px solid var(--wt-border-soft);
+      border-right: 2px solid var(--wt-border);
       position: sticky;
       top: 0;
       height: 100vh;
@@ -74,7 +86,7 @@
 
     .brand-block {
       padding: 20px 16px;
-      border-bottom: 1px solid var(--wt-border-soft);
+      border-bottom: 2px solid var(--wt-border);
     }
 
     .brand {
@@ -140,19 +152,30 @@
 
     .primary-button {
       width: 100%;
-      border: 1px solid var(--wt-border);
+      border: 2px solid var(--wt-border);
       color: #ffffff;
       background: var(--wt-accent);
-      box-shadow: 2px 2px 0 0 var(--wt-border);
-    }
-
-    .primary-button:hover,
-    .secondary-button:hover {
-      transform: translateY(-1px);
+      box-shadow: var(--shadow);
+      border-radius: 0;
+      transition: transform var(--dur-fast) var(--ease-spring), box-shadow var(--dur-fast) ease, background var(--dur-fast) ease;
     }
 
     .primary-button:hover {
       background: #991b1b;
+      transform: translate(-2px, -2px);
+      box-shadow: var(--shadow-hover);
+    }
+
+    .secondary-button:hover {
+      background: #fef9ee;
+      transform: translate(-2px, -2px);
+      box-shadow: var(--shadow-hover);
+    }
+
+    .primary-button:active,
+    .secondary-button:active {
+      transform: translate(2px, 2px);
+      box-shadow: none;
     }
 
     .sidebar-nav {
@@ -186,7 +209,7 @@
       background: #fef2f2;
       color: var(--wt-accent-strong);
       border-left-color: var(--wt-accent-strong);
-      box-shadow: 0 1px 0 rgba(15, 23, 42, 0.06);
+      border-left-width: 3px;
     }
 
     .nav-dot {
@@ -228,7 +251,7 @@
       justify-content: space-between;
       gap: 16px;
       padding: 20px 32px;
-      border-bottom: 1px solid var(--wt-border-soft);
+      border-bottom: 2px solid var(--wt-border);
       background: rgba(248, 251, 255, 0.9);
       backdrop-filter: blur(8px);
     }
@@ -274,11 +297,42 @@
       width: 100%;
     }
 
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(14px) scale(0.98); }
+      to   { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    @keyframes cardIn {
+      from { opacity: 0; transform: translateY(22px) scale(0.97); }
+      to   { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    @keyframes slideRight {
+      from { opacity: 0; transform: translateX(-18px); }
+      to   { opacity: 1; transform: translateX(0); }
+    }
+
+    /* Framer-style scroll-driven motion */
+    .motion-item {
+      opacity: 0;
+      transform: translateY(10px) scale(0.99);
+      transition:
+        opacity 360ms var(--ease-out),
+        transform 440ms var(--ease-spring);
+      transition-delay: var(--motion-delay, 0ms);
+    }
+
+    .motion-item.motion-in {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+
     .panel {
-      border: 1px solid var(--wt-border);
-      border-radius: 18px;
+      border: 2px solid var(--wt-border);
+      border-radius: 0;
       background: var(--wt-panel);
-      box-shadow: 2px 2px 0 0 rgba(31, 41, 55, 0.08);
+      box-shadow: var(--shadow);
+      animation: fadeInUp 0.28s var(--ease-out) both;
     }
 
     .hero {
@@ -328,8 +382,7 @@
       align-items: center;
       min-height: 34px;
       padding: 7px 12px;
-      border-radius: 999px;
-      border: 1px solid var(--wt-border);
+      border: 2px solid var(--wt-border);
       background: var(--wt-accent-soft);
       color: var(--wt-accent-strong);
       font-size: 0.8rem;
@@ -341,10 +394,12 @@
     }
 
     .secondary-button {
-      border: 1px solid var(--wt-border);
+      border: 2px solid var(--wt-border);
       background: #ffffff;
       color: #0f172a;
-      box-shadow: 2px 2px 0 0 rgba(31, 41, 55, 0.08);
+      box-shadow: var(--shadow);
+      border-radius: 0;
+      transition: transform var(--dur-fast) var(--ease-spring), box-shadow var(--dur-fast) ease, background var(--dur-fast) ease;
     }
 
     .stats {
@@ -353,6 +408,11 @@
       grid-template-columns: repeat(4, minmax(0, 1fr));
       gap: 14px;
     }
+
+    .stats .stat-card:nth-child(1) { animation-delay: 0.04s; }
+    .stats .stat-card:nth-child(2) { animation-delay: 0.09s; }
+    .stats .stat-card:nth-child(3) { animation-delay: 0.14s; }
+    .stats .stat-card:nth-child(4) { animation-delay: 0.19s; }
 
     .blueprint-grid {
       margin-top: 18px;
@@ -365,20 +425,28 @@
       display: block;
       padding: 14px;
       text-decoration: none;
-      transition: transform 140ms ease, border-color 140ms ease;
+      transition: transform var(--dur-fast) var(--ease-spring), box-shadow var(--dur-fast) ease;
+      overflow: hidden;
     }
 
     .blueprint-card:hover {
-      transform: translateY(-1px);
-      border-color: #ef9a9a;
+      transform: translate(-2px, -2px);
+      box-shadow: var(--shadow-hover);
+    }
+
+    .blueprint-card:active {
+      transform: translate(2px, 2px);
+      box-shadow: none;
     }
 
     .blueprint-card img {
       width: 100%;
       display: block;
-      border-radius: 14px;
-      border: 1px solid var(--wt-border-soft);
+      border: 2px solid var(--wt-border-soft);
       background: #fffdf7;
+      aspect-ratio: 16 / 9;
+      object-fit: contain;
+      padding: 8px;
     }
 
     .blueprint-card strong {
@@ -398,14 +466,15 @@
 
     .stat-card {
       padding: 18px;
-      border-radius: 16px;
-      border: 1px solid var(--wt-border);
+      border: 2px solid var(--wt-border);
       background: #ffffff;
-      transition: border-color 140ms ease;
+      box-shadow: var(--shadow);
+      transition: transform var(--dur-fast) var(--ease-spring), box-shadow var(--dur-fast) ease;
     }
 
     .stat-card:hover {
-      border-color: #ef9a9a;
+      transform: translate(-2px, -2px);
+      box-shadow: var(--shadow-hover);
     }
 
     .stat-card .label {
@@ -466,9 +535,8 @@
     }
 
     .subpanel {
-      border: 1px solid var(--wt-border-soft);
+      border: 2px solid var(--wt-border-soft);
       background: var(--wt-panel-soft);
-      border-radius: 14px;
       padding: 16px;
     }
 
@@ -562,18 +630,70 @@
       gap: 12px;
     }
 
+    .explain-grid {
+      margin-top: 18px;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .explain-card,
+    .path-card {
+      padding: 18px;
+      border-radius: 16px;
+      border: 1px solid var(--wt-border);
+      background: #ffffff;
+    }
+
+    .explain-card .eyeline,
+    .path-card .eyeline {
+      margin: 0 0 10px;
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      color: #64748b;
+      font-weight: 700;
+    }
+
+    .explain-card h3,
+    .path-card h3 {
+      margin: 0;
+      font-size: 1.02rem;
+      color: #0f172a;
+    }
+
+    .explain-card p,
+    .path-card p {
+      margin: 10px 0 0;
+      color: #64748b;
+      font-size: 0.9rem;
+      line-height: 1.55;
+    }
+
+    .path-grid {
+      margin-top: 16px;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+    }
+
     .doc-link {
       text-decoration: none;
       padding: 16px;
-      border-radius: 14px;
-      border: 1px solid var(--wt-border-soft);
+      border: 2px solid var(--wt-border);
       background: #ffffff;
-      transition: transform 140ms ease, border-color 140ms ease;
+      box-shadow: var(--shadow);
+      transition: transform var(--dur-fast) var(--ease-spring), box-shadow var(--dur-fast) ease;
     }
 
     .doc-link:hover {
-      transform: translateY(-1px);
-      border-color: #ef9a9a;
+      transform: translate(-2px, -2px);
+      box-shadow: var(--shadow-hover);
+    }
+
+    .doc-link:active {
+      transform: translate(2px, 2px);
+      box-shadow: none;
     }
 
     .doc-link strong {
@@ -597,7 +717,9 @@
 
       .blueprint-grid,
       .info-grid,
-      .link-grid {
+      .link-grid,
+      .explain-grid,
+      .path-grid {
         grid-template-columns: 1fr;
       }
     }
@@ -615,6 +737,19 @@
         border-bottom: 1px solid var(--wt-border-soft);
       }
 
+      .sidebar-nav {
+        flex-direction: row;
+        overflow-x: auto;
+        overflow-y: hidden;
+        padding-bottom: 12px;
+        scrollbar-width: thin;
+      }
+
+      .nav-link {
+        flex: 0 0 auto;
+        white-space: nowrap;
+      }
+
       .topbar,
       .content {
         padding-left: 18px;
@@ -622,6 +757,7 @@
       }
 
       .topbar {
+        position: relative;
         flex-direction: column;
         align-items: flex-start;
       }
@@ -629,6 +765,14 @@
       .hero,
       .section-card {
         padding: 20px;
+      }
+
+      .blueprint-card {
+        padding: 12px;
+      }
+
+      .blueprint-card img {
+        padding: 6px;
       }
     }
 
@@ -646,6 +790,36 @@
       .secondary-button {
         width: 100%;
       }
+
+      .content {
+        padding-top: 18px;
+        padding-bottom: 28px;
+      }
+
+      .hero h2 {
+        font-size: 1.75rem;
+        line-height: 1.08;
+      }
+
+      .hero,
+      .section-card,
+      .explain-card,
+      .path-card,
+      .stat-card {
+        padding: 16px;
+      }
+
+      .blueprint-grid {
+        gap: 14px;
+      }
+
+      .blueprint-card strong {
+        font-size: 0.92rem;
+      }
+
+      .blueprint-card span {
+        font-size: 0.82rem;
+      }
     }
   </style>
 </head>
@@ -657,168 +831,371 @@
           <span class="brand-mark"><img src="./wt-logo.svg" alt="Wt logo"></span>
           <span class="brand-copy">
             <strong>WatchTower</strong>
-            <span>Control Plane Docs</span>
+            <span>Deployment Control Plane</span>
           </span>
         </a>
       </div>
 
       <div class="sidebar-cta">
-        <a class="primary-button" href="https://github.com/sinhaankur/WatchTower">Open Repository</a>
+        <a class="primary-button" href="https://github.com/sinhaankur/WatchTower" target="_blank" rel="noopener">⭐ Star on GitHub</a>
       </div>
 
       <nav class="sidebar-nav" aria-label="Documentation sections">
         <a class="nav-link active" href="#overview"><span class="nav-dot"></span>Overview</a>
-        <a class="nav-link" href="#modes"><span class="nav-dot"></span>Deployment Modes</a>
-        <a class="nav-link" href="#upstream"><span class="nav-dot"></span>Upstream Usage</a>
-        <a class="nav-link" href="#setup"><span class="nav-dot"></span>Quick Team Setup</a>
-        <a class="nav-link" href="#provenance"><span class="nav-dot"></span>Feature Provenance</a>
+        <a class="nav-link" href="#dashboard"><span class="nav-dot"></span>Dashboard</a>
+        <a class="nav-link" href="#applications"><span class="nav-dot"></span>Applications</a>
+        <a class="nav-link" href="#servers"><span class="nav-dot"></span>Servers</a>
+        <a class="nav-link" href="#host-connect"><span class="nav-dot"></span>Host Connect</a>
+        <a class="nav-link" href="#databases"><span class="nav-dot"></span>Databases &amp; Services</a>
+        <a class="nav-link" href="#auth"><span class="nav-dot"></span>Auth &amp; Team</a>
+        <a class="nav-link" href="#quickstart"><span class="nav-dot"></span>Quick Start</a>
         <a class="nav-link" href="#guides"><span class="nav-dot"></span>Guides</a>
       </nav>
 
       <div class="sidebar-footer">
-        <div>GitHub Pages mirrors the same visual shell as the app dashboard for faster team onboarding.</div>
-        <div style="margin-top: 10px;"><a href="https://github.com/sinhaankur/WatchTower">GitHub</a> · <a href="./viewer.html?doc=mesh">Mesh Runbook</a></div>
+        <div>These docs mirror the app sidebar — if you can navigate the app, you already know this page.</div>
+        <div style="margin-top: 10px;"><a href="https://github.com/sinhaankur/WatchTower" target="_blank" rel="noopener">GitHub</a> · <a href="./viewer.html?doc=mesh">Mesh Runbook</a> · <a href="./viewer.html?doc=ha">HA Guide</a></div>
       </div>
     </aside>
 
     <main class="main-shell">
       <header class="topbar">
         <div>
-          <h1>Docs Dashboard</h1>
-          <p>Product-style documentation for WatchTower operations, setup, and release flow.</p>
+          <h1>WatchTower Documentation</h1>
+          <p>Self-hosted deployment control plane — ship apps to your own nodes, manage hosts, and monitor services.</p>
         </div>
         <div class="status-pill">GitHub Pages Live</div>
       </header>
 
       <div class="content">
         <section class="panel hero" id="overview">
-          <p class="eyebrow">WatchTower</p>
-          <h2>Use the docs with the same UI language as the app itself.</h2>
+          <p class="eyebrow">WatchTower · Open Source</p>
+          <h2>Deploy and manage apps across your own servers — no third-party cloud required.</h2>
           <p>
-            GitHub Pages now follows the WatchTower control-plane shell: the same retro product palette, the same left navigation model,
-            the same card rhythm, and the same quick-action structure used inside the application dashboard.
+            WatchTower is an operator-facing control plane. Register apps, connect SSH nodes, set up databases,
+            and ship releases — all from one dashboard that works as a desktop app, a browser tab, or a headless service.
           </p>
           <div class="chip-row">
-            <span class="chip">Mode 1: Podman container auto-updates</span>
-            <span class="chip">Mode 2: App Center multi-node SSH deploys</span>
-            <span class="chip">Onboarding: Podman, Docker, Tailscale, Cloudflare, Nginx</span>
+            <span class="chip">Multi-node SSH deploys</span>
+            <span class="chip">Podman / Docker runtimes</span>
+            <span class="chip">GitHub OAuth + API token auth</span>
+            <span class="chip">Desktop app — Linux · macOS · Windows</span>
+            <span class="chip">Host Connect: Tailscale, Cloudflare, Nginx</span>
           </div>
           <div class="actions">
-            <a class="primary-button" href="https://github.com/sinhaankur/WatchTower">Repository</a>
-            <a class="secondary-button" href="./viewer.html?doc=readme">Main README</a>
+            <a class="primary-button" href="https://github.com/sinhaankur/WatchTower" target="_blank" rel="noopener">View on GitHub</a>
+            <a class="secondary-button" href="./viewer.html?doc=readme">README</a>
             <a class="secondary-button" href="./viewer.html?doc=mesh">Mesh Runbook</a>
           </div>
         </section>
 
         <section class="stats" id="modes">
           <article class="stat-card panel">
-            <p class="label">Release Channel</p>
-            <p class="value">GitHub + GHCR + PyPI</p>
-            <p class="meta">Versioned tags publish package, image, and CLI artifacts.</p>
+            <p class="label">App Screens</p>
+            <p class="value">8 Pages</p>
+            <p class="meta">Dashboard, Applications, Servers, Databases, Services, Host Connect, Team, Settings.</p>
           </article>
           <article class="stat-card panel">
-            <p class="label">Deployment Modes</p>
-            <p class="value">App Center, Mesh, Hybrid</p>
-            <p class="meta">Local-first control plane with optional cloud-backed persistence.</p>
+            <p class="label">Auth Options</p>
+            <p class="value">GitHub OAuth / Token</p>
+            <p class="meta">Sign in with GitHub for org/team access, or use a static API token for solo and automated use.</p>
           </article>
           <article class="stat-card panel">
-            <p class="label">Auth Modes</p>
-            <p class="value">GitHub OAuth or API Token</p>
-            <p class="meta">GitHub sign-in is optional; token-based access remains available.</p>
+            <p class="label">Runtimes</p>
+            <p class="value">Podman + Docker</p>
+            <p class="meta">Rootless Podman as the native runtime; Docker-compatible for existing stacks.</p>
           </article>
           <article class="stat-card panel">
-            <p class="label">Docs UX</p>
-            <p class="value">Sidebar + Panels</p>
-            <p class="meta">The docs now mirror dashboard navigation and action placement.</p>
+            <p class="label">Desktop App</p>
+            <p class="value">Electron · All OS</p>
+            <p class="meta">Runs as a system tray app on Linux, macOS, and Windows. Backend + UI in one process.</p>
           </article>
         </section>
 
-        <section class="blueprint-grid">
-          <a class="panel blueprint-card" href="./viewer.html?doc=readme">
-            <img src="./assets/modes-overview.svg" alt="WatchTower modes overview" />
-            <strong>Modes Overview</strong>
-            <span>See the two core operating modes in the same visual language used across the product docs.</span>
+        <section class="explain-grid" aria-label="What WatchTower does">
+          <article class="explain-card panel">
+            <p class="eyeline">Register</p>
+            <h3>Add apps and target nodes</h3>
+            <p>Create an app record, point it at a GitHub repo or local folder, then assign one or more SSH nodes as deploy targets.</p>
+          </article>
+          <article class="explain-card panel">
+            <p class="eyeline">Deploy</p>
+            <h3>Trigger a release from the dashboard</h3>
+            <p>Click Deploy in Applications, pick a branch, and WatchTower packages and rolls the release to your nodes over SSH.</p>
+          </article>
+          <article class="explain-card panel">
+            <p class="eyeline">Monitor</p>
+            <h3>Inspect state in real time</h3>
+            <p>Dashboard shows container health, running services, recent deploys, and runtime status — no external monitoring tool needed.</p>
+          </article>
+        </section>
+
+        <section class="panel section-card">
+          <h3>Pick Your Starting Point</h3>
+          <p class="lead">Choose the path that matches what you want to do. Each one leads to the right section below.</p>
+          <div class="path-grid">
+            <article class="path-card">
+              <p class="eyeline">Deploy an app</p>
+              <h3>Applications + Setup Wizard</h3>
+              <p>Register your app, add an SSH node in Servers, run the Setup Wizard, and ship your first release in Applications.</p>
+            </article>
+            <article class="path-card">
+              <p class="eyeline">Manage a host</p>
+              <h3>Servers + Host Connect</h3>
+              <p>Add your server in the Servers page, then use Host Connect to install Podman, Tailscale, Cloudflare, or Nginx on it.</p>
+            </article>
+            <article class="path-card">
+              <p class="eyeline">Invite the team</p>
+              <h3>Settings + Team Management</h3>
+              <p>Set up GitHub OAuth under Settings, then manage org/team membership from the Team page to grant access.</p>
+            </article>
+          </div>
+        </section>
+
+        <section class="blueprint-grid" id="dashboard">
+          <a class="panel blueprint-card" href="#dashboard">
+            <svg viewBox="0 0 80 60" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="4" width="72" height="52" rx="4" stroke="#1f2937" stroke-width="2" fill="#fffdf7"/><rect x="10" y="10" width="26" height="18" rx="2" fill="#fde68a" stroke="#1f2937" stroke-width="1.5"/><rect x="42" y="10" width="28" height="8" rx="2" fill="#fbf6ea" stroke="#1f2937" stroke-width="1.5"/><rect x="42" y="22" width="28" height="6" rx="2" fill="#fbf6ea" stroke="#1f2937" stroke-width="1.5"/><rect x="10" y="32" width="60" height="4" rx="1" fill="#b91c1c" opacity=".3"/><rect x="10" y="40" width="40" height="4" rx="1" fill="#1f2937" opacity=".15"/><rect x="10" y="47" width="25" height="4" rx="1" fill="#1f2937" opacity=".1"/></svg>
+            <strong>Dashboard</strong>
+            <span>Live overview of projects, runtime status, recent deployments, and quick-action buttons.</span>
           </a>
-          <a class="panel blueprint-card" href="./viewer.html?doc=readme">
-            <img src="./assets/deploy-process.svg" alt="WatchTower deployment process" />
-            <strong>Deployment Process</strong>
-            <span>Follow the App Center release pipeline from app selection through health verification.</span>
+          <a class="panel blueprint-card" href="#applications">
+            <svg viewBox="0 0 80 60" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="4" width="72" height="52" rx="4" stroke="#1f2937" stroke-width="2" fill="#fffdf7"/><rect x="10" y="10" width="60" height="12" rx="2" fill="#fde68a" stroke="#1f2937" stroke-width="1.5"/><rect x="10" y="26" width="60" height="12" rx="2" fill="#fbf6ea" stroke="#1f2937" stroke-width="1.5"/><rect x="10" y="42" width="60" height="12" rx="2" fill="#fbf6ea" stroke="#1f2937" stroke-width="1.5"/><rect x="56" y="13" width="10" height="6" rx="2" fill="#b91c1c"/><rect x="56" y="29" width="10" height="6" rx="2" fill="#b91c1c" opacity=".4"/></svg>
+            <strong>Applications</strong>
+            <span>Deploy, rollback, or preview apps. Each row shows branch, last deploy status, and target nodes.</span>
           </a>
-          <a class="panel blueprint-card" href="./viewer.html?doc=mesh">
-            <img src="./assets/mesh-topology.svg" alt="WatchTower mesh topology" />
-            <strong>Mesh Topology</strong>
-            <span>Map preview and live traffic flows across mesh-oriented nodes and routing layers.</span>
+          <a class="panel blueprint-card" href="#servers">
+            <svg viewBox="0 0 80 60" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="4" width="72" height="52" rx="4" stroke="#1f2937" stroke-width="2" fill="#fffdf7"/><rect x="10" y="10" width="60" height="10" rx="2" fill="#fbf6ea" stroke="#1f2937" stroke-width="1.5"/><circle cx="16" cy="15" r="3" fill="#047857"/><rect x="24" y="12" width="20" height="3" rx="1" fill="#1f2937" opacity=".2"/><rect x="10" y="24" width="60" height="10" rx="2" fill="#fbf6ea" stroke="#1f2937" stroke-width="1.5"/><circle cx="16" cy="29" r="3" fill="#047857"/><rect x="24" y="26" width="20" height="3" rx="1" fill="#1f2937" opacity=".2"/><rect x="10" y="38" width="60" height="10" rx="2" fill="#fde68a" stroke="#1f2937" stroke-width="1.5"/><circle cx="16" cy="43" r="3" fill="#fde68a" stroke="#b91c1c" stroke-width="1"/></svg>
+            <strong>Servers</strong>
+            <span>Register SSH nodes, set remote paths, and mark a primary deploy target.</span>
           </a>
-          <a class="panel blueprint-card" href="./viewer.html?doc=hybrid">
-            <img src="./assets/hybrid-stack.svg" alt="WatchTower hybrid stack" />
-            <strong>Hybrid Stack</strong>
-            <span>Summarize how local control, remote services, and managed data paths connect together.</span>
+          <a class="panel blueprint-card" href="#host-connect">
+            <svg viewBox="0 0 80 60" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="4" width="72" height="52" rx="4" stroke="#1f2937" stroke-width="2" fill="#fffdf7"/><rect x="10" y="10" width="28" height="40" rx="2" fill="#f8fbff" stroke="#1f2937" stroke-width="1.5"/><rect x="14" y="16" width="20" height="4" rx="1" fill="#b91c1c" opacity=".3"/><rect x="14" y="24" width="16" height="3" rx="1" fill="#1f2937" opacity=".15"/><rect x="14" y="30" width="16" height="3" rx="1" fill="#1f2937" opacity=".15"/><rect x="42" y="10" width="28" height="14" rx="2" fill="#fde68a" stroke="#1f2937" stroke-width="1.5"/><rect x="42" y="28" width="28" height="10" rx="2" fill="#fbf6ea" stroke="#1f2937" stroke-width="1.5"/><rect x="42" y="42" width="28" height="8" rx="2" fill="#fbf6ea" stroke="#1f2937" stroke-width="1.5"/></svg>
+            <strong>Host Connect</strong>
+            <span>Step-by-step tooling installation for each host — Podman, Tailscale, Cloudflare, Nginx.</span>
           </a>
-          <a class="panel blueprint-card" href="./viewer.html?doc=readme">
-            <img src="./assets/application-surface.svg" alt="WatchTower application and web app surface" />
-            <strong>Application Surface</strong>
-            <span>Show how applications and web apps move from dashboard-managed projects into public delivery.</span>
+          <a class="panel blueprint-card" href="#databases">
+            <svg viewBox="0 0 80 60" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="4" width="72" height="52" rx="4" stroke="#1f2937" stroke-width="2" fill="#fffdf7"/><ellipse cx="40" cy="16" rx="22" ry="8" fill="#fde68a" stroke="#1f2937" stroke-width="1.5"/><path d="M18 16 Q18 28 40 28 Q62 28 62 16" stroke="#1f2937" stroke-width="1.5" fill="none"/><path d="M18 28 Q18 40 40 40 Q62 40 62 28" stroke="#1f2937" stroke-width="1.5" fill="none"/><path d="M18 40 Q18 52 40 52 Q62 52 62 40" stroke="#1f2937" stroke-width="1.5" fill="none"/></svg>
+            <strong>Databases &amp; Services</strong>
+            <span>Manage local Podman databases, remote endpoints, and background service workers in one view.</span>
           </a>
-          <a class="panel blueprint-card" href="./viewer.html?doc=readme">
-            <img src="./assets/secure-terminal-flow.svg" alt="WatchTower secure terminal command flow" />
-            <strong>Secure Terminal Flow</strong>
-            <span>Explain how approved terminal commands are validated, executed safely, and recorded with encrypted audit data.</span>
+          <a class="panel blueprint-card" href="#auth">
+            <svg viewBox="0 0 80 60" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="4" width="72" height="52" rx="4" stroke="#1f2937" stroke-width="2" fill="#fffdf7"/><circle cx="40" cy="22" r="10" fill="#fde68a" stroke="#1f2937" stroke-width="1.5"/><rect x="22" y="36" width="36" height="14" rx="4" fill="#fbf6ea" stroke="#1f2937" stroke-width="1.5"/><circle cx="30" cy="41" r="3" fill="#b91c1c"/><circle cx="40" cy="41" r="3" fill="#b91c1c" opacity=".5"/><circle cx="50" cy="41" r="3" fill="#b91c1c" opacity=".25"/></svg>
+            <strong>Auth &amp; Team</strong>
+            <span>GitHub OAuth, API token, and org/team-based access control for the whole team.</span>
           </a>
         </section>
 
         <div class="sections">
-          <section class="panel section-card" id="upstream">
-            <h3>What This Project Uses From Upstream</h3>
-            <p class="lead">This section keeps the provenance story explicit while matching the application’s panel-based information layout.</p>
+          <section class="panel section-card" id="applications">
+            <h3>Applications</h3>
+            <p class="lead">
+              Manage every app registered in WatchTower. Each entry shows source (GitHub repo or local folder),
+              last deploy status, assigned nodes, and a one-click deploy button.
+            </p>
             <div class="info-grid">
               <div class="subpanel">
-                <h4>Upstream Dependencies</h4>
+                <h4>What you can do here</h4>
                 <ul class="list">
-                  <li><strong>Container updater behavior:</strong> Uses upstream <a href="https://github.com/containrrr/watchtower">containrrr/watchtower</a> for image polling and restart semantics.</li>
-                  <li><strong>Networking concept direction:</strong> UX and control flow are inspired by <a href="https://github.com/tailscale/tailscale">tailscale/tailscale</a> for team-friendly host connectivity workflows.</li>
-                  <li><strong>Domain connectivity:</strong> Cloudflare tunnel setup is generated through WatchTower Host Connect helper endpoints.</li>
+                  <li><strong>Deploy:</strong> Trigger a new release to all assigned nodes with the current branch tip.</li>
+                  <li><strong>Rollback:</strong> Revert to the previous successful deployment in one click.</li>
+                  <li><strong>Preview deploy:</strong> Ship a branch to a preview URL before promoting to live.</li>
+                  <li><strong>Edit config:</strong> Update build command, output directory, and environment variables.</li>
                 </ul>
               </div>
-              <div class="subpanel" id="provenance">
-                <h4>Feature Provenance</h4>
+              <div class="subpanel">
+                <h4>Deployment models</h4>
                 <div class="stack">
-                  <div class="status-row"><span>WatchTower runtime API</span><span class="badge native">native</span></div>
-                  <div class="status-row"><span>GitHub OAuth + API token auth</span><span class="badge native">native</span></div>
-                  <div class="status-row"><span>Auto image polling and restart</span><span class="badge upstream">upstream watchtower</span></div>
-                  <div class="status-row"><span>Host-connect UX pattern</span><span class="badge upstream">tailscale-inspired</span></div>
-                  <div class="status-row"><span>Managed DB + Nginx setup plans</span><span class="badge native">native</span></div>
-                  <div class="status-row"><span>Secure terminal command runner + encrypted audit</span><span class="badge native">native</span></div>
+                  <div class="status-row"><span>Netlify-like static + functions</span><span class="badge native">native</span></div>
+                  <div class="status-row"><span>Vercel-like SSR / edge</span><span class="badge native">native</span></div>
+                  <div class="status-row"><span>Containerised apps via Podman/Docker</span><span class="badge native">native</span></div>
+                  <div class="status-row"><span>GitHub source or local folder</span><span class="badge native">native</span></div>
                 </div>
               </div>
             </div>
           </section>
 
-          <section class="panel section-card" id="setup">
-            <h3>Quick Team Setup</h3>
-            <p class="lead">The same “what do I do next?” UX from the product dashboard is carried into the docs as a concise operational checklist.</p>
-            <pre class="code-block"><code>1) Open Host Connect in WatchTower
-2) Install missing tools on each team machine
-3) Join Tailscale tailnet for private connectivity
-4) Configure encrypted terminal audit key
-5) Generate Cloudflare tunnel domain plan
-6) Deploy applications from Dashboard</code></pre>
+          <section class="panel section-card" id="servers">
+            <h3>Servers</h3>
+            <p class="lead">
+              Register and manage the SSH nodes WatchTower deploys to. Each node record stores the hostname,
+              SSH user, port, remote app path, and reload command.
+            </p>
+            <div class="info-grid">
+              <div class="subpanel">
+                <h4>Node fields</h4>
+                <ul class="list">
+                  <li><strong>Host:</strong> IP address or hostname reachable over SSH.</li>
+                  <li><strong>User:</strong> SSH user — defaults to <code>deploy</code>.</li>
+                  <li><strong>Remote path:</strong> Where apps are placed, e.g. <code>/opt/apps/watchtower</code>.</li>
+                  <li><strong>Reload command:</strong> Runs after deploy, e.g. <code>sudo systemctl reload caddy</code>.</li>
+                </ul>
+              </div>
+              <div class="subpanel">
+                <h4>Organisation</h4>
+                <div class="stack">
+                  <div class="status-row"><span>Primary node flag</span><span class="badge native">native</span></div>
+                  <div class="status-row"><span>Concurrent deploy limit per node</span><span class="badge native">native</span></div>
+                  <div class="status-row"><span>SSH key path config</span><span class="badge native">native</span></div>
+                  <div class="status-row"><span>Nodes scoped to org</span><span class="badge native">native</span></div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="panel section-card" id="host-connect">
+            <h3>Host Connect</h3>
+            <p class="lead">
+              Guided onboarding for each host in your fleet. Host Connect auto-detects installed tools
+              (Podman, Docker, Tailscale, Cloudflare, Nginx) and provides step-by-step install plans.
+            </p>
+            <div class="info-grid">
+              <div class="subpanel">
+                <h4>Supported tools</h4>
+                <ul class="list">
+                  <li><strong>Podman / Docker:</strong> Runtime detection and rootless container setup.</li>
+                  <li><strong>Tailscale:</strong> Private mesh networking — check status, generate join key.</li>
+                  <li><strong>Cloudflare Tunnel:</strong> Zero-trust domain routing without firewall changes.</li>
+                  <li><strong>Nginx:</strong> Auto-generate reverse proxy config for deployed apps.</li>
+                </ul>
+              </div>
+              <div class="subpanel">
+                <h4>Secure terminal</h4>
+                <div class="stack">
+                  <div class="status-row"><span>Allow-listed commands only</span><span class="badge native">native</span></div>
+                  <div class="status-row"><span>Encrypted audit log</span><span class="badge native">native</span></div>
+                  <div class="status-row"><span>Policy-gated sudo</span><span class="badge native">native</span></div>
+                  <div class="status-row"><span>No raw shell exposure</span><span class="badge native">native</span></div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="panel section-card" id="databases">
+            <h3>Databases &amp; Services</h3>
+            <p class="lead">
+              Manage database connections and background services alongside app deployments.
+              WatchTower tracks local Podman-managed databases and remote managed endpoints in one view.
+            </p>
+            <div class="path-grid">
+              <article class="path-card">
+                <p class="eyeline">Local DBs</p>
+                <h3>Podman containers</h3>
+                <p>Postgres, MySQL, Redis and more as rootless Podman containers with configurable resource limits.</p>
+              </article>
+              <article class="path-card">
+                <p class="eyeline">Remote DBs</p>
+                <h3>Managed cloud endpoints</h3>
+                <p>Register connection strings from external providers. Stored encrypted and injected as env vars at deploy time.</p>
+              </article>
+              <article class="path-card">
+                <p class="eyeline">Services</p>
+                <h3>Background workloads</h3>
+                <p>Register workers, crons, and long-running services. Monitor state and link them to the app that depends on them.</p>
+              </article>
+            </div>
+          </section>
+
+          <section class="panel section-card" id="auth">
+            <h3>Auth &amp; Team Management</h3>
+            <p class="lead">
+              Two auth modes that can coexist: GitHub OAuth for team access with org/team role gating,
+              and a static API token for solo and automated use.
+            </p>
+            <div class="info-grid">
+              <div class="subpanel">
+                <h4>Auth options</h4>
+                <ul class="list">
+                  <li><strong>GitHub OAuth:</strong> Sign in with GitHub. Org and team membership gate access.</li>
+                  <li><strong>API token:</strong> Set <code>WATCHTOWER_API_TOKEN</code>, send as Bearer from scripts or the VS Code extension.</li>
+                  <li><strong>Dev mode:</strong> <code>WATCHTOWER_ALLOW_INSECURE_DEV_AUTH=true</code> for local development without credentials.</li>
+                </ul>
+              </div>
+              <div class="subpanel" id="provenance">
+                <h4>Feature Provenance</h4>
+                <div class="stack">
+                  <div class="status-row"><span>Runtime API + deploy engine</span><span class="badge native">native</span></div>
+                  <div class="status-row"><span>GitHub OAuth + HMAC sessions</span><span class="badge native">native</span></div>
+                  <div class="status-row"><span>Host Connect + secure terminal</span><span class="badge native">native</span></div>
+                  <div class="status-row"><span>Container image polling + restart</span><span class="badge upstream">containrrr/watchtower</span></div>
+                  <div class="status-row"><span>Host-connect UX pattern</span><span class="badge upstream">tailscale-inspired</span></div>
+                  <div class="status-row"><span>VS Code extension API</span><span class="badge native">native</span></div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="panel section-card" id="upstream">
+            <h3>Architecture &amp; Stack</h3>
+            <p class="lead">WatchTower builds on well-known open-source tools with its own native control plane layer on top.</p>
+            <div class="info-grid">
+              <div class="subpanel">
+                <h4>Stack</h4>
+                <ul class="list">
+                  <li><strong>Backend:</strong> Python 3.12 · FastAPI · SQLAlchemy · SQLite (dev) / Postgres (prod)</li>
+                  <li><strong>Frontend:</strong> React 18 · TypeScript · Vite · Tailwind CSS · shadcn/ui</li>
+                  <li><strong>Desktop:</strong> Electron 31 — frameless window, system tray, IPC bridge</li>
+                  <li><strong>Container updater:</strong> Wraps <a href="https://github.com/containrrr/watchtower" target="_blank" rel="noopener">containrrr/watchtower</a> for image polling and restart semantics.</li>
+                </ul>
+              </div>
+              <div class="subpanel">
+                <h4>Deployment variants</h4>
+                <div class="stack">
+                  <div class="status-row"><span>Local — browser or desktop app</span><span class="badge native">native</span></div>
+                  <div class="status-row"><span>Server — headless API + static frontend</span><span class="badge native">native</span></div>
+                  <div class="status-row"><span>HA Podman multi-node</span><span class="badge native">native</span></div>
+                  <div class="status-row"><span>Mesh topology (blue/green + preview)</span><span class="badge native">native</span></div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="panel section-card" id="quickstart">
+            <h3>Quick Start — Local</h3>
+            <p class="lead">Get the desktop app running in under two minutes on Linux, macOS, or Windows.</p>
+            <pre class="code-block"><code># 1. Clone
+git clone https://github.com/sinhaankur/WatchTower.git &amp;&amp; cd WatchTower
+
+# 2. Create virtualenv and install backend
+python3 -m venv .venv &amp;&amp; source .venv/bin/activate
+pip install -r requirements.txt
+
+# 3. Install frontend and desktop dependencies
+npm --prefix web install &amp;&amp; npm --prefix desktop install
+
+# 4a. Browser mode — opens http://127.0.0.1:5222
+bash scripts/run-local-app.sh
+
+# 4b. Desktop app mode (Electron, runs in system tray)
+npm run desktop</code></pre>
           </section>
 
           <section class="panel section-card" id="guides">
-            <h3>Guides And Runbooks</h3>
-            <p class="lead">Use the same quick-link discovery pattern as the app for the documents teams actually open during setup and operations.</p>
+            <h3>Guides &amp; Runbooks</h3>
+            <p class="lead">Reference material for advanced deployment topologies, HA setups, and hybrid cloud configurations.</p>
             <div class="link-grid">
               <a class="doc-link" href="./viewer.html?doc=mesh">
                 <strong>Mesh Runbook</strong>
-                <span>Deploy WatchTower in mesh-style topologies with operational guardrails and preview patterns.</span>
+                <span>Deploy WatchTower in multi-node mesh topologies with blue/green and preview traffic routing.</span>
               </a>
               <a class="doc-link" href="./viewer.html?doc=ha">
-                <strong>HA Podman WatchTower</strong>
-                <span>High-availability guidance for Podman-based update flows and service operations.</span>
+                <strong>HA Podman Setup</strong>
+                <span>High-availability configuration for Podman-based update flows with failover and health verification.</span>
               </a>
               <a class="doc-link" href="./viewer.html?doc=hybrid">
                 <strong>Hybrid Cloud Databases</strong>
-                <span>Reference material for mixed local and remote database connectivity in WatchTower deployments.</span>
+                <span>Mix local Podman-managed databases with remote managed endpoints in a single deployment.</span>
+              </a>
+              <a class="doc-link" href="./viewer.html?doc=readme">
+                <strong>Main README</strong>
+                <span>Full feature overview, environment variable reference, and contribution guide.</span>
+              </a>
+              <a class="doc-link" href="https://github.com/sinhaankur/WatchTower/blob/main/docs/ENTERPRISE_FEATURES.md" target="_blank" rel="noopener">
+                <strong>Enterprise Features</strong>
+                <span>GitHub OAuth, org/team access control, and audit log configuration.</span>
+              </a>
+              <a class="doc-link" href="https://github.com/sinhaankur/WatchTower/blob/main/docs/EXAMPLES.md" target="_blank" rel="noopener">
+                <strong>Examples</strong>
+                <span>Real-world deployment examples for static sites, APIs, and containerised workloads.</span>
               </a>
             </div>
           </section>
@@ -854,6 +1231,25 @@
     );
 
     sections.forEach((section) => observer.observe(section));
+
+    // Framer-style scroll-in motion
+    const motionObserver = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('motion-in');
+            motionObserver.unobserve(entry.target);
+          }
+        });
+      },
+      { threshold: 0.08, rootMargin: '0px 0px -40px 0px' }
+    );
+
+    document.querySelectorAll('.panel, .stat-card, .blueprint-card, .doc-link, .path-card, .explain-card').forEach((el, i) => {
+      el.classList.add('motion-item');
+      el.style.setProperty('--motion-delay', `${i * 40}ms`);
+      motionObserver.observe(el);
+    });
   </script>
 </body>
 </html>

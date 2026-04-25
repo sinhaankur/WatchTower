@@ -1,15 +1,111 @@
 # WatchTower
 
-WatchTower can run in two primary modes:
+## Get Running in 30 Seconds
 
-1. **Podman Auto-Update Service** for containers.
-2. **App Center** for Linux servers, deploying websites/APIs to multiple nodes over SSH.
+```bash
+git clone https://github.com/sinhaankur/WatchTower.git
+cd WatchTower
+./run.sh
+```
 
-App Center mode is designed to feel simple like hosted deployment platforms:
+That's it. `run.sh` will:
+- Create a Python virtualenv and install dependencies (first run only)
+- Install Node packages (first run only)
+- Build the frontend (first run only)
+- Start the backend API on `127.0.0.1:8000`
+- Launch the **Electron desktop app** if a display is available, otherwise open the browser at `http://127.0.0.1:5222`
 
-- Register apps in a single `apps.json` file.
-- Deploy by app name from your dev machine.
-- Push code, run optional build, sync artifacts to nodes, and reload services.
+**Other commands:**
+
+| Command | What it does |
+|---|---|
+| `./run.sh desktop` | Force Electron desktop app |
+| `./run.sh browser` | Force browser mode |
+| `./run.sh stop` | Kill all WatchTower processes |
+| `./run.sh logs` | Tail backend + frontend logs |
+
+> **Requirements:** Python 3.8+, Node.js 18+, npm. Podman optional (only needed for container auto-update mode).
+
+---
+
+WatchTower is an operator-facing tool for two adjacent jobs:
+
+1. **Keep existing Podman workloads current** with health-aware image updates.
+2. **Deploy applications to your own nodes** with a compact control plane, SSH rollout, and operator-visible status.
+
+The project is intentionally lightweight. It is not trying to replace a full PaaS. It gives teams a clear release path, host operations, and a dashboard-oriented workflow without hiding what happens underneath.
+
+## What It Does
+
+- **Container auto-update mode:** poll running containers, pull newer images, restart safely, and verify health.
+- **App Center mode:** register workloads in `config/apps.json`, package from a dev machine, sync to nodes, activate remotely, and confirm rollout state.
+- **Operator tooling:** expose guided actions, runtime inspection, and secure host operations from one control surface.
+
+## Choose Your Path
+
+- **Use Podman Auto-Update Service** if you already have a release process and only need safe host maintenance for containers.
+- **Use App Center** if you want WatchTower to behave like a compact deployment control plane for websites, APIs, previews, and multi-node rollouts.
+- **Use Host Connect / secure terminal flows** if the team needs guided host actions without opening an unrestricted shell path.
+
+## Why It Is Different
+
+- **Explicit deploy flow:** operators can see app selection, artifact creation, sync, activation, and health verification as separate steps.
+- **Own-your-infrastructure model:** deploy to your own Linux nodes over SSH instead of handing control to a hosted platform.
+- **Consistent UX:** the desktop app, web UI, GitHub Pages docs, and architecture diagrams all explain the same product model.
+
+---
+
+## Visual Blueprints
+
+These diagrams are the fastest way to understand the product before reading setup guides.
+
+### Modes Overview
+
+Start here if you need the shortest explanation of the two operating modes.
+
+<a href="https://sinhaankur.github.io/WatchTower/" target="_blank" rel="noreferrer">
+  <img src="https://sinhaankur.github.io/WatchTower/assets/modes-overview.svg" alt="WatchTower modes overview showing Podman auto-update service and App Center control plane mode" />
+</a>
+
+### Deployment Process
+
+Use this to understand the App Center release path from app choice to healthy service.
+
+<a href="https://sinhaankur.github.io/WatchTower/viewer.html?doc=readme" target="_blank" rel="noreferrer">
+  <img src="https://sinhaankur.github.io/WatchTower/assets/deploy-process.svg" alt="WatchTower deployment process showing app selection, packaging, SSH transfer, remote activation, and health verification" />
+</a>
+
+### Mesh Topology
+
+Use this when you need to understand preview traffic, live traffic, and mesh routing decisions.
+
+<a href="https://sinhaankur.github.io/WatchTower/viewer.html?doc=mesh" target="_blank" rel="noreferrer">
+  <img src="https://sinhaankur.github.io/WatchTower/assets/mesh-topology.svg" alt="WatchTower mesh topology showing control plane, preview nodes, live nodes, and traffic layer" />
+</a>
+
+### Hybrid Stack
+
+Use this when your control plane stays local but data or services live remotely.
+
+<a href="https://sinhaankur.github.io/WatchTower/viewer.html?doc=hybrid" target="_blank" rel="noreferrer">
+  <img src="https://sinhaankur.github.io/WatchTower/assets/hybrid-stack.svg" alt="WatchTower hybrid stack overview showing local operator workspace, WatchTower API, managed services, app nodes, and data plane" />
+</a>
+
+### Application And Web App Surface
+
+Use this to see how dashboard-managed app records turn into a public URL that end users actually open.
+
+<a href="https://sinhaankur.github.io/WatchTower/" target="_blank" rel="noreferrer">
+  <img src="https://sinhaankur.github.io/WatchTower/assets/application-surface.svg" alt="WatchTower application and web app surface showing dashboard, artifact build, and public web app delivery" />
+</a>
+
+### Secure Terminal Command Flow
+
+Use this to understand how guided host operations stay useful without exposing a raw shell.
+
+<a href="https://sinhaankur.github.io/WatchTower/viewer.html?doc=readme" target="_blank" rel="noreferrer">
+  <img src="https://sinhaankur.github.io/WatchTower/assets/secure-terminal-flow.svg" alt="WatchTower secure terminal command flow showing Host Connect request, policy gate, execution path, encrypted audit, and operator result" />
+</a>
 
 ---
 
@@ -101,7 +197,7 @@ App Center mode is designed to feel simple like hosted deployment platforms:
 ### One-Command App Center Install (Linux)
 
 ```bash
-sudo ./install_app_center.sh
+sudo ./install/install_app_center.sh
 ```
 
 This installer:
@@ -121,8 +217,8 @@ curl http://<server-ip>:8000/health
 ### Windows Installation (App Center)
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\install_windows.ps1
-powershell -ExecutionPolicy Bypass -File .\run_app_center_windows.ps1
+powershell -ExecutionPolicy Bypass -File .\install\install_windows.ps1
+powershell -ExecutionPolicy Bypass -File .\install\run_app_center_windows.ps1
 ```
 
 Default paths:
@@ -139,8 +235,8 @@ curl http://127.0.0.1:8000/health
 ### macOS Installation (App Center)
 
 ```bash
-./install_macos.sh
-./run_app_center_macos.sh
+./install/install_macos.sh
+./install/run_app_center_macos.sh
 ```
 
 Default paths:
@@ -301,7 +397,7 @@ On Windows and macOS, platform installer/run scripts write and load these automa
 Deploy by app name:
 
 ```bash
-WATCHTOWER_BASE_URL=http://server:8000 WATCHTOWER_TOKEN=change-me ./deploy.sh --app website-main main
+WATCHTOWER_BASE_URL=http://server:8000 WATCHTOWER_TOKEN=change-me ./scripts/deploy.sh --app website-main main
 ```
 
 List registered apps:
@@ -313,7 +409,7 @@ curl -H "X-Watchtower-Token: change-me" http://server:8000/apps
 Trigger deployment from dev machine:
 
 ```bash
-WATCHTOWER_URL=http://server:8000/deploy WATCHTOWER_TOKEN=change-me ./deploy.sh main
+WATCHTOWER_URL=http://server:8000/deploy WATCHTOWER_TOKEN=change-me ./scripts/deploy.sh main
 ```
 
 One-off server deploy commands:

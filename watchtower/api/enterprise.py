@@ -29,6 +29,50 @@ router = APIRouter(prefix="/api", tags=["Enterprise"])
 logger = logging.getLogger(__name__)
 
 
+@router.get("/auth/status")
+async def auth_status():
+    """Return current auth mode and OAuth readiness for UI diagnostics."""
+    oauth_client_id = (
+        os.getenv("GITHUB_OAUTH_CLIENT_ID")
+        or os.getenv("GITHUB_CLIENT_ID")
+    )
+    oauth_client_secret = (
+        os.getenv("GITHUB_OAUTH_CLIENT_SECRET")
+        or os.getenv("GITHUB_CLIENT_SECRET")
+    )
+    api_token_set = bool(os.getenv("WATCHTOWER_API_TOKEN"))
+    insecure_dev_auth = (
+        os.getenv("WATCHTOWER_ALLOW_INSECURE_DEV_AUTH", "false").lower()
+        == "true"
+    )
+
+    missing = []
+    if not oauth_client_id:
+        missing.append("GITHUB_OAUTH_CLIENT_ID or GITHUB_CLIENT_ID")
+    if not oauth_client_secret:
+        missing.append(
+            "GITHUB_OAUTH_CLIENT_SECRET or GITHUB_CLIENT_SECRET"
+        )
+
+    return {
+        "oauth": {
+            "github_configured": bool(oauth_client_id and oauth_client_secret),
+            "missing": missing,
+        },
+        "api_token": {
+            "configured": api_token_set,
+        },
+        "dev_auth": {
+            "allow_insecure": insecure_dev_auth,
+        },
+        "recommended": (
+            "oauth"
+            if oauth_client_id and oauth_client_secret
+            else "api_token"
+        ),
+    }
+
+
 def _current_user_uuid(current_user: dict) -> UUID:
     return UUID(str(current_user["user_id"]))
 
@@ -79,11 +123,21 @@ def _ensure_user_org_member(db: Session, current_user: dict):
 
 
 def _oauth_state_secret() -> str:
-    return (
+    secret = (
         os.getenv("WATCHTOWER_OAUTH_STATE_SECRET")
         or os.getenv("WATCHTOWER_API_TOKEN")
-        or "watchtower-oauth-dev-secret"
     )
+    if not secret:
+        if os.getenv("WATCHTOWER_ALLOW_INSECURE_DEV_AUTH", "false").lower() == "true":
+            import secrets as _secrets
+            secret = _secrets.token_hex(32)
+            os.environ["WATCHTOWER_OAUTH_STATE_SECRET"] = secret
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="OAuth state signing key is not configured.",
+            )
+    return secret
 
 
 def _sign_oauth_state(payload: dict) -> str:

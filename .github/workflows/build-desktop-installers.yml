@@ -1,0 +1,73 @@
+name: Build Desktop Installers
+
+# Manual trigger only — tag-based release builds are handled by release.yml
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "desktop/**"
+      - "web/**"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            eb_args: --linux AppImage deb
+            artifact: watchtower-desktop-linux
+          - os: macos-latest
+            eb_args: --mac dmg zip
+            artifact: watchtower-desktop-macos
+          - os: windows-latest
+            eb_args: --win nsis zip
+            artifact: watchtower-desktop-windows
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # ── Build web frontend first ──────────────────────────────────────────
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install web dependencies
+        run: npm --prefix web install
+
+      - name: Build frontend (web/dist)
+        run: npm --prefix web run build
+
+      # ── Build desktop ─────────────────────────────────────────────────────
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Pillow
+        run: pip install Pillow
+
+      - name: Install desktop dependencies
+        run: npm --prefix desktop install
+
+      - name: Build installers (no publish)
+        run: npm --prefix desktop run dist -- ${{ matrix.eb_args }}
+
+      - name: Upload installer artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: desktop/dist/*
+          if-no-files-found: error

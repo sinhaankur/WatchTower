@@ -1,5 +1,6 @@
-name: Create GitHub Release
+name: Release
 
+# Triggered by a vX.Y.Z tag pushed via scripts/release.sh
 on:
   push:
     tags:
@@ -7,48 +8,115 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: write   # needed to create releases and upload assets
 
 jobs:
+  # ── 1. Python tests ──────────────────────────────────────────────────────────
   test:
+    name: Run tests
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
-      - name: Install test dependencies
+      - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -e .
-          python -m pip install -r requirements.txt
-          python -m pip install pytest
+          pip install -e .
+          pip install -r requirements.txt
+          pip install pytest
 
-      - name: Run tests
-        run: |
-          pytest -q
+      - name: Pytest
+        run: pytest -q
 
+  # ── 2. Create the GitHub Release ─────────────────────────────────────────────
   create-release:
+    name: Create GitHub Release
     needs: test
     runs-on: ubuntu-latest
+    outputs:
+      upload_url: ${{ steps.gh_release.outputs.upload_url }}
+      tag:        ${{ github.ref_name }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Validate tag matches package version
         run: |
           TAG="${GITHUB_REF_NAME#v}"
           PKG_VERSION=$(python -c "from watchtower import __version__; print(__version__)")
           if [ "$TAG" != "$PKG_VERSION" ]; then
-            echo "Tag version ($TAG) does not match package version ($PKG_VERSION)"
+            echo "ERROR: tag $TAG != package version $PKG_VERSION"
             exit 1
           fi
 
-      - name: Create GitHub Release
+      - name: Create release
+        id: gh_release
         uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
+          draft: false
+          prerelease: ${{ contains(github.ref_name, '-') }}
+
+  # ── 3. Build desktop installers (parallel matrix) ───────────────────────────
+  build-desktop:
+    name: Desktop — ${{ matrix.os }}
+    needs: create-release
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            eb_args: --linux AppImage deb
+            artifact_glob: "desktop/dist/*.AppImage desktop/dist/*.deb"
+          - os: macos-latest
+            eb_args: --mac dmg zip
+            artifact_glob: "desktop/dist/*.dmg desktop/dist/*.zip"
+          - os: windows-latest
+            eb_args: --win nsis zip
+            artifact_glob: "desktop/dist/*.exe desktop/dist/*.zip"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # ── Build the React frontend first (web/dist/) ──────────────────────────
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install web dependencies
+        run: npm --prefix web install
+
+      - name: Build frontend (web/dist)
+        run: npm --prefix web run build
+
+      # ── Build the Electron desktop app ─────────────────────────────────────
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Pillow (installer image generation)
+        run: pip install Pillow
+
+      - name: Install desktop dependencies
+        run: npm --prefix desktop install
+
+      - name: Build & publish installers
+        # --publish always: electron-builder uploads each artifact to the
+        # already-created GitHub Release for this tag.
+        run: npm --prefix desktop run dist -- ${{ matrix.eb_args }} --publish always
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Ensure electron-builder finds the pre-built frontend
+          WEB_DIST: ${{ github.workspace }}/web/dist
