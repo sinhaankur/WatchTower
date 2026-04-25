@@ -66,7 +66,23 @@ jobs:
       - run: npm ci
       - run: npm run compile
 
+      - name: Check published extension version
+        id: published-version
+        run: |
+          CURRENT_VERSION=$(node -p "require('./package.json').version")
+          PUBLISHED_VERSION=$(npx @vscode/vsce show sinhaankur.watchtower --json | node -e "let input=''; process.stdin.on('data', (chunk) => input += chunk); process.stdin.on('end', () => { try { const parsed = JSON.parse(input); const versions = Array.isArray(parsed.versions) ? parsed.versions : []; process.stdout.write(versions[0]?.version || ''); } catch { process.stdout.write(''); } });")
+          echo "current=$CURRENT_VERSION" >> "$GITHUB_OUTPUT"
+          echo "published=$PUBLISHED_VERSION" >> "$GITHUB_OUTPUT"
+          if [ "$CURRENT_VERSION" = "$PUBLISHED_VERSION" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "Extension version $CURRENT_VERSION is already published; skipping marketplace publish."
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+            echo "Publishing extension version $CURRENT_VERSION (latest marketplace version: ${PUBLISHED_VERSION:-none})."
+          fi
+
       - name: Publish to Marketplace
+        if: steps.published-version.outputs.skip != 'true'
         run: npx vsce publish --no-dependencies
         env:
           VSCE_PAT: ${{ secrets.VSCE_PAT }}

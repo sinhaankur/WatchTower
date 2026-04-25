@@ -11,6 +11,7 @@ ROOT = Path(__file__).resolve().parent.parent
 INIT_FILE = ROOT / "watchtower" / "__init__.py"
 ROOT_PACKAGE = ROOT / "package.json"
 DESKTOP_PACKAGE = ROOT / "desktop" / "package.json"
+VSCODE_EXTENSION_PACKAGE = ROOT / "vscode-extension" / "package.json"
 
 
 def read_python_version() -> str:
@@ -33,6 +34,7 @@ def main() -> None:
     version = read_python_version()
     update_package_json(ROOT_PACKAGE, version)
     update_package_json(DESKTOP_PACKAGE, version)
+    update_package_json(VSCODE_EXTENSION_PACKAGE, version)
     print(f"Version sync complete: {version}")
 
 
