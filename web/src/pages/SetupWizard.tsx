@@ -120,6 +120,7 @@ const SetupWizard = () => {
     if (!ghPickerOpen || !selectedGHOrg) return;
     const fetchRepos = async () => {
       setGhPickerLoading(true);
+      setGhPickerError('');
       try {
         // Determine if we're fetching user repos or org repos
         const isUser = ghOrgs.find(o => o.login === selectedGHOrg)?.type === 'user';
@@ -127,8 +128,9 @@ const SetupWizard = () => {
         if (!isUser) params['org'] = selectedGHOrg;
         const res = await apiClient.get('/github/user/repos', { params });
         setGhRepos(res.data as GHRepo[]);
-      } catch {
+      } catch (e: any) {
         setGhRepos([]);
+        setGhPickerError(e?.response?.data?.detail || 'Could not load repositories for this account.');
       } finally {
         setGhPickerLoading(false);
       }
@@ -142,13 +144,41 @@ const SetupWizard = () => {
       navigate('/login?next=/setup');
       return;
     }
+
+    // Re-check active GitHub connection on demand (state can be stale after OAuth return).
+    try {
+      const orgsResp = await apiClient.get('/github/user/orgs');
+      const orgs = orgsResp.data as GHOrg[];
+      if (orgs.length > 0) {
+        setGhConnected(true);
+        setGhOrgs(orgs);
+        if (!selectedGHOrg) setSelectedGHOrg(orgs[0].login);
+        setGhPickerOpen(true);
+        setGhPickerError('');
+        return;
+      }
+    } catch {
+      // Fall through to OAuth connect path.
+      setGhConnected(false);
+    }
+
     if (!ghConnected) {
       // Need to connect GitHub with repo scope
-      if (!orgId) { setGhPickerError('Organization context not loaded. Refresh and try again.'); return; }
+      let effectiveOrgId = orgId;
+      if (!effectiveOrgId) {
+        try {
+          const ctxRes = await apiClient.get('/context');
+          effectiveOrgId = (ctxRes.data as any)?.organization?.id || null;
+          setOrgId(effectiveOrgId);
+        } catch {
+          effectiveOrgId = null;
+        }
+      }
+      if (!effectiveOrgId) { setGhPickerError('Organization context not loaded. Refresh and try again.'); return; }
       try {
         const redirectUri = `${window.location.origin}/oauth/github/callback`;
         const res = await apiClient.get('/github/oauth/start', {
-          params: { org_id: orgId, redirect_uri: redirectUri, next_path: '/setup?github_picker=1' },
+          params: { org_id: effectiveOrgId, redirect_uri: redirectUri, next_path: '/setup?github_picker=1' },
         });
         const url = (res.data as any)?.authorize_url;
         if (url) { window.location.href = url; }
@@ -158,6 +188,7 @@ const SetupWizard = () => {
       return;
     }
     setGhPickerOpen(true);
+    setGhPickerError('');
   };
 
   const selectRepo = (repo: GHRepo) => {
