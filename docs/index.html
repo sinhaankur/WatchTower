@@ -1092,6 +1092,7 @@
 
       <nav class="sidebar-nav" aria-label="Documentation sections">
         <a class="nav-link active" href="#overview"><span class="nav-dot"></span>Overview</a>
+        <a class="nav-link" href="#devops"><span class="nav-dot"></span>DevOps Use Cases</a>
         <a class="nav-link" href="#dashboard"><span class="nav-dot"></span>Dashboard</a>
         <a class="nav-link" href="#applications"><span class="nav-dot"></span>Applications</a>
         <a class="nav-link" href="#servers"><span class="nav-dot"></span>Servers</a>
@@ -1105,8 +1106,8 @@
       </nav>
 
       <div class="sidebar-footer">
-        <div>These docs mirror the app sidebar — if you can navigate the app, you already know this page.</div>
-        <div style="margin-top: 10px;"><a href="https://github.com/sinhaankur/WatchTower" target="_blank" rel="noopener">GitHub</a> · <a href="./viewer.html?doc=mesh">Mesh Runbook</a> · <a href="./viewer.html?doc=ha">HA Guide</a></div>
+        <div>DevOps control plane for self-hosted infrastructure. No vendor lock-in.</div>
+        <div style="margin-top: 10px;"><a href="https://github.com/sinhaankur/WatchTower" target="_blank" rel="noopener">GitHub</a> · <a href="./viewer.html?doc=vercel_alternative">vs Vercel</a> · <a href="./viewer.html?doc=mesh">Mesh</a> · <a href="./viewer.html?doc=ha">HA</a></div>
       </div>
     </aside>
 
@@ -1114,71 +1115,73 @@
       <header class="topbar">
         <div>
           <h1>WatchTower Documentation</h1>
-          <p>Self-hosted deployment control plane — ship apps to your own nodes, manage hosts, and monitor services.</p>
+          <p>Self-hosted deployment control plane for DevOps teams — eliminate Vercel/PaaS lock-in and own your infrastructure.</p>
         </div>
-        <div class="status-pill">GitHub Pages Live</div>
+        <div class="status-pill">v1.2.2 Production Ready</div>
       </header>
 
       <div class="content">
         <section class="panel hero" id="overview">
-          <p class="eyebrow">WatchTower · Open Source</p>
-          <h2>Deploy and manage apps across your own servers — no third-party cloud required.</h2>
+          <p class="eyebrow">WatchTower · Open Source DevOps Control Plane</p>
+          <h2>Ship apps to your servers. Own your infrastructure. Cut deployment costs by 60–80%.</h2>
           <p>
-            WatchTower is an operator-facing control plane. Register apps, connect SSH nodes, set up databases,
-            and ship releases — all from one dashboard that works as a desktop app, a browser tab, or a headless service.
+            WatchTower replaces Vercel, Netlify, and platform-as-a-service solutions by putting deployment control in DevOps hands. 
+            Register apps in one place, deploy to your own nodes via SSH, monitor containers in real time, and manage everything 
+            from a unified dashboard — without handing control to a vendor or paying $50+ per app.
           </p>
           <div class="chip-row">
-            <span class="chip">Multi-node SSH deploys</span>
-            <span class="chip">Podman / Docker runtimes</span>
-            <span class="chip">GitHub OAuth + API token auth</span>
-            <span class="chip">Desktop app — Linux · macOS · Windows</span>
-            <span class="chip">Host Connect: Tailscale, Cloudflare, Nginx</span>
+            <span class="chip">Multi-node SSH deployments (HA + failover)</span>
+            <span class="chip">Podman + Docker runtimes (rootless by default)</span>
+            <span class="chip">Integration stack (Nginx, Tailscale, Cloudflare, Coolify)</span>
+            <span class="chip">Auto-restart watchdog (survives reboots)</span>
+            <span class="chip">Desktop app + Browser + Headless API</span>
+            <span class="chip">Cost: ~$5–20/month vs $60+ on Vercel</span>
           </div>
           <div class="actions">
-            <a class="primary-button" href="https://github.com/sinhaankur/WatchTower/releases/latest" target="_blank" rel="noopener">⬇ Download Desktop App</a>
-            <a class="secondary-button" href="https://github.com/sinhaankur/WatchTower" target="_blank" rel="noopener">View on GitHub</a>
-            <a class="secondary-button" href="./viewer.html?doc=readme">README</a>
+            <a class="primary-button" href="https://github.com/sinhaankur/WatchTower/releases/latest" target="_blank" rel="noopener">⬇ Download v1.2.2</a>
+            <a class="secondary-button" href="https://github.com/sinhaankur/WatchTower" target="_blank" rel="noopener">Star on GitHub</a>
+            <a class="secondary-button" href="./viewer.html?doc=vercel_alternative">Why WatchTower (vs Vercel)</a>
           </div>
         </section>
 
         <section class="stats" id="modes">
           <article class="stat-card panel">
-            <p class="label">App Screens</p>
-            <p class="value">8 Pages</p>
-            <p class="meta">Dashboard, Applications, Servers, Databases, Services, Host Connect, Team, Settings.</p>
+            <p class="label">Deployment Model</p>
+            <p class="value">Vercel Alternative</p>
+            <p class="meta">Self-hosted, multi-node, 60–80% cost savings. Preview slots, blue-green deploys, auto-rollback on health checks.</p>
           </article>
           <article class="stat-card panel">
-            <p class="label">Auth Options</p>
-            <p class="value">GitHub OAuth / Token</p>
-            <p class="meta">Sign in with GitHub for org/team access, or use a static API token for solo and automated use.</p>
+            <p class="label">CI/CD Integration</p>
+            <p class="value">GitHub webhooks + API</p>
+            <p class="meta">Push to main → GitHub → WatchTower API → Auto-build → Auto-deploy. Or use the CLI for manual control.</p>
           </article>
           <article class="stat-card panel">
-            <p class="label">Runtimes</p>
-            <p class="value">Podman + Docker</p>
-            <p class="meta">Rootless Podman as the native runtime; Docker-compatible for existing stacks.</p>
+            <p class="label">Infrastructure Stack</p>
+            <p class="value">6-tool integration</p>
+            <p class="meta">Podman → Nginx → Tailscale → Cloudflare → Coolify → WatchTower Watchdog. All on your servers.</p>
           </article>
           <article class="stat-card panel">
-            <p class="label">Desktop App</p>
-            <p class="value">Electron · All OS</p>
-            <p class="meta">Runs as a system tray app on Linux, macOS, and Windows. Backend + UI in one process.</p>
+            <p class="label">High Availability</p>
+            <p class="value">HA + Mesh Topology</p>
+            <p class="meta">Primary + standby nodes. Auto-restart on reboot (watchdog). Encrypted inter-node comms (Tailscale). Zero downtime deploys.</p>
           </article>
         </section>
 
-        <section class="explain-grid" aria-label="What WatchTower does">
+        <section class="explain-grid" aria-label="DevOps workflow">
           <article class="explain-card panel">
-            <p class="eyeline">Register</p>
-            <h3>Add apps and target nodes</h3>
-            <p>Create an app record, point it at a GitHub repo or local folder, then assign one or more SSH nodes as deploy targets.</p>
+            <p class="eyeline">Self-Hosted</p>
+            <h3>Own your infrastructure entirely</h3>
+            <p>Deploy to your own Linux nodes via SSH. No vendor lock-in, no surprise bills. Control where data lives. Use your existing Podman/Docker stack.</p>
           </article>
           <article class="explain-card panel">
-            <p class="eyeline">Deploy</p>
-            <h3>Trigger a release from the dashboard</h3>
-            <p>Click Deploy in Applications, pick a branch, and WatchTower packages and rolls the release to your nodes over SSH.</p>
+            <p class="eyeline">Autonomous</p>
+            <h3>Containers survive reboots</h3>
+            <p>WatchTower Watchdog automatically restarts all containers after server reboots or crashes. No manual intervention. Perfect for production.</p>
           </article>
           <article class="explain-card panel">
-            <p class="eyeline">Monitor</p>
-            <h3>Inspect state in real time</h3>
-            <p>Dashboard shows container health, running services, recent deploys, and runtime status — no external monitoring tool needed.</p>
+            <p class="eyeline">Observable</p>
+            <h3>Single pane of glass</h3>
+            <p>Live deployment status, container health, node connectivity, and runtime integrations (Podman, Nginx, Tailscale, Cloudflare) all in one dashboard.</p>
           </article>
         </section>
 
@@ -1202,6 +1205,113 @@
               <p>Set up GitHub OAuth under Settings, then manage org/team membership from the Team page to grant access.</p>
             </article>
           </div>
+        </section>
+
+        <section class="panel section-card" id="devops">
+          <h3>🚀 DevOps Use Cases & Benefits</h3>
+          <p class="lead">How DevOps teams use WatchTower to eliminate vendor lock-in, reduce costs, and own their infrastructure.</p>
+          <div class="subpanel">
+            <h4>📊 Cost Reduction</h4>
+            <ul class="list">
+              <li><strong>Vercel:</strong> $20–60/month per app + databases. Multiple apps = $500–2000/year.</li>
+              <li><strong>WatchTower:</strong> ~$5–20/month for your entire infrastructure. One Linux server handles unlimited apps. <strong>Saves $480–1900/year per team.</strong></li>
+              <li><strong>Formula:</strong> Your infrastructure cost (VPS + networking) vs PaaS subscription. Pays for itself after 1–2 months.</li>
+            </ul>
+          </div>
+          <div class="subpanel">
+            <h4>🔒 Infrastructure Ownership</h4>
+            <ul class="list">
+              <li><strong>No Vendor Lock-In:</strong> Apps run in Podman/Docker on <em>your</em> servers. If WatchTower disappears, your apps keep running.</li>
+              <li><strong>Data Residency Control:</strong> Ideal for healthcare, finance, or regulated industries. Data never leaves your infrastructure.</li>
+              <li><strong>Custom Integration Stack:</strong> Combine Podman + Nginx + Tailscale + Cloudflare + Coolify + WatchTower exactly as you need it.</li>
+            </ul>
+          </div>
+          <div class="subpanel">
+            <h4>⚡ Production Reliability</h4>
+            <ul class="list">
+              <li><strong>Auto-Restart Watchdog:</strong> Containers auto-recover after PC/server reboot — no manual intervention. Perfect for unattended deployments.</li>
+              <li><strong>HA Setup:</strong> Primary + standby nodes with automatic failover. Zero-downtime blue-green deploys.</li>
+              <li><strong>Multi-Node Deployments:</strong> Push one button, deploy to 3 regions simultaneously. All from one dashboard.</li>
+              <li><strong>Health Checks:</strong> Auto-rollback if health check fails. No bad deployments go live.</li>
+            </ul>
+          </div>
+          <div class="subpanel">
+            <h4>🛠️ For DevOps Teams</h4>
+            <ul class="list">
+              <li><strong>CI/CD Ready:</strong> GitHub webhook integration. Push to main → auto-build → auto-deploy. Or trigger manually via API.</li>
+              <li><strong>Team Collaboration:</strong> GitHub OAuth login. Multi-user dashboard. Deployment audit trail.</li>
+              <li><strong>Integrations Page:</strong> Single pane of glass for Docker, Podman, Tailscale, Cloudflare, Nginx, Coolify status.</li>
+              <li><strong>No Learning Curve:</strong> If you know SSH, Git, and Podman, you already know WatchTower. Same concepts, unified UI.</li>
+            </ul>
+          </div>
+          <div class="subpanel">
+            <h4>🌍 Multi-Region & Hybrid Cloud</h4>
+            <ul class="list">
+              <li><strong>Deploy anywhere:</strong> AWS EC2, Digital Ocean, Hetzner, your own data center, or a mix of all three.</li>
+              <li><strong>Tailscale mesh:</strong> All nodes communicate securely without public IPs. Encrypted, no firewall drama.</li>
+              <li><strong>Cloudflare tunnel:</strong> Expose apps to the internet with DDoS protection. Keep nodes private.</li>
+              <li><strong>Database flexibility:</strong> PostgreSQL in Podman, RDS on AWS, or managed services — all managed from one place.</li>
+            </ul>
+          </div>
+        </section>
+
+        <section class="panel section-card">
+          <h3>Vercel vs WatchTower — Quick Comparison</h3>
+          <p class="lead">Cost savings and feature parity at a glance. See the full comparison in <a href="./viewer.html?doc=vercel_alternative">VERCEL_ALTERNATIVE.md</a>.</p>
+          <div style="overflow-x: auto;">
+            <table style="width: 100%; border-collapse: collapse; margin-top: 14px;">
+              <thead>
+                <tr style="background: #f1f5f9; border-bottom: 2px solid #d7e0ec;">
+                  <th style="text-align: left; padding: 12px; color: #0f172a; font-weight: 600;">Feature</th>
+                  <th style="text-align: center; padding: 12px; color: #0f172a; font-weight: 600;">Vercel</th>
+                  <th style="text-align: center; padding: 12px; color: #0f172a; font-weight: 600;">WatchTower</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr style="border-bottom: 1px solid #e5e7eb;">
+                  <td style="padding: 12px;"><strong>Cost (3 apps)</strong></td>
+                  <td style="padding: 12px; text-align: center;">$60–150/month</td>
+                  <td style="padding: 12px; text-align: center; color: #047857;"><strong>$5–20/month</strong></td>
+                </tr>
+                <tr style="border-bottom: 1px solid #e5e7eb;">
+                  <td style="padding: 12px;"><strong>Infrastructure</strong></td>
+                  <td style="padding: 12px; text-align: center;">Vercel-managed (no control)</td>
+                  <td style="padding: 12px; text-align: center;">Your servers (complete control)</td>
+                </tr>
+                <tr style="border-bottom: 1px solid #e5e7eb;">
+                  <td style="padding: 12px;"><strong>Multi-node deploys</strong></td>
+                  <td style="padding: 12px; text-align: center;">Enterprise plan only</td>
+                  <td style="padding: 12px; text-align: center; color: #047857;"><strong>Built-in from day 1</strong></td>
+                </tr>
+                <tr style="border-bottom: 1px solid #e5e7eb;">
+                  <td style="padding: 12px;"><strong>HA + auto-failover</strong></td>
+                  <td style="padding: 12px; text-align: center;">Enterprise only</td>
+                  <td style="padding: 12px; text-align: center; color: #047857;"><strong>Free, included</strong></td>
+                </tr>
+                <tr style="border-bottom: 1px solid #e5e7eb;">
+                  <td style="padding: 12px;"><strong>Auto-restart on reboot</strong></td>
+                  <td style="padding: 12px; text-align: center;">N/A (FaaS model)</td>
+                  <td style="padding: 12px; text-align: center; color: #047857;"><strong>Watchdog service</strong></td>
+                </tr>
+                <tr style="border-bottom: 1px solid #e5e7eb;">
+                  <td style="padding: 12px;"><strong>Data residency</strong></td>
+                  <td style="padding: 12px; text-align: center;">Vercel's regions</td>
+                  <td style="padding: 12px; text-align: center; color: #047857;"><strong>Your choice</strong></td>
+                </tr>
+                <tr style="border-bottom: 1px solid #e5e7eb;">
+                  <td style="padding: 12px;"><strong>Vendor lock-in risk</strong></td>
+                  <td style="padding: 12px; text-align: center;">High (proprietary)</td>
+                  <td style="padding: 12px; text-align: center; color: #047857;"><strong>None (open source)</strong></td>
+                </tr>
+                <tr>
+                  <td style="padding: 12px;"><strong>Integration stack</strong></td>
+                  <td style="padding: 12px; text-align: center;">Limited</td>
+                  <td style="padding: 12px; text-align: center; color: #047857;"><strong>6-tool suite included</strong></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p style="margin-top: 16px; font-size: 0.9rem; color: #64748b;"><em>Note: Costs based on single Linux VPS (~$5/month) + WatchTower (free) vs Vercel's published pricing. Actual savings depend on your app count and scale.</em></p>
         </section>
 
         <section class="panel blueprint-section" id="dashboard">
