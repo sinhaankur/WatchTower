@@ -1,7 +1,13 @@
 # WatchTower - App Center and Podman Management
 
+![Wt Logo](assets/wt-logo.svg)
+
+Branding note:
+- The application mark is `Wt` (retro-style yellow tile with dark border) and should be reused across UI, docs, and container artifacts.
+
 Project site (GitHub Pages):
 - https://sinhaankur.github.io/WatchTower/
+- Docs hub includes feature provenance and references to upstream projects used by this repo (for example tailscale/tailscale and containrrr/watchtower).
 
 WatchTower can run as:
 - A Podman auto-update service for containers
@@ -111,6 +117,59 @@ Stop everything:
 ./scripts/dev-down.sh
 ```
 
+### One-Command Integration Bootstrap
+
+Run a single script to:
+- validate GitHub OAuth env vars,
+- install or verify Podman, Docker, and Tailscale,
+- start WatchTower background updater,
+- run final health checks with pass/fail summary.
+
+```bash
+./scripts/bootstrap-watchtower-integrations.sh
+```
+
+Safe verification mode (no installs, no background start):
+
+```bash
+./scripts/bootstrap-watchtower-integrations.sh --no-install --skip-background
+```
+
+### Runtime Operations (Podman + WatchTower)
+
+The Dashboard now includes a **Runtime Operations** card that shows:
+- Podman availability and running container count
+- WatchTower service state
+- WatchTower background updater state + recent logs
+
+From the UI, you can run:
+- **Refresh Runtime**
+- **Start Background WatchTower**
+- **Stop Background WatchTower**
+- **Run Update Check Now**
+
+These actions are backed by API endpoints under `/api/runtime/*`.
+
+### Run WatchTower In Background (CLI)
+
+If you want the updater loop to continue without keeping the UI open:
+
+```bash
+python -m watchtower start
+```
+
+For one manual update pass:
+
+```bash
+python -m watchtower update-now
+```
+
+For status:
+
+```bash
+python -m watchtower status
+```
+
 Notes:
 - The script auto-creates `.venv` and installs backend dependencies from `requirements-new.txt`.
 - It auto-installs frontend dependencies in `web/` if `node_modules` is missing.
@@ -182,6 +241,28 @@ export WATCHTOWER_ALLOW_INSECURE_DEV_AUTH=true
 ```
 
 This should never be enabled in production.
+
+### Secure Terminal Command Runner (Host Connect)
+
+WatchTower includes a **Secure Terminal Command Runner** in Host Connect for
+operations commands. It is intentionally locked down:
+
+- Only allow-listed commands are executable (no arbitrary shell).
+- `sudo` is controlled per-command (optional/required/forbidden).
+- Every execution is encrypted in an audit log.
+
+To enable command execution, set an audit encryption key:
+
+```bash
+export WATCHTOWER_TERMINAL_AUDIT_KEY="$(python3 - <<'PY'
+from cryptography.fernet import Fernet
+print(Fernet.generate_key().decode())
+PY
+)"
+```
+
+Then restart the API service. If this key is missing, terminal execution is
+disabled by design.
 
 ### Desktop Pinning and Application Listing
 
@@ -328,6 +409,8 @@ Notes:
 - Prefer Podman secrets over plain env vars for connection strings.
 - The deploy workflow at `.github/workflows/deploy.yml` is the `WatchTower Deployer` pipeline and pushes both `latest` and SHA tags to `ghcr.io/<owner>/<repo>` on every push to `main`.
 - The node-side default Watchtower poll interval for hybrid mode is 30 seconds.
+- Upstream reference: image update and restart behavior comes from `containrrr/watchtower`.
+  See: https://github.com/containrrr/watchtower
 
 ### WatchTower Mesh (Vercel-On-Podman)
 
@@ -354,6 +437,8 @@ Notes:
 - The mesh defaults to a 15-second Watchtower poll interval for fast sync.
 - Zero-downtime promotion is handled by the blue-green deploy script, because Watchtower alone is not a health-gated blue-green rollout engine.
 - Non-main branches can publish preview images through `.github/workflows/preview-image.yml`.
+- Upstream reference: for all container auto-update flags and behavior, refer to `containrrr/watchtower` docs.
+  See: https://github.com/containrrr/watchtower
 
 ### Release Safety (Tests First)
 
@@ -424,6 +509,53 @@ If Pages has never been enabled on this repository:
 1. Open repository settings -> Pages
 2. Under Build and deployment, select Source: `GitHub Actions`
 3. Run the `Deploy Docs Site` workflow once (or push docs changes)
+
+### Unified Direct Installer Entry Points
+
+For a one-file installer flow similar to Podman/Tailscale:
+
+- Linux and macOS: `./install_watchtower.sh`
+- Windows: `install_watchtower_windows.cmd`
+
+Examples:
+
+```bash
+# Linux/macOS (recommended)
+./install_watchtower.sh
+
+# Linux legacy mode (older install.sh flow)
+./install_watchtower.sh --mode legacy
+```
+
+```powershell
+.\install_watchtower_windows.cmd
+```
+
+### Native Desktop Installer Artifacts (.dmg, .AppImage/.deb, .exe)
+
+This repo now includes a cross-platform build workflow:
+
+- Workflow file: `.github/workflows/build-desktop-installers.yml`
+- Trigger: manual (`workflow_dispatch`) or tag push (`v*`)
+
+What it builds:
+
+- macOS: `.dmg`, `.zip`
+- Linux: `.AppImage`, `.deb`
+- Windows: `.exe` (NSIS), `.zip`
+
+Run from GitHub Actions:
+
+1. Open Actions -> `Build Desktop Installers`
+2. Click `Run workflow`
+3. Download artifacts from the completed run
+
+Desktop icon assets are generated from `assets/wt-logo.svg`:
+
+```bash
+cd desktop
+npm run icons
+```
 
 ### One-Command App Center Install (Linux)
 

@@ -1,0 +1,1138 @@
+"""Runtime endpoints for Podman and WatchTower operations."""
+
+from __future__ import annotations
+
+import json
+import os
+import signal
+import shlex
+import subprocess
+import sys
+import time
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
+
+from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel, Field
+
+from watchtower.api import util
+
+router = APIRouter(prefix="/api/runtime", tags=["Runtime"])
+
+ROOT_DIR = Path(__file__).resolve().parents[2]
+DEV_DIR = ROOT_DIR / ".dev"
+PID_FILE = DEV_DIR / "watchtower-service.pid"
+LOG_FILE = DEV_DIR / "watchtower-service.log"
+TERMINAL_AUDIT_FILE = DEV_DIR / "terminal-audit.log.enc"
+TERMINAL_MAX_OUTPUT = 12000
+TERMINAL_MAX_ARGS = 20
+TERMINAL_MAX_ARG_LENGTH = 300
+
+try:
+    from cryptography.fernet import Fernet
+except Exception:  # pragma: no cover - optional import in some envs
+    Fernet = None  # type: ignore[assignment]
+
+
+TERMINAL_ALLOWED_COMMANDS = {
+    "docker": {"allow_sudo": True, "must_sudo": False},
+    "podman": {"allow_sudo": True, "must_sudo": False},
+    "systemctl": {"allow_sudo": True, "must_sudo": True},
+    "journalctl": {"allow_sudo": True, "must_sudo": False},
+    "tailscale": {"allow_sudo": True, "must_sudo": False},
+    "cloudflared": {"allow_sudo": True, "must_sudo": False},
+    "nginx": {"allow_sudo": True, "must_sudo": True},
+    "ls": {"allow_sudo": False, "must_sudo": False},
+    "pwd": {"allow_sudo": False, "must_sudo": False},
+    "whoami": {"allow_sudo": False, "must_sudo": False},
+    "id": {"allow_sudo": False, "must_sudo": False},
+    "uname": {"allow_sudo": False, "must_sudo": False},
+    "df": {"allow_sudo": False, "must_sudo": False},
+    "free": {"allow_sudo": False, "must_sudo": False},
+    "uptime": {"allow_sudo": False, "must_sudo": False},
+}
+
+
+class DomainConnectRequest(BaseModel):
+    domain: str = Field(min_length=3)
+    subdomain: str = Field(default="app")
+    target_host: str = Field(
+        default="localhost:3000",
+        description="Local service endpoint exposed by cloudflared",
+    )
+
+
+class DatabasePlanRequest(BaseModel):
+    provider: str = Field(
+        description=(
+            "mongodb_atlas | aws_rds_postgres | oracle_freedb | supabase"
+        )
+    )
+    app_name: str = Field(default="watchtower-app")
+    db_name: str = Field(default="appdb")
+    username: str = Field(default="appuser")
+    region: str = Field(default="us-east-1")
+
+
+class NginxConfigRequest(BaseModel):
+    server_name: str = Field(default="app.example.com")
+    upstream_host: str = Field(default="127.0.0.1:3000")
+
+
+class VSCodeOpenRequest(BaseModel):
+    path: str = Field(min_length=1, description="Absolute path to open in VS Code")
+
+
+class TerminalCommandRequest(BaseModel):
+    command: str = Field(min_length=1, max_length=1200)
+    require_sudo: bool = Field(default=False)
+    timeout_seconds: int = Field(default=20, ge=1, le=120)
+
+
+def _get_terminal_audit_fernet() -> Fernet:
+    key = os.getenv("WATCHTOWER_TERMINAL_AUDIT_KEY", "").strip()
+    if not key:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=(
+                "Terminal execution is disabled until WATCHTOWER_TERMINAL_AUDIT_KEY "
+                "is configured for encrypted audit logging."
+            ),
+        )
+    if Fernet is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=(
+                "Terminal execution requires the 'cryptography' package for "
+                "encrypted audit logging."
+            ),
+        )
+    try:
+        return Fernet(key.encode("utf-8"))
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=(
+                "WATCHTOWER_TERMINAL_AUDIT_KEY is invalid. Expected a valid "
+                "Fernet key (44-char URL-safe base64)."
+            ),
+        ) from exc
+
+
+def _truncate_terminal_output(text: str) -> str:
+    if len(text) <= TERMINAL_MAX_OUTPUT:
+        return text
+    suffix = "\n...[output truncated for safety]"
+    return text[: TERMINAL_MAX_OUTPUT - len(suffix)] + suffix
+
+
+def _redact_sensitive_tokens(args: list[str]) -> list[str]:
+    redact_next = False
+    redacted: list[str] = []
+    sensitive_flags = {
+        "--password",
+        "--token",
+        "--secret",
+        "-p",
+    }
+    for value in args:
+        if redact_next:
+            redacted.append("***")
+            redact_next = False
+            continue
+        if value in sensitive_flags:
+            redacted.append(value)
+            redact_next = True
+            continue
+        if "password=" in value.lower() or "token=" in value.lower():
+            redacted.append("***")
+            continue
+        redacted.append(value)
+    return redacted
+
+
+def _append_encrypted_terminal_audit(
+    fernet: Fernet,
+    *,
+    user_id: str,
+    command: str,
+    args: list[str],
+    require_sudo: bool,
+    exit_code: int,
+    success: bool,
+) -> None:
+    DEV_DIR.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "user_id": user_id,
+        "command": command,
+        "args": _redact_sensitive_tokens(args),
+        "require_sudo": require_sudo,
+        "exit_code": exit_code,
+        "success": success,
+    }
+    encrypted = fernet.encrypt(
+        json.dumps(payload, separators=(",", ":")).encode("utf-8")
+    )
+    with TERMINAL_AUDIT_FILE.open("ab") as f:
+        f.write(encrypted + b"\n")
+
+
+def _execute_terminal_command(
+    payload: TerminalCommandRequest,
+    *,
+    user_id: str,
+) -> dict[str, Any]:
+    fernet = _get_terminal_audit_fernet()
+
+    try:
+        parts = shlex.split(payload.command.strip(), posix=True)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid command syntax.",
+        ) from exc
+
+    if not parts:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Command cannot be empty.",
+        )
+
+    command_name = parts[0]
+    args = parts[1:]
+    policy = TERMINAL_ALLOWED_COMMANDS.get(command_name)
+    if not policy:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=(
+                "Command is not allowed. Only approved operations commands "
+                "are permitted."
+            ),
+        )
+
+    if len(args) > TERMINAL_MAX_ARGS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Too many arguments. Maximum is {TERMINAL_MAX_ARGS}.",
+        )
+
+    if any(len(a) > TERMINAL_MAX_ARG_LENGTH for a in args):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "One or more arguments are too long. "
+                f"Maximum argument length is {TERMINAL_MAX_ARG_LENGTH}."
+            ),
+        )
+
+    if payload.require_sudo and not policy["allow_sudo"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Sudo is not permitted for this command.",
+        )
+
+    if policy["must_sudo"] and not payload.require_sudo:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="This command must be run with sudo.",
+        )
+
+    final_cmd = [command_name, *args]
+    if payload.require_sudo:
+        final_cmd = ["sudo", "-n", *final_cmd]
+
+    try:
+        result = subprocess.run(
+            final_cmd,
+            capture_output=True,
+            text=True,
+            timeout=payload.timeout_seconds,
+            cwd=str(ROOT_DIR),
+            check=False,
+        )
+        stdout = _truncate_terminal_output(result.stdout.strip())
+        stderr = _truncate_terminal_output(result.stderr.strip())
+        success = result.returncode == 0
+        _append_encrypted_terminal_audit(
+            fernet,
+            user_id=user_id,
+            command=command_name,
+            args=args,
+            require_sudo=payload.require_sudo,
+            exit_code=result.returncode,
+            success=success,
+        )
+        return {
+            "ok": success,
+            "command": command_name,
+            "args": _redact_sensitive_tokens(args),
+            "require_sudo": payload.require_sudo,
+            "exit_code": result.returncode,
+            "stdout": stdout,
+            "stderr": stderr,
+        }
+    except subprocess.TimeoutExpired as exc:
+        _append_encrypted_terminal_audit(
+            fernet,
+            user_id=user_id,
+            command=command_name,
+            args=args,
+            require_sudo=payload.require_sudo,
+            exit_code=124,
+            success=False,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_408_REQUEST_TIMEOUT,
+            detail="Command timed out.",
+        ) from exc
+    except FileNotFoundError as exc:
+        _append_encrypted_terminal_audit(
+            fernet,
+            user_id=user_id,
+            command=command_name,
+            args=args,
+            require_sudo=payload.require_sudo,
+            exit_code=127,
+            success=False,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Command not found: {command_name}",
+        ) from exc
+
+
+def _command_exists(command: str) -> bool:
+    ok, _, _, _ = _run_cmd(["which", command], timeout=3)
+    return ok
+
+
+def _tool_status(command: str, version_args: list[str]) -> dict[str, Any]:
+    if not _command_exists(command):
+        return {"installed": False, "version": None}
+    _, out, err, _ = _run_cmd([command, *version_args], timeout=5)
+    return {
+        "installed": True,
+        "version": out or err or "unknown",
+    }
+
+
+def _docker_status() -> dict[str, Any]:
+    meta = _tool_status("docker", ["--version"])
+    if not meta["installed"]:
+        return {
+            **meta,
+            "daemon_available": False,
+            "running_containers": 0,
+            "sample_containers": [],
+        }
+
+    info_ok, _, _, _ = _run_cmd(["docker", "info"], timeout=8)
+    ps_ok, ps_out, _, _ = _run_cmd(
+        ["docker", "ps", "--format", "json"],
+        timeout=10,
+    )
+    sample_containers: list[dict[str, str]] = []
+
+    if ps_ok and ps_out:
+        # docker ps --format json may return:
+        #   - one JSON array per invocation (newer Docker / Podman),  or
+        #   - one JSON object per line (older Docker)
+        raw = ps_out.strip()
+        rows: list[Any] = []
+        try:
+            parsed = json.loads(raw)
+            if isinstance(parsed, list):
+                rows = parsed          # whole-array format
+            else:
+                rows = [parsed]        # shouldn't happen but handle it
+        except json.JSONDecodeError:
+            # Fall back to line-by-line
+            for line in raw.splitlines():
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    obj = json.loads(line)
+                    if isinstance(obj, dict):
+                        rows.append(obj)
+                    elif isinstance(obj, list):
+                        rows.extend(obj)
+                except json.JSONDecodeError:
+                    continue
+
+        for row in rows[:5]:
+            if not isinstance(row, dict):
+                continue
+            names = row.get("Names", row.get("Name", "unknown"))
+            if isinstance(names, list):
+                names = names[0] if names else "unknown"
+            sample_containers.append(
+                {
+                    "name": str(names),
+                    "image": row.get("Image", "unknown"),
+                    "state": row.get("State", row.get("Status", "unknown")),
+                }
+            )
+
+    return {
+        **meta,
+        "daemon_available": info_ok,
+        "running_containers": len(sample_containers),
+        "sample_containers": sample_containers,
+    }
+
+
+def _tailscale_status() -> dict[str, Any]:
+    meta = _tool_status("tailscale", ["version"])
+    if not meta["installed"]:
+        return {
+            **meta,
+            "connected": False,
+            "ip": None,
+            "hostname": None,
+        }
+
+    ip_ok, ip_out, _, _ = _run_cmd(["tailscale", "ip", "-4"], timeout=6)
+    connected = ip_ok and bool(ip_out.strip())
+    status_ok, status_out, _, _ = _run_cmd(
+        ["tailscale", "status", "--json"],
+        timeout=8,
+    )
+
+    hostname = None
+    if status_ok and status_out:
+        try:
+            parsed = json.loads(status_out)
+            self_data = parsed.get("Self") or {}
+            hostname = self_data.get("HostName") or self_data.get("DNSName")
+        except json.JSONDecodeError:
+            hostname = None
+
+    return {
+        **meta,
+        "connected": connected,
+        "ip": ip_out.splitlines()[0] if connected else None,
+        "hostname": hostname,
+    }
+
+
+def _cloudflared_status() -> dict[str, Any]:
+    meta = _tool_status("cloudflared", ["--version"])
+    if not meta["installed"]:
+        return {
+            **meta,
+            "authenticated": False,
+            "tunnels": [],
+        }
+
+    # This command can fail if user is not authenticated yet.
+    list_ok, list_out, list_err, _ = _run_cmd(
+        ["cloudflared", "tunnel", "list", "--output", "json"], timeout=10
+    )
+    if not list_ok:
+        return {
+            **meta,
+            "authenticated": False,
+            "tunnels": [],
+            "auth_hint": list_err or "Run 'cloudflared tunnel login' first.",
+        }
+
+    tunnels: list[dict[str, str]] = []
+    try:
+        parsed = json.loads(list_out)
+        for row in (parsed if isinstance(parsed, list) else [])[:10]:
+            tunnels.append(
+                {
+                    "id": row.get("id", ""),
+                    "name": row.get("name", ""),
+                    "status": row.get("status", "unknown"),
+                }
+            )
+    except json.JSONDecodeError:
+        tunnels = []
+
+    return {
+        **meta,
+        "authenticated": True,
+        "tunnels": tunnels,
+    }
+
+
+def _coolify_status() -> dict[str, Any]:
+    cli = _tool_status("coolify", ["--version"])
+    if cli["installed"]:
+        return {
+            "installed": True,
+            "version": cli["version"],
+            "source": "coolify-cli",
+        }
+
+    # Fallback check: running Coolify container on host.
+    docker_ok, docker_ps_out, _, _ = _run_cmd(
+        ["docker", "ps", "--format", "json"], timeout=8
+    )
+    if docker_ok and docker_ps_out:
+        raw = docker_ps_out.strip()
+        rows: list[Any] = []
+        try:
+            parsed = json.loads(raw)
+            rows = parsed if isinstance(parsed, list) else [parsed]
+        except json.JSONDecodeError:
+            for line in raw.splitlines():
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    obj = json.loads(line)
+                    rows.extend(obj if isinstance(obj, list) else [obj])
+                except json.JSONDecodeError:
+                    continue
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            image = (row.get("Image") or "").lower()
+            if "coolify" in image:
+                return {
+                    "installed": True,
+                    "version": "container-running",
+                    "source": "docker-container",
+                }
+
+    return {
+        "installed": False,
+        "version": None,
+        "source": "not-detected",
+    }
+
+
+def _nginx_status() -> dict[str, Any]:
+    meta = _tool_status("nginx", ["-v"])
+    if not meta["installed"]:
+        return {
+            **meta,
+            "config_test_ok": False,
+            "running": False,
+        }
+
+    test_ok, _, test_err, _ = _run_cmd(["nginx", "-t"], timeout=8)
+    active = _systemd_status("nginx.service") == "active"
+    return {
+        **meta,
+        "config_test_ok": test_ok,
+        "running": active,
+        "config_test_output": test_err,
+    }
+
+
+def _database_plan(payload: DatabasePlanRequest) -> dict[str, Any]:
+    provider = payload.provider.strip().lower()
+
+    if provider == "mongodb_atlas":
+        return {
+            "provider": "MongoDB Atlas",
+            "id": provider,
+            "steps": [
+                "Create a free Atlas cluster and database user.",
+                "Allow your server IP in Network Access list.",
+                "Get SRV URI and store as secret, not plaintext env.",
+            ],
+            "connection_example": (
+                f"mongodb+srv://{payload.username}:<password>@"
+                "cluster0.xxxxx.mongodb.net/"
+                f"{payload.db_name}?retryWrites=true&w=majority"
+            ),
+            "env": {
+                "MONGODB_URI": "<atlas-srv-uri>",
+                "MONGODB_DB_NAME": payload.db_name,
+            },
+            "notes": [
+                "Use podman secrets for MONGODB_URI.",
+                "Enable TLS (default for Atlas SRV URLs).",
+            ],
+        }
+
+    if provider == "aws_rds_postgres":
+        return {
+            "provider": "AWS RDS PostgreSQL",
+            "id": provider,
+            "steps": [
+                "Create PostgreSQL RDS instance on free-tier eligible class.",
+                "Open security group to app subnet or trusted IP only.",
+                "Create application database and least-privilege role.",
+            ],
+            "connection_example": (
+                f"postgresql://{payload.username}:<password>@"
+                f"<rds-endpoint>.{payload.region}.rds.amazonaws.com:5432/"
+                f"{payload.db_name}?sslmode=require"
+            ),
+            "env": {
+                "DATABASE_URL": "<rds-postgres-url>",
+                "PGSSLMODE": "require",
+            },
+            "notes": [
+                "Keep backup retention enabled.",
+                "Prefer private networking for production.",
+            ],
+        }
+
+    if provider == "oracle_freedb":
+        return {
+            "provider": "Oracle FreeDB / Autonomous",
+            "id": provider,
+            "steps": [
+                "Create Oracle cloud free database instance.",
+                "Create app user schema and grant minimal permissions.",
+                "Download wallet if required by chosen Oracle mode.",
+            ],
+            "connection_example": (
+                "oracle+oracledb://"
+                f"{payload.username}:<password>@<host>:1521/?"
+                "service_name=<service>"
+            ),
+            "env": {
+                "ORACLE_DSN": "<oracle-dsn>",
+                "ORACLE_USER": payload.username,
+                "ORACLE_PASSWORD": "<password>",
+            },
+            "notes": [
+                "If wallet auth is required, mount wallet files securely.",
+                "Use TLS-enabled endpoint whenever available.",
+            ],
+        }
+
+    if provider == "supabase":
+        return {
+            "provider": "Supabase Postgres",
+            "id": provider,
+            "steps": [
+                "Create project in Supabase and wait for database ready.",
+                (
+                    "Copy pooled Postgres connection string "
+                    "from project settings."
+                ),
+                "Store service role key and DB URL as secrets.",
+            ],
+            "connection_example": (
+                "postgresql://postgres:<password>@"
+                "db.<project-ref>.supabase.co:5432/postgres?sslmode=require"
+            ),
+            "env": {
+                "DATABASE_URL": "<supabase-postgres-url>",
+                "SUPABASE_URL": "https://<project-ref>.supabase.co",
+                "SUPABASE_ANON_KEY": "<anon-key>",
+                "SUPABASE_SERVICE_ROLE_KEY": "<service-role-key>",
+            },
+            "notes": [
+                "Use row-level security if client apps connect directly.",
+                "Prefer pooled connection endpoint for scale.",
+            ],
+        }
+
+    raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail=(
+            "Unsupported provider. Use mongodb_atlas, aws_rds_postgres, "
+            "oracle_freedb, or supabase."
+        ),
+    )
+
+
+def _nginx_proxy_config(payload: NginxConfigRequest) -> str:
+    server_name = payload.server_name.strip()
+    upstream = payload.upstream_host.strip()
+    lines = [
+        "server {",
+        "    listen 80;",
+        f"    server_name {server_name};",
+        "",
+        "    location / {",
+        f"        proxy_pass http://{upstream};",
+        "        proxy_http_version 1.1;",
+        "        proxy_set_header Host $host;",
+        "        proxy_set_header X-Real-IP $remote_addr;",
+        "        proxy_set_header X-Forwarded-For"
+        " $proxy_add_x_forwarded_for;",
+        "        proxy_set_header X-Forwarded-Proto $scheme;",
+        "        proxy_set_header Upgrade $http_upgrade;",
+        '        proxy_set_header Connection "upgrade";',
+        "    }",
+        "}",
+    ]
+    return "\n".join(lines) + "\n"
+
+
+def _linux_install_commands() -> dict[str, list[str]]:
+    return {
+        "podman": [
+            "sudo apt update",
+            "sudo apt install -y podman",
+            "podman --version",
+        ],
+        "docker": [
+            "curl -fsSL https://get.docker.com | sh",
+            "sudo usermod -aG docker $USER",
+            "docker --version",
+        ],
+        "coolify": [
+            "curl -fsSL https://cdn.coollabs.io/coolify/install.sh | bash",
+            "docker ps | grep coolify",
+        ],
+        "tailscale": [
+            "curl -fsSL https://tailscale.com/install.sh | sh",
+            "sudo tailscale up",
+            "tailscale ip -4",
+        ],
+        "cloudflared": [
+            (
+                "curl -L https://github.com/cloudflare/cloudflared/"
+                "releases/latest/download/cloudflared-linux-amd64.deb "
+                "-o cloudflared.deb"
+            ),
+            "sudo dpkg -i cloudflared.deb",
+            "cloudflared --version",
+        ],
+        "nginx": [
+            "sudo apt update",
+            "sudo apt install -y nginx",
+            "sudo systemctl enable --now nginx",
+            "nginx -v",
+        ],
+    }
+
+
+def _run_cmd(
+    command: list[str], timeout: int = 10
+) -> tuple[bool, str, str, int]:
+    try:
+        result = subprocess.run(
+            command,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            cwd=str(ROOT_DIR),
+            check=False,
+        )
+        return (
+            result.returncode == 0,
+            result.stdout.strip(),
+            result.stderr.strip(),
+            result.returncode,
+        )
+    except FileNotFoundError:
+        return False, "", f"Command not found: {command[0]}", 127
+    except subprocess.TimeoutExpired:
+        return False, "", "Command timed out", 124
+
+
+def _read_pid() -> int | None:
+    if not PID_FILE.exists():
+        return None
+    try:
+        return int(PID_FILE.read_text(encoding="utf-8").strip())
+    except ValueError:
+        return None
+
+
+def _is_pid_running(pid: int | None) -> bool:
+    if not pid or pid <= 0:
+        return False
+    try:
+        os.kill(pid, 0)
+        return True
+    except OSError:
+        return False
+
+
+def _podman_status() -> dict[str, Any]:
+    installed, version_out, _, _ = _run_cmd(["podman", "--version"], timeout=5)
+    if not installed:
+        return {
+            "installed": False,
+            "version": None,
+            "running_containers": 0,
+            "sample_containers": [],
+        }
+
+    ps_ok, ps_out, _, _ = _run_cmd(
+        ["podman", "ps", "--format", "json"], timeout=10
+    )
+    containers = []
+    if ps_ok and ps_out:
+        try:
+            containers = json.loads(ps_out)
+        except json.JSONDecodeError:
+            containers = []
+
+    sample = []
+    for row in containers[:5]:
+        names = row.get("Names") or []
+        sample.append(
+            {
+                "name": names[0] if names else row.get("Id", "unknown")[:12],
+                "image": row.get("Image", "unknown"),
+                "state": row.get("State", "unknown"),
+            }
+        )
+
+    return {
+        "installed": True,
+        "version": version_out,
+        "running_containers": len(containers),
+        "sample_containers": sample,
+    }
+
+
+def _systemd_status(service_name: str) -> str:
+    ok, out, _, code = _run_cmd(
+        ["systemctl", "is-active", service_name], timeout=5
+    )
+    if ok:
+        return out or "active"
+    if code == 127:
+        return "unavailable"
+    return out or "inactive"
+
+
+def _background_status() -> dict[str, Any]:
+    pid = _read_pid()
+    running = _is_pid_running(pid)
+    if not running and PID_FILE.exists():
+        PID_FILE.unlink(missing_ok=True)
+
+    log_tail = ""
+    if LOG_FILE.exists():
+        lines = LOG_FILE.read_text(
+            encoding="utf-8", errors="ignore"
+        ).splitlines()
+        log_tail = "\n".join(lines[-8:])
+
+    return {
+        "running": running,
+        "pid": pid if running else None,
+        "pid_file": str(PID_FILE),
+        "log_file": str(LOG_FILE),
+        "log_tail": log_tail,
+    }
+
+
+@router.get("/status")
+async def runtime_status(_current_user: dict = Depends(util.get_current_user)):
+    """Summarize local Podman and WatchTower runtime health."""
+    podman = _podman_status()
+    watchtower_cmd_ok, _, watchtower_cmd_err, _ = _run_cmd(
+        [sys.executable, "-m", "watchtower", "--help"], timeout=10
+    )
+
+    return {
+        "podman": podman,
+        "watchtower": {
+            "cli_available": watchtower_cmd_ok,
+            "cli_error": None if watchtower_cmd_ok else watchtower_cmd_err,
+            "systemd_service": _systemd_status("watchtower.service"),
+            "appcenter_service": _systemd_status(
+                "watchtower-appcenter.service"
+            ),
+            "background_process": _background_status(),
+        },
+    }
+
+
+@router.post("/watchtower/start-background")
+async def start_watchtower_background(
+    _current_user: dict = Depends(util.get_current_user)
+):
+    """Start WatchTower updater loop as a detached background process."""
+    DEV_DIR.mkdir(parents=True, exist_ok=True)
+
+    existing_pid = _read_pid()
+    if _is_pid_running(existing_pid):
+        return {
+            "status": "already_running",
+            "message": (
+                "WatchTower background process is already running "
+                f"(PID {existing_pid})."
+            ),
+            "pid": existing_pid,
+            "log_file": str(LOG_FILE),
+        }
+
+    with LOG_FILE.open("a", encoding="utf-8") as log_file:
+        process = subprocess.Popen(  # noqa: S603
+            [sys.executable, "-m", "watchtower", "start"],
+            cwd=str(ROOT_DIR),
+            stdout=log_file,
+            stderr=subprocess.STDOUT,
+            start_new_session=True,
+            env={
+                **os.environ,
+                "PYTHONUNBUFFERED": "1",
+            },
+        )
+
+    PID_FILE.write_text(str(process.pid), encoding="utf-8")
+    time.sleep(0.8)
+
+    if not _is_pid_running(process.pid):
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=(
+                "WatchTower background process failed to start. "
+                f"Check log at {LOG_FILE}"
+            ),
+        )
+
+    return {
+        "status": "started",
+        "message": "WatchTower background process started.",
+        "pid": process.pid,
+        "log_file": str(LOG_FILE),
+    }
+
+
+@router.post("/watchtower/stop-background")
+async def stop_watchtower_background(
+    _current_user: dict = Depends(util.get_current_user)
+):
+    """Stop detached WatchTower updater process started by the runtime API."""
+    pid = _read_pid()
+    if not _is_pid_running(pid):
+        PID_FILE.unlink(missing_ok=True)
+        return {
+            "status": "not_running",
+            "message": "WatchTower background process is not running.",
+        }
+
+    os.kill(pid, signal.SIGTERM)
+    time.sleep(0.4)
+    still_running = _is_pid_running(pid)
+    if still_running:
+        os.kill(pid, signal.SIGKILL)
+
+    PID_FILE.unlink(missing_ok=True)
+
+    return {
+        "status": "stopped",
+        "message": "WatchTower background process stopped.",
+        "pid": pid,
+    }
+
+
+@router.post("/watchtower/update-now")
+async def watchtower_update_now(
+    _current_user: dict = Depends(util.get_current_user)
+):
+    """Run one immediate WatchTower update check and return command output."""
+    ok, out, err, code = _run_cmd(
+        [sys.executable, "-m", "watchtower", "update-now"], timeout=120
+    )
+    if not ok:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": "Update check failed",
+                "exit_code": code,
+                "stderr": err,
+                "stdout": out,
+            },
+        )
+
+    return {
+        "status": "ok",
+        "message": "Update check completed.",
+        "stdout": out,
+    }
+
+
+@router.get("/integrations/status")
+async def integrations_status(
+    _current_user: dict = Depends(util.get_current_user),
+):
+    """Return host integration readiness for team onboarding."""
+    return {
+        "podman": _podman_status(),
+        "docker": _docker_status(),
+        "coolify": _coolify_status(),
+        "tailscale": _tailscale_status(),
+        "cloudflared": _cloudflared_status(),
+        "nginx": _nginx_status(),
+    }
+
+
+@router.get("/integrations/install-commands")
+async def integrations_install_commands(
+    _current_user: dict = Depends(util.get_current_user),
+):
+    """Return copy-ready install commands for each supported integration."""
+    return {
+        "os": "linux",
+        "commands": _linux_install_commands(),
+    }
+
+
+@router.post("/integrations/domain/connect")
+async def integrations_domain_connect(
+    payload: DomainConnectRequest,
+    _current_user: dict = Depends(util.get_current_user),
+):
+    """Return guided Cloudflare tunnel commands for a domain/subdomain."""
+    domain = payload.domain.strip().lower()
+    subdomain = payload.subdomain.strip().lower()
+    target = payload.target_host.strip()
+
+    if "." not in domain:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Provide a valid domain, for example: example.com",
+        )
+
+    hostname = f"{subdomain}.{domain}"
+    tunnel_name = f"watchtower-{subdomain}"
+
+    commands = [
+        "cloudflared tunnel login",
+        f"cloudflared tunnel create {tunnel_name}",
+        f"cloudflared tunnel route dns {tunnel_name} {hostname}",
+        (
+            "cloudflared tunnel run "
+            f"--url http://{target} {tunnel_name}"
+        ),
+    ]
+
+    return {
+        "hostname": hostname,
+        "tunnel_name": tunnel_name,
+        "target_host": target,
+        "commands": commands,
+        "notes": [
+            (
+                "Run cloudflared on the same machine that can reach "
+                "your WatchTower app."
+            ),
+            (
+                "Use Cloudflare Zero Trust dashboard to keep "
+                "the tunnel always-on as a service."
+            ),
+            (
+                "For production, point the tunnel URL to your reverse "
+                "proxy (for example caddy:80)."
+            ),
+        ],
+    }
+
+
+@router.post("/integrations/database/plan")
+async def integration_database_plan(
+    payload: DatabasePlanRequest,
+    _current_user: dict = Depends(util.get_current_user),
+):
+    """Return guided setup plan for supported managed database providers."""
+    return _database_plan(payload)
+
+
+@router.post("/integrations/nginx/config")
+async def integration_nginx_config(
+    payload: NginxConfigRequest,
+    _current_user: dict = Depends(util.get_current_user),
+):
+    """Return sample Nginx reverse proxy config and setup steps."""
+    return {
+        "server_name": payload.server_name.strip(),
+        "upstream_host": payload.upstream_host.strip(),
+        "config": _nginx_proxy_config(payload),
+        "steps": [
+            "Save config under /etc/nginx/sites-available/watchtower.conf",
+            "ln -s to sites-enabled and remove default site if needed",
+            "Run nginx -t and reload with systemctl reload nginx",
+        ],
+    }
+
+
+@router.get("/integrations/vscode/status")
+async def vscode_status(
+    _current_user: dict = Depends(util.get_current_user),
+):
+    """Return VS Code CLI availability and host root directory."""
+    installed = _command_exists("code")
+    version: str | None = None
+    if installed:
+        ok, out, _, _ = _run_cmd(["code", "--version"], timeout=5)
+        if ok and out.strip():
+            version = out.strip().splitlines()[0]
+    return {
+        "installed": installed,
+        "version": version,
+        "root_dir": str(ROOT_DIR),
+        "install_instructions": {
+            "linux": (
+                "Download VS Code from https://code.visualstudio.com/download "
+                "or install via: sudo snap install --classic code"
+            ),
+            "macos": (
+                "Download VS Code from https://code.visualstudio.com/download. "
+                "Then open VS Code → Command Palette → 'Shell Command: Install code in PATH'"
+            ),
+            "windows": "Download VS Code from https://code.visualstudio.com/download",
+        },
+    }
+
+
+@router.post("/integrations/vscode/open")
+async def vscode_open(
+    payload: VSCodeOpenRequest,
+    _current_user: dict = Depends(util.get_current_user),
+):
+    """Open a directory or file in VS Code via the `code` CLI on the server."""
+    path = Path(payload.path.strip()).expanduser().resolve()
+    if not path.exists():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Path not found: {path}",
+        )
+    if not _command_exists("code"):
+        raise HTTPException(
+            status_code=status.HTTP_501_NOT_IMPLEMENTED,
+            detail=(
+                "VS Code CLI (`code`) is not installed on this host. "
+                "Install VS Code and run 'Shell Command: Install code in PATH'."
+            ),
+        )
+    ok, _, err, _ = _run_cmd(["code", str(path)], timeout=10)
+    if not ok:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=err or "Failed to launch VS Code.",
+        )
+    return {"opened": str(path)}
+
+
+@router.get("/terminal/policy")
+async def terminal_policy(
+    _current_user: dict = Depends(util.get_current_user),
+):
+    """Expose safe terminal execution policy for the UI."""
+    return {
+        "enabled": bool(os.getenv("WATCHTOWER_TERMINAL_AUDIT_KEY", "").strip()),
+        "encryption_required": True,
+        "audit_log": str(TERMINAL_AUDIT_FILE),
+        "max_timeout_seconds": 120,
+        "allowed_commands": [
+            {
+                "command": name,
+                "allow_sudo": cfg["allow_sudo"],
+                "must_sudo": cfg["must_sudo"],
+            }
+            for name, cfg in sorted(TERMINAL_ALLOWED_COMMANDS.items())
+        ],
+    }
+
+
+@router.post("/terminal/execute")
+async def terminal_execute(
+    payload: TerminalCommandRequest,
+    _current_user: dict = Depends(util.get_current_user),
+):
+    """Execute an allow-listed terminal command with encrypted auditing."""
+    user_id = str(_current_user.get("id", "unknown"))
+    return _execute_terminal_command(payload, user_id=user_id)
