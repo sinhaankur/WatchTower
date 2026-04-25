@@ -5,6 +5,7 @@ Docker Compose files for each WatchTower deployment topology.
 | File | Topology |
 |------|----------|
 | `docker-compose.yml` (root) | Standard single-node |
+| `docker-compose.app.yml` (root) | Single-node app runtime (Docker-first quick start) |
 | `docker-compose.ha.yml` | High-availability primary + standby |
 | `docker-compose.hybrid.yml` | Hybrid cloud (local + remote nodes) |
 | `docker-compose.mesh.yml` | Multi-node mesh network |
