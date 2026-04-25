@@ -27,6 +27,15 @@
       --wt-ok-bg: rgba(16, 185, 129, 0.12);
       --wt-ok-text: #047857;
       --wt-ok-border: rgba(16, 185, 129, 0.28);
+      /* Archetype-level motion + shadow tokens */
+      --shadow: 4px 4px 0 0 hsl(0 0% 0% / 1);
+      --shadow-hover: 6px 6px 0 0 hsl(0 0% 0% / 1);
+      --shadow-soft: 8px 8px 0 0 hsl(0 0% 0% / 0.18);
+      --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+      --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+      --dur-fast: 140ms;
+      --dur-base: 240ms;
+      --dur-slow: 400ms;
     }
 
     * {
@@ -146,12 +155,21 @@
       border: 2px solid var(--wt-border);
       color: #ffffff;
       background: var(--wt-accent);
-      box-shadow: 3px 3px 0 0 var(--wt-border);
+      box-shadow: var(--shadow);
       border-radius: 0;
+      transition: transform var(--dur-fast) var(--ease-spring), box-shadow var(--dur-fast) ease, background var(--dur-fast) ease;
     }
 
     .primary-button:hover {
       background: #991b1b;
+      transform: translate(-2px, -2px);
+      box-shadow: var(--shadow-hover);
+    }
+
+    .secondary-button:hover {
+      background: #fef9ee;
+      transform: translate(-2px, -2px);
+      box-shadow: var(--shadow-hover);
     }
 
     .primary-button:active,
@@ -280,16 +298,41 @@
     }
 
     @keyframes fadeInUp {
-      from { opacity: 0; transform: translateY(14px); }
-      to   { opacity: 1; transform: translateY(0); }
+      from { opacity: 0; transform: translateY(14px) scale(0.98); }
+      to   { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    @keyframes cardIn {
+      from { opacity: 0; transform: translateY(22px) scale(0.97); }
+      to   { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    @keyframes slideRight {
+      from { opacity: 0; transform: translateX(-18px); }
+      to   { opacity: 1; transform: translateX(0); }
+    }
+
+    /* Framer-style scroll-driven motion */
+    .motion-item {
+      opacity: 0;
+      transform: translateY(10px) scale(0.99);
+      transition:
+        opacity 360ms var(--ease-out),
+        transform 440ms var(--ease-spring);
+      transition-delay: var(--motion-delay, 0ms);
+    }
+
+    .motion-item.motion-in {
+      opacity: 1;
+      transform: translateY(0) scale(1);
     }
 
     .panel {
       border: 2px solid var(--wt-border);
       border-radius: 0;
       background: var(--wt-panel);
-      box-shadow: 3px 3px 0 0 var(--wt-border);
-      animation: fadeInUp 0.28s ease both;
+      box-shadow: var(--shadow);
+      animation: fadeInUp 0.28s var(--ease-out) both;
     }
 
     .hero {
@@ -354,12 +397,9 @@
       border: 2px solid var(--wt-border);
       background: #ffffff;
       color: #0f172a;
-      box-shadow: 3px 3px 0 0 var(--wt-border);
+      box-shadow: var(--shadow);
       border-radius: 0;
-    }
-
-    .secondary-button:hover {
-      background: #fef9ee;
+      transition: transform var(--dur-fast) var(--ease-spring), box-shadow var(--dur-fast) ease, background var(--dur-fast) ease;
     }
 
     .stats {
@@ -385,13 +425,13 @@
       display: block;
       padding: 14px;
       text-decoration: none;
-      transition: transform 120ms ease, box-shadow 120ms ease;
+      transition: transform var(--dur-fast) var(--ease-spring), box-shadow var(--dur-fast) ease;
       overflow: hidden;
     }
 
     .blueprint-card:hover {
-      transform: translate(-1px, -1px);
-      box-shadow: 4px 4px 0 0 var(--wt-border);
+      transform: translate(-2px, -2px);
+      box-shadow: var(--shadow-hover);
     }
 
     .blueprint-card:active {
@@ -428,13 +468,13 @@
       padding: 18px;
       border: 2px solid var(--wt-border);
       background: #ffffff;
-      box-shadow: 3px 3px 0 0 var(--wt-border);
-      transition: transform 120ms ease, box-shadow 120ms ease;
+      box-shadow: var(--shadow);
+      transition: transform var(--dur-fast) var(--ease-spring), box-shadow var(--dur-fast) ease;
     }
 
     .stat-card:hover {
-      transform: translate(-1px, -1px);
-      box-shadow: 4px 4px 0 0 var(--wt-border);
+      transform: translate(-2px, -2px);
+      box-shadow: var(--shadow-hover);
     }
 
     .stat-card .label {
@@ -642,13 +682,13 @@
       padding: 16px;
       border: 2px solid var(--wt-border);
       background: #ffffff;
-      box-shadow: 3px 3px 0 0 var(--wt-border);
-      transition: transform 120ms ease, box-shadow 120ms ease;
+      box-shadow: var(--shadow);
+      transition: transform var(--dur-fast) var(--ease-spring), box-shadow var(--dur-fast) ease;
     }
 
     .doc-link:hover {
-      transform: translate(-1px, -1px);
-      box-shadow: 4px 4px 0 0 var(--wt-border);
+      transform: translate(-2px, -2px);
+      box-shadow: var(--shadow-hover);
     }
 
     .doc-link:active {
@@ -1028,6 +1068,25 @@
     );
 
     sections.forEach((section) => observer.observe(section));
+
+    // Framer-style scroll-in motion
+    const motionObserver = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('motion-in');
+            motionObserver.unobserve(entry.target);
+          }
+        });
+      },
+      { threshold: 0.08, rootMargin: '0px 0px -40px 0px' }
+    );
+
+    document.querySelectorAll('.panel, .stat-card, .blueprint-card, .doc-link, .path-card, .explain-card').forEach((el, i) => {
+      el.classList.add('motion-item');
+      el.style.setProperty('--motion-delay', `${i * 40}ms`);
+      motionObserver.observe(el);
+    });
   </script>
 </body>
 </html>
