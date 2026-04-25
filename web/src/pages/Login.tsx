@@ -33,6 +33,7 @@ const Login = () => {
   const [statusLoading, setStatusLoading] = useState(true);
   const oauthReady = Boolean(authStatus?.oauth?.github_configured);
 
+  const [loggedInUser, setLoggedInUser] = useState<{ name?: string; avatar?: string } | null>(null);
   useEffect(() => {
     // Auto-login: Electron injects VITE_API_TOKEN into the Vite process at launch.
     // If present, store it and go straight to the dashboard.
@@ -44,7 +45,10 @@ const Login = () => {
     }
     const existing = localStorage.getItem('authToken');
     if (existing) {
-      navigate('/', { replace: true });
+      // Show logged-in state before redirecting
+      const user = localStorage.getItem('user') ? JSON.parse(localStorage.getItem('user')!) : { name: 'User' };
+      setLoggedInUser(user);
+      setTimeout(() => navigate('/', { replace: true }), 2000);
     }
   }, [navigate]);
 
@@ -78,7 +82,8 @@ const Login = () => {
       localStorage.setItem('authToken', trimmed);
       await apiClient.get('/context');
       trackEvent('login', { method: 'api_token' });
-      navigate('/', { replace: true });
+      setLoggedInUser({ name: 'Authenticated' });
+      setTimeout(() => navigate('/', { replace: true }), 1500);
     } catch {
       localStorage.removeItem('authToken');
       setError('Authentication failed. If installation ownership is enabled, your account must be invited by an owner/admin before access is granted.');
@@ -132,82 +137,103 @@ const Login = () => {
   return (
     <div className="min-h-screen flex items-center justify-center px-6 bg-transparent">
       <div className="w-full max-w-md rounded-2xl px-8 py-10 text-center border border-border bg-white/95 backdrop-blur-sm shadow-sm fade-in-up">
-        <div className="mb-4 flex justify-center">
-          <BrandLogo size="lg" withLabel subtitle="Secure Team Access" />
-        </div>
-        <h1 className="text-2xl font-semibold mb-2 text-slate-900">Sign in to WatchTower</h1>
-        <p className="text-sm text-slate-600 mb-6">
-          Use GitHub to authenticate, or enter an API token below.
-        </p>
+        {loggedInUser ? (
+          <div className="space-y-6 py-8">
+            <div className="flex justify-center">
+              <div className="w-16 h-16 rounded-full bg-emerald-100 flex items-center justify-center animate-pulse">
+                <svg viewBox="0 0 16 16" width="32" height="32" fill="#047857" aria-hidden="true">
+                  <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/>
+                </svg>
+              </div>
+            </div>
+            <div>
+              <h2 className="text-2xl font-bold text-slate-900 mb-2">✓ Logged In</h2>
+              <p className="text-sm text-slate-600">
+                {loggedInUser.name ? `Welcome, ${loggedInUser.name}!` : 'Successfully authenticated with GitHub'}
+              </p>
+            </div>
+            <div className="text-xs text-slate-500">
+              Redirecting to dashboard...
+            </div>
+          </div>
+        ) : (
+          <>
+            <div className="mb-4 flex justify-center">
+              <BrandLogo size="lg" withLabel subtitle="Secure Team Access" />
+            </div>
+            <h1 className="text-2xl font-semibold mb-2 text-slate-900">Sign in to WatchTower</h1>
+            <p className="text-sm text-slate-600 mb-6">
+              Use GitHub to authenticate, or enter an API token below.
+            </p>
 
         {/* Server not configured at all */}
         {nothingConfigured && (
-          <div className="text-left text-sm mb-5 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 space-y-1">
+            <div className="text-left text-sm mb-5 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 space-y-1">
             <p className="font-medium text-amber-800">⚠ Server setup required</p>
             <p className="text-amber-700 text-xs">
               Set <code className="font-mono bg-amber-100 px-1 rounded">WATCHTOWER_API_TOKEN</code> on the server, or configure GitHub OAuth to enable secure team sign-in.
             </p>
-          </div>
+            </div>
         )}
 
         {/* Owner mode hint */}
         {!statusLoading && authStatus?.installation?.owner_mode_enabled && (
-          <div className="text-left text-xs mb-4 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2">
+            <div className="text-left text-xs mb-4 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2">
             <p className="font-medium text-blue-800">Installation ownership is active</p>
             <p className="text-blue-700 mt-0.5">Ask your owner or admin to invite your account before signing in.</p>
-          </div>
+            </div>
         )}
 
         {error && (
-          <div className="text-sm text-red-700 border border-red-200 bg-red-50 rounded-lg px-3 py-2.5 mb-4 text-left">
+            <div className="text-sm text-red-700 border border-red-200 bg-red-50 rounded-lg px-3 py-2.5 mb-4 text-left">
             {error}
-          </div>
+            </div>
         )}
 
         {/* Auth methods */}
         {statusLoading ? (
-          <div className="py-6 flex items-center justify-center gap-2 text-slate-400 text-sm">
+            <div className="py-6 flex items-center justify-center gap-2 text-slate-400 text-sm">
             <span className="inline-block w-4 h-4 border-2 border-slate-300 border-t-slate-600 rounded-full animate-spin" />
             Checking server…
-          </div>
-        ) : (
+            </div>
+          ) : (
           <>
             {/* GitHub OAuth — PRIMARY auth method */}
             <div className="space-y-3 mb-4">
               {!oauthReady && (
-                <div className="text-left text-xs rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-blue-700 mb-3">
+                  <div className="text-left text-xs rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-blue-700 mb-3">
                   <p className="font-medium text-blue-800 mb-1">GitHub not configured yet</p>
                   <p>Ask your admin to set <code className="font-mono bg-blue-100 px-1 rounded text-xs">GITHUB_OAUTH_CLIENT_ID</code> and <code className="font-mono bg-blue-100 px-1 rounded text-xs">GITHUB_OAUTH_CLIENT_SECRET</code></p>
-                </div>
+                  </div>
               )}
               <Button
                 onClick={() => void loginWithGitHub()}
                 disabled={loading || !oauthReady}
-                className={`w-full rounded-lg gap-2 py-6 text-base font-semibold ${
+                className={`w-full rounded-lg gap-2 py-6 text-base font-semibold flex items-center justify-center ${
                   oauthReady
                     ? 'bg-slate-900 hover:bg-slate-800 text-white'
                     : 'bg-slate-300 text-slate-500 cursor-not-allowed'
                 }`}
               >
                 {loading ? (
-                  <span className="inline-flex items-center gap-2">
+                    <span className="inline-flex items-center gap-2">
                     <span className="inline-block w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
                     Redirecting to GitHub…
-                  </span>
+                    </span>
                 ) : (
-                  <span className="inline-flex items-center gap-2">
+                    <span className="inline-flex items-center gap-2">
                     {/* GitHub mark */}
                     <svg viewBox="0 0 16 16" width="20" height="20" fill="currentColor" aria-hidden="true">
                       <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/>
                     </svg>
                     <span>{oauthReady ? 'Sign in with GitHub' : 'GitHub Login (Not Ready)'}</span>
-                  </span>
+                    </span>
                 )}
               </Button>
               {oauthReady && (
-                <p className="text-xs text-slate-600 text-center">
+                  <p className="text-xs text-slate-600 text-center">
                   ✓ Browser opens GitHub → authenticate → returns here automatically
-                </p>
+                  </p>
               )}
             </div>
 
@@ -244,6 +270,8 @@ const Login = () => {
                 {loading ? 'Verifying…' : 'Sign in with Token'}
               </Button>
             </div>
+          </>
+          )}
           </>
         )}
       </div>
