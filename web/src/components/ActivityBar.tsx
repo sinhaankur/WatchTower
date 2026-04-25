@@ -1,9 +1,10 @@
 import { Link, useLocation } from 'react-router-dom';
+import { type ReactElement } from 'react';
 
 type ActivityItem = {
   path: string;
   label: string;
-  icon: () => JSX.Element;
+  icon: () => ReactElement;
   bottom?: boolean;
 };
 

@@ -1,4 +1,4 @@
-import { ReactNode, useState } from 'react';
+import { ReactNode, useState, type ReactElement } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import BrandLogo from './BrandLogo';
 import TitleBar from './TitleBar';
@@ -92,7 +92,7 @@ function IconPlus() {
 }
 
 // ── Navigation structure ──────────────────────────────────────────────────────
-type NavItem = { path: string; label: string; Icon: () => JSX.Element };
+type NavItem = { path: string; label: string; Icon: () => ReactElement };
 
 const PRIMARY_NAV: NavItem[] = [
   { path: '/',             label: 'Dashboard',     Icon: IconDashboard },
