@@ -76,7 +76,7 @@ async def list_deployments(
     """List deployments for a project"""
     project = db.query(Project).filter(
         Project.id == project_id,
-        Project.owner_id == current_user["user_id"]
+        Project.owner_id == UUID(str(current_user["user_id"]))
     ).first()
     
     if not project:
@@ -134,7 +134,13 @@ async def trigger_deployment(
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied")
 
         target_nodes = _select_org_nodes_for_deploy(db, project, deploy_data.node_ids or [])
-        if not target_nodes:
+        # For self-hosted / vercel-like projects we allow zero nodes: the
+        # builder will run the build locally and store artifacts under the
+        # local builds directory. Only block when the user explicitly asked
+        # for specific nodes that don't exist, or when the deployment model
+        # requires remote nodes.
+        _model_val = getattr(project.deployment_model, "value", project.deployment_model)
+        if not target_nodes and (deploy_data.node_ids or _model_val not in ("self_hosted", None)):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="No active deployment nodes are available for this organization",
