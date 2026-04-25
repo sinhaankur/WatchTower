@@ -135,3 +135,12 @@ dmypy.json
 # OS
 .DS_Store
 Thumbs.db
+
+# Local WatchTower runtime artifacts
+watchtower.db
+watchtower_test.db
+.dev/
+*.bak
+MoonTracker UI /
+node_modules/
+desktop/node_modules/

@@ -1,0 +1,84 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: watchtower
+      POSTGRES_PASSWORD: watchtower-dev
+      POSTGRES_DB: watchtower
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U watchtower"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis (for Celery task queue)
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # WatchTower API
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://watchtower:watchtower-dev@postgres:5432/watchtower
+      REDIS_URL: redis://redis:6379
+      LOG_LEVEL: INFO
+      CORS_ORIGINS: "http://localhost:3000,http://localhost:5173"
+      WATCHTOWER_API_TOKEN: ${WATCHTOWER_API_TOKEN:-}
+      WATCHTOWER_ALLOW_INSECURE_DEV_AUTH: ${WATCHTOWER_ALLOW_INSECURE_DEV_AUTH:-false}
+    command: uvicorn watchtower.api:app --host 0.0.0.0 --port 8000 --reload
+    volumes:
+      - .:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # WatchTower Web UI
+  web:
+    image: node:20-alpine
+    working_dir: /app/web
+    command: sh -c "npm install --legacy-peer-deps && npm run dev -- --host 0.0.0.0 --port 5173"
+    ports:
+      - "5173:5173"
+    environment:
+      VITE_API_PROXY_TARGET: http://api:8000
+      VITE_API_TOKEN: ${WATCHTOWER_API_TOKEN:-}
+      CHOKIDAR_USEPOLLING: "true"
+    volumes:
+      - ./web:/app/web
+      - web_node_modules:/app/web/node_modules
+    depends_on:
+      api:
+        condition: service_started
+
+volumes:
+  postgres_data:
+  web_node_modules:
+
+networks:
+  default:
+    name: watchtower-network

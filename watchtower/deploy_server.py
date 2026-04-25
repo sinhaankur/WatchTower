@@ -11,6 +11,7 @@ Features:
 from __future__ import annotations
 
 import argparse
+import hmac
 import json
 import logging
 import os
@@ -582,7 +583,7 @@ def build_ui_data() -> dict[str, Any]:
 
 def validate_token(x_watchtower_token: str | None) -> None:
     required_token = os.getenv("WATCHTOWER_TRIGGER_TOKEN")
-    if required_token and x_watchtower_token != required_token:
+    if required_token and not hmac.compare_digest(x_watchtower_token or "", required_token):
         raise HTTPException(status_code=401, detail="Invalid deployment token")
 
 
@@ -604,7 +605,8 @@ def ui_data(
     try:
         return build_ui_data()
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        logger.exception("Failed to build UI data")
+        raise HTTPException(status_code=500, detail="Internal server error") from exc
 
 
 @app.post("/deploy")
@@ -636,7 +638,7 @@ def trigger_deploy(
             message=str(exc),
         )
         logger.exception("Deployment failed")
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        raise HTTPException(status_code=500, detail="Internal server error") from exc
 
 
 @app.get("/apps")
@@ -653,7 +655,8 @@ def list_apps(
             "apps": sorted(registry.keys()),
         }
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        logger.exception("Failed to list apps")
+        raise HTTPException(status_code=500, detail="Internal server error") from exc
 
 
 @app.post("/apps/{app_name}/deploy")
@@ -683,7 +686,7 @@ def trigger_app_deploy(
             message=str(exc),
         )
         logger.exception("App deployment failed")
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        raise HTTPException(status_code=500, detail="Internal server error") from exc
 
 
 def build_parser() -> argparse.ArgumentParser:

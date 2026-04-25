@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  caddy:
+    image: docker.io/library/caddy:2.9-alpine
+    container_name: wt-caddy-${NODE_NAME:-node}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "127.0.0.1:${CADDY_ADMIN_PORT:-2019}:2019"
+    environment:
+      ACME_EMAIL: ${ACME_EMAIL:?set ACME_EMAIL in .env.mesh}
+      APP_DOMAIN: ${APP_DOMAIN:?set APP_DOMAIN in .env.mesh}
+      PREVIEW_BASE_DOMAIN: ${PREVIEW_BASE_DOMAIN:-}
+    volumes:
+      - ./config/caddy/Caddyfile.mesh:/etc/caddy/Caddyfile:ro
+      - ./config/caddy/upstreams:/etc/caddy/upstreams
+      - ./config/caddy/previews:/etc/caddy/previews
+      - ./data/caddy/data:/data
+      - ./data/caddy/config:/config
+    restart: always
+
+  watchtower:
+    image: docker.io/containrrr/watchtower:latest
+    container_name: wt-updater-${NODE_NAME:-node}
+    volumes:
+      - ${XDG_RUNTIME_DIR}/podman/podman.sock:/var/run/docker.sock
+    environment:
+      WATCHTOWER_POLL_INTERVAL: ${WATCHTOWER_POLL_INTERVAL:-15}
+      WATCHTOWER_CLEANUP: "true"
+      WATCHTOWER_INCLUDE_STOPPED: "false"
+      WATCHTOWER_LABEL_ENABLE: "true"
+      WATCHTOWER_LIFECYCLE_HOOKS: "true"
+      WATCHTOWER_NOTIFICATIONS: ${WATCHTOWER_NOTIFICATIONS:-shoutrrr}
+      WATCHTOWER_NOTIFICATION_URL: ${WATCHTOWER_NOTIFICATION_URL:-}
+      REPO_USER: ${GH_USERNAME:-}
+      REPO_PASS: ${GH_PAT_TOKEN:-}
+    command: --interval ${WATCHTOWER_POLL_INTERVAL:-15} --label-enable
+    restart: always

@@ -1,0 +1,63 @@
+version: '3.8'
+
+services:
+  database:
+    image: docker.io/bitnami/postgresql:16
+    container_name: wt-db-${NODE_NAME:-node}
+    environment:
+      POSTGRESQL_POSTGRES_PASSWORD: ${POSTGRESQL_POSTGRES_PASSWORD:?set in .env}
+      POSTGRESQL_USERNAME: ${POSTGRESQL_USERNAME:-watchtower}
+      POSTGRESQL_PASSWORD: ${POSTGRESQL_PASSWORD:?set in .env}
+      POSTGRESQL_DATABASE: ${POSTGRESQL_DATABASE:-watchtower}
+      POSTGRESQL_REPLICATION_MODE: ${POSTGRESQL_REPLICATION_MODE:-master}
+      POSTGRESQL_REPLICATION_USER: ${POSTGRESQL_REPLICATION_USER:-repl_user}
+      POSTGRESQL_REPLICATION_PASSWORD: ${POSTGRESQL_REPLICATION_PASSWORD:?set in .env}
+      POSTGRESQL_MASTER_HOST: ${POSTGRESQL_MASTER_HOST:-127.0.0.1}
+      POSTGRESQL_MASTER_PORT_NUMBER: ${POSTGRESQL_MASTER_PORT_NUMBER:-5432}
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - ${DB_DATA_DIR:-./data/postgres}:/bitnami/postgresql
+    restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRESQL_USERNAME:-watchtower} -d ${POSTGRESQL_DATABASE:-watchtower}"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+
+  app-server:
+    image: ${APP_IMAGE:?set APP_IMAGE in .env}
+    container_name: wt-app-${NODE_NAME:-node}
+    depends_on:
+      database:
+        condition: service_healthy
+    environment:
+      DB_HOST: ${DB_HOST:-database}
+      DB_PORT: ${DB_PORT:-5432}
+      DB_USER: ${POSTGRESQL_USERNAME:-watchtower}
+      DB_PASSWORD: ${POSTGRESQL_PASSWORD:?set in .env}
+      DB_NAME: ${POSTGRESQL_DATABASE:-watchtower}
+      WATCHTOWER_API_TOKEN: ${WATCHTOWER_API_TOKEN:-}
+      WATCHTOWER_SECRET_KEY: ${WATCHTOWER_SECRET_KEY:-}
+    ports:
+      - "${APP_PORT:-8080}:80"
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+    restart: always
+
+  watchtower:
+    image: docker.io/containrrr/watchtower:latest
+    container_name: wt-updater-${NODE_NAME:-node}
+    volumes:
+      - ${XDG_RUNTIME_DIR}/podman/podman.sock:/var/run/docker.sock
+    environment:
+      WATCHTOWER_POLL_INTERVAL: ${WATCHTOWER_POLL_INTERVAL:-60}
+      WATCHTOWER_CLEANUP: "true"
+      WATCHTOWER_INCLUDE_STOPPED: "false"
+      WATCHTOWER_LABEL_ENABLE: "true"
+      WATCHTOWER_NOTIFICATIONS: ${WATCHTOWER_NOTIFICATIONS:-shoutrrr}
+      WATCHTOWER_NOTIFICATION_URL: ${WATCHTOWER_NOTIFICATION_URL:-}
+      REPO_USER: ${GH_USERNAME:-}
+      REPO_PASS: ${GH_PAT_TOKEN:-}
+    command: --interval ${WATCHTOWER_POLL_INTERVAL:-60} --debug
+    restart: always
