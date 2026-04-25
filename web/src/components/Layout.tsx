@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import BrandLogo from './BrandLogo';
 import TitleBar from './TitleBar';
 import ActivityBar from './ActivityBar';
+import { PageTransition } from './PageTransition';
 
 // Detect if running inside Electron
 const isElectron = typeof window !== 'undefined' && Boolean((window as any).electronAPI);
@@ -242,7 +243,7 @@ export default function Layout({ children }: { children: ReactNode }) {
 
         {/* ── Main content ── */}
         <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-          {children}
+          <PageTransition>{children}</PageTransition>
         </div>
       </div>
     </div>
