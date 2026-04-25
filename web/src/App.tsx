@@ -4,7 +4,12 @@ import { QueryClientProvider, QueryClient } from '@tanstack/react-query';
 import SetupWizard from './pages/SetupWizard';
 import Dashboard from './pages/Dashboard';
 import TeamManagement from './pages/TeamManagement';
-import NodeManagement from './pages/NodeManagement';
+import Servers from './pages/Servers';
+import Applications from './pages/Applications';
+import Databases from './pages/Databases';
+import Services from './pages/Services';
+import Settings from './pages/Settings';
+import HostConnect from './pages/HostConnect';
 import GitHubOAuthCallback from './pages/GitHubOAuthCallback';
 import GitHubLoginCallback from './pages/GitHubLoginCallback';
 import Login from './pages/Login';
@@ -27,21 +32,8 @@ function RequireAuth({ children }: { children: JSX.Element }) {
 
 function App() {
   useEffect(() => {
-    const media = window.matchMedia('(prefers-color-scheme: dark)');
-
-    const applyTheme = () => {
-      document.documentElement.setAttribute('data-theme', media.matches ? 'dark' : 'light');
-    };
-
-    applyTheme();
-
-    if (media.addEventListener) {
-      media.addEventListener('change', applyTheme);
-      return () => media.removeEventListener('change', applyTheme);
-    }
-
-    media.addListener(applyTheme);
-    return () => media.removeListener(applyTheme);
+    // Keep a single light visual system across all pages.
+    document.documentElement.setAttribute('data-theme', 'light');
   }, []);
 
   return (
@@ -53,8 +45,15 @@ function App() {
 
           {/* Pages with shared sidebar layout */}
           <Route path="/" element={<RequireAuth><Layout><Dashboard /></Layout></RequireAuth>} />
-          <Route path="/nodes" element={<RequireAuth><Layout><NodeManagement /></Layout></RequireAuth>} />
+          <Route path="/servers" element={<RequireAuth><Layout><Servers /></Layout></RequireAuth>} />
+          <Route path="/applications" element={<RequireAuth><Layout><Applications /></Layout></RequireAuth>} />
+          <Route path="/databases" element={<RequireAuth><Layout><Databases /></Layout></RequireAuth>} />
+          <Route path="/services" element={<RequireAuth><Layout><Services /></Layout></RequireAuth>} />
+          <Route path="/host-connect" element={<RequireAuth><Layout><HostConnect /></Layout></RequireAuth>} />
           <Route path="/team" element={<RequireAuth><Layout><TeamManagement /></Layout></RequireAuth>} />
+          <Route path="/settings" element={<RequireAuth><Layout><Settings /></Layout></RequireAuth>} />
+          {/* Legacy redirect */}
+          <Route path="/nodes" element={<Navigate to="/servers" replace />} />
           {/* Full-screen pages (wizard & oauth flow — no sidebar) */}
           <Route path="/setup" element={<RequireAuth><SetupWizard /></RequireAuth>} />
           <Route path="/oauth/github/callback" element={<RequireAuth><GitHubOAuthCallback /></RequireAuth>} />

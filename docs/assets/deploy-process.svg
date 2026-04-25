@@ -1,67 +1,71 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" role="img" aria-label="WatchTower deployment process">
   <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#fffaf0" />
-      <stop offset="100%" stop-color="#eef6ff" />
-    </linearGradient>
-    <style>
-      .title { font: 800 50px 'DM Sans', Arial, sans-serif; fill: #0f172a; }
-      .subtitle { font: 500 23px 'DM Sans', Arial, sans-serif; fill: #475569; }
-      .stepTitle { font: 800 26px 'DM Sans', Arial, sans-serif; fill: #0f172a; }
-      .stepCopy { font: 500 20px 'DM Sans', Arial, sans-serif; fill: #475569; }
-      .stepNo { font: 800 20px 'Space Mono', monospace; fill: #b91c1c; }
-      .eyebrow { font: 700 20px 'Space Mono', monospace; letter-spacing: 2px; fill: #b91c1c; }
-      .pill { font: 700 18px 'DM Sans', Arial, sans-serif; fill: #7f1d1d; }
-    </style>
+    <filter id="cs" x="-4%" y="-4%" width="112%" height="116%">
+      <feDropShadow dx="3" dy="3" stdDeviation="0" flood-color="#1f2937"/>
+    </filter>
+    <filter id="ps" x="-2%" y="-8%" width="108%" height="132%">
+      <feDropShadow dx="2" dy="2" stdDeviation="0" flood-color="#1f2937"/>
+    </filter>
   </defs>
-  <rect width="1600" height="900" fill="url(#bg)" />
-  <circle cx="124" cy="130" r="120" fill="#fde68a" opacity="0.24" />
-  <circle cx="1490" cy="150" r="170" fill="#dbeafe" opacity="0.45" />
+  <rect width="1600" height="900" fill="#fbf6ea"/>
+  <circle cx="130" cy="130" r="120" fill="#fde68a" opacity="0.28"/>
+  <circle cx="1490" cy="160" r="160" fill="#dbeafe" opacity="0.35"/>
+  <text x="80" y="82" font-family="'Space Mono', monospace" font-size="18" font-weight="700" fill="#b91c1c" letter-spacing="2">APP CENTER FLOW</text>
+  <text x="80" y="140" font-family="'DM Sans', Arial, sans-serif" font-size="44" font-weight="800" fill="#0f172a">Five visible steps from app choice to live service.</text>
+  <text x="80" y="180" font-family="'DM Sans', Arial, sans-serif" font-size="20" font-weight="500" fill="#475569">Each card answers one operator question: what goes in, what happens, and what comes out.</text>
 
-  <text x="90" y="86" class="eyebrow">APP CENTER FLOW</text>
-  <text x="90" y="146" class="title">From repo change to live nodes in a visible pipeline.</text>
-  <text x="90" y="184" class="subtitle">This is the flow used for README and Pages documentation: package locally, transfer predictably, activate remotely, and confirm health.</text>
+  <rect x="80" y="226" width="1440" height="72" rx="20" fill="#ffffff" stroke="#1f2937" stroke-width="2" filter="url(#cs)"/>
+  <rect x="108" y="244" width="780" height="34" rx="17" fill="#fde68a" stroke="#1f2937" stroke-width="1.5" filter="url(#ps)"/>
+  <text x="128" y="266" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="700" fill="#7f1d1d">Select app → Build artifact → Sync nodes → Activate release → Confirm health</text>
 
-  <rect x="90" y="235" width="1420" height="90" rx="26" fill="#ffffff" stroke="#1f2937" stroke-width="3" />
-  <rect x="120" y="260" width="340" height="40" rx="20" fill="#fde68a" stroke="#1f2937" stroke-width="2" />
-  <text x="145" y="286" class="pill">Developer → Control Plane → Package → SSH Sync → Activation</text>
+  <rect x="80" y="344" width="244" height="262" rx="20" fill="#ffffff" stroke="#1f2937" stroke-width="2" filter="url(#cs)"/>
+  <rect x="104" y="364" width="102" height="30" rx="15" fill="#fde68a" stroke="#1f2937" stroke-width="1.5" filter="url(#ps)"/>
+  <text x="118" y="384" font-family="'Space Mono', monospace" font-size="13" font-weight="700" fill="#7f1d1d">STEP 01</text>
+  <text x="104" y="432" font-family="'DM Sans', Arial, sans-serif" font-size="24" font-weight="800" fill="#0f172a">Choose app</text>
+  <text x="104" y="470" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">Pick a named workload</text>
+  <text x="104" y="494" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">from the registry or</text>
+  <text x="104" y="518" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">dashboard.</text>
 
-  <rect x="90" y="380" width="230" height="250" rx="26" fill="#ffffff" stroke="#1f2937" stroke-width="3" />
-  <rect x="380" y="380" width="230" height="250" rx="26" fill="#ffffff" stroke="#1f2937" stroke-width="3" />
-  <rect x="670" y="380" width="230" height="250" rx="26" fill="#ffffff" stroke="#1f2937" stroke-width="3" />
-  <rect x="960" y="380" width="230" height="250" rx="26" fill="#ffffff" stroke="#1f2937" stroke-width="3" />
-  <rect x="1250" y="380" width="230" height="250" rx="26" fill="#ffffff" stroke="#1f2937" stroke-width="3" />
+  <rect x="372" y="344" width="244" height="262" rx="20" fill="#ffffff" stroke="#1f2937" stroke-width="2" filter="url(#cs)"/>
+  <rect x="396" y="364" width="102" height="30" rx="15" fill="#fde68a" stroke="#1f2937" stroke-width="1.5" filter="url(#ps)"/>
+  <text x="410" y="384" font-family="'Space Mono', monospace" font-size="13" font-weight="700" fill="#7f1d1d">STEP 02</text>
+  <text x="396" y="432" font-family="'DM Sans', Arial, sans-serif" font-size="24" font-weight="800" fill="#0f172a">Build package</text>
+  <text x="396" y="470" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">Create the tar.gz or zip</text>
+  <text x="396" y="494" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">payload for this release.</text>
 
-  <line x1="320" y1="505" x2="380" y2="505" stroke="#1f2937" stroke-width="4" stroke-linecap="round" />
-  <polygon points="366,494 388,505 366,516" fill="#1f2937" />
-  <line x1="610" y1="505" x2="670" y2="505" stroke="#1f2937" stroke-width="4" stroke-linecap="round" />
-  <polygon points="656,494 678,505 656,516" fill="#1f2937" />
-  <line x1="900" y1="505" x2="960" y2="505" stroke="#1f2937" stroke-width="4" stroke-linecap="round" />
-  <polygon points="946,494 968,505 946,516" fill="#1f2937" />
-  <line x1="1190" y1="505" x2="1250" y2="505" stroke="#1f2937" stroke-width="4" stroke-linecap="round" />
-  <polygon points="1236,494 1258,505 1236,516" fill="#1f2937" />
+  <rect x="664" y="344" width="244" height="262" rx="20" fill="#ffffff" stroke="#1f2937" stroke-width="2" filter="url(#cs)"/>
+  <rect x="688" y="364" width="102" height="30" rx="15" fill="#fde68a" stroke="#1f2937" stroke-width="1.5" filter="url(#ps)"/>
+  <text x="702" y="384" font-family="'Space Mono', monospace" font-size="13" font-weight="700" fill="#7f1d1d">STEP 03</text>
+  <text x="688" y="432" font-family="'DM Sans', Arial, sans-serif" font-size="24" font-weight="800" fill="#0f172a">Sync nodes</text>
+  <text x="688" y="470" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">Transfer artifact and</text>
+  <text x="688" y="494" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">release metadata via SSH.</text>
 
-  <text x="120" y="430" class="stepNo">STEP 01</text>
-  <text x="120" y="474" class="stepTitle">Select App</text>
-  <text x="120" y="516" class="stepCopy">Pick a named workload from apps.json or the dashboard.</text>
+  <rect x="956" y="344" width="244" height="262" rx="20" fill="#ffffff" stroke="#1f2937" stroke-width="2" filter="url(#cs)"/>
+  <rect x="980" y="364" width="102" height="30" rx="15" fill="#fde68a" stroke="#1f2937" stroke-width="1.5" filter="url(#ps)"/>
+  <text x="994" y="384" font-family="'Space Mono', monospace" font-size="13" font-weight="700" fill="#7f1d1d">STEP 04</text>
+  <text x="980" y="432" font-family="'DM Sans', Arial, sans-serif" font-size="24" font-weight="800" fill="#0f172a">Activate</text>
+  <text x="980" y="470" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">Run hooks, switch the</text>
+  <text x="980" y="494" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">target, and restart safely.</text>
 
-  <text x="410" y="430" class="stepNo">STEP 02</text>
-  <text x="410" y="474" class="stepTitle">Package Build</text>
-  <text x="410" y="516" class="stepCopy">Create tar.gz or zip artifacts from the chosen source tree.</text>
+  <rect x="1248" y="344" width="272" height="262" rx="20" fill="#ffffff" stroke="#1f2937" stroke-width="2" filter="url(#cs)"/>
+  <rect x="1272" y="364" width="102" height="30" rx="15" fill="#ecfdf5" stroke="#10b981" stroke-width="1.5"/>
+  <text x="1286" y="384" font-family="'Space Mono', monospace" font-size="13" font-weight="700" fill="#047857">STEP 05</text>
+  <text x="1272" y="432" font-family="'DM Sans', Arial, sans-serif" font-size="24" font-weight="800" fill="#0f172a">Verify health</text>
+  <text x="1272" y="470" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">WatchTower reports</text>
+  <text x="1272" y="494" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">service status back to</text>
+  <text x="1272" y="518" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">the operator.</text>
 
-  <text x="700" y="430" class="stepNo">STEP 03</text>
-  <text x="700" y="474" class="stepTitle">SSH Transfer</text>
-  <text x="700" y="516" class="stepCopy">Sync release payloads and release metadata to selected nodes.</text>
+  <line x1="324" y1="476" x2="372" y2="476" stroke="#1f2937" stroke-width="4" stroke-linecap="round"/>
+  <polygon points="360,465 384,476 360,487" fill="#1f2937"/>
+  <line x1="616" y1="476" x2="664" y2="476" stroke="#1f2937" stroke-width="4" stroke-linecap="round"/>
+  <polygon points="652,465 676,476 652,487" fill="#1f2937"/>
+  <line x1="908" y1="476" x2="956" y2="476" stroke="#1f2937" stroke-width="4" stroke-linecap="round"/>
+  <polygon points="944,465 968,476 944,487" fill="#1f2937"/>
+  <line x1="1200" y1="476" x2="1248" y2="476" stroke="#1f2937" stroke-width="4" stroke-linecap="round"/>
+  <polygon points="1236,465 1260,476 1236,487" fill="#1f2937"/>
 
-  <text x="990" y="430" class="stepNo">STEP 04</text>
-  <text x="990" y="474" class="stepTitle">Remote Activate</text>
-  <text x="990" y="516" class="stepCopy">Run build hooks, restart services, and switch live targets.</text>
-
-  <text x="1280" y="430" class="stepNo">STEP 05</text>
-  <text x="1280" y="474" class="stepTitle">Health Verify</text>
-  <text x="1280" y="516" class="stepCopy">Capture status and expose results back to operators.</text>
-
-  <rect x="90" y="690" width="1420" height="120" rx="26" fill="#fffdf7" stroke="#1f2937" stroke-width="3" />
-  <text x="130" y="740" class="stepTitle">Process outcome</text>
-  <text x="130" y="780" class="stepCopy">The same five-stage release narrative now has dedicated visuals for GitHub README and GitHub Pages, instead of relying on text-only setup instructions.</text>
+  <rect x="80" y="676" width="1440" height="126" rx="20" fill="#fffdf7" stroke="#1f2937" stroke-width="2" filter="url(#cs)"/>
+  <text x="116" y="720" font-family="'DM Sans', Arial, sans-serif" font-size="21" font-weight="800" fill="#0f172a">Why this matters</text>
+  <text x="116" y="754" font-family="'DM Sans', Arial, sans-serif" font-size="17" font-weight="500" fill="#475569">The release path is explicit. Operators can tell what stage is running, where the artifact is,</text>
+  <text x="116" y="780" font-family="'DM Sans', Arial, sans-serif" font-size="17" font-weight="500" fill="#475569">and whether the deployment finished healthy without reading backend logs first.</text>
 </svg>

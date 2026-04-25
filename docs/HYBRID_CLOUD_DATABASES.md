@@ -8,11 +8,11 @@ This guide covers the hybrid model where your Podman nodes provide compute and r
 
 ## Visual Overview
 
-![WatchTower hybrid stack](./assets/hybrid-stack.svg)
+![WatchTower hybrid stack](https://sinhaankur.github.io/WatchTower/assets/hybrid-stack.svg)
 
-![WatchTower application and web app surface](./assets/application-surface.svg)
+![WatchTower application and web app surface](https://sinhaankur.github.io/WatchTower/assets/application-surface.svg)
 
-![WatchTower secure terminal command flow](./assets/secure-terminal-flow.svg)
+![WatchTower secure terminal command flow](https://sinhaankur.github.io/WatchTower/assets/secure-terminal-flow.svg)
 
 The intended fit is:
 

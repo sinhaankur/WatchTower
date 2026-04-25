@@ -4,7 +4,10 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>WatchTower Docs Viewer</title>
+  <link rel="icon" type="image/x-icon" href="./favicon.ico">
+  <link rel="icon" type="image/png" sizes="32x32" href="./favicon-32x32.png">
   <link rel="icon" type="image/svg+xml" href="./wt-logo.svg">
+  <link rel="apple-touch-icon" sizes="152x152" href="./apple-touch-icon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
@@ -26,6 +29,13 @@
       --wt-ok-text: #047857;
       --wt-ok-border: rgba(16, 185, 129, 0.28);
       --wt-link: #1d4ed8;
+      /* Archetype-level motion + shadow tokens */
+      --shadow: 4px 4px 0 0 hsl(0 0% 0% / 1);
+      --shadow-hover: 6px 6px 0 0 hsl(0 0% 0% / 1);
+      --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+      --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+      --dur-fast: 140ms;
+      --dur-base: 240ms;
     }
 
     * { box-sizing: border-box; }
@@ -54,14 +64,14 @@
       flex-direction: column;
       background: rgba(248, 251, 255, 0.9);
       backdrop-filter: blur(8px);
-      border-right: 1px solid var(--wt-border-soft);
+      border-right: 2px solid var(--wt-border);
       position: sticky;
       top: 0;
       height: 100vh;
     }
     .brand-block {
       padding: 20px 16px;
-      border-bottom: 1px solid var(--wt-border-soft);
+      border-bottom: 2px solid var(--wt-border);
     }
     .brand {
       display: flex;
@@ -114,22 +124,31 @@
     }
     .primary-button {
       width: 100%;
-      border: 1px solid var(--wt-border);
+      border: 2px solid var(--wt-border);
       color: #ffffff;
       background: var(--wt-accent);
-      box-shadow: 2px 2px 0 0 var(--wt-border);
+      box-shadow: var(--shadow);
+      border-radius: 0;
+      transition: transform var(--dur-fast) var(--ease-spring), box-shadow var(--dur-fast) ease, background var(--dur-fast) ease;
     }
     .secondary-button,
     .ghost-button {
-      border: 1px solid var(--wt-border);
+      border: 2px solid var(--wt-border);
       background: #ffffff;
       color: #0f172a;
-      box-shadow: 2px 2px 0 0 rgba(31, 41, 55, 0.08);
+      box-shadow: var(--shadow);
+      border-radius: 0;
+      transition: transform var(--dur-fast) var(--ease-spring), box-shadow var(--dur-fast) ease, background var(--dur-fast) ease;
     }
-    .primary-button:hover,
+    .primary-button:hover { background: #991b1b; transform: translate(-2px, -2px); box-shadow: var(--shadow-hover); }
     .secondary-button:hover,
-    .ghost-button:hover { transform: translateY(-1px); }
-    .primary-button:hover { background: #991b1b; }
+    .ghost-button:hover { background: #fef9ee; transform: translate(-2px, -2px); box-shadow: var(--shadow-hover); }
+    .primary-button:active,
+    .secondary-button:active,
+    .ghost-button:active {
+      transform: translate(2px, 2px);
+      box-shadow: none;
+    }
     .sidebar-nav {
       padding: 10px 12px 16px;
       display: flex;
@@ -155,7 +174,7 @@
       background: #fef2f2;
       color: var(--wt-accent-strong);
       border-left-color: var(--wt-accent-strong);
-      box-shadow: 0 1px 0 rgba(15, 23, 42, 0.06);
+      border-left-width: 3px;
     }
     .nav-dot {
       width: 8px;
@@ -189,7 +208,7 @@
       justify-content: space-between;
       gap: 16px;
       padding: 20px 32px;
-      border-bottom: 1px solid var(--wt-border-soft);
+      border-bottom: 2px solid var(--wt-border);
       background: rgba(248, 251, 255, 0.9);
       backdrop-filter: blur(8px);
     }
@@ -314,6 +333,10 @@
     .markdown-panel {
       padding: 20px;
     }
+
+    .markdown-panel {
+      overflow: hidden;
+    }
     .toc h3,
     .markdown-panel h3 {
       margin: 0 0 12px;
@@ -343,19 +366,7 @@
     }
     .loading,
     .error-box {
-      padding: 18px;
-      border-radius: 14px;
-      border: 1px solid var(--wt-border-soft);
-      background: var(--wt-panel-soft);
-      color: var(--wt-text-dim);
-    }
-    .error-box { color: #991b1b; }
-
-    .markdown-body {
-      color: #1f2937;
-      line-height: 1.75;
-      font-size: 0.96rem;
-    }
+      padding: 18px;\n      border: 2px solid var(--wt-border-soft);\n      background: var(--wt-panel-soft);\n      color: var(--wt-text-dim);\n    }\n    .error-box { color: #991b1b; }\n\n    @keyframes fadeInUp {\n      from { opacity: 0; transform: translateY(14px); }\n      to   { opacity: 1; transform: translateY(0); }\n    }\n\n    .markdown-body {\n      color: #1f2937;\n      line-height: 1.75;\n      font-size: 0.96rem;\n      animation: fadeInUp 0.28s ease both;\n    }
     .markdown-body > *:first-child { margin-top: 0; }
     .markdown-body h1,
     .markdown-body h2,
@@ -389,6 +400,8 @@
     }
     .markdown-body table {
       width: 100%;
+      display: block;
+      overflow-x: auto;
       border-collapse: collapse;
       margin: 1rem 0;
       font-size: 0.9rem;
@@ -437,6 +450,8 @@
       height: auto;
       border-radius: 12px;
       border: 1px solid var(--wt-border-soft);
+      background: #fffdf7;
+      padding: 6px;
     }
 
     @media (max-width: 980px) {
@@ -452,18 +467,51 @@
         border-right: 0;
         border-bottom: 1px solid var(--wt-border-soft);
       }
+      .sidebar-nav {
+        flex-direction: row;
+        overflow-x: auto;
+        overflow-y: hidden;
+        padding-bottom: 12px;
+        scrollbar-width: thin;
+      }
+      .nav-link {
+        flex: 0 0 auto;
+        white-space: nowrap;
+      }
       .topbar,
       .content { padding-left: 18px; padding-right: 18px; }
-      .topbar { flex-direction: column; align-items: flex-start; }
+      .topbar {
+        position: relative;
+        flex-direction: column;
+        align-items: flex-start;
+      }
       .hero,
       .toc,
       .markdown-panel { padding: 18px; }
+      .doc-layout { gap: 14px; }
     }
     @media (max-width: 640px) {
       .actions { flex-direction: column; }
       .primary-button,
       .secondary-button,
       .ghost-button { width: 100%; }
+      .content {
+        padding-top: 18px;
+        padding-bottom: 28px;
+      }
+      .hero h2 {
+        font-size: 1.7rem;
+        line-height: 1.08;
+      }
+      .hero,
+      .toc,
+      .markdown-panel,
+      .doc-nav-card { padding: 16px; }
+      .doc-nav-title { font-size: 0.95rem; }
+      .markdown-body { font-size: 0.93rem; }
+      .markdown-body h1 { font-size: 1.7rem; }
+      .markdown-body h2 { font-size: 1.28rem; }
+      .markdown-body pre { font-size: 0.78rem; }
     }
   </style>
 </head>
@@ -499,7 +547,7 @@
       <header class="topbar">
         <div>
           <h1 id="page-title">Docs Viewer</h1>
-          <p id="page-subtitle">Rendered documentation with clickable internal links and Pages-safe navigation.</p>
+          <p id="page-subtitle">Rendered documentation with Pages-safe navigation and clearer product framing.</p>
         </div>
         <div class="status-pill">GitHub Pages Viewer</div>
       </header>
@@ -508,7 +556,7 @@
         <section class="panel hero">
           <p class="eyebrow">Document</p>
           <h2 id="hero-title">Loading document…</h2>
-          <p id="hero-description">Preparing the selected guide inside the same WatchTower docs shell.</p>
+          <p id="hero-description">Preparing the selected guide with context so first-time readers know where this document fits.</p>
           <div class="actions">
             <a class="secondary-button" href="./index.html">Back To Docs Home</a>
             <a class="ghost-button" id="raw-link" href="#">Open Raw Source</a>
@@ -547,31 +595,31 @@
     const DOCS = {
       readme: {
         title: 'Main README',
-        subtitle: 'Project overview, installation, features, security, release flow, and usage guidance.',
+        subtitle: 'Best starting point for understanding what WatchTower is, how it is installed, and which mode to use.',
         source: 'https://raw.githubusercontent.com/sinhaankur/WatchTower/main/README.md',
         raw: 'https://github.com/sinhaankur/WatchTower/blob/main/README.md'
       },
       mesh: {
         title: 'Mesh Runbook',
-        subtitle: 'Mesh-style deployment guidance and preview workflows for WatchTower.',
+        subtitle: 'Read this when you need preview and live routing across a mesh of nodes.',
         source: './WATCHTOWER_MESH_VERCEL.md',
         raw: 'https://github.com/sinhaankur/WatchTower/blob/main/docs/WATCHTOWER_MESH_VERCEL.md'
       },
       ha: {
         title: 'HA Podman WatchTower',
-        subtitle: 'High-availability operations guidance for Podman-based update flows.',
+        subtitle: 'Read this when the job is resilient Podman host maintenance rather than app delivery.',
         source: './HA_PODMAN_WATCHTOWER.md',
         raw: 'https://github.com/sinhaankur/WatchTower/blob/main/docs/HA_PODMAN_WATCHTOWER.md'
       },
       hybrid: {
         title: 'Hybrid Cloud Databases',
-        subtitle: 'Connectivity and deployment notes for hybrid local and cloud database use.',
+        subtitle: 'Read this when compute stays close to the team but data or services live remotely.',
         source: './HYBRID_CLOUD_DATABASES.md',
         raw: 'https://github.com/sinhaankur/WatchTower/blob/main/docs/HYBRID_CLOUD_DATABASES.md'
       },
       enterprise: {
         title: 'Enterprise Features',
-        subtitle: 'Enterprise-oriented capabilities, controls, and platform considerations.',
+        subtitle: 'Read this for controls, platform constraints, and features aimed at larger teams.',
         source: './ENTERPRISE_FEATURES.md',
         raw: 'https://github.com/sinhaankur/WatchTower/blob/main/docs/ENTERPRISE_FEATURES.md'
       }
