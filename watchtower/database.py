@@ -322,6 +322,21 @@ class TeamMember(Base):
     user = relationship("User", backref="team_memberships")
 
 
+class InstallationClaim(Base):
+    """Singleton record describing who owns this WatchTower installation."""
+    __tablename__ = "installation_claims"
+
+    id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    owner_user_id = Column(Uuid(as_uuid=True), ForeignKey("users.id"), unique=True)
+    owner_github_id = Column(Integer, nullable=True)
+    owner_login = Column(String, nullable=True)
+    claimed_at = Column(DateTime, default=datetime.utcnow)
+    github_connected_at = Column(DateTime, nullable=True)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    owner_user = relationship("User", backref="installation_claims")
+
+
 class OrgNode(Base):
     """Deployment nodes managed by organization"""
     __tablename__ = "org_nodes"
@@ -352,6 +367,8 @@ class OrgNode(Base):
     max_concurrent_deployments = Column(Integer, default=1)
     is_active = Column(Boolean, default=True)
     is_primary = Column(Boolean, default=False)  # Primary node for deployments
+    created_by_user_id = Column(Uuid(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    updated_by_user_id = Column(Uuid(as_uuid=True), ForeignKey("users.id"), nullable=True)
     
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -429,6 +446,7 @@ def get_db():
 def init_db():
     Base.metadata.create_all(bind=engine)
     _ensure_project_columns()
+    _ensure_org_node_columns()
 
 
 def _ensure_project_columns():
@@ -451,6 +469,32 @@ def _ensure_project_columns():
     if "launch_url" not in existing_cols:
         alter_statements.append(
             "ALTER TABLE projects ADD COLUMN launch_url VARCHAR"
+        )
+
+    if not alter_statements:
+        return
+
+    with engine.begin() as conn:
+        for stmt in alter_statements:
+            conn.execute(text(stmt))
+
+
+def _ensure_org_node_columns():
+    """Backfill new org_nodes columns in existing databases."""
+    inspector = inspect(engine)
+    if "org_nodes" not in inspector.get_table_names():
+        return
+
+    existing_cols = {col["name"] for col in inspector.get_columns("org_nodes")}
+    alter_statements = []
+
+    if "created_by_user_id" not in existing_cols:
+        alter_statements.append(
+            "ALTER TABLE org_nodes ADD COLUMN created_by_user_id UUID"
+        )
+    if "updated_by_user_id" not in existing_cols:
+        alter_statements.append(
+            "ALTER TABLE org_nodes ADD COLUMN updated_by_user_id UUID"
         )
 
     if not alter_statements:

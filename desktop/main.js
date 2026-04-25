@@ -31,6 +31,10 @@ if (process.platform === 'linux') {
     // Use SwiftShader (CPU software renderer bundled in Electron).
     // Avoids all GPU driver crashes on NVIDIA 500+ + kernel 6.x + X11.
     app.disableHardwareAcceleration();
+    app.commandLine.appendSwitch('disable-gpu');
+    app.commandLine.appendSwitch('disable-gpu-sandbox');
+    app.commandLine.appendSwitch('no-sandbox');
+    app.commandLine.appendSwitch('disable-dev-shm-usage');
   }
 }
 
@@ -135,8 +139,35 @@ const pythonUnix = path.join(repoRoot, '.venv', 'bin', 'python');
 const pythonWin = path.join(repoRoot, '.venv', 'Scripts', 'python.exe');
 const runtimeApiToken = process.env.WATCHTOWER_API_TOKEN || `wt-${crypto.randomBytes(24).toString('hex')}`;
 
+function isGithubOauthConfigured() {
+  const clientId = process.env.GITHUB_OAUTH_CLIENT_ID || process.env.GITHUB_CLIENT_ID;
+  const clientSecret = process.env.GITHUB_OAUTH_CLIENT_SECRET || process.env.GITHUB_CLIENT_SECRET;
+  return Boolean(clientId && clientSecret);
+}
+
+function shouldAutoAuthDesktop() {
+  // Explicit override for local/dev automation.
+  if (process.env.WATCHTOWER_DESKTOP_AUTO_AUTH === '1') return true;
+  if (process.env.WATCHTOWER_DESKTOP_AUTO_AUTH === '0') return false;
+  // Default behavior:
+  // - OAuth configured => require per-user login.
+  // - OAuth not configured => keep bootstrap token login for local usability.
+  return !isGithubOauthConfigured();
+}
+
 // Resolve the best available icon for this platform.
 const iconsDir = path.join(__dirname, 'build', 'icons');
+
+function isLoadableImage(filePath) {
+  if (!filePath || !fs.existsSync(filePath)) return false;
+  try {
+    const img = nativeImage.createFromPath(filePath);
+    return !img.isEmpty();
+  } catch {
+    return false;
+  }
+}
+
 function resolveAppIcon() {
   // Only offer formats the current OS can actually load.
   const candidates =
@@ -147,7 +178,7 @@ function resolveAppIcon() {
       : /* linux / other */
         [path.join(iconsDir, 'favicon-128.png'), path.join(iconsDir, 'favicon-96.png')];
   for (const f of candidates) {
-    if (fs.existsSync(f)) return f;
+    if (isLoadableImage(f)) return f;
   }
   return undefined;
 }
@@ -158,7 +189,17 @@ const APP_ICON = resolveAppIcon();
 // Expose the per-launch API token to the renderer via synchronous IPC.
 // The preload script calls this before React boots so the token is already
 // in localStorage when the first useEffect runs.
-ipcMain.on('wt:getApiToken', (event) => { event.returnValue = runtimeApiToken; });
+//
+// Token injection is safe only when:
+//   (a) WATCHTOWER_API_TOKEN was explicitly set in the environment (user knows it), OR
+//   (b) Electron spawned the backend itself (so runtimeApiToken is guaranteed to match).
+ipcMain.on('wt:getAuthBootstrap', (event) => {
+  const tokenIsKnown = Boolean(process.env.WATCHTOWER_API_TOKEN) || electronSpawnedBackend;
+  event.returnValue = {
+    autoAuth: shouldAutoAuthDesktop(),
+    apiToken: tokenIsKnown ? runtimeApiToken : null,
+  };
+});
 
 // Prevents a second Electron process from opening a duplicate splash window.
 const gotSingleInstanceLock = app.requestSingleInstanceLock();
@@ -182,6 +223,9 @@ let staticServer;   // Node http.Server for pre-built static files
 let splashWindow;
 let mainWindow;
 let tray = null;
+// True when this Electron process started the backend itself.
+// Only then is runtimeApiToken guaranteed to match the running server.
+let electronSpawnedBackend = false;
 let isQuitting = false;
 
 // MIME types for the built-in static file server
@@ -312,6 +356,7 @@ async function startBackend() {
   // Kill any process already holding the backend port (stale uvicorn, container, etc.)
   await killPortProcesses(BACKEND_PORT);
 
+  electronSpawnedBackend = true;
   const python = resolvePython();
   backendProcess = spawn(
     python,
@@ -523,8 +568,17 @@ async function launch() {
 }
 
 function createTray() {
-  const iconPath = APP_ICON || path.join(iconsDir, 'favicon-128.png');
-  tray = new Tray(iconPath);
+  const fallbackIcon = path.join(iconsDir, 'favicon-128.png');
+  const iconPath = isLoadableImage(APP_ICON) ? APP_ICON : (isLoadableImage(fallbackIcon) ? fallbackIcon : null);
+
+  try {
+    tray = iconPath ? new Tray(iconPath) : new Tray(nativeImage.createEmpty());
+  } catch (error) {
+    // Never crash app startup due to a tray icon decode/format issue.
+    console.warn('[WatchTower] Tray icon load failed, continuing without icon:', error.message);
+    tray = new Tray(nativeImage.createEmpty());
+  }
+
   tray.setToolTip('WatchTower');
 
   const contextMenu = Menu.buildFromTemplate([
