@@ -1,5 +1,21 @@
 # WatchTower
 
+<p align="center">
+  <a href="https://github.com/sinhaankur/WatchTower/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT License" /></a>
+  <img src="https://img.shields.io/badge/python-3.8%2B-blue.svg" alt="Python 3.8+" />
+  <img src="https://img.shields.io/badge/node-18%2B-brightgreen.svg" alt="Node 18+" />
+  <a href="https://github.com/sinhaankur/WatchTower/pkgs/container/watchtower"><img src="https://img.shields.io/badge/container-GHCR-blueviolet.svg" alt="GHCR" /></a>
+  <a href="https://sinhaankur.github.io/WatchTower/"><img src="https://img.shields.io/badge/docs-GitHub%20Pages-orange.svg" alt="Docs" /></a>
+  <a href="https://github.com/sinhaankur/WatchTower/issues"><img src="https://img.shields.io/github/issues/sinhaankur/WatchTower.svg" alt="Issues" /></a>
+</p>
+
+<p align="center">
+  <strong>Keep Podman containers current. Ship apps across your own nodes.</strong><br/>
+  Operator-facing tooling for container auto-updates, multi-node deployments, and guided host operations — without handing control to a hosted platform.
+</p>
+
+---
+
 ## Get Running in 30 Seconds
 
 ```bash
@@ -57,95 +73,67 @@ The project is intentionally lightweight. It is not trying to replace a full Paa
 
 ## Visual Blueprints
 
-These diagrams are the fastest way to understand the product before reading setup guides.
+These diagrams are the fastest way to understand WatchTower before reading setup guides. Click any image to open the full interactive viewer.
 
 ### Modes Overview
 
-Start here if you need the shortest explanation of the two operating modes.
+<p align="center">
+  <a href="https://sinhaankur.github.io/WatchTower/" target="_blank" rel="noreferrer">
+    <img src="docs/assets/modes-overview.svg" width="860" alt="WatchTower modes overview — Podman auto-update service vs App Center control plane" />
+  </a>
+</p>
 
-<a href="https://sinhaankur.github.io/WatchTower/" target="_blank" rel="noreferrer">
-  <img src="https://sinhaankur.github.io/WatchTower/assets/modes-overview.svg" alt="WatchTower modes overview showing Podman auto-update service and App Center control plane mode" />
-</a>
-
-### Deployment Process
-
-Use this to understand the App Center release path from app choice to healthy service.
-
-<a href="https://sinhaankur.github.io/WatchTower/viewer.html?doc=readme" target="_blank" rel="noreferrer">
-  <img src="https://sinhaankur.github.io/WatchTower/assets/deploy-process.svg" alt="WatchTower deployment process showing app selection, packaging, SSH transfer, remote activation, and health verification" />
-</a>
-
-### Mesh Topology
-
-Use this when you need to understand preview traffic, live traffic, and mesh routing decisions.
-
-<a href="https://sinhaankur.github.io/WatchTower/viewer.html?doc=mesh" target="_blank" rel="noreferrer">
-  <img src="https://sinhaankur.github.io/WatchTower/assets/mesh-topology.svg" alt="WatchTower mesh topology showing control plane, preview nodes, live nodes, and traffic layer" />
-</a>
-
-### Hybrid Stack
-
-Use this when your control plane stays local but data or services live remotely.
-
-<a href="https://sinhaankur.github.io/WatchTower/viewer.html?doc=hybrid" target="_blank" rel="noreferrer">
-  <img src="https://sinhaankur.github.io/WatchTower/assets/hybrid-stack.svg" alt="WatchTower hybrid stack overview showing local operator workspace, WatchTower API, managed services, app nodes, and data plane" />
-</a>
-
-### Application And Web App Surface
-
-Use this to see how dashboard-managed app records turn into a public URL that end users actually open.
-
-<a href="https://sinhaankur.github.io/WatchTower/" target="_blank" rel="noreferrer">
-  <img src="https://sinhaankur.github.io/WatchTower/assets/application-surface.svg" alt="WatchTower application and web app surface showing dashboard, artifact build, and public web app delivery" />
-</a>
-
-### Secure Terminal Command Flow
-
-Use this to understand how guided host operations stay useful without exposing a raw shell.
-
-<a href="https://sinhaankur.github.io/WatchTower/viewer.html?doc=readme" target="_blank" rel="noreferrer">
-  <img src="https://sinhaankur.github.io/WatchTower/assets/secure-terminal-flow.svg" alt="WatchTower secure terminal command flow showing Host Connect request, policy gate, execution path, encrypted audit, and operator result" />
-</a>
-
----
-
-## Visual Blueprints
-
-### Modes Overview
-
-<a href="https://sinhaankur.github.io/WatchTower/" target="_blank" rel="noreferrer">
-  <img src="docs/assets/modes-overview.svg" alt="WatchTower modes overview showing Podman auto-update service and App Center control plane mode" />
-</a>
+> Start here. Two operating modes — keep existing containers current, or run a full app delivery pipeline.
 
 ### Deployment Process
 
-<a href="https://sinhaankur.github.io/WatchTower/viewer.html?doc=readme" target="_blank" rel="noreferrer">
-  <img src="docs/assets/deploy-process.svg" alt="WatchTower deployment process showing app selection, packaging, SSH transfer, remote activation, and health verification" />
-</a>
+<p align="center">
+  <a href="https://sinhaankur.github.io/WatchTower/viewer.html?doc=deploy" target="_blank" rel="noreferrer">
+    <img src="docs/assets/deploy-process.svg" width="860" alt="WatchTower deployment process — app selection, packaging, SSH transfer, remote activation, health verification" />
+  </a>
+</p>
+
+> The App Center release path: choose an app, build an artifact, sync to nodes, activate, confirm health.
 
 ### Mesh Topology
 
-<a href="https://sinhaankur.github.io/WatchTower/viewer.html?doc=mesh" target="_blank" rel="noreferrer">
-  <img src="docs/assets/mesh-topology.svg" alt="WatchTower mesh topology showing control plane, preview nodes, live nodes, and traffic layer" />
-</a>
+<p align="center">
+  <a href="https://sinhaankur.github.io/WatchTower/viewer.html?doc=mesh" target="_blank" rel="noreferrer">
+    <img src="docs/assets/mesh-topology.svg" width="860" alt="WatchTower mesh topology — control plane, preview nodes, live nodes, and traffic routing" />
+  </a>
+</p>
+
+> Preview traffic, live traffic, and mesh routing decisions at a glance.
 
 ### Hybrid Stack
 
-<a href="https://sinhaankur.github.io/WatchTower/viewer.html?doc=hybrid" target="_blank" rel="noreferrer">
-  <img src="docs/assets/hybrid-stack.svg" alt="WatchTower hybrid stack overview showing local operator workspace, WatchTower API, managed services, app nodes, and data plane" />
-</a>
+<p align="center">
+  <a href="https://sinhaankur.github.io/WatchTower/viewer.html?doc=hybrid" target="_blank" rel="noreferrer">
+    <img src="docs/assets/hybrid-stack.svg" width="860" alt="WatchTower hybrid stack — local operator workspace, WatchTower API, managed services, app nodes, data plane" />
+  </a>
+</p>
 
-### Application And Web App Surface
+> Your control plane stays local; data and services live where you put them.
 
-<a href="https://sinhaankur.github.io/WatchTower/" target="_blank" rel="noreferrer">
-  <img src="docs/assets/application-surface.svg" alt="WatchTower application and web app surface showing dashboard, artifact build, and public web app delivery" />
-</a>
+### Application & Web App Surface
+
+<p align="center">
+  <a href="https://sinhaankur.github.io/WatchTower/" target="_blank" rel="noreferrer">
+    <img src="docs/assets/application-surface.svg" width="860" alt="WatchTower application surface — dashboard, artifact build, and public web app delivery" />
+  </a>
+</p>
+
+> How a dashboard-registered app record becomes a URL your users can open.
 
 ### Secure Terminal Command Flow
 
-<a href="https://sinhaankur.github.io/WatchTower/viewer.html?doc=readme" target="_blank" rel="noreferrer">
-  <img src="docs/assets/secure-terminal-flow.svg" alt="WatchTower secure terminal command flow showing Host Connect request, policy gate, execution path, encrypted audit, and operator result" />
-</a>
+<p align="center">
+  <a href="https://sinhaankur.github.io/WatchTower/viewer.html?doc=terminal" target="_blank" rel="noreferrer">
+    <img src="docs/assets/secure-terminal-flow.svg" width="860" alt="WatchTower secure terminal command flow — Host Connect request, policy gate, execution path, encrypted audit, operator result" />
+  </a>
+</p>
+
+> How guided host operations stay useful without exposing a raw shell.
 
 ---
 

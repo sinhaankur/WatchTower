@@ -10,30 +10,30 @@
   <rect width="1600" height="900" fill="#fbf6ea"/>
   <circle cx="130" cy="130" r="120" fill="#fde68a" opacity="0.28"/>
   <circle cx="1490" cy="160" r="160" fill="#dbeafe" opacity="0.35"/>
-  <text x="80" y="82" font-family="'Space Mono', monospace" font-size="18" font-weight="700" fill="#b91c1c" letter-spacing="2">HYBRID RUNTIME MAP</text>
-  <text x="80" y="140" font-family="'DM Sans', Arial, sans-serif" font-size="42" font-weight="800" fill="#0f172a">Local control can still manage remote services and cloud data.</text>
-  <text x="80" y="180" font-family="'DM Sans', Arial, sans-serif" font-size="20" font-weight="500" fill="#475569">The hybrid model keeps the operator workflow close to the team while letting runtime pieces live elsewhere.</text>
+  <text x="80" y="82" font-family="'Courier New', Courier, monospace" font-size="18" font-weight="700" fill="#b91c1c" letter-spacing="2">HYBRID RUNTIME MAP</text>
+  <text x="80" y="140" font-family="Arial, 'Helvetica Neue', Helvetica, sans-serif" font-size="42" font-weight="800" fill="#0f172a">Local control can still manage remote services and cloud data.</text>
+  <text x="80" y="180" font-family="Arial, 'Helvetica Neue', Helvetica, sans-serif" font-size="20" font-weight="500" fill="#475569">The hybrid model keeps the operator workflow close to the team while letting runtime pieces live elsewhere.</text>
 
   <rect x="80" y="258" width="420" height="220" rx="20" fill="#ffffff" stroke="#1f2937" stroke-width="2" filter="url(#cs)"/>
   <rect x="106" y="282" width="198" height="30" rx="15" fill="#fde68a" stroke="#1f2937" stroke-width="1.5" filter="url(#ps)"/>
-  <text x="120" y="302" font-family="'Space Mono', monospace" font-size="12" font-weight="700" fill="#7f1d1d">LOCAL WORKSPACE</text>
-  <text x="106" y="362" font-family="'DM Sans', Arial, sans-serif" font-size="24" font-weight="800" fill="#0f172a">Operator tools</text>
-  <text x="106" y="400" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">Dashboard, CLI, package build,</text>
-  <text x="106" y="424" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">and release intent start here.</text>
+  <text x="120" y="302" font-family="'Courier New', Courier, monospace" font-size="12" font-weight="700" fill="#7f1d1d">LOCAL WORKSPACE</text>
+  <text x="106" y="362" font-family="Arial, 'Helvetica Neue', Helvetica, sans-serif" font-size="24" font-weight="800" fill="#0f172a">Operator tools</text>
+  <text x="106" y="400" font-family="Arial, 'Helvetica Neue', Helvetica, sans-serif" font-size="16" font-weight="500" fill="#475569">Dashboard, CLI, package build,</text>
+  <text x="106" y="424" font-family="Arial, 'Helvetica Neue', Helvetica, sans-serif" font-size="16" font-weight="500" fill="#475569">and release intent start here.</text>
 
   <rect x="590" y="258" width="420" height="220" rx="20" fill="#ffffff" stroke="#1f2937" stroke-width="2" filter="url(#cs)"/>
   <rect x="616" y="282" width="168" height="30" rx="15" fill="#fde68a" stroke="#1f2937" stroke-width="1.5" filter="url(#ps)"/>
-  <text x="630" y="302" font-family="'Space Mono', monospace" font-size="12" font-weight="700" fill="#7f1d1d">WATCHTOWER API</text>
-  <text x="616" y="362" font-family="'DM Sans', Arial, sans-serif" font-size="24" font-weight="800" fill="#0f172a">Deploy engine</text>
-  <text x="616" y="400" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">Handles auth, rollout plans,</text>
-  <text x="616" y="424" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">inspection, and secure actions.</text>
+  <text x="630" y="302" font-family="'Courier New', Courier, monospace" font-size="12" font-weight="700" fill="#7f1d1d">WATCHTOWER API</text>
+  <text x="616" y="362" font-family="Arial, 'Helvetica Neue', Helvetica, sans-serif" font-size="24" font-weight="800" fill="#0f172a">Deploy engine</text>
+  <text x="616" y="400" font-family="Arial, 'Helvetica Neue', Helvetica, sans-serif" font-size="16" font-weight="500" fill="#475569">Handles auth, rollout plans,</text>
+  <text x="616" y="424" font-family="Arial, 'Helvetica Neue', Helvetica, sans-serif" font-size="16" font-weight="500" fill="#475569">inspection, and secure actions.</text>
 
   <rect x="1100" y="258" width="420" height="220" rx="20" fill="#ffffff" stroke="#1f2937" stroke-width="2" filter="url(#cs)"/>
   <rect x="1126" y="282" width="176" height="30" rx="15" fill="#fde68a" stroke="#1f2937" stroke-width="1.5" filter="url(#ps)"/>
-  <text x="1140" y="302" font-family="'Space Mono', monospace" font-size="12" font-weight="700" fill="#7f1d1d">MANAGED SERVICES</text>
-  <text x="1126" y="362" font-family="'DM Sans', Arial, sans-serif" font-size="24" font-weight="800" fill="#0f172a">Cloud dependencies</text>
-  <text x="1126" y="400" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">DNS, tunnels, auth providers,</text>
-  <text x="1126" y="424" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">storage, and hosted databases.</text>
+  <text x="1140" y="302" font-family="'Courier New', Courier, monospace" font-size="12" font-weight="700" fill="#7f1d1d">MANAGED SERVICES</text>
+  <text x="1126" y="362" font-family="Arial, 'Helvetica Neue', Helvetica, sans-serif" font-size="24" font-weight="800" fill="#0f172a">Cloud dependencies</text>
+  <text x="1126" y="400" font-family="Arial, 'Helvetica Neue', Helvetica, sans-serif" font-size="16" font-weight="500" fill="#475569">DNS, tunnels, auth providers,</text>
+  <text x="1126" y="424" font-family="Arial, 'Helvetica Neue', Helvetica, sans-serif" font-size="16" font-weight="500" fill="#475569">storage, and hosted databases.</text>
 
   <line x1="500" y1="370" x2="590" y2="370" stroke="#1f2937" stroke-width="4" stroke-linecap="round"/>
   <polygon points="578,359 602,370 578,381" fill="#1f2937"/>
@@ -42,17 +42,17 @@
 
   <rect x="190" y="570" width="520" height="220" rx="20" fill="#ffffff" stroke="#1f2937" stroke-width="2" filter="url(#cs)"/>
   <rect x="220" y="594" width="112" height="30" rx="15" fill="#fde68a" stroke="#1f2937" stroke-width="1.5" filter="url(#ps)"/>
-  <text x="236" y="614" font-family="'Space Mono', monospace" font-size="12" font-weight="700" fill="#7f1d1d">APP NODES</text>
-  <text x="220" y="674" font-family="'DM Sans', Arial, sans-serif" font-size="24" font-weight="800" fill="#0f172a">Compute targets</text>
-  <text x="220" y="712" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">Remote hosts receive artifacts, run services,</text>
-  <text x="220" y="736" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">and expose application traffic.</text>
+  <text x="236" y="614" font-family="'Courier New', Courier, monospace" font-size="12" font-weight="700" fill="#7f1d1d">APP NODES</text>
+  <text x="220" y="674" font-family="Arial, 'Helvetica Neue', Helvetica, sans-serif" font-size="24" font-weight="800" fill="#0f172a">Compute targets</text>
+  <text x="220" y="712" font-family="Arial, 'Helvetica Neue', Helvetica, sans-serif" font-size="16" font-weight="500" fill="#475569">Remote hosts receive artifacts, run services,</text>
+  <text x="220" y="736" font-family="Arial, 'Helvetica Neue', Helvetica, sans-serif" font-size="16" font-weight="500" fill="#475569">and expose application traffic.</text>
 
   <rect x="890" y="570" width="520" height="220" rx="20" fill="#ffffff" stroke="#1f2937" stroke-width="2" filter="url(#cs)"/>
   <rect x="920" y="594" width="112" height="30" rx="15" fill="#fde68a" stroke="#1f2937" stroke-width="1.5" filter="url(#ps)"/>
-  <text x="936" y="614" font-family="'Space Mono', monospace" font-size="12" font-weight="700" fill="#7f1d1d">DATA PLANE</text>
-  <text x="920" y="674" font-family="'DM Sans', Arial, sans-serif" font-size="24" font-weight="800" fill="#0f172a">Persistence layer</text>
-  <text x="920" y="712" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">Hosted or local databases keep state outside</text>
-  <text x="920" y="736" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">the application compute path.</text>
+  <text x="936" y="614" font-family="'Courier New', Courier, monospace" font-size="12" font-weight="700" fill="#7f1d1d">DATA PLANE</text>
+  <text x="920" y="674" font-family="Arial, 'Helvetica Neue', Helvetica, sans-serif" font-size="24" font-weight="800" fill="#0f172a">Persistence layer</text>
+  <text x="920" y="712" font-family="Arial, 'Helvetica Neue', Helvetica, sans-serif" font-size="16" font-weight="500" fill="#475569">Hosted or local databases keep state outside</text>
+  <text x="920" y="736" font-family="Arial, 'Helvetica Neue', Helvetica, sans-serif" font-size="16" font-weight="500" fill="#475569">the application compute path.</text>
 
   <path d="M 770 478 C 690 520, 620 566, 520 624" fill="none" stroke="#1f2937" stroke-width="4" stroke-linecap="round"/>
   <polygon points="530,607 506,632 538,627" fill="#1f2937"/>
