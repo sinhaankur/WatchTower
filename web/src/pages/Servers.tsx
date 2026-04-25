@@ -58,6 +58,8 @@ const Servers = () => {
   const [addingNode, setAddingNode] = useState(false);
   const [offlineMode, setOffline]   = useState(false);
   const [showForm, setShowForm]     = useState(false);
+  const [search, setSearch]         = useState('');
+  const [filterStatus, setFilter]   = useState<string>('all');
 
   const [form, setFormData] = useState({
     name: '', host: '', user: 'deploy', port: 22,
@@ -135,6 +137,31 @@ const Servers = () => {
     } catch { showMsg('error', 'Health check failed. Ensure the node is reachable.'); }
     finally { setHealthL(null); }
   };
+
+  const [deleteLoading, setDeleteL] = useState<string | null>(null);
+
+  const deleteNode = async (nodeId: string) => {
+    if (!window.confirm('Remove this server from your organization?')) return;
+    setDeleteL(nodeId);
+    try {
+      await apiClient.delete(`/org-nodes/${nodeId}`);
+      setNodes((prev) => prev.filter((n) => n.id !== nodeId));
+      showMsg('success', 'Server removed.');
+    } catch { showMsg('error', 'Failed to remove server.'); }
+    finally { setDeleteL(null); }
+  };
+
+  const filteredNodes = nodes.filter((n) => {
+    const q = search.toLowerCase();
+    const matchSearch = !q || n.name.toLowerCase().includes(q) || n.host.toLowerCase().includes(q) || n.user.toLowerCase().includes(q);
+    const matchStatus = filterStatus === 'all' || n.status === filterStatus;
+    return matchSearch && matchStatus;
+  });
+
+  const healthCounts = nodes.reduce<Record<string, number>>(
+    (acc, n) => { acc[n.status] = (acc[n.status] ?? 0) + 1; return acc; },
+    {}
+  );
 
   const isStepValid = (s: number) => {
     if (s === 0) return form.name.trim().length > 0 && form.host.trim().length > 0;
@@ -332,9 +359,54 @@ const Servers = () => {
 
         {/* Server list */}
         <div className="rounded-xl border border-border bg-card p-5">
-          <h2 className="text-sm font-semibold text-slate-900 mb-4">
-            {loading ? 'Loading servers…' : `${nodes.length} Server${nodes.length !== 1 ? 's' : ''}`}
-          </h2>
+          {/* Header row: count + health summary + search/filter */}
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-4">
+            <h2 className="text-sm font-semibold text-slate-900 shrink-0">
+              {loading ? 'Loading servers…' : `${nodes.length} Server${nodes.length !== 1 ? 's' : ''}`}
+            </h2>
+
+            {/* Health summary pills */}
+            {!loading && nodes.length > 0 && (
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {(Object.entries(healthCounts) as [string, number][]).map(([st, cnt]) => {
+                  const m = STATUS_META[st as keyof typeof STATUS_META] ?? STATUS_META.offline;
+                  return (
+                    <button
+                      key={st}
+                      onClick={() => setFilter((f) => f === st ? 'all' : st)}
+                      className={`text-[11px] px-2 py-0.5 rounded-full border font-medium transition-colors ${
+                        filterStatus === st ? m.badge + ' ring-1 ring-offset-1 ring-current' : m.badge
+                      }`}
+                    >
+                      {cnt} {m.label}
+                    </button>
+                  );
+                })}
+                {filterStatus !== 'all' && (
+                  <button
+                    onClick={() => setFilter('all')}
+                    className="text-[11px] text-slate-500 hover:text-slate-700 transition-colors"
+                  >
+                    ✕ clear
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* Search input */}
+            {nodes.length > 0 && (
+              <div className="sm:ml-auto relative">
+                <input
+                  type="search"
+                  placeholder="Search servers…"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="w-full sm:w-52 pl-7 pr-3 py-1.5 text-xs rounded-lg border border-border bg-white text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-red-400"
+                />
+                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs pointer-events-none">🔍</span>
+              </div>
+            )}
+          </div>
 
           {nodes.length === 0 && !loading && (
             <div className="text-center py-14 border border-dashed border-border rounded-xl">
@@ -360,8 +432,15 @@ const Servers = () => {
             </div>
           )}
 
+          {nodes.length > 0 && filteredNodes.length === 0 && (
+            <div className="text-center py-10 text-xs text-slate-500">
+              No servers match your search.
+              <button onClick={() => { setSearch(''); setFilter('all'); }} className="ml-2 text-red-700 hover:underline">Clear filters</button>
+            </div>
+          )}
+
           <div className="space-y-3">
-            {nodes.map((node) => {
+            {filteredNodes.map((node) => {
               const meta = STATUS_META[node.status] ?? STATUS_META.offline;
               return (
                 <div key={node.id}
@@ -394,6 +473,14 @@ const Servers = () => {
                         className="px-3 py-1 text-xs rounded-lg border border-border text-slate-700 hover:bg-slate-100 hover:text-slate-900 transition-colors disabled:opacity-50"
                       >
                         {healthLoading === node.id ? 'Checking…' : 'Check Health'}
+                      </button>
+                      <button
+                        onClick={() => void deleteNode(node.id)}
+                        disabled={deleteLoading === node.id}
+                        className="px-3 py-1 text-xs rounded-lg border border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 transition-colors disabled:opacity-50"
+                        title="Remove server"
+                      >
+                        {deleteLoading === node.id ? '…' : '✕'}
                       </button>
                     </div>
                   </div>

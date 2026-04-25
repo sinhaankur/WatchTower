@@ -94,12 +94,23 @@ function IconPlus() {
 // ── Navigation structure ──────────────────────────────────────────────────────
 type NavItem = { path: string; label: string; Icon: () => ReactElement };
 
+function IconPuzzle() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M20.24 12.24a6 6 0 0 0-8.49-8.49L5 10.5V19h8.5z" />
+      <line x1="16" y1="8" x2="2" y2="22" />
+      <line x1="17.5" y1="15" x2="9" y2="15" />
+    </svg>
+  );
+}
+
 const PRIMARY_NAV: NavItem[] = [
-  { path: '/',             label: 'Dashboard',     Icon: IconDashboard },
-  { path: '/servers',      label: 'Servers',        Icon: IconServer },
-  { path: '/applications', label: 'Applications',   Icon: IconBox },
-  { path: '/databases',    label: 'Databases',      Icon: IconDatabase },
-  { path: '/services',     label: 'Services',       Icon: IconLayers },
+  { path: '/',              label: 'Dashboard',     Icon: IconDashboard },
+  { path: '/servers',       label: 'Servers',        Icon: IconServer },
+  { path: '/applications',  label: 'Applications',   Icon: IconBox },
+  { path: '/databases',     label: 'Databases',      Icon: IconDatabase },
+  { path: '/integrations',  label: 'Integrations',   Icon: IconPuzzle },
+  { path: '/services',      label: 'Services',       Icon: IconLayers },
 ];
 
 const SECONDARY_NAV: NavItem[] = [

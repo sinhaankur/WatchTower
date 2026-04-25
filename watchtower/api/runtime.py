@@ -1107,6 +1107,84 @@ async def vscode_open(
     return {"opened": str(path)}
 
 
+
+
+def _podman_watchdog_status() -> dict[str, Any]:
+    """Return whether the Podman auto-restart watchdog is enabled."""
+    restart_state = _systemd_status("podman-restart.service")
+    enabled_ok, enabled_out, _, _ = _run_cmd(
+        ["systemctl", "is-enabled", "podman-restart.service"], timeout=5
+    )
+    return {
+        "service": "podman-restart.service",
+        "active": restart_state == "active",
+        "enabled": enabled_ok and enabled_out.strip() in ("enabled", "enabled-runtime"),
+        "state": restart_state,
+    }
+
+
+@router.get("/podman/watchdog")
+async def get_podman_watchdog(
+    _current_user: dict = Depends(util.get_current_user),
+):
+    """Return Podman watchdog (auto-restart on boot) status."""
+    return _podman_watchdog_status()
+
+
+@router.post("/podman/watchdog/enable")
+async def enable_podman_watchdog(
+    _current_user: dict = Depends(util.get_current_user),
+):
+    """Enable podman-restart.service so Podman containers auto-restart on boot.
+
+    Containers must be started with ``--restart=always`` (or ``on-failure``)
+    for the service to restart them.  This call also starts the service now.
+    """
+    ok_enable, _, err_enable, _ = _run_cmd(
+        ["sudo", "-n", "systemctl", "enable", "--now", "podman-restart.service"],
+        timeout=15,
+    )
+    if not ok_enable:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=(
+                "Failed to enable podman-restart.service. "
+                f"Ensure sudo privileges: {err_enable}"
+            ),
+        )
+    return {
+        "status": "enabled",
+        "message": (
+            "podman-restart.service is now enabled and active. "
+            "Containers started with --restart=always will auto-restart on boot."
+        ),
+        "watchdog": _podman_watchdog_status(),
+    }
+
+
+@router.post("/podman/watchdog/disable")
+async def disable_podman_watchdog(
+    _current_user: dict = Depends(util.get_current_user),
+):
+    """Disable the Podman watchdog service."""
+    ok, _, err, _ = _run_cmd(
+        ["sudo", "-n", "systemctl", "disable", "--now", "podman-restart.service"],
+        timeout=15,
+    )
+    if not ok:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=(
+                f"Failed to disable podman-restart.service: {err}"
+            ),
+        )
+    return {
+        "status": "disabled",
+        "message": "podman-restart.service disabled. Containers will not auto-restart on boot.",
+        "watchdog": _podman_watchdog_status(),
+    }
+
+
 @router.get("/terminal/policy")
 async def terminal_policy(
     _current_user: dict = Depends(util.get_current_user),

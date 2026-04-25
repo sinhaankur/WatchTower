@@ -1,5 +1,48 @@
 # WatchTower 2.0 - Implementation Guide
 
+## 🔗 How They Work Together
+
+WatchTower is designed to work with a complete integration stack. Here's how each component plays its part:
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  Podman runs containers → Nginx proxies traffic → Tailscale secures SSH    │
+│  ↓                                                                           │
+│  Cloudflare exposes to internet → Coolify provides PaaS UI → WatchTower    │
+│  ↓                                                                           │
+│  Watchdog keeps it all alive after reboots                                  │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Each Component's Role
+
+| Tool | Purpose | WatchTower Integration |
+|---|---|---|
+| **Podman** | Container runtime | WatchTower monitors, updates, and auto-restarts containers |
+| **Nginx** | Reverse proxy & load balancer | Routes traffic to containerized apps, SSL termination |
+| **Tailscale** | Mesh VPN network | Secures SSH access between nodes, encrypted comms |
+| **Cloudflare** | DDoS protection & CDN | Exposes apps to the internet with Tunnel/Workers |
+| **Coolify** | PaaS management layer | Provides clean UI for app deployment & lifecycle |
+| **WatchTower Watchdog** | Autonomous restart service | **Auto-restarts all containers after reboot or crash** |
+
+### Why This Stack?
+
+- **Self-hosted** — you own and control everything
+- **Decoupled** — each tool does one job well
+- **Resilient** — watchdog ensures continuity after hardware events
+- **Observable** — all 6 tools show live status in WatchTower's Integrations page
+- **Minimal overhead** — lightweight control plane, no vendor lock-in
+
+### Managing the Stack
+
+Use the **Integrations** page (`/integrations`) to:
+- ✅ See live connection status for all 6 tools
+- 🔄 Toggle the Podman Watchdog (auto-restart on reboot)
+- 📋 View install commands for each tool
+- 🔗 Understand how they connect and depend on each other
+
+---
+
 ## Overview
 
 You now have a fully scaffolded WatchTower 2.0 platform with:

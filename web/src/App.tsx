@@ -11,6 +11,7 @@ import Applications from './pages/Applications';
 import LocalNode from './pages/LocalNode';
 import Databases from './pages/Databases';
 import Services from './pages/Services';
+import Integrations from './pages/Integrations';
 import Settings from './pages/Settings';
 import HostConnect from './pages/HostConnect';
 import GitHubOAuthCallback from './pages/GitHubOAuthCallback';
@@ -63,6 +64,7 @@ function App() {
           <Route path="/applications" element={<RequireAuth><Layout><Applications /></Layout></RequireAuth>} />
           <Route path="/databases" element={<RequireAuth><Layout><Databases /></Layout></RequireAuth>} />
           <Route path="/services" element={<RequireAuth><Layout><Services /></Layout></RequireAuth>} />
+          <Route path="/integrations" element={<RequireAuth><Layout><Integrations /></Layout></RequireAuth>} />
           <Route path="/host-connect" element={<RequireAuth><Layout><HostConnect /></Layout></RequireAuth>} />
           <Route path="/team" element={<RequireAuth><Layout><TeamManagement /></Layout></RequireAuth>} />
           <Route path="/settings" element={<RequireAuth><Layout><Settings /></Layout></RequireAuth>} />
