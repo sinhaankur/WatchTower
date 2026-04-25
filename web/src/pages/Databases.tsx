@@ -19,7 +19,7 @@ const Databases = () => (
         <h1 className="text-lg font-semibold text-slate-900">Databases</h1>
         <p className="text-xs text-slate-600 mt-0.5 hidden sm:block">Deploy and manage self-hosted databases</p>
       </div>
-      <Link to="/host-connect"
+      <Link to="/host-connect?tab=database"
         className="px-3 sm:px-4 py-1.5 rounded-lg bg-red-700 hover:bg-red-800 text-white text-xs sm:text-sm font-medium transition-colors border border-slate-800 shadow-[2px_2px_0_0_#1f2937]">
         Setup Guide
       </Link>
@@ -32,7 +32,7 @@ const Databases = () => (
         <div>
           <p className="text-sm font-semibold text-slate-900">Deploy a database in minutes</p>
           <p className="text-xs text-slate-600 mt-0.5">
-            Pick a database below, then visit <Link to="/host-connect" className="text-red-700 underline">Host Connect → Database</Link> to generate a step-by-step setup guide and connection credentials.
+            Pick a database below, then visit <Link to="/host-connect?tab=database" className="text-red-700 underline">Host Connect → Database</Link> to generate a step-by-step setup guide and connection credentials.
           </p>
         </div>
       </div>
@@ -41,7 +41,7 @@ const Databases = () => (
         <h2 className="text-sm font-semibold text-slate-900 mb-3">Available Databases</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {DB_TYPES.map(({ icon, name, desc }) => (
-            <Link key={name} to="/host-connect"
+            <Link key={name} to="/host-connect?tab=database"
               className="p-4 rounded-xl border border-border bg-muted/20 hover:border-red-300 hover:bg-red-50/40 transition-all cursor-pointer group">
               <div className="flex items-center gap-2 mb-2">
                 <span className="text-2xl">{icon}</span>
