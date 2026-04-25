@@ -137,6 +137,17 @@ const runtimeApiToken = process.env.WATCHTOWER_API_TOKEN || `wt-${crypto.randomB
 
 // Resolve the best available icon for this platform.
 const iconsDir = path.join(__dirname, 'build', 'icons');
+
+function isLoadableImage(filePath) {
+  if (!filePath || !fs.existsSync(filePath)) return false;
+  try {
+    const img = nativeImage.createFromPath(filePath);
+    return !img.isEmpty();
+  } catch {
+    return false;
+  }
+}
+
 function resolveAppIcon() {
   // Only offer formats the current OS can actually load.
   const candidates =
@@ -147,7 +158,7 @@ function resolveAppIcon() {
       : /* linux / other */
         [path.join(iconsDir, 'favicon-128.png'), path.join(iconsDir, 'favicon-96.png')];
   for (const f of candidates) {
-    if (fs.existsSync(f)) return f;
+    if (isLoadableImage(f)) return f;
   }
   return undefined;
 }
@@ -483,8 +494,17 @@ async function launch() {
 }
 
 function createTray() {
-  const iconPath = APP_ICON || path.join(iconsDir, 'favicon-128.png');
-  tray = new Tray(iconPath);
+  const fallbackIcon = path.join(iconsDir, 'favicon-128.png');
+  const iconPath = isLoadableImage(APP_ICON) ? APP_ICON : (isLoadableImage(fallbackIcon) ? fallbackIcon : null);
+
+  try {
+    tray = iconPath ? new Tray(iconPath) : new Tray(nativeImage.createEmpty());
+  } catch (error) {
+    // Never crash app startup due to a tray icon decode/format issue.
+    console.warn('[WatchTower] Tray icon load failed, continuing without icon:', error.message);
+    tray = new Tray(nativeImage.createEmpty());
+  }
+
   tray.setToolTip('WatchTower');
 
   const contextMenu = Menu.buildFromTemplate([
