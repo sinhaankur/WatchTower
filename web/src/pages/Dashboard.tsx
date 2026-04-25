@@ -236,16 +236,16 @@ const Dashboard = () => {
     <div className="flex-1 overflow-auto bg-transparent">
       {/* Page header */}
       <header
-        className="px-8 py-5 flex items-center justify-between border-b sticky top-0 z-10 backdrop-blur-sm"
+        className="px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between gap-3 border-b sticky top-0 z-10 backdrop-blur-sm"
         style={{ borderColor: 'hsl(214 32% 88%)', background: 'rgba(248, 251, 255, 0.9)' }}
       >
-        <div>
+        <div className="min-w-0">
           <h1 className="text-lg font-semibold text-slate-900">Dashboard</h1>
-          <p className="text-xs text-slate-600 mt-0.5">Overview of your self-hosted infrastructure</p>
+          <p className="text-xs text-slate-600 mt-0.5 hidden sm:block">Overview of your self-hosted infrastructure</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 shrink-0">
           <span
-            className={`inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border font-medium ${
+            className={`hidden sm:inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border font-medium ${
               serverStatus === 'online'
                 ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
                 : serverStatus === 'offline'
@@ -254,47 +254,69 @@ const Dashboard = () => {
             }`}
           >
             <StatusDot running={serverStatus === 'online'} />
-            {serverStatus === 'online' ? 'API online' : serverStatus === 'offline' ? 'Offline mode' : 'Connecting…'}
+            {serverStatus === 'online' ? 'API online' : serverStatus === 'offline' ? 'Offline' : 'Connecting…'}
           </span>
           <button
             onClick={() => void loadProjects()}
             disabled={loading}
             className="px-3 py-1.5 rounded-lg border border-border text-xs text-slate-700 hover:bg-slate-100 transition-colors disabled:opacity-50"
           >
-            {loading ? 'Refreshing…' : 'Refresh'}
+            {loading ? '…' : 'Refresh'}
           </button>
           <Link
             to="/setup"
-            className="px-4 py-1.5 rounded-lg bg-red-700 hover:bg-red-800 transition-colors text-white text-sm font-medium border border-slate-800 shadow-[2px_2px_0_0_#1f2937]"
+            className="px-3 sm:px-4 py-1.5 rounded-lg bg-red-700 hover:bg-red-800 transition-colors text-white text-xs sm:text-sm font-medium border border-slate-800 shadow-[2px_2px_0_0_#1f2937]"
           >
-            + New Resource
+            + New
           </Link>
         </div>
       </header>
 
-      <main className="px-8 py-6 space-y-6 max-w-6xl fade-in-up">
+      <main className="px-4 sm:px-6 lg:px-8 py-6 space-y-6 max-w-6xl mx-auto w-full fade-in-up">
         {notice && <NoticeBanner notice={notice} />}
 
-        <section className="wt-panel p-6 bg-gradient-to-br from-white to-amber-50">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <div>
+        {/* Hero / onboarding banner */}
+        <section className="wt-panel p-5 bg-gradient-to-br from-white to-amber-50">
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+            <div className="min-w-0">
               <p className="text-[11px] uppercase tracking-[0.18em] text-red-700 font-semibold">WatchTower</p>
-              <h2 className="text-2xl font-bold text-slate-900 mt-1">Simple Infrastructure Control</h2>
-              <p className="text-sm text-slate-600 mt-2 max-w-2xl">
-                Manage hosts, deploy apps, connect managed databases, and keep containers up to date from one control plane.
+              <h2 className="text-xl font-bold text-slate-900 mt-1">Simple Infrastructure Control</h2>
+              <p className="text-sm text-slate-600 mt-1.5">
+                Manage hosts, deploy apps, connect databases, and keep containers up to date from one place.
               </p>
             </div>
             <Link
               to="/host-connect"
-              className="px-4 py-2.5 rounded-xl border border-slate-800 bg-white hover:bg-amber-50 text-red-700 text-sm font-semibold transition-colors shadow-[2px_2px_0_0_#1f2937]"
+              className="shrink-0 px-4 py-2 rounded-xl border border-slate-800 bg-white hover:bg-amber-50 text-red-700 text-sm font-semibold transition-colors shadow-[2px_2px_0_0_#1f2937]"
             >
-              Open Host Connect
+              Host Connect
             </Link>
           </div>
+          {/* Quick start steps — shown when offline / no projects */}
+          {(serverStatus !== 'online' || projects.length === 0) && !loading && (
+            <div className="mt-4 pt-4 border-t border-amber-200">
+              <p className="text-xs font-semibold text-slate-700 mb-2">Getting started</p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                {[
+                  { step: '1', label: 'Set up tools', desc: 'Install Podman, Docker or Nginx on your server', to: '/host-connect' },
+                  { step: '2', label: 'Add a server', desc: 'Connect your infrastructure node to WatchTower', to: '/servers' },
+                  { step: '3', label: 'Deploy a project', desc: 'Use the Setup Wizard to launch your first app', to: '/setup' },
+                ].map(({ step, label, desc, to }) => (
+                  <Link key={step} to={to} className="flex items-start gap-3 p-3 rounded-lg border border-amber-200 bg-white/60 hover:bg-white hover:border-amber-300 transition-all">
+                    <span className="w-5 h-5 rounded-full bg-red-700 text-white text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">{step}</span>
+                    <div>
+                      <p className="text-xs font-semibold text-slate-800">{label}</p>
+                      <p className="text-[11px] text-slate-500 mt-0.5">{desc}</p>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
         </section>
 
         {/* Stats row */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           <StatCard label="Total Projects" value={stats.total} sub={dataSource === 'server' ? 'from API' : 'local cache'} accent="text-red-700" />
           <StatCard label="Containers" value={containers} sub={runtimeStatus?.podman.installed ? `Podman ${runtimeStatus.podman.version ?? ''}` : 'Podman not detected'} />
           <StatCard label="Static Sites"   value={stats.static} sub="Netlify-style" />
@@ -302,7 +324,7 @@ const Dashboard = () => {
         </div>
 
         {/* Runtime health + quick actions */}
-        <div className="grid md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {/* Container status */}
           <div className="rounded-xl border border-border bg-card p-5 space-y-3">
             <div className="flex items-center justify-between">
