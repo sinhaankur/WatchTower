@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>WatchTower</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html, body {
+      width: 100%; height: 100%;
+      background: #fbf6ea;
+      font-family: 'DM Sans', 'Segoe UI', system-ui, sans-serif;
+      overflow: hidden;
+      user-select: none;
+      -webkit-app-region: drag;
+    }
+
+    .shell {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      gap: 0;
+    }
+
+    /* Logo mark */
+    .logo-wrap {
+      position: relative;
+      width: 96px;
+      height: 96px;
+      margin-bottom: 24px;
+    }
+    .logo-box {
+      width: 96px;
+      height: 96px;
+      border-radius: 22px;
+      background: #fde68a;
+      border: 3px solid #1f2937;
+      box-shadow: 4px 4px 0 0 #1f2937;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .logo-box span {
+      font-size: 36px;
+      font-weight: 800;
+      color: #b91c1c;
+      letter-spacing: -1px;
+    }
+
+    /* Name */
+    .app-name {
+      font-size: 28px;
+      font-weight: 800;
+      color: #0f172a;
+      letter-spacing: -0.5px;
+      margin-bottom: 6px;
+    }
+    .app-tagline {
+      font-size: 14px;
+      font-weight: 500;
+      color: #64748b;
+      margin-bottom: 40px;
+    }
+
+    /* Status line */
+    .status {
+      font-family: 'Space Mono', 'Courier New', monospace;
+      font-size: 12px;
+      font-weight: 700;
+      color: #b91c1c;
+      letter-spacing: 1px;
+      margin-bottom: 14px;
+      min-height: 18px;
+      transition: opacity 0.3s;
+    }
+
+    /* Progress bar */
+    .bar-track {
+      width: 240px;
+      height: 6px;
+      border-radius: 3px;
+      background: #e2d9c8;
+      border: 1.5px solid #1f2937;
+      overflow: hidden;
+    }
+    .bar-fill {
+      height: 100%;
+      width: 0%;
+      background: #b91c1c;
+      border-radius: 2px;
+      transition: width 0.4s ease;
+    }
+
+    /* Animated dots */
+    @keyframes pulse {
+      0%, 100% { opacity: 0.3; }
+      50% { opacity: 1; }
+    }
+    .dots span {
+      display: inline-block;
+      animation: pulse 1.2s ease-in-out infinite;
+    }
+    .dots span:nth-child(2) { animation-delay: 0.2s; }
+    .dots span:nth-child(3) { animation-delay: 0.4s; }
+
+    /* Version badge */
+    .version {
+      position: absolute;
+      bottom: 20px;
+      right: 20px;
+      font-family: 'Space Mono', monospace;
+      font-size: 10px;
+      font-weight: 700;
+      color: #94a3b8;
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <div class="logo-wrap">
+      <div class="logo-box">
+        <span>Wt</span>
+      </div>
+    </div>
+
+    <div class="app-name">WatchTower</div>
+    <div class="app-tagline">Deployment control plane</div>
+
+    <div class="status" id="status">
+      STARTING <span class="dots"><span>.</span><span>.</span><span>.</span></span>
+    </div>
+    <div class="bar-track">
+      <div class="bar-fill" id="bar"></div>
+    </div>
+  </div>
+
+  <div class="version" id="version">v1.2.2</div>
+
+  <script>
+    const statusEl = document.getElementById('status');
+    const bar = document.getElementById('bar');
+
+    const steps = [
+      [10, 'CHECKING ENVIRONMENT'],
+      [30, 'STARTING BACKEND'],
+      [55, 'LOADING API'],
+      [75, 'STARTING FRONTEND'],
+      [90, 'ALMOST READY'],
+    ];
+
+    let idx = 0;
+    const tick = () => {
+      if (idx >= steps.length) return;
+      const [pct, msg] = steps[idx++];
+      bar.style.width = pct + '%';
+      statusEl.innerHTML = msg + ' <span class="dots"><span>.</span><span>.</span><span>.</span></span>';
+      setTimeout(tick, 900 + Math.random() * 400);
+    };
+    tick();
+
+    // IPC from main — update status dynamically
+    if (typeof window.__setStatus === 'undefined') {
+      window.__setStatus = (msg, pct) => {
+        statusEl.innerHTML = msg + ' <span class="dots"><span>.</span><span>.</span><span>.</span></span>';
+        if (pct !== undefined) bar.style.width = pct + '%';
+      };
+    }
+  </script>
+</body>
+</html>
