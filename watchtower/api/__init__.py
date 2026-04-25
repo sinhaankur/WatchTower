@@ -85,6 +85,12 @@ async def health():
     return {"status": "healthy", "service": "watchtower-api"}
 
 
+@app.get("/api/health", tags=["Health"], include_in_schema=False)
+async def health_alias():
+    """Alias so the frontend apiClient (baseURL=/api) can reach /health."""
+    return {"status": "healthy", "service": "watchtower-api"}
+
+
 app.include_router(projects.router)
 app.include_router(deployments.router)
 app.include_router(builds.router)
