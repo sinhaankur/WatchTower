@@ -477,6 +477,11 @@ async function startBackend() {
       env: {
         ...process.env,
         WATCHTOWER_API_TOKEN: runtimeApiToken,
+        // Stable identity across restarts — the email-based fallback lookup in
+        // _ensure_user_org_member uses this to find the same DB user even when
+        // runtimeApiToken (and thus the uuid5-derived user_id) changes.
+        WATCHTOWER_DEFAULT_USER_EMAIL: process.env.WATCHTOWER_DEFAULT_USER_EMAIL || 'desktop@watchtower.local',
+        WATCHTOWER_DEFAULT_USER_NAME:  process.env.WATCHTOWER_DEFAULT_USER_NAME  || 'WatchTower Desktop',
         // Do NOT propagate dev-only overrides into the desktop process.
         WATCHTOWER_ALLOW_INSECURE_DEV_AUTH: undefined,
       },
