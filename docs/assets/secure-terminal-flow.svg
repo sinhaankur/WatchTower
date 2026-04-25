@@ -10,55 +10,55 @@
   <rect width="1600" height="900" fill="#fbf6ea"/>
   <circle cx="130" cy="130" r="120" fill="#fde68a" opacity="0.28"/>
   <circle cx="1490" cy="160" r="160" fill="#dbeafe" opacity="0.35"/>
-    <text x="80" y="82" font-family="'Space Mono', monospace" font-size="18" font-weight="700" fill="#b91c1c" letter-spacing="2">SECURE TERMINAL FLOW</text>
-    <text x="80" y="140" font-family="'DM Sans', Arial, sans-serif" font-size="42" font-weight="800" fill="#0f172a">Allow operational commands without opening an unsafe shell path.</text>
-    <text x="80" y="180" font-family="'DM Sans', Arial, sans-serif" font-size="21" font-weight="500" fill="#475569">Request validation, policy gate, audited execution, and encrypted log capture.</text>
-  <!-- 5 step cards same style as deploy-process -->
-  <rect x="80" y="338" width="252" height="296" rx="20" fill="#ffffff" stroke="#1f2937" stroke-width="2" filter="url(#cs)"/>
-  <rect x="104" y="360" width="100" height="28" rx="14" fill="#fde68a" stroke="#1f2937" stroke-width="1.5" filter="url(#ps)"/>
-  <text x="116" y="379" font-family="'Space Mono', monospace" font-size="14" font-weight="700" fill="#7f1d1d">STAGE 01</text>
-  <text x="104" y="424" font-family="'DM Sans', Arial, sans-serif" font-size="22" font-weight="800" fill="#0f172a">Host Connect UI</text>
-  <text x="104" y="462" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">Operator selects a</text>
-  <text x="104" y="484" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">supported command</text>
-  <text x="104" y="506" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">and timeout.</text>
-  <line x1="334" y1="486" x2="374" y2="486" stroke="#1f2937" stroke-width="4" stroke-linecap="round"/>
-  <polygon points="362,475 386,486 362,497" fill="#1f2937"/>
-  <rect x="385" y="338" width="252" height="296" rx="20" fill="#ffffff" stroke="#1f2937" stroke-width="2" filter="url(#cs)"/>
-  <rect x="409" y="360" width="100" height="28" rx="14" fill="#fde68a" stroke="#1f2937" stroke-width="1.5" filter="url(#ps)"/>
-  <text x="421" y="379" font-family="'Space Mono', monospace" font-size="14" font-weight="700" fill="#7f1d1d">STAGE 02</text>
-  <text x="409" y="424" font-family="'DM Sans', Arial, sans-serif" font-size="22" font-weight="800" fill="#0f172a">Policy Gate</text>
-  <text x="409" y="462" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">Allowlist, sudo rules,</text>
-  <text x="409" y="484" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">length limits, and</text>
-  <text x="409" y="506" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">argument validation.</text>
-  <line x1="639" y1="486" x2="679" y2="486" stroke="#1f2937" stroke-width="4" stroke-linecap="round"/>
-  <polygon points="667,475 691,486 667,497" fill="#1f2937"/>
-  <rect x="690" y="338" width="252" height="296" rx="20" fill="#ffffff" stroke="#1f2937" stroke-width="2" filter="url(#cs)"/>
-  <rect x="714" y="360" width="100" height="28" rx="14" fill="#fde68a" stroke="#1f2937" stroke-width="1.5" filter="url(#ps)"/>
-  <text x="726" y="379" font-family="'Space Mono', monospace" font-size="14" font-weight="700" fill="#7f1d1d">STAGE 03</text>
-  <text x="714" y="424" font-family="'DM Sans', Arial, sans-serif" font-size="22" font-weight="800" fill="#0f172a">Execution Path</text>
-  <text x="714" y="462" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">No shell injection path.</text>
-  <text x="714" y="484" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">Structured argv and</text>
-  <text x="714" y="506" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">controlled subprocess.</text>
-  <line x1="944" y1="486" x2="984" y2="486" stroke="#1f2937" stroke-width="4" stroke-linecap="round"/>
-  <polygon points="972,475 996,486 972,497" fill="#1f2937"/>
-  <rect x="995" y="338" width="252" height="296" rx="20" fill="#ffffff" stroke="#1f2937" stroke-width="2" filter="url(#cs)"/>
-  <rect x="1019" y="360" width="100" height="28" rx="14" fill="#fde68a" stroke="#1f2937" stroke-width="1.5" filter="url(#ps)"/>
-  <text x="1031" y="379" font-family="'Space Mono', monospace" font-size="14" font-weight="700" fill="#7f1d1d">STAGE 04</text>
-  <text x="1019" y="424" font-family="'DM Sans', Arial, sans-serif" font-size="22" font-weight="800" fill="#0f172a">Audit Encrypt</text>
-  <text x="1019" y="462" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">Command metadata</text>
-  <text x="1019" y="484" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">is redacted and</text>
-  <text x="1019" y="506" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">encrypted with Fernet.</text>
-  <line x1="1249" y1="486" x2="1289" y2="486" stroke="#1f2937" stroke-width="4" stroke-linecap="round"/>
-  <polygon points="1277,475 1301,486 1277,497" fill="#1f2937"/>
-  <rect x="1300" y="338" width="220" height="296" rx="20" fill="#ffffff" stroke="#1f2937" stroke-width="2" filter="url(#cs)"/>
-  <rect x="1324" y="360" width="100" height="28" rx="14" fill="#fde68a" stroke="#1f2937" stroke-width="1.5" filter="url(#ps)"/>
-  <text x="1336" y="379" font-family="'Space Mono', monospace" font-size="14" font-weight="700" fill="#7f1d1d">STAGE 05</text>
-  <text x="1324" y="424" font-family="'DM Sans', Arial, sans-serif" font-size="22" font-weight="800" fill="#0f172a">Operator Result</text>
-  <text x="1324" y="462" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">Streamed output</text>
-  <text x="1324" y="484" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">returned to the UI</text>
-  <text x="1324" y="506" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">with exit code.</text>
-  <!-- Security banner -->
-  <rect x="80" y="694" width="1440" height="112" rx="20" fill="#fffdf7" stroke="#1f2937" stroke-width="2" filter="url(#cs)"/>
-  <text x="116" y="738" font-family="'DM Sans', Arial, sans-serif" font-size="21" font-weight="800" fill="#0f172a">Security design</text>
-  <text x="116" y="772" font-family="'DM Sans', Arial, sans-serif" font-size="17" font-weight="500" fill="#475569">No raw shell exposure. Every command passes allowlist validation, structured execution, redacted audit logging, and Fernet-encrypted storage.</text>
+  <text x="80" y="82" font-family="'Space Mono', monospace" font-size="18" font-weight="700" fill="#b91c1c" letter-spacing="2">SECURE TERMINAL FLOW</text>
+  <text x="80" y="140" font-family="'DM Sans', Arial, sans-serif" font-size="42" font-weight="800" fill="#0f172a">Operational commands stay useful without becoming a raw shell.</text>
+  <text x="80" y="180" font-family="'DM Sans', Arial, sans-serif" font-size="20" font-weight="500" fill="#475569">Each stage narrows risk: request, policy, execution, audit, and returned result.</text>
+
+  <rect x="80" y="344" width="244" height="274" rx="20" fill="#ffffff" stroke="#1f2937" stroke-width="2" filter="url(#cs)"/>
+  <rect x="104" y="366" width="110" height="30" rx="15" fill="#fde68a" stroke="#1f2937" stroke-width="1.5" filter="url(#ps)"/>
+  <text x="118" y="386" font-family="'Space Mono', monospace" font-size="13" font-weight="700" fill="#7f1d1d">STAGE 01</text>
+  <text x="104" y="436" font-family="'DM Sans', Arial, sans-serif" font-size="24" font-weight="800" fill="#0f172a">Request command</text>
+  <text x="104" y="474" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">The operator picks an</text>
+  <text x="104" y="498" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">approved action and timeout.</text>
+
+  <rect x="372" y="344" width="244" height="274" rx="20" fill="#ffffff" stroke="#1f2937" stroke-width="2" filter="url(#cs)"/>
+  <rect x="396" y="366" width="110" height="30" rx="15" fill="#fde68a" stroke="#1f2937" stroke-width="1.5" filter="url(#ps)"/>
+  <text x="410" y="386" font-family="'Space Mono', monospace" font-size="13" font-weight="700" fill="#7f1d1d">STAGE 02</text>
+  <text x="396" y="436" font-family="'DM Sans', Arial, sans-serif" font-size="24" font-weight="800" fill="#0f172a">Policy check</text>
+  <text x="396" y="474" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">Allowlists, arg checks,</text>
+  <text x="396" y="498" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">limits, and sudo rules apply.</text>
+
+  <rect x="664" y="344" width="244" height="274" rx="20" fill="#ffffff" stroke="#1f2937" stroke-width="2" filter="url(#cs)"/>
+  <rect x="688" y="366" width="110" height="30" rx="15" fill="#fde68a" stroke="#1f2937" stroke-width="1.5" filter="url(#ps)"/>
+  <text x="702" y="386" font-family="'Space Mono', monospace" font-size="13" font-weight="700" fill="#7f1d1d">STAGE 03</text>
+  <text x="688" y="436" font-family="'DM Sans', Arial, sans-serif" font-size="24" font-weight="800" fill="#0f172a">Run safely</text>
+  <text x="688" y="474" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">WatchTower uses structured</text>
+  <text x="688" y="498" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">argv execution, not free-form shell.</text>
+
+  <rect x="956" y="344" width="244" height="274" rx="20" fill="#ffffff" stroke="#1f2937" stroke-width="2" filter="url(#cs)"/>
+  <rect x="980" y="366" width="110" height="30" rx="15" fill="#fde68a" stroke="#1f2937" stroke-width="1.5" filter="url(#ps)"/>
+  <text x="994" y="386" font-family="'Space Mono', monospace" font-size="13" font-weight="700" fill="#7f1d1d">STAGE 04</text>
+  <text x="980" y="436" font-family="'DM Sans', Arial, sans-serif" font-size="24" font-weight="800" fill="#0f172a">Audit record</text>
+  <text x="980" y="474" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">Metadata is redacted and</text>
+  <text x="980" y="498" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">stored with encryption.</text>
+
+  <rect x="1248" y="344" width="272" height="274" rx="20" fill="#ffffff" stroke="#1f2937" stroke-width="2" filter="url(#cs)"/>
+  <rect x="1272" y="366" width="110" height="30" rx="15" fill="#ecfdf5" stroke="#10b981" stroke-width="1.5"/>
+  <text x="1286" y="386" font-family="'Space Mono', monospace" font-size="13" font-weight="700" fill="#047857">STAGE 05</text>
+  <text x="1272" y="436" font-family="'DM Sans', Arial, sans-serif" font-size="24" font-weight="800" fill="#0f172a">Return result</text>
+  <text x="1272" y="474" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">The UI receives output,</text>
+  <text x="1272" y="498" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">status, and exit code.</text>
+
+  <line x1="324" y1="482" x2="372" y2="482" stroke="#1f2937" stroke-width="4" stroke-linecap="round"/>
+  <polygon points="360,471 384,482 360,493" fill="#1f2937"/>
+  <line x1="616" y1="482" x2="664" y2="482" stroke="#1f2937" stroke-width="4" stroke-linecap="round"/>
+  <polygon points="652,471 676,482 652,493" fill="#1f2937"/>
+  <line x1="908" y1="482" x2="956" y2="482" stroke="#1f2937" stroke-width="4" stroke-linecap="round"/>
+  <polygon points="944,471 968,482 944,493" fill="#1f2937"/>
+  <line x1="1200" y1="482" x2="1248" y2="482" stroke="#1f2937" stroke-width="4" stroke-linecap="round"/>
+  <polygon points="1236,471 1260,482 1236,493" fill="#1f2937"/>
+
+  <rect x="80" y="690" width="1440" height="116" rx="20" fill="#fffdf7" stroke="#1f2937" stroke-width="2" filter="url(#cs)"/>
+  <text x="116" y="734" font-family="'DM Sans', Arial, sans-serif" font-size="21" font-weight="800" fill="#0f172a">Security property</text>
+  <text x="116" y="768" font-family="'DM Sans', Arial, sans-serif" font-size="17" font-weight="500" fill="#475569">WatchTower exposes useful host operations without handing out an unrestricted shell session.</text>
 </svg>
