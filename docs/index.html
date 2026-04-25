@@ -354,6 +354,48 @@
       gap: 14px;
     }
 
+    .blueprint-grid {
+      margin-top: 18px;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+    }
+
+    .blueprint-card {
+      display: block;
+      padding: 14px;
+      text-decoration: none;
+      transition: transform 140ms ease, border-color 140ms ease;
+    }
+
+    .blueprint-card:hover {
+      transform: translateY(-1px);
+      border-color: #ef9a9a;
+    }
+
+    .blueprint-card img {
+      width: 100%;
+      display: block;
+      border-radius: 14px;
+      border: 1px solid var(--wt-border-soft);
+      background: #fffdf7;
+    }
+
+    .blueprint-card strong {
+      display: block;
+      margin-top: 12px;
+      font-size: 0.96rem;
+      color: #0f172a;
+    }
+
+    .blueprint-card span {
+      display: block;
+      margin-top: 6px;
+      color: #64748b;
+      font-size: 0.84rem;
+      line-height: 1.5;
+    }
+
     .stat-card {
       padding: 18px;
       border-radius: 16px;
@@ -553,6 +595,7 @@
         grid-template-columns: repeat(2, minmax(0, 1fr));
       }
 
+      .blueprint-grid,
       .info-grid,
       .link-grid {
         grid-template-columns: 1fr;
@@ -688,6 +731,29 @@
             <p class="value">Sidebar + Panels</p>
             <p class="meta">The docs now mirror dashboard navigation and action placement.</p>
           </article>
+        </section>
+
+        <section class="blueprint-grid">
+          <a class="panel blueprint-card" href="./viewer.html?doc=readme">
+            <img src="./assets/modes-overview.svg" alt="WatchTower modes overview" />
+            <strong>Modes Overview</strong>
+            <span>See the two core operating modes in the same visual language used across the product docs.</span>
+          </a>
+          <a class="panel blueprint-card" href="./viewer.html?doc=readme">
+            <img src="./assets/deploy-process.svg" alt="WatchTower deployment process" />
+            <strong>Deployment Process</strong>
+            <span>Follow the App Center release pipeline from app selection through health verification.</span>
+          </a>
+          <a class="panel blueprint-card" href="./viewer.html?doc=mesh">
+            <img src="./assets/mesh-topology.svg" alt="WatchTower mesh topology" />
+            <strong>Mesh Topology</strong>
+            <span>Map preview and live traffic flows across mesh-oriented nodes and routing layers.</span>
+          </a>
+          <a class="panel blueprint-card" href="./viewer.html?doc=hybrid">
+            <img src="./assets/hybrid-stack.svg" alt="WatchTower hybrid stack" />
+            <strong>Hybrid Stack</strong>
+            <span>Summarize how local control, remote services, and managed data paths connect together.</span>
+          </a>
         </section>
 
         <div class="sections">
