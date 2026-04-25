@@ -168,6 +168,24 @@ def _ensure_user_org_member(db: Session, current_user: dict):
                 )
                 db.add(member)
                 db.flush()
+            else:
+                # Backfill permissions for owner rows created before these
+                # columns existed (e.g. after a schema migration).
+                changed = False
+                if not member.can_manage_nodes:
+                    member.can_manage_nodes = True
+                    changed = True
+                if not member.can_create_projects:
+                    member.can_create_projects = True
+                    changed = True
+                if not member.can_manage_deployments:
+                    member.can_manage_deployments = True
+                    changed = True
+                if not member.can_manage_team:
+                    member.can_manage_team = True
+                    changed = True
+                if changed:
+                    db.flush()
         else:
             if not member and user.email:
                 member = db.query(TeamMember).filter(
@@ -221,6 +239,17 @@ def _ensure_user_org_member(db: Session, current_user: dict):
         )
         db.add(member)
         db.flush()
+    else:
+        # Backfill permissions for owner rows created before these columns
+        # existed (e.g. after a schema migration or first-run upgrade).
+        changed = False
+        for attr in ("can_manage_nodes", "can_create_projects",
+                     "can_manage_deployments", "can_manage_team"):
+            if not getattr(member, attr, False):
+                setattr(member, attr, True)
+                changed = True
+        if changed:
+            db.flush()
 
     db.commit()
     db.refresh(user)
@@ -1029,44 +1058,52 @@ async def add_org_node(
     if not member or not member.can_manage_nodes:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied")
     
+    node = OrgNode(
+        org_id=org_id,
+        name=node_data.name,
+        host=node_data.host,
+        user=node_data.user,
+        port=node_data.port,
+        remote_path=node_data.remote_path,
+        ssh_key_path=node_data.ssh_key_path,
+        reload_command=node_data.reload_command,
+        is_primary=node_data.is_primary,
+        max_concurrent_deployments=node_data.max_concurrent_deployments,
+        created_by_user_id=user_id,
+        updated_by_user_id=user_id,
+    )
+
     try:
-        node = OrgNode(
-            org_id=org_id,
-            name=node_data.name,
-            host=node_data.host,
-            user=node_data.user,
-            port=node_data.port,
-            remote_path=node_data.remote_path,
-            ssh_key_path=node_data.ssh_key_path,
-            reload_command=node_data.reload_command,
-            is_primary=node_data.is_primary,
-            max_concurrent_deployments=node_data.max_concurrent_deployments,
-            created_by_user_id=user_id,
-            updated_by_user_id=user_id,
-        )
-        
         db.add(node)
         db.commit()
         db.refresh(node)
+    except Exception:
+        db.rollback()
+        logger.exception("DB error persisting org node")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Database error — could not save deployment node.",
+        )
 
-        # Test SSH connectivity and record initial health status
+    # Test SSH connectivity and record initial health status.
+    # A failed SSH check does NOT prevent the node from being registered —
+    # the node is saved with status UNREACHABLE so the user can fix it later.
+    try:
         from watchtower.builder import check_ssh_connectivity
         from watchtower.database import NodeStatus
         ssh_ok, ssh_msg = check_ssh_connectivity(node)
-        if ssh_ok:
-            node.status = NodeStatus.HEALTHY
-        else:
-            node.status = NodeStatus.UNREACHABLE
+        node.status = NodeStatus.HEALTHY if ssh_ok else NodeStatus.UNREACHABLE
+        if not ssh_ok:
             logger.warning("SSH health check failed for new node %s: %s", node.host, ssh_msg)
         node.status_message = ssh_msg
         db.commit()
         db.refresh(node)
-
-        return node
     except Exception:
+        # SSH check failure must never prevent the node from being returned.
+        logger.exception("SSH health check raised an exception for node %s", node.host)
         db.rollback()
-        logger.exception("Adding org node failed")
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unable to add deployment node")
+
+    return node
 
 
 @router.put("/org-nodes/{node_id}", response_model=schemas.OrgNodeResponse)
