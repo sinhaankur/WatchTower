@@ -669,6 +669,7 @@ async def start_github_oauth(
     provider: schemas.GitHubProvider = schemas.GitHubProvider.GITHUB_COM,
     enterprise_url: Optional[str] = None,
     redirect_uri: Optional[str] = None,
+    next_path: Optional[str] = None,
     db: Session = Depends(get_db),
     current_user: dict = Depends(util.get_current_user)
 ):
@@ -682,11 +683,16 @@ async def start_github_oauth(
     if not effective_redirect:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="OAuth redirect URI not configured")
 
+    effective_next = next_path or "/team"
+    if not effective_next.startswith("/") or effective_next.startswith("//"):
+        effective_next = "/team"
+
     state = _sign_oauth_state(
         {
             "org_id": str(org_id),
             "provider": provider.value,
             "enterprise_url": enterprise_url,
+            "next": effective_next,
             "iat": int(datetime.utcnow().timestamp()),
         }
     )
@@ -705,7 +711,7 @@ async def start_github_oauth(
     }
 
 
-@router.post("/github/oauth/callback", response_model=schemas.GitHubConnectionResponse)
+@router.post("/github/oauth/callback")
 async def github_oauth_callback(
     payload: schemas.GitHubOAuthCallback,
     db: Session = Depends(get_db),
@@ -716,6 +722,7 @@ async def github_oauth_callback(
     org_id = UUID(state_data["org_id"])
     provider = schemas.GitHubProvider(state_data["provider"])
     enterprise_url = state_data.get("enterprise_url")
+    redirect_to = state_data.get("next", "/team")
     user_id = _current_user_uuid(current_user)
 
     _ensure_user_org_member(db, current_user)
@@ -782,7 +789,7 @@ async def github_oauth_callback(
             claim.github_connected_at = datetime.utcnow()
         db.commit()
         db.refresh(existing)
-        return existing
+        return {"redirect_to": redirect_to, **schemas.GitHubConnectionResponse.model_validate(existing).model_dump()}
 
     connection = GitHubConnection(
         user_id=user_id,
@@ -809,7 +816,135 @@ async def github_oauth_callback(
         claim.github_connected_at = datetime.utcnow()
     db.commit()
     db.refresh(connection)
-    return connection
+    return {"redirect_to": redirect_to, **schemas.GitHubConnectionResponse.model_validate(connection).model_dump()}
+
+
+# ============================================================================
+# GitHub User Repos / Orgs (for wizard repo picker)
+# ============================================================================
+
+@router.get("/github/user/repos")
+async def list_github_user_repos(
+    org: Optional[str] = None,
+    search: Optional[str] = None,
+    page: int = 1,
+    per_page: int = 30,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(util.get_current_user),
+):
+    """List GitHub repositories accessible to the current user's active GitHub connection."""
+    _user, org_entity, _ = _ensure_user_org_member(db, current_user)
+    connection = (
+        db.query(GitHubConnection)
+        .filter(
+            GitHubConnection.org_id == org_entity.id,
+            GitHubConnection.is_active == True,
+        )
+        .order_by(GitHubConnection.is_primary.desc(), GitHubConnection.created_at.desc())
+        .first()
+    )
+    if not connection:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No active GitHub connection found. Connect GitHub first via Team settings.",
+        )
+
+    try:
+        token = util.decrypt_secret(connection.github_access_token)
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Could not decrypt GitHub token. Reconnect GitHub.",
+        )
+
+    base_url = connection.enterprise_url.rstrip("/") if connection.enterprise_url else "https://api.github.com"
+    api_url = f"{base_url}/orgs/{org}/repos" if org else f"{base_url}/user/repos"
+
+    resp = requests.get(
+        api_url,
+        params={"sort": "updated", "per_page": min(per_page, 100), "page": max(page, 1), "type": "all"},
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/json",
+            "X-GitHub-Api-Version": "2022-11-28",
+        },
+        timeout=15,
+    )
+    if resp.status_code == 401:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="GitHub token expired. Reconnect GitHub.")
+    if resp.status_code >= 400:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="GitHub API error listing repositories.")
+
+    repos = resp.json()
+    if search:
+        q = search.lower()
+        repos = [r for r in repos if q in r.get("name", "").lower() or q in (r.get("description") or "").lower()]
+
+    return [
+        {
+            "id": r["id"],
+            "name": r["name"],
+            "full_name": r["full_name"],
+            "html_url": r["html_url"],
+            "description": r.get("description"),
+            "private": r.get("private", False),
+            "default_branch": r.get("default_branch", "main"),
+            "updated_at": r.get("updated_at"),
+        }
+        for r in repos
+    ]
+
+
+@router.get("/github/user/orgs")
+async def list_github_user_orgs(
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(util.get_current_user),
+):
+    """List GitHub user profile and organizations accessible via the active connection."""
+    _user, org_entity, _ = _ensure_user_org_member(db, current_user)
+    connection = (
+        db.query(GitHubConnection)
+        .filter(
+            GitHubConnection.org_id == org_entity.id,
+            GitHubConnection.is_active == True,
+        )
+        .order_by(GitHubConnection.is_primary.desc(), GitHubConnection.created_at.desc())
+        .first()
+    )
+    if not connection:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No active GitHub connection found.",
+        )
+
+    try:
+        token = util.decrypt_secret(connection.github_access_token)
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Could not decrypt GitHub token.",
+        )
+
+    base_url = connection.enterprise_url.rstrip("/") if connection.enterprise_url else "https://api.github.com"
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/json",
+        "X-GitHub-Api-Version": "2022-11-28",
+    }
+
+    result: list[dict] = []
+
+    user_resp = requests.get(f"{base_url}/user", headers=headers, timeout=15)
+    if user_resp.status_code == 200:
+        profile = user_resp.json()
+        result.append({"login": profile["login"], "avatar_url": profile.get("avatar_url"), "type": "user"})
+
+    orgs_resp = requests.get(f"{base_url}/user/orgs", params={"per_page": 100}, headers=headers, timeout=15)
+    if orgs_resp.status_code == 200:
+        for o in orgs_resp.json():
+            result.append({"login": o["login"], "avatar_url": o.get("avatar_url"), "type": "organization"})
+
+    return result
 
 
 # ============================================================================
