@@ -57,7 +57,7 @@ That is the safe engineering tradeoff in this repository today.
 
 ## Reverse Proxy
 
-The checked-in Caddy config is in [config/caddy/Caddyfile.mesh](/home/ankursinha/Documents/GitHub/WatchTower/config/caddy/Caddyfile.mesh).
+The checked-in Caddy config is in [config/caddy/Caddyfile.mesh](../config/caddy/Caddyfile.mesh).
 
 It provides:
 
@@ -86,7 +86,7 @@ That script:
 
 ## Preview URL Hack
 
-The preview workflow at [.github/workflows/preview-image.yml](/home/ankursinha/Documents/GitHub/WatchTower/.github/workflows/preview-image.yml) publishes a branch-tagged image for every non-main push.
+The preview workflow at [.github/workflows/preview-image.yml](../.github/workflows/preview-image.yml) publishes a branch-tagged image for every non-main push.
 
 For example, a branch named `feature/login` becomes an image tag like:
 

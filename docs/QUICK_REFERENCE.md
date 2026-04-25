@@ -208,7 +208,7 @@ Use mesh orchestrator as described in `MESH_IMPLEMENTATION_GUIDE.md`.
 # Python 3.12 + pip + Node 18+ + npm/yarn
 
 # Backend setup
-cd /home/ankursinha/Documents/GitHub/WatchTower
+cd /path/to/WatchTower
 pip install -r requirements.txt
 
 # Frontend setup
@@ -217,7 +217,7 @@ npm install
 npm run dev        # Starts on :5222
 
 # In another terminal, start backend
-cd /home/ankursinha/Documents/GitHub/WatchTower
+cd /path/to/WatchTower
 python -m watchtower.api  # Starts on :8000
 
 # Electron desktop
