@@ -87,6 +87,7 @@ export default function LocalNode() {
   const [deployPath, setDeployPath] = useState('/opt/watchtower/agent');
   const [nodeName, setNodeName] = useState('');
   const [os, setOs] = useState<OsType>('linux');
+  const [autoRegister, setAutoRegister] = useState(false);
 
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [submitting, setSubmitting] = useState(false);
@@ -261,12 +262,24 @@ export default function LocalNode() {
               )}
             </div>
 
-            <div className="flex justify-end">
+            <div className="flex justify-between items-center">
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="auto-register"
+                  checked={autoRegister}
+                  onChange={(e) => setAutoRegister(e.target.checked)}
+                  className="w-4 h-4 rounded border-border"
+                />
+                <label htmlFor="auto-register" className="text-xs text-slate-600 cursor-pointer">
+                  Skip confirmation — register immediately
+                </label>
+              </div>
               <button
-                onClick={() => setStep(2)}
+                onClick={() => autoRegister ? void registerNode() : setStep(2)}
                 className="px-5 py-2 rounded-lg bg-red-700 hover:bg-red-800 text-white text-sm font-medium border border-slate-800 shadow-[2px_2px_0_0_#1f2937] transition-colors"
               >
-                Continue →
+                {autoRegister ? 'Register Now →' : 'Continue →'}
               </button>
             </div>
           </div>

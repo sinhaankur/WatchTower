@@ -47,6 +47,7 @@ const SetupWizard = () => {
   const [step, setStep] = useState(1);
   const [submitting, setSubmitting] = useState(false);
   const [hasNodes, setHasNodes] = useState<boolean | null>(null);
+  const [quickMode, setQuickMode] = useState(false);
   const navigate = useNavigate();
 
   // Check if any deployment nodes exist so we can warn before wasting the user's time
@@ -68,16 +69,16 @@ const SetupWizard = () => {
   const [data, setData] = useState<WizardData>({
     source_type: 'github',
     deployment_model: 'self_hosted',
-    use_case: 'netlify_like',
+    use_case: 'vercel_like',
     repo_url: '',
     local_folder_path: '',
     repo_branch: 'main',
     build_command: 'npm ci && npm run build',
     project_name: '',
-    launch_url: '',
+    launch_url: 'http://localhost:3000',
     output_dir: 'dist',
     functions_dir: 'api',
-    enable_functions: false,
+    enable_functions: true,
     framework: 'next.js',
     enable_preview_deployments: true,
     dockerfile_path: './Dockerfile',
@@ -86,7 +87,16 @@ const SetupWizard = () => {
     custom_domain: '',
   });
 
+  const activateQuickMode = () => {
+    setQuickMode(true);
+    setStep(3);
+  };
+
   const canContinue = useMemo(() => {
+    if (quickMode) {
+      // In quick mode, only need repo URL and project name
+      return data.repo_url.trim().length > 0 && data.project_name.trim().length > 0;
+    }
     if (step === 1) return Boolean(data.deployment_model);
     if (step === 2) return Boolean(data.use_case);
     if (step === 3) {
@@ -96,7 +106,7 @@ const SetupWizard = () => {
       return data.local_folder_path.trim().length > 0;
     }
     return data.project_name.trim().length > 0;
-  }, [data, step]);
+  }, [data, step, quickMode]);
 
   const setField = <K extends keyof WizardData>(key: K, value: WizardData[K]) => {
     setData((prev) => ({ ...prev, [key]: value }));
@@ -218,6 +228,19 @@ const SetupWizard = () => {
 
       <div className="max-w-6xl mx-auto px-6 py-8 grid lg:grid-cols-3 gap-6">
         <section className="lg:col-span-2 space-y-4">
+          {/* Quick-start prompt only on step 1 */}
+          {step === 1 && !quickMode && (
+            <div className="electron-card rounded-xl p-4 bg-gradient-to-r from-sky-50 to-cyan-50 border border-sky-300">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-semibold text-sky-900 text-sm">✨ Quick Start Available</p>
+                  <p className="text-xs text-sky-700 mt-1">Skip form decisions — we'll use smart defaults and you just confirm the repo.</p>
+                </div>
+                <Button onClick={activateQuickMode} className="bg-sky-600 hover:bg-sky-700 text-white rounded-md text-sm whitespace-nowrap">Start Quick Mode →</Button>
+              </div>
+            </div>
+          )}
+
           <div className="electron-card rounded-xl px-4 py-3">
             <div className="flex items-center gap-0">
               {STEP_LABELS.map((label, i) => {
@@ -247,7 +270,7 @@ const SetupWizard = () => {
             </div>
           </div>
 
-          {step === 1 && (
+          {step === 1 && !quickMode && (
             <div className="electron-card rounded-xl p-6">
               <h2 className="text-lg font-semibold text-slate-900">Where will you deploy?</h2>
               <p className="text-sm text-slate-600 mb-4">Select runtime ownership mode.</p>
@@ -289,7 +312,7 @@ const SetupWizard = () => {
             </div>
           )}
 
-          {step === 2 && (
+          {step === 2 && !quickMode && (
             <div className="electron-card rounded-xl p-6">
               <h2 className="text-lg font-semibold text-slate-900">Choose application type</h2>
               <p className="text-sm text-slate-600 mb-6">Pick workflow template.</p>
@@ -317,9 +340,35 @@ const SetupWizard = () => {
 
           {step === 3 && (
             <div className="electron-card rounded-xl p-6">
-              <h2 className="text-lg font-semibold text-slate-900">Connect source</h2>
-              <p className="text-sm text-slate-600 mb-6">Use GitHub or a local folder path and launch like a web app.</p>
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h2 className="text-lg font-semibold text-slate-900">Connect source</h2>
+                  <p className="text-sm text-slate-600 mt-1">GitHub repo or local folder. Deploy like a web app.</p>
+                </div>
+                {quickMode && (
+                  <span className="px-2 py-1 bg-sky-100 text-sky-700 text-xs font-medium rounded-md">⚡ Quick Mode</span>
+                )}
+              </div>
+
+              {/* In quick mode, simplify significantly */}
+              {quickMode && (
+                <div className="space-y-4 bg-sky-50 rounded-lg p-4 border border-sky-200 mb-6">
+                  <div>
+                    <p className="text-xs font-semibold text-sky-900 mb-2">📋 Using these presets:</p>
+                    <ul className="text-xs text-sky-700 space-y-0.5 list-disc list-inside">
+                      <li><strong>App type:</strong> SSR / Full-Stack (Next.js, Svelte, etc.)</li>
+                      <li><strong>Deployment:</strong> Self-Hosted</li>
+                      <li><strong>Branch previews:</strong> Enabled</li>
+                      <li><strong>Build command:</strong> npm ci && npm run build</li>
+                    </ul>
+                  </div>
+                  <p className="text-xs text-sky-600 italic">Just paste your GitHub repo URL and give your project a name!</p>
+                </div>
+              )}
+
               <div className="space-y-4">
+                {/* Hide source type toggle in quick mode */}
+                {!quickMode && (
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"
@@ -336,6 +385,7 @@ const SetupWizard = () => {
                     Local Folder
                   </button>
                 </div>
+                )}
 
                 {data.source_type === 'github' ? (
                   <>
@@ -353,6 +403,18 @@ const SetupWizard = () => {
                   </div>
                 )}
 
+                {/* In quick mode, show project name here */}
+                {quickMode && (
+                  <div>
+                    <Label htmlFor="project_name">Project Name *</Label>
+                    <Input id="project_name" value={data.project_name} onChange={(e) => setField('project_name', e.target.value)} className="mt-1.5 rounded-md border-border bg-white" placeholder="my-web-app" />
+                    <p className="text-xs text-slate-600 mt-1">A unique name for your deployment.</p>
+                  </div>
+                )}
+
+                {/* Hide detailed options in quick mode */}
+                {!quickMode && (
+                <>
                 <div>
                   <Label htmlFor="launch_url">Launch URL (optional)</Label>
                   <Input id="launch_url" value={data.launch_url} onChange={(e) => setField('launch_url', e.target.value)} className="mt-1.5 rounded-md border-border bg-white" placeholder="https://my-app.example.com or http://127.0.0.1:3000" />
@@ -369,15 +431,27 @@ const SetupWizard = () => {
                     <Input id="build_command" value={data.build_command} onChange={(e) => setField('build_command', e.target.value)} className="mt-1.5 rounded-md border-border bg-white" placeholder={data.source_type === 'github' ? 'npm ci && npm run build' : 'npm run dev'} />
                   </div>
                 </div>
+                </>
+                )}
               </div>
               <div className="mt-6 flex justify-between">
-                <Button variant="outline" onClick={() => setStep(2)} className="electron-button rounded-md">Back</Button>
-                <Button onClick={() => setStep(4)} disabled={!canContinue} className="electron-accent-bg rounded-md">Continue</Button>
+                <Button variant="outline" onClick={() => {
+                  if (quickMode) {
+                    setQuickMode(false);
+                    setStep(1);
+                  } else {
+                    setStep(2);
+                  }
+                }} className="electron-button rounded-md">Back</Button>
+                <Button onClick={() => quickMode ? void createProject() : setStep(4)} disabled={!canContinue || submitting} className="electron-accent-bg rounded-md">
+                  {quickMode ? (submitting ? 'Creating...' : 'Create Project') : 'Continue'}
+                </Button>
               </div>
             </div>
           )}
 
-          {step === 4 && (
+          {/* Only show step 4 if not in quick mode */}
+          {step === 4 && !quickMode && (
             <div className="electron-card rounded-xl p-6">
               <h2 className="text-lg font-semibold text-slate-900">Finalize configuration</h2>
               <p className="text-sm text-slate-600 mb-6">Set project identity and runtime options.</p>
