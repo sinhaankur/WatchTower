@@ -12,4 +12,9 @@ Docker Compose files for each WatchTower deployment topology.
 
 Example `.env` files are in the repo root (`*.example`).
 
+Port mapping notes:
+- `APP_PORT` controls the host port.
+- `APP_CONTAINER_PORT` controls the port exposed inside your app container.
+- Defaults are set per topology, and can be overridden in your `.env`.
+
 See the [HA & Podman docs](../docs/HA_PODMAN_WATCHTOWER.md) and [Hybrid Cloud docs](../docs/HYBRID_CLOUD_DATABASES.md) for setup details.

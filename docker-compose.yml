@@ -61,7 +61,7 @@ services:
   web:
     image: docker.io/library/node:20-alpine
     working_dir: /app/web
-    command: sh -c "npm install --legacy-peer-deps && npm run dev -- --host 0.0.0.0 --port 5173"
+    command: sh -c "npm ci --legacy-peer-deps && npm run dev -- --host 0.0.0.0 --port 5173"
     ports:
       - "5173:5173"
     environment:
@@ -73,7 +73,7 @@ services:
       - web_node_modules:/app/web/node_modules
     depends_on:
       api:
-        condition: service_started
+        condition: service_healthy
 
 volumes:
   postgres_data:
