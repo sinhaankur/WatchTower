@@ -10,7 +10,7 @@
   "homepage": "https://github.com/sinhaankur/WatchTower",
   "main": "main.js",
   "scripts": {
-    "start": "electron .",
+    "start": "electron --no-sandbox .",
     "icons": "icon-gen -i ../assets/wt-logo.svg -o build/icons",
     "installer-images": "python3 scripts/gen-installer-images.py",
     "pack": "electron-builder --dir",

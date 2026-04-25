@@ -136,6 +136,8 @@ class OrgNodeResponse(OrgNodeBase):
     memory_usage: Optional[int]
     disk_usage: Optional[int]
     is_active: bool
+    created_by_user_id: Optional[UUID] = None
+    updated_by_user_id: Optional[UUID] = None
     created_at: datetime
     updated_at: datetime
 
@@ -255,3 +257,14 @@ class OrganizationDashboard(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class InstallationOwnerResponse(BaseModel):
+    owner_user_id: Optional[UUID] = None
+    owner_login: Optional[str] = None
+    owner_github_id: Optional[int] = None
+    claimed_at: Optional[datetime] = None
+    github_connected_at: Optional[datetime] = None
+    is_claimed: bool
+    is_owner: bool
+    owner_mode_enabled: bool

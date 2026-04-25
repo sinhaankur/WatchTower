@@ -6,9 +6,28 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
 type ContextResponse = {
+  user: {
+    id: string;
+    email: string;
+    name: string;
+  };
   organization: {
     id: string;
     name: string;
+  };
+  installation?: {
+    owner_mode_enabled?: boolean;
+    is_claimed?: boolean;
+    owner_user_id?: string | null;
+    owner_login?: string | null;
+    is_owner?: boolean;
+  };
+  github_connection?: {
+    connected?: boolean;
+    provider?: string | null;
+    github_username?: string | null;
+    managed_by_user_id?: string | null;
+    last_synced?: string | null;
   };
 };
 
@@ -53,6 +72,7 @@ const TeamManagement = () => {
   const [actionError, setActionError] = useState('');
   const [actionSuccess, setActionSuccess] = useState('');
   const [inviting, setInviting] = useState(false);
+  const [context, setContext] = useState<ContextResponse | null>(null);
 
   const ownerCount = useMemo(() => members.filter((m) => m.role === 'owner').length, [members]);
 
@@ -76,6 +96,7 @@ const TeamManagement = () => {
     try {
       const ctxResp = await apiClient.get('/context');
       const context = ctxResp.data as ContextResponse;
+      setContext(context);
       setOrgId(context.organization.id);
       setOrgName(context.organization.name);
       await refreshData(context.organization.id);
@@ -152,6 +173,17 @@ const TeamManagement = () => {
 
       <main className="px-8 py-6 space-y-6 max-w-4xl">
 
+        {context?.installation?.owner_mode_enabled && (
+          <div className="rounded-md border border-blue-200 bg-blue-50 px-4 py-3">
+            <p className="text-sm font-medium text-blue-900">Installation ownership is enabled</p>
+            <p className="text-xs text-blue-800 mt-1">
+              {context.installation.is_owner
+                ? 'You are the installation owner. You control node governance and GitHub application connectivity.'
+                : `This installation is owned by ${context.installation.owner_login || 'another user'}. Node and team access must be granted by owner/admin.`}
+            </p>
+          </div>
+        )}
+
         {pageError && (
           <div className="flex items-start gap-3 border border-amber-200 bg-amber-50 rounded-md px-4 py-3">
             <span className="text-amber-500 mt-0.5">⚠</span>
@@ -214,20 +246,36 @@ const TeamManagement = () => {
           {/* GitHub Connections */}
           <Card className="electron-card rounded-xl shadow-none">
             <CardHeader className="pb-3">
-              <CardTitle className="text-base">GitHub Connections</CardTitle>
-              <CardDescription>Link GitHub accounts so WatchTower can pull repositories.</CardDescription>
+              <CardTitle className="text-base">GitHub Application Connections</CardTitle>
+              <CardDescription>Connect a managed GitHub application account so WatchTower can securely sync repositories.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
+              {context?.github_connection?.connected ? (
+                <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2">
+                  <p className="text-xs font-medium text-emerald-800">
+                    Connected as @{context.github_connection.github_username || 'github-user'}
+                  </p>
+                  <p className="text-[11px] text-emerald-700 mt-0.5">
+                    Provider: {context.github_connection.provider === 'github_enterprise' ? 'GitHub Enterprise' : 'GitHub.com'}
+                  </p>
+                </div>
+              ) : (
+                <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2">
+                  <p className="text-xs font-medium text-amber-800">No managed GitHub application is connected yet.</p>
+                  <p className="text-[11px] text-amber-700 mt-0.5">Connect one now to keep repository access managed and auditable.</p>
+                </div>
+              )}
+
               <div className="grid grid-cols-2 gap-2">
                 <Button onClick={() => void startOAuth('github_com')}
                   disabled={loading || !orgId || offlineMode}
                   className="bg-red-700 text-white hover:bg-red-800 rounded-md text-sm">
-                  🔗 GitHub.com
+                  Connect GitHub.com App
                 </Button>
                 <Button onClick={() => void startOAuth('github_enterprise')}
                   disabled={loading || !orgId || offlineMode}
                   variant="outline" className="text-sm">
-                  🏢 GitHub Enterprise
+                  Connect Enterprise App
                 </Button>
               </div>
               <p className="text-xs text-gray-400">You'll be redirected to GitHub to authorize access.</p>
