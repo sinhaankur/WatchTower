@@ -15,6 +15,30 @@ if [ "$EUID" -ne 0 ]; then
     exit 1
 fi
 
+# ── Detect existing installation ───────────────────────────────────────────────
+EXISTING_VERSION=""
+if command -v watchtower &>/dev/null; then
+    EXISTING_VERSION=$(watchtower --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' || true)
+fi
+if [[ -z "${EXISTING_VERSION}" ]] && pip3 show watchtower &>/dev/null 2>&1; then
+    EXISTING_VERSION=$(pip3 show watchtower 2>/dev/null | grep '^Version:' | awk '{print $2}' || true)
+fi
+
+if [[ -n "${EXISTING_VERSION}" ]]; then
+    echo "Existing WatchTower ${EXISTING_VERSION} detected."
+    # Stop the service if running so files can be replaced safely.
+    if systemctl is-active --quiet watchtower.service 2>/dev/null; then
+        echo "Stopping watchtower.service before update…"
+        systemctl stop watchtower.service || true
+    fi
+    echo "Removing old installation before re-install…"
+    pip3 uninstall -y watchtower 2>/dev/null || true
+    echo "Old version removed. Installing new version now."
+else
+    echo "No existing WatchTower installation found — performing fresh install."
+fi
+echo ""
+
 # Check Python version
 echo "Checking Python version..."
 if ! command -v python3 &> /dev/null; then
