@@ -3,7 +3,8 @@ Deployments API endpoints
 """
 
 import logging
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
+from fastapi.exceptions import HTTPException as FastAPIHTTPException
 from sqlalchemy.orm import Session
 from typing import List
 from uuid import UUID
@@ -22,6 +23,7 @@ from watchtower.database import (
 )
 from watchtower import schemas
 from watchtower.api import util
+from watchtower import builder as build_runner
 
 router = APIRouter(prefix="/api/projects", tags=["Deployments"])
 logger = logging.getLogger(__name__)
@@ -94,28 +96,40 @@ async def list_deployments(
 async def trigger_deployment(
     project_id: UUID,
     deploy_data: schemas.DeploymentTriggerRequest,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: dict = Depends(util.get_current_user)
 ):
     """Manually trigger a deployment"""
-    user_id = UUID(str(current_user["user_id"]))
-    project = db.query(Project).filter(
-        Project.id == project_id,
-        Project.owner_id == user_id
-    ).first()
-    
-    if not project:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Project not found"
-        )
-    
     try:
-        member = db.query(TeamMember).filter(
-            TeamMember.org_id == project.org_id,
-            TeamMember.user_id == user_id,
-            TeamMember.is_active == True,
+        from watchtower.api.enterprise import _ensure_user_org_member
+        _user, canonical_org, canonical_member = _ensure_user_org_member(db, current_user)
+        user_id = _user.id
+
+        # Locate the project: first by ownership, then by org membership as fallback
+        # for projects created under a prior user-id derived from a different token.
+        project = db.query(Project).filter(
+            Project.id == project_id,
+            Project.owner_id == user_id,
         ).first()
+        if not project:
+            project = db.query(Project).filter(
+                Project.id == project_id,
+                Project.org_id == canonical_org.id,
+            ).first()
+        if not project:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
+
+        # Use canonical member if project is in the canonical org; else look up separately.
+        if project.org_id == canonical_org.id:
+            member = canonical_member
+        else:
+            member = db.query(TeamMember).filter(
+                TeamMember.org_id == project.org_id,
+                TeamMember.user_id == user_id,
+                TeamMember.is_active == True,
+            ).first()
+
         if not member or not member.can_manage_deployments:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied")
 
@@ -149,11 +163,13 @@ async def trigger_deployment(
 
         db.commit()
         db.refresh(deployment)
-        
-        # TODO: Queue build job (Celery/RQ)
-        
+
+        background_tasks.add_task(build_runner.run_build_async, str(deployment.id))
+
         return deployment
     
+    except FastAPIHTTPException:
+        raise
     except Exception:
         db.rollback()
         logger.exception("Deployment trigger failed")
@@ -235,9 +251,11 @@ async def rollback_deployment(
     deployment.status = DeploymentStatus.ROLLED_BACK
     db.commit()
     db.refresh(rollback)
-    
-    # TODO: Queue rollback job
-    
+
+    # Schedule the rollback build asynchronously
+    import asyncio
+    asyncio.ensure_future(build_runner.run_build_async(str(rollback.id)))
+
     return rollback
 
 

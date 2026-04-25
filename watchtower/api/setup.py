@@ -29,20 +29,12 @@ async def complete_setup_wizard(
     Complete setup wizard - create project with all configuration
     """
     try:
-        user_id = UUID(str(current_user["user_id"]))
-        # Get or create default organization
-        org = db.query(Organization).filter(
-            Organization.owner_id == user_id
-        ).first()
-        
-        if not org:
-            user = db.query(User).filter(User.id == user_id).first()
-            org = Organization(
-                name=f"{user.name}'s Organization" if user else "Default Organization",
-                owner_id=user_id
-            )
-            db.add(org)
-            db.flush()
+        # Use canonical org resolution so the project is always placed under
+        # the installation owner's org (avoids org fragmentation when the token
+        # changes between restarts).
+        from watchtower.api.enterprise import _ensure_user_org_member
+        user, org, _member = _ensure_user_org_member(db, current_user)
+        user_id = user.id
         
         # Create project
         webhook_secret = util.generate_webhook_secret()
@@ -145,17 +137,16 @@ async def detect_framework(
     branch: str = "main"
 ):
     """
-    Auto-detect framework from repository
+    Auto-detect framework from repository by inspecting package.json.
     """
+    import asyncio
+    from watchtower import builder as build_runner
     try:
-        # TODO: Clone repo and check package.json, etc.
-        # For now, return Next.js as default
-        return {
-            "framework": "next.js",
-            "detected": False,
-            "build_command": "npm ci && npm run build",
-            "output_dir": ".next"
-        }
+        # Run in a thread to avoid blocking the event loop (may do network I/O)
+        result = await asyncio.get_event_loop().run_in_executor(
+            None, build_runner.detect_framework, repo_url, branch
+        )
+        return result
     except Exception:
         logger.exception("Framework detection failed")
         raise HTTPException(

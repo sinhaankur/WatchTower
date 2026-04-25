@@ -35,7 +35,7 @@ function checkForAppUpdates(win) {
       type: 'info',
       title: 'Update Available',
       message: `WatchTower ${info.version} is available`,
-      detail: 'Downloading in the background. You'll be prompted to restart when it's ready.',
+      detail: "Downloading in the background. You'll be prompted to restart when it's ready.",
       buttons: ['OK'],
     });
   });
@@ -358,7 +358,7 @@ function startStaticServer(distDir) {
         // Tight CSP: same-origin only; connect-src allows localhost API
         'Content-Security-Policy':
           "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; " +
-          `connect-src 'self' http://${HOST}:${BACKEND_PORT}; img-src 'self' data:; font-src 'self' data:;`,
+          `connect-src 'self' http://${HOST}:${BACKEND_PORT} ws://${HOST}:${BACKEND_PORT}; img-src 'self' data:; font-src 'self' data:;`,
         // No caching for index.html (always re-check); long-lived cache for hashed assets
         'Cache-Control': isIndex
           ? 'no-store'
@@ -379,6 +379,36 @@ function startStaticServer(distDir) {
 
     server.listen(FRONTEND_PORT, HOST, () => resolve(server));
     server.on('error', reject);
+
+    // Proxy WebSocket upgrade requests (e.g. /api/ws/builds/…/logs) to the backend.
+    server.on('upgrade', (req, socket, head) => {
+      const urlPath = (req.url || '/').split('?')[0];
+      if (!urlPath.startsWith('/api')) {
+        socket.destroy();
+        return;
+      }
+      const query = req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : '';
+      const opts = {
+        hostname: HOST,
+        port: BACKEND_PORT,
+        path: urlPath + query,
+        headers: { ...req.headers, host: `${HOST}:${BACKEND_PORT}` },
+      };
+      const proxyReq = http.request(opts);
+      proxyReq.on('upgrade', (_proxyRes, proxySocket, proxyHead) => {
+        socket.write(
+          'HTTP/1.1 101 Switching Protocols\r\n' +
+          'Upgrade: websocket\r\nConnection: Upgrade\r\n\r\n'
+        );
+        if (proxyHead && proxyHead.length) proxySocket.unshift(proxyHead);
+        proxySocket.pipe(socket);
+        socket.pipe(proxySocket);
+        proxySocket.on('error', () => socket.destroy());
+        socket.on('error', () => proxySocket.destroy());
+      });
+      proxyReq.on('error', () => socket.destroy());
+      proxyReq.end();
+    });
   });
 }
 
