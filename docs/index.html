@@ -366,6 +366,7 @@
       padding: 14px;
       text-decoration: none;
       transition: transform 140ms ease, border-color 140ms ease;
+      overflow: hidden;
     }
 
     .blueprint-card:hover {
@@ -379,6 +380,9 @@
       border-radius: 14px;
       border: 1px solid var(--wt-border-soft);
       background: #fffdf7;
+      aspect-ratio: 16 / 9;
+      object-fit: contain;
+      padding: 8px;
     }
 
     .blueprint-card strong {
@@ -664,6 +668,19 @@
         border-bottom: 1px solid var(--wt-border-soft);
       }
 
+      .sidebar-nav {
+        flex-direction: row;
+        overflow-x: auto;
+        overflow-y: hidden;
+        padding-bottom: 12px;
+        scrollbar-width: thin;
+      }
+
+      .nav-link {
+        flex: 0 0 auto;
+        white-space: nowrap;
+      }
+
       .topbar,
       .content {
         padding-left: 18px;
@@ -671,6 +688,7 @@
       }
 
       .topbar {
+        position: relative;
         flex-direction: column;
         align-items: flex-start;
       }
@@ -678,6 +696,14 @@
       .hero,
       .section-card {
         padding: 20px;
+      }
+
+      .blueprint-card {
+        padding: 12px;
+      }
+
+      .blueprint-card img {
+        padding: 6px;
       }
     }
 
@@ -694,6 +720,36 @@
       .primary-button,
       .secondary-button {
         width: 100%;
+      }
+
+      .content {
+        padding-top: 18px;
+        padding-bottom: 28px;
+      }
+
+      .hero h2 {
+        font-size: 1.75rem;
+        line-height: 1.08;
+      }
+
+      .hero,
+      .section-card,
+      .explain-card,
+      .path-card,
+      .stat-card {
+        padding: 16px;
+      }
+
+      .blueprint-grid {
+        gap: 14px;
+      }
+
+      .blueprint-card strong {
+        font-size: 0.92rem;
+      }
+
+      .blueprint-card span {
+        font-size: 0.82rem;
       }
     }
   </style>
