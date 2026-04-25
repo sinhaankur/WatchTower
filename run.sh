@@ -266,27 +266,18 @@ if [[ "$MODE" == "desktop" ]]; then
   success "Desktop app launched."
 
 elif [[ "$MODE" == "browser" ]]; then
-  free_port "$WEB_PORT"
-  info "Starting static frontend server on 127.0.0.1:$WEB_PORT..."
-  # Serve web/dist with a tiny Python HTTP server + show the URL
-  "$VENV/bin/python" -m http.server "$WEB_PORT" \
-    --bind 127.0.0.1 \
-    --directory "$ROOT/web/dist" \
-    >"$LOG_WEB" 2>&1 &
-  for i in $(seq 1 20); do
-    is_listening "$WEB_PORT" && break
-    sleep 0.5
-  done
-  is_listening "$WEB_PORT" || { error "Frontend failed to start. Check: $LOG_WEB"; exit 1; }
-  success "Frontend ready."
+  # The backend (port 8000) now serves both the API and the React SPA.
+  # No separate static server needed — opening port 8000 directly avoids
+  # cross-origin issues where /api calls would 404 on a plain file server.
+  success "Frontend served by backend."
   echo ""
-  echo -e "  ${GREEN}Open in your browser:${NC}  http://127.0.0.1:${WEB_PORT}"
+  echo -e "  ${GREEN}Open in your browser:${NC}  http://127.0.0.1:${API_PORT}"
   echo ""
   # Open browser
   if command -v xdg-open >/dev/null 2>&1; then
-    xdg-open "http://127.0.0.1:${WEB_PORT}" 2>/dev/null &
+    xdg-open "http://127.0.0.1:${API_PORT}" 2>/dev/null &
   elif command -v open >/dev/null 2>&1; then
-    open "http://127.0.0.1:${WEB_PORT}" &
+    open "http://127.0.0.1:${API_PORT}" &
   fi
 fi
 
