@@ -48,9 +48,19 @@ const Login = () => {
 
   const [loggedInUser, setLoggedInUser] = useState<LoggedInUser | null>(null);
 
-  const showSuccessAndRedirect = (user: LoggedInUser, delayMs = 1600) => {
+  const resolveNextPath = () => {
+    const fromState = (location.state as { from?: string } | null)?.from;
+    const fromQuery = searchParams.get('next') || undefined;
+    const candidate = fromQuery || fromState || '/';
+    if (!candidate.startsWith('/') || candidate.startsWith('//')) return '/';
+    if (candidate === '/login') return '/';
+    return candidate;
+  };
+
+  const showSuccessAndRedirect = (user: LoggedInUser, delayMs = 1600, nextPath?: string) => {
     setLoggedInUser(user);
-    window.setTimeout(() => navigate('/', { replace: true }), delayMs);
+    const target = nextPath || '/';
+    window.setTimeout(() => navigate(target, { replace: true }), delayMs);
   };
 
   const resolveUserFromContext = async (): Promise<LoggedInUser> => {
@@ -66,6 +76,7 @@ const Login = () => {
 
   useEffect(() => {
     const testLoginEnabled = searchParams.get('test_login') === '1';
+    const nextPath = resolveNextPath();
     if (testLoginEnabled) {
       setLoggedInUser({ name: 'Test User', email: 'test@example.com', isTest: true });
       return;
@@ -74,7 +85,7 @@ const Login = () => {
     const hydrateExistingSession = async (token: string) => {
       localStorage.setItem('authToken', token);
       const user = await resolveUserFromContext();
-      showSuccessAndRedirect(user, 1800);
+      showSuccessAndRedirect(user, 1800, nextPath);
     };
 
     // Auto-login: Electron injects VITE_API_TOKEN into the Vite process at launch.
@@ -89,7 +100,7 @@ const Login = () => {
     if (existing) {
       void hydrateExistingSession(existing);
     }
-  }, [navigate, searchParams]);
+  }, [location.state, navigate, searchParams]);
 
   useEffect(() => {
     const loadAuthStatus = async () => {
@@ -121,7 +132,7 @@ const Login = () => {
       localStorage.setItem('authToken', trimmed);
       const user = await resolveUserFromContext();
       trackEvent('login', { method: 'api_token' });
-      showSuccessAndRedirect(user);
+      showSuccessAndRedirect(user, 1600, resolveNextPath());
     } catch {
       localStorage.removeItem('authToken');
       setError('Authentication failed. If installation ownership is enabled, your account must be invited by an owner/admin before access is granted.');
@@ -137,7 +148,7 @@ const Login = () => {
       localStorage.setItem('authToken', devToken);
       const user = await resolveUserFromContext();
       trackEvent('login', { method: 'dev_auto' });
-      showSuccessAndRedirect(user);
+      showSuccessAndRedirect(user, 1600, resolveNextPath());
     } catch {
       localStorage.removeItem('authToken');
       setError('Dev auto-login failed. Check that WATCHTOWER_ALLOW_INSECURE_DEV_AUTH=true on the server.');
