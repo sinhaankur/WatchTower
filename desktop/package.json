@@ -38,8 +38,8 @@
     "mac": {
       "icon": "build/icons/app.icns",
       "target": [
-        "dmg",
-        "zip"
+        { "target": "dmg", "arch": ["universal"] },
+        { "target": "zip", "arch": ["universal"] }
       ],
       "category": "public.app-category.developer-tools"
     },
@@ -60,8 +60,8 @@
     "win": {
       "icon": "build/icons/app.ico",
       "target": [
-        "nsis",
-        "zip"
+        { "target": "nsis", "arch": ["x64", "arm64"] },
+        { "target": "zip",  "arch": ["x64", "arm64"] }
       ]
     },
     "nsis": {
