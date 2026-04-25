@@ -8,6 +8,7 @@ from uuid import UUID
 from datetime import datetime
 from enum import Enum
 
+
 # Enums matching database
 class UseCaseType(str, Enum):
     NETLIFY_LIKE = "netlify_like"
@@ -18,6 +19,11 @@ class UseCaseType(str, Enum):
 class DeploymentModel(str, Enum):
     SELF_HOSTED = "self_hosted"
     SAAS = "saas"
+
+
+class ProjectSourceType(str, Enum):
+    GITHUB = "github"
+    LOCAL_FOLDER = "local_folder"
 
 
 class DeploymentStatus(str, Enum):
@@ -90,6 +96,9 @@ class ProjectBase(BaseModel):
     name: str
     use_case: UseCaseType
     deployment_model: DeploymentModel = DeploymentModel.SELF_HOSTED
+    source_type: ProjectSourceType = ProjectSourceType.GITHUB
+    local_folder_path: Optional[str] = None
+    launch_url: Optional[str] = None
     repo_url: str
     repo_branch: str = "main"
 
@@ -297,6 +306,9 @@ class SetupWizardComplete(BaseModel):
     """Step 5: Complete setup wizard with all data"""
     deployment_model: DeploymentModel
     use_case: UseCaseType
+    source_type: ProjectSourceType = ProjectSourceType.GITHUB
+    local_folder_path: Optional[str] = None
+    launch_url: Optional[str] = None
     repo_url: str
     repo_branch: str
     build_command: str

@@ -58,8 +58,8 @@ const GitHubLoginCallback = () => {
   }, [navigate, searchParams]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-6">
-      <div className="w-full max-w-md electron-card rounded-xl px-8 py-10 text-center">
+    <div className="min-h-screen flex items-center justify-center px-6 bg-slate-50">
+      <div className="w-full max-w-md rounded-xl px-8 py-10 text-center border border-border bg-white shadow-sm">
         <div className="mb-4 flex justify-center">
           <BrandLogo size="sm" />
         </div>
@@ -67,7 +67,7 @@ const GitHubLoginCallback = () => {
           <>
             <div className="text-4xl mb-4 animate-spin inline-block">⌛</div>
             <h1 className="text-base font-semibold mb-1">Signing you in...</h1>
-            <p className="text-sm text-slate-300">Completing GitHub authentication.</p>
+            <p className="text-sm text-slate-600">Completing GitHub authentication.</p>
           </>
         )}
 
@@ -75,7 +75,7 @@ const GitHubLoginCallback = () => {
           <>
             <div className="text-5xl mb-4">✅</div>
             <h1 className="text-base font-semibold mb-1">Signed in</h1>
-            <p className="text-sm text-slate-300">Redirecting to your dashboard.</p>
+            <p className="text-sm text-slate-600">Redirecting to your dashboard.</p>
           </>
         )}
 
@@ -85,7 +85,7 @@ const GitHubLoginCallback = () => {
             <h1 className="text-base font-semibold mb-1">GitHub sign-in failed</h1>
             <p className="text-sm text-red-600 border border-red-200 bg-red-50 rounded-md px-3 py-2 text-left mb-5">{detail}</p>
             <Link to="/login">
-              <Button className="w-full electron-accent-bg rounded-md">Try login again</Button>
+              <Button className="w-full rounded-md">Try login again</Button>
             </Link>
           </>
         )}

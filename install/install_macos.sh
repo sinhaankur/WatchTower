@@ -31,8 +31,8 @@ python3 -m venv "${VENV_DIR}"
 "${VENV_DIR}/bin/python" -m pip install --upgrade pip
 "${VENV_DIR}/bin/python" -m pip install "${INSTALL_DIR}"
 
-[[ -f "${CONFIG_DIR}/nodes.json" ]] || cp "${INSTALL_DIR}/nodes.json" "${CONFIG_DIR}/nodes.json"
-[[ -f "${CONFIG_DIR}/apps.json" ]] || cp "${INSTALL_DIR}/apps.json" "${CONFIG_DIR}/apps.json"
+[[ -f "${CONFIG_DIR}/nodes.json" ]] || cp "${INSTALL_DIR}/config/nodes.json" "${CONFIG_DIR}/nodes.json"
+[[ -f "${CONFIG_DIR}/apps.json" ]] || cp "${INSTALL_DIR}/config/apps.json" "${CONFIG_DIR}/apps.json"
 
 if [[ ! -f "${CONFIG_DIR}/appcenter.env" ]]; then
   TRIGGER_TOKEN="$(generate_token)"
