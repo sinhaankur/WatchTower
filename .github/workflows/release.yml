@@ -81,12 +81,20 @@ jobs:
             eb_args: --linux AppImage deb --armv7l
             artifact_glob: "desktop/dist/*armv7l*"
             extra_apt: "gcc-arm-linux-gnueabihf"
-          - os: macos-latest
-            eb_args: --mac dmg zip
+          - os: macos-14
+            # macos-14 is the Apple Silicon (M1) runner — required to build
+            # the x64 slice of a universal binary via Rosetta cross-compilation.
+            # electron-builder --universal produces a fat DMG that runs on
+            # both Intel Macs and M1/M2/M3/M4 with a single download.
+            eb_args: --mac --universal
             artifact_glob: "desktop/dist/*.dmg desktop/dist/*.zip"
+            extra_apt: ""
           - os: windows-latest
-            eb_args: --win nsis zip
+            # package.json win.target already lists x64 + arm64 arches,
+            # so --win builds both Surface Pro X (arm64) and regular x64 installers.
+            eb_args: --win
             artifact_glob: "desktop/dist/*.exe desktop/dist/*.zip"
+            extra_apt: ""
 
     steps:
       - uses: actions/checkout@v4

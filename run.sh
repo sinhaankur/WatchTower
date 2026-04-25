@@ -43,22 +43,33 @@ is_listening() {
   fi
 }
 
-# Kill whatever is holding a port — works without fuser (not on Pi OS Lite)
+# Kill PIDs holding a port — portable across Linux, macOS, Pi OS Lite.
+# Priority: fuser (Linux full) → lsof (macOS) → ss+kill (Pi OS Lite / no fuser)
+# Uses only POSIX grep (no -P/lookbehind) so it works on BSD grep (macOS).
+kill_port() {
+  local port="$1"
+  if command -v fuser >/dev/null 2>&1; then
+    fuser -k "${port}/tcp" 2>/dev/null || true
+  elif command -v lsof >/dev/null 2>&1; then
+    # macOS: lsof -ti returns bare PIDs, one per line
+    local pids
+    pids=$(lsof -ti tcp:"${port}" 2>/dev/null || true)
+    for pid in $pids; do kill "$pid" 2>/dev/null || true; done
+  elif command -v ss >/dev/null 2>&1; then
+    # Pi OS Lite (no fuser, no lsof): use ss — POSIX grep only
+    local pids
+    pids=$(ss -tlnpH "sport = :${port}" 2>/dev/null \
+           | grep -o 'pid=[0-9]*' | cut -d= -f2 || true)
+    for pid in $pids; do kill "$pid" 2>/dev/null || true; done
+  fi
+}
+
+# Kill whatever is holding a port — works on Linux, macOS, and Pi OS Lite.
 free_port() {
   local port="$1"
   if is_listening "$port"; then
     warn "Port $port is occupied — killing existing process..."
-    # Try fuser first (Debian full), fall back to ss+kill (Pi OS Lite)
-    if command -v fuser >/dev/null 2>&1; then
-      fuser -k "${port}/tcp" 2>/dev/null || true
-    else
-      local pids
-      pids=$(ss -tlnpH "sport = :${port}" 2>/dev/null \
-             | grep -oP 'pid=\K[0-9]+' || true)
-      for pid in $pids; do
-        kill "$pid" 2>/dev/null || true
-      done
-    fi
+    kill_port "$port"
     sleep 0.5
   fi
 }
@@ -67,8 +78,8 @@ free_port() {
 cmd_stop() {
   info "Stopping WatchTower..."
   pkill -f "electron \." 2>/dev/null && info "Electron stopped." || true
-  fuser -k "${API_PORT}/tcp" 2>/dev/null && info "Backend stopped." || true
-  fuser -k "${WEB_PORT}/tcp" 2>/dev/null && info "Frontend stopped." || true
+  kill_port "$API_PORT" && info "Backend stopped." || true
+  kill_port "$WEB_PORT" && info "Frontend stopped." || true
   success "Done."
   exit 0
 }
@@ -108,8 +119,10 @@ fi
 SENTINEL="$VENV/.deps_installed"
 if [[ ! -f "$SENTINEL" ]] || [[ "$ROOT/requirements.txt" -nt "$SENTINEL" ]]; then
   info "Installing Python dependencies (first run or requirements changed)..."
-  "$VENV/bin/pip" install --upgrade pip -q
-  "$VENV/bin/pip" install -r "$ROOT/requirements.txt" -q
+  # --prefer-binary: use pre-built wheels instead of compiling from source.
+  # Critical on ARM (Pi, M1) where C extension compilation often fails or is slow.
+  "$VENV/bin/pip" install --prefer-binary --upgrade pip -q
+  "$VENV/bin/pip" install --prefer-binary -r "$ROOT/requirements.txt" -q
   touch "$SENTINEL"
 fi
 

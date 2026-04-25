@@ -15,7 +15,8 @@ pyyaml>=6.0
 apscheduler>=3.10.0
 requests==2.31.0
 fabric==3.2.2
-podman==5.0.0
+# podman Python SDK only has Linux binaries — skip on macOS/Windows
+podman==5.0.0; sys_platform == "linux"
 
 # HTTP client (used in tests and health checks)
 httpx==0.25.2
