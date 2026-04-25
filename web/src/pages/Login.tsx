@@ -10,6 +10,9 @@ type AuthStatus = {
     github_configured?: boolean;
     missing?: string[];
   };
+  device_flow?: {
+    github_configured?: boolean;
+  };
   api_token?: {
     configured?: boolean;
   };
@@ -19,7 +22,7 @@ type AuthStatus = {
   installation?: {
     owner_mode_enabled?: boolean;
   };
-  recommended?: 'oauth' | 'api_token';
+  recommended?: 'oauth' | 'device_flow' | 'api_token';
 };
 
 type ContextResponse = {
@@ -45,6 +48,19 @@ const Login = () => {
   const [authStatus, setAuthStatus] = useState<AuthStatus | null>(null);
   const [statusLoading, setStatusLoading] = useState(true);
   const oauthReady = Boolean(authStatus?.oauth?.github_configured);
+  const deviceFlowReady = Boolean(authStatus?.device_flow?.github_configured);
+
+  // Device Flow state
+  const [deviceFlow, setDeviceFlow] = useState<null | {
+    user_code: string;
+    verification_uri: string;
+    verification_uri_complete?: string;
+    device_code: string;
+    expires_in: number;
+    interval: number;
+    started: number;
+  }>(null);
+  const [devicePolling, setDevicePolling] = useState(false);
 
   const [loggedInUser, setLoggedInUser] = useState<LoggedInUser | null>(null);
 
@@ -195,6 +211,116 @@ const Login = () => {
     }
   };
 
+  const startGitHubDeviceFlow = async () => {
+    setError('');
+    setLoading(true);
+    try {
+      const resp = await apiClient.post('/auth/github/device/start', {});
+      const data = resp.data as {
+        user_code: string;
+        verification_uri: string;
+        verification_uri_complete?: string;
+        device_code: string;
+        expires_in: number;
+        interval: number;
+      };
+      setDeviceFlow({ ...data, started: Date.now() });
+      trackEvent('login', { method: 'github_device_flow_start' });
+      // Open the GitHub verification page automatically
+      const url = data.verification_uri_complete || data.verification_uri;
+      const electron = (window as any).electronAPI;
+      if (electron?.openOAuth) {
+        electron.openOAuth(url);
+      } else {
+        window.open(url, '_blank', 'noopener,noreferrer');
+      }
+    } catch (e: any) {
+      const detail = e?.response?.data?.detail || 'Could not start GitHub Device Flow.';
+      setError(detail);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const cancelDeviceFlow = () => {
+    setDeviceFlow(null);
+    setDevicePolling(false);
+  };
+
+  const copyUserCode = async () => {
+    if (!deviceFlow?.user_code) return;
+    try {
+      await navigator.clipboard.writeText(deviceFlow.user_code);
+    } catch {
+      // ignore
+    }
+  };
+
+  // Poll the device flow endpoint while we have an active flow
+  useEffect(() => {
+    if (!deviceFlow) return;
+    let cancelled = false;
+    setDevicePolling(true);
+
+    const poll = async () => {
+      if (cancelled) return;
+      const elapsed = (Date.now() - deviceFlow.started) / 1000;
+      if (elapsed > deviceFlow.expires_in) {
+        setDevicePolling(false);
+        setError('Device code expired. Click "Sign in with GitHub" again.');
+        setDeviceFlow(null);
+        return;
+      }
+      try {
+        const resp = await apiClient.post('/auth/github/device/poll', {
+          device_code: deviceFlow.device_code,
+        });
+        const data = resp.data as {
+          status?: string;
+          token?: string;
+          interval?: number;
+          user?: { name?: string; email?: string };
+        };
+        if (cancelled) return;
+        if (data.status === 'success' && data.token) {
+          localStorage.setItem('authToken', data.token);
+          setDevicePolling(false);
+          setDeviceFlow(null);
+          trackEvent('login', { method: 'github_device_flow_success' });
+          showSuccessAndRedirect(
+            { name: data.user?.name, email: data.user?.email },
+            1400,
+            resolveNextPath()
+          );
+          return;
+        }
+        if (data.status === 'access_denied') {
+          setDevicePolling(false);
+          setDeviceFlow(null);
+          setError('GitHub authorization was denied.');
+          return;
+        }
+        // authorization_pending or slow_down — wait then poll again
+        const wait = (data.status === 'slow_down' && data.interval ? data.interval : deviceFlow.interval) * 1000;
+        setTimeout(poll, wait);
+      } catch (e: any) {
+        if (cancelled) return;
+        const detail = e?.response?.data?.detail || 'Polling failed.';
+        setError(detail);
+        setDevicePolling(false);
+        setDeviceFlow(null);
+      }
+    };
+
+    const t = setTimeout(poll, deviceFlow.interval * 1000);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+      setDevicePolling(false);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deviceFlow?.device_code]);
+
   const openGitHubTokenGenerator = () => {
     trackEvent('login', { method: 'token_generator_opened', type: 'fine_grained' });
     window.open('https://github.com/settings/personal-access-tokens/new', '_blank', 'noopener,noreferrer');
@@ -211,7 +337,7 @@ const Login = () => {
 
   // Determine if the server has anything configured at all
   const apiTokenConfigured = Boolean(authStatus?.api_token?.configured);
-  const nothingConfigured = !statusLoading && authStatus && !oauthReady && !apiTokenConfigured && !authStatus?.dev_auth?.allow_insecure;
+  const nothingConfigured = !statusLoading && authStatus && !oauthReady && !deviceFlowReady && !apiTokenConfigured && !authStatus?.dev_auth?.allow_insecure;
 
   return (
     <div className="min-h-screen flex items-center justify-center px-6 bg-transparent">
@@ -332,40 +458,95 @@ const Login = () => {
           <>
             {/* GitHub OAuth — PRIMARY auth method */}
             <div className="space-y-3 mb-4">
-              {!oauthReady && (
+              {!oauthReady && !deviceFlowReady && (
                   <div className="text-left text-xs rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-blue-700 mb-3">
                   <p className="font-medium text-blue-800 mb-1">GitHub not configured yet</p>
-                  <p>Ask your admin to set <code className="font-mono bg-blue-100 px-1 rounded text-xs">GITHUB_OAUTH_CLIENT_ID</code> and <code className="font-mono bg-blue-100 px-1 rounded text-xs">GITHUB_OAUTH_CLIENT_SECRET</code></p>
+                  <p>Set <code className="font-mono bg-blue-100 px-1 rounded text-xs">WATCHTOWER_GITHUB_DEVICE_CLIENT_ID</code> (Device Flow, no secret) or <code className="font-mono bg-blue-100 px-1 rounded text-xs">GITHUB_OAUTH_CLIENT_ID</code> + <code className="font-mono bg-blue-100 px-1 rounded text-xs">GITHUB_OAUTH_CLIENT_SECRET</code> on the server.</p>
                   </div>
               )}
-              <Button
-                onClick={() => void loginWithGitHub()}
-                disabled={loading || !oauthReady}
-                className={`w-full rounded-lg gap-2 py-6 text-base font-semibold flex items-center justify-center ${
-                  oauthReady
-                    ? 'bg-slate-900 hover:bg-slate-800 text-white'
-                    : 'bg-slate-300 text-slate-500 cursor-not-allowed'
-                }`}
-              >
-                {loading ? (
-                    <span className="inline-flex items-center gap-2">
-                    <span className="inline-block w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-                    Redirecting to GitHub…
-                    </span>
-                ) : (
-                    <span className="inline-flex items-center gap-2">
-                    {/* GitHub mark */}
-                    <svg viewBox="0 0 16 16" width="20" height="20" fill="currentColor" aria-hidden="true">
-                      <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/>
-                    </svg>
-                    <span>{oauthReady ? 'Sign in with GitHub' : 'GitHub Login (Not Ready)'}</span>
-                    </span>
-                )}
-              </Button>
-              {oauthReady && (
-                  <p className="text-xs text-slate-600 text-center">
-                  ✓ Browser opens GitHub → authenticate → returns here automatically
-                  </p>
+
+              {/* Device Flow active panel */}
+              {deviceFlow ? (
+                <div className="text-left rounded-xl border-2 border-slate-900 bg-slate-50 px-4 py-4 space-y-3">
+                  <p className="text-sm font-semibold text-slate-900">Authorize WatchTower on GitHub</p>
+                  <ol className="list-decimal list-inside text-xs text-slate-700 space-y-1">
+                    <li>A browser opened at <span className="font-mono">{deviceFlow.verification_uri}</span></li>
+                    <li>Enter the code below if not pre-filled</li>
+                    <li>Approve access — this page will sign you in automatically</li>
+                  </ol>
+                  <div className="flex items-center justify-between bg-white border border-slate-300 rounded-lg px-4 py-3">
+                    <code className="text-2xl font-mono tracking-widest font-bold text-slate-900">
+                      {deviceFlow.user_code}
+                    </code>
+                    <button
+                      type="button"
+                      onClick={() => void copyUserCode()}
+                      className="text-xs text-slate-600 hover:text-slate-900 underline"
+                    >
+                      Copy
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs text-slate-500">
+                    <span className="inline-block w-3 h-3 border-2 border-slate-300 border-t-slate-700 rounded-full animate-spin" />
+                    {devicePolling ? 'Waiting for GitHub authorization…' : 'Starting…'}
+                  </div>
+                  <div className="flex gap-2">
+                    <a
+                      href={deviceFlow.verification_uri_complete || deviceFlow.verification_uri}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex-1 text-center text-xs bg-slate-900 hover:bg-slate-800 text-white rounded-md px-3 py-2"
+                    >
+                      Reopen GitHub
+                    </a>
+                    <button
+                      type="button"
+                      onClick={cancelDeviceFlow}
+                      className="text-xs border border-slate-300 hover:bg-slate-100 text-slate-700 rounded-md px-3 py-2"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <Button
+                    onClick={() => {
+                      if (deviceFlowReady) {
+                        void startGitHubDeviceFlow();
+                      } else {
+                        void loginWithGitHub();
+                      }
+                    }}
+                    disabled={loading || (!oauthReady && !deviceFlowReady)}
+                    className={`w-full rounded-lg gap-2 py-6 text-base font-semibold flex items-center justify-center ${
+                      (oauthReady || deviceFlowReady)
+                        ? 'bg-slate-900 hover:bg-slate-800 text-white'
+                        : 'bg-slate-300 text-slate-500 cursor-not-allowed'
+                    }`}
+                  >
+                    {loading ? (
+                        <span className="inline-flex items-center gap-2">
+                        <span className="inline-block w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                        Connecting to GitHub…
+                        </span>
+                    ) : (
+                        <span className="inline-flex items-center gap-2">
+                        <svg viewBox="0 0 16 16" width="20" height="20" fill="currentColor" aria-hidden="true">
+                          <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/>
+                        </svg>
+                        <span>{(oauthReady || deviceFlowReady) ? 'Sign in with GitHub' : 'GitHub Login (Not Ready)'}</span>
+                        </span>
+                    )}
+                  </Button>
+                  {(oauthReady || deviceFlowReady) && (
+                      <p className="text-xs text-slate-600 text-center">
+                      {deviceFlowReady
+                        ? '✓ No setup needed — GitHub will give you a short code to enter'
+                        : '✓ Browser opens GitHub → authenticate → returns here automatically'}
+                      </p>
+                  )}
+                </>
               )}
             </div>
 
