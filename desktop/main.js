@@ -42,14 +42,15 @@ if (process.platform === 'linux') {
     // X11 fallback: guard against NVIDIA 500+ / kernel 6.x sandbox crash.
     // Run GPU in the browser process — avoids the sandbox fork that segfaults.
     app.commandLine.appendSwitch('in-process-gpu');
-    // Use desktop EGL/OpenGL via NVIDIA instead of SwiftShader.
-    app.commandLine.appendSwitch('use-gl', 'desktop');
+    // Use EGL directly — NOT ANGLE. ANGLE's GL backend creates "shared contexts
+    // for virtualization" (SharedImageStub) that fail on NVIDIA 500+ drivers
+    // with SIGSEGV. Direct EGL bypasses ANGLE entirely.
+    app.commandLine.appendSwitch('use-gl', 'egl');
     // Disable GPU sandbox — causes SIGSEGV on new NVIDIA open drivers.
     app.commandLine.appendSwitch('disable-gpu-sandbox');
-    // Avoid ANGLE black-window bug on NVIDIA + X11.
-    app.commandLine.appendSwitch('use-angle', 'gl');
-    // Reduce GPU memory pressure during startup.
-    app.commandLine.appendSwitch('disable-features', 'VizDisplayCompositor');
+    // Disable compositing — reduces GPU memory pressure and avoids additional
+    // context creation paths that can SIGSEGV on broken drivers.
+    app.commandLine.appendSwitch('disable-gpu-compositing');
   }
 }
 
