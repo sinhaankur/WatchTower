@@ -66,6 +66,13 @@ def _ensure_secret_key() -> None:
                 return
             key = Fernet.generate_key().decode("utf-8")
             data_dir.mkdir(parents=True, exist_ok=True)
+            try:
+                # Tighten parent-dir perms — the key file itself is 0600 but
+                # an open parent (umask 022 → 0755) would still allow other
+                # local users to inspect timestamps / replace the file.
+                os.chmod(data_dir, 0o700)
+            except OSError:
+                pass
             key_path.write_text(key, encoding="utf-8")
             try:
                 os.chmod(key_path, 0o600)
@@ -212,8 +219,19 @@ if _WEB_DIST.is_dir():
     # Public root files (favicon, etc.) — serve any file that exists
     @app.get("/{filename:path}", include_in_schema=False)
     async def spa_fallback(filename: str):
-        """Serve static files or fall back to index.html for SPA routing."""
-        candidate = _WEB_DIST / filename
+        """Serve static files or fall back to index.html for SPA routing.
+
+        Path-traversal hardening: resolve the candidate path and require it to
+        live inside ``_WEB_DIST``. A request like ``GET /../../etc/passwd``
+        would otherwise escape the web root via ``Path / filename``.
+        """
+        web_root = _WEB_DIST.resolve()
+        try:
+            candidate = (_WEB_DIST / filename).resolve()
+            candidate.relative_to(web_root)
+        except (ValueError, OSError):
+            # Outside the web root → fall through to SPA index.
+            return FileResponse(str(_WEB_DIST / "index.html"))
         if candidate.is_file():
             return FileResponse(str(candidate))
         return FileResponse(str(_WEB_DIST / "index.html"))

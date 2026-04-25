@@ -329,6 +329,12 @@ def _resolve_github_oauth_endpoints(provider: schemas.GitHubProvider, enterprise
     if provider == schemas.GitHubProvider.GITHUB_ENTERPRISE:
         if not enterprise_url:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="enterprise_url is required")
+        # SSRF guard: the enterprise_url is user-controlled and is later used
+        # in server-side requests.post()/get(); reject http(s)://localhost,
+        # link-local, private RFC1918 ranges, etc. Bypass only via the
+        # explicit WATCHTOWER_ALLOW_INTERNAL_HTTP=true env var.
+        from . import util as _util
+        _util.assert_safe_external_url(enterprise_url)
         base = enterprise_url.rstrip("/")
         return {
             "authorize_url": f"{base}/login/oauth/authorize",
