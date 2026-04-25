@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" role="img" aria-label="WatchTower application and web app surface overview">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#fffaf0" />
+      <stop offset="100%" stop-color="#eef6ff" />
+    </linearGradient>
+    <style>
+      .title { font: 800 50px 'DM Sans', Arial, sans-serif; fill: #0f172a; }
+      .subtitle { font: 500 23px 'DM Sans', Arial, sans-serif; fill: #475569; }
+      .eyebrow { font: 700 20px 'Space Mono', monospace; letter-spacing: 2px; fill: #b91c1c; }
+      .cardTitle { font: 800 24px 'DM Sans', Arial, sans-serif; fill: #0f172a; }
+      .cardCopy { font: 500 19px 'DM Sans', Arial, sans-serif; fill: #475569; }
+      .small { font: 700 16px 'Space Mono', monospace; fill: #b91c1c; }
+    </style>
+  </defs>
+  <rect width="1600" height="900" fill="url(#bg)" />
+  <circle cx="180" cy="120" r="150" fill="#fde68a" opacity="0.22" />
+  <circle cx="1410" cy="130" r="160" fill="#dbeafe" opacity="0.42" />
+
+  <text x="90" y="92" class="eyebrow">APPLICATION SURFACE</text>
+  <text x="90" y="152" class="title">Show projects, web apps, and deploy paths in one product view.</text>
+  <text x="90" y="190" class="subtitle">A visual for application and web-application usage: project registry, dashboard actions, and the public surface that users actually reach.</text>
+
+  <rect x="110" y="260" width="480" height="520" rx="30" fill="#ffffff" stroke="#1f2937" stroke-width="3" />
+  <text x="150" y="318" class="small">WATCHTOWER DASHBOARD</text>
+  <text x="150" y="362" class="cardTitle">Applications and projects</text>
+  <text x="150" y="400" class="cardCopy">Track app records, project types, deployment state, runtime status, and quick actions from one control plane.</text>
+  <rect x="150" y="450" width="400" height="70" rx="16" fill="#f8fafc" stroke="#1f2937" stroke-width="2.5" />
+  <text x="180" y="494" class="cardTitle">Project registry</text>
+  <rect x="150" y="548" width="400" height="70" rx="16" fill="#f8fafc" stroke="#1f2937" stroke-width="2.5" />
+  <text x="180" y="592" class="cardTitle">Deploy and refresh actions</text>
+  <rect x="150" y="646" width="400" height="70" rx="16" fill="#f8fafc" stroke="#1f2937" stroke-width="2.5" />
+  <text x="180" y="690" class="cardTitle">Runtime and health feedback</text>
+
+  <rect x="670" y="330" width="250" height="160" rx="28" fill="#ffffff" stroke="#1f2937" stroke-width="3" />
+  <text x="718" y="394" class="cardTitle">Build Artifact</text>
+  <text x="715" y="430" class="cardCopy">Static site, SSR app,</text>
+  <text x="734" y="458" class="cardCopy">or Docker package.</text>
+
+  <rect x="1040" y="260" width="430" height="240" rx="30" fill="#ffffff" stroke="#1f2937" stroke-width="3" />
+  <text x="1080" y="318" class="small">PUBLIC EXPERIENCE</text>
+  <text x="1080" y="362" class="cardTitle">Web application surface</text>
+  <text x="1080" y="400" class="cardCopy">Users reach a deployed URL through the edge layer, while WatchTower keeps the release path operator-friendly.</text>
+  <rect x="1080" y="436" width="220" height="36" rx="18" fill="#fde68a" stroke="#1f2937" stroke-width="2" />
+  <text x="1122" y="460" class="small">HTTPS · domain · preview URL</text>
+
+  <rect x="980" y="580" width="490" height="180" rx="30" fill="#ffffff" stroke="#1f2937" stroke-width="3" />
+  <text x="1020" y="638" class="cardTitle">Project types supported</text>
+  <text x="1020" y="676" class="cardCopy">Static sites, web applications, APIs, and container-based services all fit the same visual delivery model.</text>
+  <text x="1020" y="714" class="cardCopy">That keeps documentation, UI, and release workflows aligned.</text>
+
+  <line x1="590" y1="470" x2="670" y2="410" stroke="#1f2937" stroke-width="4" stroke-linecap="round" />
+  <polygon points="654,405 678,403 666,423" fill="#1f2937" />
+  <line x1="920" y1="410" x2="1040" y2="380" stroke="#1f2937" stroke-width="4" stroke-linecap="round" />
+  <polygon points="1024,371 1048,378 1027,392" fill="#1f2937" />
+  <line x1="920" y1="470" x2="1030" y2="610" stroke="#1f2937" stroke-width="4" stroke-linecap="round" />
+  <polygon points="1008,602 1036,617 1017,590" fill="#1f2937" />
+</svg>
