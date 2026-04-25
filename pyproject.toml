@@ -21,7 +21,10 @@ classifiers = [
   "Programming Language :: Python :: 3.9",
   "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
-  "Operating System :: POSIX :: Linux"
+  "Programming Language :: Python :: 3.12",
+  "Operating System :: POSIX :: Linux",
+  "Operating System :: Microsoft :: Windows",
+  "Operating System :: MacOS"
 ]
 dependencies = [
   "pyyaml>=6.0",
@@ -36,7 +39,9 @@ dependencies = [
 
 [project.urls]
 Homepage = "https://github.com/sinhaankur/WatchTower"
+Documentation = "https://sinhaankur.github.io/WatchTower/"
 Issues = "https://github.com/sinhaankur/WatchTower/issues"
+Source = "https://github.com/sinhaankur/WatchTower"
 
 [project.scripts]
 watchtower = "watchtower.cli:main"

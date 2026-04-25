@@ -1,0 +1,68 @@
+{
+  "name": "watchtower-desktop",
+  "version": "1.2.2",
+  "private": true,
+  "description": "WatchTower Desktop",
+  "author": "WatchTower Contributors",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder"
+  },
+  "devDependencies": {
+    "electron": "^31.7.7",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.watchtower.desktop",
+    "productName": "WatchTower",
+    "artifactName": "WatchTower-${version}-${os}-${arch}.${ext}",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js"
+    ],
+    "mac": {
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "category": "public.app-category.developer-tools"
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "category": "Development",
+      "desktop": {
+        "Name": "WatchTower",
+        "Comment": "WatchTower deployment desktop",
+        "Categories": "Development;Utility;"
+      }
+    },
+    "win": {
+      "target": [
+        "nsis",
+        "zip"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "WatchTower"
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "sinhaankur",
+        "repo": "WatchTower"
+      }
+    ]
+  }
+}
