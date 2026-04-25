@@ -41,8 +41,18 @@
     "mac": {
       "icon": "build/icons/app.icns",
       "target": [
-        { "target": "dmg", "arch": ["universal"] },
-        { "target": "zip", "arch": ["universal"] }
+        {
+          "target": "dmg",
+          "arch": [
+            "universal"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "universal"
+          ]
+        }
       ],
       "category": "public.app-category.developer-tools"
     },
@@ -50,8 +60,22 @@
       "maintainer": "WatchTower Contributors <opensource@sinhaankur.dev>",
       "icon": "build/icons",
       "target": [
-        { "target": "AppImage", "arch": ["x64", "arm64", "armv7l"] },
-        { "target": "deb",      "arch": ["x64", "arm64", "armv7l"] }
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64",
+            "arm64",
+            "armv7l"
+          ]
+        },
+        {
+          "target": "deb",
+          "arch": [
+            "x64",
+            "arm64",
+            "armv7l"
+          ]
+        }
       ],
       "category": "Development",
       "desktop": {
@@ -63,8 +87,20 @@
     "win": {
       "icon": "build/icons/app.ico",
       "target": [
-        { "target": "nsis", "arch": ["x64", "arm64"] },
-        { "target": "zip",  "arch": ["x64", "arm64"] }
+        {
+          "target": "nsis",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
       ]
     },
     "nsis": {
@@ -79,10 +115,22 @@
     },
     "dmg": {
       "background": "build/installer/dmg-background.png",
-      "window": { "width": 600, "height": 400 },
+      "window": {
+        "width": 600,
+        "height": 400
+      },
       "contents": [
-        { "x": 156, "y": 200, "type": "file" },
-        { "x": 416, "y": 200, "type": "link", "path": "/Applications" }
+        {
+          "x": 156,
+          "y": 200,
+          "type": "file"
+        },
+        {
+          "x": 416,
+          "y": 200,
+          "type": "link",
+          "path": "/Applications"
+        }
       ]
     },
     "publish": [
