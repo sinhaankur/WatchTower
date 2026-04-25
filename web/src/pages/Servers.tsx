@@ -118,7 +118,11 @@ const Servers = () => {
       setShowForm(false);
       showMsg('success', 'Server added successfully!');
       await refreshNodes(orgId);
-    } catch { showMsg('error', 'Failed to add server. Check the connection and try again.'); }
+    } catch (err: unknown) {
+      const detail =
+        (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      showMsg('error', detail ?? 'Failed to add server. Check the connection details and try again.');
+    }
     finally { setAddingNode(false); }
   };
 
