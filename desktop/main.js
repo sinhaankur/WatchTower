@@ -189,10 +189,15 @@ const APP_ICON = resolveAppIcon();
 // Expose the per-launch API token to the renderer via synchronous IPC.
 // The preload script calls this before React boots so the token is already
 // in localStorage when the first useEffect runs.
+//
+// Token injection is safe only when:
+//   (a) WATCHTOWER_API_TOKEN was explicitly set in the environment (user knows it), OR
+//   (b) Electron spawned the backend itself (so runtimeApiToken is guaranteed to match).
 ipcMain.on('wt:getAuthBootstrap', (event) => {
+  const tokenIsKnown = Boolean(process.env.WATCHTOWER_API_TOKEN) || electronSpawnedBackend;
   event.returnValue = {
     autoAuth: shouldAutoAuthDesktop(),
-    apiToken: runtimeApiToken,
+    apiToken: tokenIsKnown ? runtimeApiToken : null,
   };
 });
 
@@ -218,6 +223,9 @@ let staticServer;   // Node http.Server for pre-built static files
 let splashWindow;
 let mainWindow;
 let tray = null;
+// True when this Electron process started the backend itself.
+// Only then is runtimeApiToken guaranteed to match the running server.
+let electronSpawnedBackend = false;
 let isQuitting = false;
 
 // MIME types for the built-in static file server
@@ -323,6 +331,7 @@ async function startBackend() {
   // Kill any process already holding the backend port (stale uvicorn, container, etc.)
   await killPortProcesses(BACKEND_PORT);
 
+  electronSpawnedBackend = true;
   const python = resolvePython();
   backendProcess = spawn(
     python,
