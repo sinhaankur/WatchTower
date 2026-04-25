@@ -30,6 +30,10 @@ if (process.platform === 'linux') {
     // Use SwiftShader (CPU software renderer bundled in Electron).
     // Avoids all GPU driver crashes on NVIDIA 500+ + kernel 6.x + X11.
     app.disableHardwareAcceleration();
+    app.commandLine.appendSwitch('disable-gpu');
+    app.commandLine.appendSwitch('disable-gpu-sandbox');
+    app.commandLine.appendSwitch('no-sandbox');
+    app.commandLine.appendSwitch('disable-dev-shm-usage');
   }
 }
 const HOST = '127.0.0.1';
