@@ -1,4 +1,4 @@
-const { app, BrowserWindow, dialog, nativeImage } = require('electron');
+const { app, BrowserWindow, dialog, ipcMain, nativeImage } = require('electron');
 const { spawn } = require('child_process');
 const crypto = require('crypto');
 const fs = require('fs');
@@ -120,20 +120,41 @@ function createSplash() {
 
 // ── Main window ──────────────────────────────────────────────────────────────
 function createMainWindow() {
+  const isMac = process.platform === 'darwin';
   mainWindow = new BrowserWindow({
     width: 1360,
     height: 860,
     minWidth: 1120,
     minHeight: 740,
     show: false,
+    frame: false,
     autoHideMenuBar: true,
     title: 'WatchTower',
     backgroundColor: '#fbf6ea',
+    ...(isMac ? { titleBarStyle: 'hiddenInset', trafficLightPosition: { x: 14, y: 14 } } : {}),
     ...(APP_ICON ? { icon: APP_ICON } : {}),
-    webPreferences: { contextIsolation: true, nodeIntegration: false },
+    webPreferences: {
+      contextIsolation: true,
+      nodeIntegration: false,
+      preload: path.join(__dirname, 'preload.js'),
+    },
   });
+
+  // Notify renderer of maximize state changes
+  mainWindow.on('maximize', () => mainWindow.webContents.send('wt:maximizeChange', true));
+  mainWindow.on('unmaximize', () => mainWindow.webContents.send('wt:maximizeChange', false));
+
   return mainWindow;
 }
+
+// ── IPC window controls ──────────────────────────────────────────────────────
+ipcMain.on('wt:minimize', () => mainWindow?.minimize());
+ipcMain.on('wt:maximize', () => {
+  if (mainWindow?.isMaximized()) mainWindow.unmaximize();
+  else mainWindow?.maximize();
+});
+ipcMain.on('wt:close', () => mainWindow?.close());
+ipcMain.handle('wt:isMaximized', () => mainWindow?.isMaximized() ?? false);
 
 async function launch() {
   createSplash();
