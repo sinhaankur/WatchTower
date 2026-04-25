@@ -47,8 +47,8 @@
       "maintainer": "WatchTower Contributors <opensource@sinhaankur.dev>",
       "icon": "build/icons",
       "target": [
-        "AppImage",
-        "deb"
+        { "target": "AppImage", "arch": ["x64", "arm64", "armv7l"] },
+        { "target": "deb",      "arch": ["x64", "arm64", "armv7l"] }
       ],
       "category": "Development",
       "desktop": {
