@@ -18,37 +18,37 @@ App Center mode is designed to feel simple like hosted deployment platforms:
 ### Modes Overview
 
 <a href="https://sinhaankur.github.io/WatchTower/" target="_blank" rel="noreferrer">
-  <img src="docs/assets/modes-overview.svg" alt="WatchTower modes overview showing Podman auto-update service and App Center control plane mode" />
+  <img src="https://sinhaankur.github.io/WatchTower/assets/modes-overview.svg" alt="WatchTower modes overview showing Podman auto-update service and App Center control plane mode" />
 </a>
 
 ### Deployment Process
 
 <a href="https://sinhaankur.github.io/WatchTower/viewer.html?doc=readme" target="_blank" rel="noreferrer">
-  <img src="docs/assets/deploy-process.svg" alt="WatchTower deployment process showing app selection, packaging, SSH transfer, remote activation, and health verification" />
+  <img src="https://sinhaankur.github.io/WatchTower/assets/deploy-process.svg" alt="WatchTower deployment process showing app selection, packaging, SSH transfer, remote activation, and health verification" />
 </a>
 
 ### Mesh Topology
 
 <a href="https://sinhaankur.github.io/WatchTower/viewer.html?doc=mesh" target="_blank" rel="noreferrer">
-  <img src="docs/assets/mesh-topology.svg" alt="WatchTower mesh topology showing control plane, preview nodes, live nodes, and traffic layer" />
+  <img src="https://sinhaankur.github.io/WatchTower/assets/mesh-topology.svg" alt="WatchTower mesh topology showing control plane, preview nodes, live nodes, and traffic layer" />
 </a>
 
 ### Hybrid Stack
 
 <a href="https://sinhaankur.github.io/WatchTower/viewer.html?doc=hybrid" target="_blank" rel="noreferrer">
-  <img src="docs/assets/hybrid-stack.svg" alt="WatchTower hybrid stack overview showing local operator workspace, WatchTower API, managed services, app nodes, and data plane" />
+  <img src="https://sinhaankur.github.io/WatchTower/assets/hybrid-stack.svg" alt="WatchTower hybrid stack overview showing local operator workspace, WatchTower API, managed services, app nodes, and data plane" />
 </a>
 
 ### Application And Web App Surface
 
 <a href="https://sinhaankur.github.io/WatchTower/" target="_blank" rel="noreferrer">
-  <img src="docs/assets/application-surface.svg" alt="WatchTower application and web app surface showing dashboard, artifact build, and public web app delivery" />
+  <img src="https://sinhaankur.github.io/WatchTower/assets/application-surface.svg" alt="WatchTower application and web app surface showing dashboard, artifact build, and public web app delivery" />
 </a>
 
 ### Secure Terminal Command Flow
 
 <a href="https://sinhaankur.github.io/WatchTower/viewer.html?doc=readme" target="_blank" rel="noreferrer">
-  <img src="docs/assets/secure-terminal-flow.svg" alt="WatchTower secure terminal command flow showing Host Connect request, policy gate, execution path, encrypted audit, and operator result" />
+  <img src="https://sinhaankur.github.io/WatchTower/assets/secure-terminal-flow.svg" alt="WatchTower secure terminal command flow showing Host Connect request, policy gate, execution path, encrypted audit, and operator result" />
 </a>
 
 ---
