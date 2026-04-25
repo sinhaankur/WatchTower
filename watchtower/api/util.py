@@ -24,6 +24,24 @@ def generate_webhook_secret() -> str:
     return secrets.token_urlsafe(32)
 
 
+def to_uuid(value) -> uuid.UUID:
+    """Coerce a value (str | UUID | None) to a uuid.UUID.
+
+    Centralises the ``UUID(str(current_user["user_id"]))`` pattern used by the
+    API routers. Raises HTTPException(400) for malformed input so callers
+    don't have to wrap in try/except.
+    """
+    if isinstance(value, uuid.UUID):
+        return value
+    try:
+        return uuid.UUID(str(value))
+    except (ValueError, TypeError, AttributeError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid identifier",
+        ) from exc
+
+
 def _auth_signing_secret() -> str:
     secret = (
         os.getenv("WATCHTOWER_AUTH_SECRET")
