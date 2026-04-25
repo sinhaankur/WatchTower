@@ -13,6 +13,34 @@ App Center mode is designed to feel simple like hosted deployment platforms:
 
 ---
 
+## Visual Blueprints
+
+### Modes Overview
+
+<a href="https://sinhaankur.github.io/WatchTower/" target="_blank" rel="noreferrer">
+  <img src="docs/assets/modes-overview.svg" alt="WatchTower modes overview showing Podman auto-update service and App Center control plane mode" />
+</a>
+
+### Deployment Process
+
+<a href="https://sinhaankur.github.io/WatchTower/viewer.html?doc=readme" target="_blank" rel="noreferrer">
+  <img src="docs/assets/deploy-process.svg" alt="WatchTower deployment process showing app selection, packaging, SSH transfer, remote activation, and health verification" />
+</a>
+
+### Mesh Topology
+
+<a href="https://sinhaankur.github.io/WatchTower/viewer.html?doc=mesh" target="_blank" rel="noreferrer">
+  <img src="docs/assets/mesh-topology.svg" alt="WatchTower mesh topology showing control plane, preview nodes, live nodes, and traffic layer" />
+</a>
+
+### Hybrid Stack
+
+<a href="https://sinhaankur.github.io/WatchTower/viewer.html?doc=hybrid" target="_blank" rel="noreferrer">
+  <img src="docs/assets/hybrid-stack.svg" alt="WatchTower hybrid stack overview showing local operator workspace, WatchTower API, managed services, app nodes, and data plane" />
+</a>
+
+---
+
 ## Core Features
 
 ### Container Auto-Update Features
