@@ -4,6 +4,13 @@ services:
   caddy:
     image: docker.io/library/caddy:2.9-alpine
     container_name: wt-caddy-${NODE_NAME:-node}
+    init: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    tmpfs:
+      - /tmp
     ports:
       - "80:80"
       - "443:443"
@@ -19,10 +26,18 @@ services:
       - ./data/caddy/data:/data
       - ./data/caddy/config:/config
     restart: always
+    stop_grace_period: 20s
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   watchtower:
     image: docker.io/containrrr/watchtower:latest
     container_name: wt-updater-${NODE_NAME:-node}
+    init: true
+    security_opt:
+      - no-new-privileges:true
     volumes:
       - ${XDG_RUNTIME_DIR}/podman/podman.sock:/var/run/docker.sock
     environment:
@@ -37,3 +52,8 @@ services:
       REPO_PASS: ${GH_PAT_TOKEN:-}
     command: --interval ${WATCHTOWER_POLL_INTERVAL:-15} --label-enable
     restart: always
+    stop_grace_period: 20s
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"

@@ -414,19 +414,105 @@
     .stats .stat-card:nth-child(3) { animation-delay: 0.14s; }
     .stats .stat-card:nth-child(4) { animation-delay: 0.19s; }
 
-    .blueprint-grid {
+    .blueprint-section {
       margin-top: 18px;
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
+      padding: 28px;
+      background: linear-gradient(160deg, #ffffff 0%, #f8fbff 100%);
+    }
+
+    .blueprint-section-header {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
       gap: 16px;
+      flex-wrap: wrap;
+      margin-bottom: 28px;
+      padding-bottom: 20px;
+      border-bottom: 2px solid var(--wt-border);
+    }
+
+    .blueprint-section-header .section-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.67rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.18em;
+      color: var(--wt-accent);
+      margin: 0 0 8px;
+      font-family: "Space Mono", monospace;
+    }
+
+    .blueprint-section-header .section-label::before {
+      content: "";
+      display: inline-block;
+      width: 18px;
+      height: 2px;
+      background: var(--wt-accent);
+    }
+
+    .blueprint-section-header h2 {
+      margin: 0;
+      font-size: 1.3rem;
+      font-weight: 800;
+      letter-spacing: -0.035em;
+      color: #0f172a;
+      line-height: 1.15;
+    }
+
+    .blueprint-section-header p {
+      margin: 8px 0 0;
+      font-size: 0.88rem;
+      color: #64748b;
+      line-height: 1.55;
+    }
+
+    .blueprint-count {
+      flex-shrink: 0;
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: var(--wt-accent);
+      background: #fef2f2;
+      border: 2px solid var(--wt-border);
+      padding: 6px 12px;
+      font-family: "Space Mono", monospace;
+      letter-spacing: 0.06em;
+      white-space: nowrap;
+      box-shadow: 2px 2px 0 0 #0f172a;
+    }
+
+    .blueprint-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 20px;
     }
 
     .blueprint-card {
-      display: block;
-      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      padding: 0;
       text-decoration: none;
-      transition: transform var(--dur-fast) var(--ease-spring), box-shadow var(--dur-fast) ease;
+      border: 2px solid var(--wt-border);
+      background: #ffffff;
+      box-shadow: var(--shadow);
+      transition:
+        transform var(--dur-fast) var(--ease-spring),
+        box-shadow var(--dur-fast) ease,
+        border-color 160ms ease;
       overflow: hidden;
+      position: relative;
+    }
+
+    .blueprint-card::after {
+      content: "";
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 3px;
+      background: var(--wt-accent);
+      transform: scaleX(0);
+      transform-origin: left;
+      transition: transform 200ms var(--ease-spring);
     }
 
     .blueprint-card:hover {
@@ -434,34 +520,112 @@
       box-shadow: var(--shadow-hover);
     }
 
+    .blueprint-card:hover::after {
+      transform: scaleX(1);
+    }
+
     .blueprint-card:active {
       transform: translate(2px, 2px);
       box-shadow: none;
     }
 
-    .blueprint-card img {
-      width: 100%;
-      display: block;
-      border: 2px solid var(--wt-border-soft);
-      background: #fffdf7;
+    .blueprint-card-preview {
+      /* subtle dot grid — blueprint paper feel */
+      background-color: #f0f4ff;
+      background-image: radial-gradient(circle, #c7d2fe 1px, transparent 1px);
+      background-size: 12px 12px;
+      border-bottom: 2px solid var(--wt-border);
+      padding: 20px 18px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
       aspect-ratio: 16 / 9;
-      object-fit: contain;
-      padding: 8px;
+    }
+
+    .blueprint-card-preview svg {
+      width: 100%;
+      max-width: 220px;
+      height: auto;
+      display: block;
+      filter: drop-shadow(0 2px 6px rgba(15,23,42,0.12));
+      transition: transform 200ms var(--ease-spring);
+    }
+
+    .blueprint-card:hover .blueprint-card-preview svg {
+      transform: scale(1.03) translateY(-2px);
+    }
+
+    .blueprint-card-body {
+      padding: 14px 16px 15px;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    .blueprint-card-meta {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 4px;
+    }
+
+    .blueprint-card-num {
+      font-size: 0.64rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      color: var(--wt-accent);
+      background: #fef2f2;
+      border: 1px solid rgba(185,28,28,0.25);
+      padding: 3px 7px;
+      font-family: "Space Mono", monospace;
+    }
+
+    .blueprint-card-tag {
+      font-size: 0.63rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      color: #94a3b8;
+      text-transform: uppercase;
     }
 
     .blueprint-card strong {
       display: block;
-      margin-top: 12px;
-      font-size: 0.96rem;
+      font-size: 0.97rem;
+      font-weight: 800;
       color: #0f172a;
+      letter-spacing: -0.02em;
+      line-height: 1.2;
     }
 
     .blueprint-card span {
       display: block;
-      margin-top: 6px;
       color: #64748b;
-      font-size: 0.84rem;
-      line-height: 1.5;
+      font-size: 0.81rem;
+      line-height: 1.55;
+      flex: 1;
+    }
+
+    .blueprint-card-cta {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      margin-top: 10px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: var(--wt-accent);
+      letter-spacing: 0.01em;
+      transition: gap 160ms ease;
+    }
+
+    .blueprint-card:hover .blueprint-card-cta {
+      gap: 8px;
+    }
+
+    .blueprint-card-cta::after {
+      content: "→";
+      font-size: 0.8rem;
     }
 
     .stat-card {
@@ -793,7 +957,10 @@
         grid-template-columns: repeat(2, minmax(0, 1fr));
       }
 
-      .blueprint-grid,
+      .blueprint-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
       .info-grid,
       .link-grid,
       .explain-grid,
@@ -855,14 +1022,6 @@
       .section-card {
         padding: 20px;
       }
-
-      .blueprint-card {
-        padding: 12px;
-      }
-
-      .blueprint-card img {
-        padding: 6px;
-      }
     }
 
     @media (max-width: 640px) {
@@ -900,6 +1059,7 @@
 
       .blueprint-grid {
         gap: 14px;
+        grid-template-columns: 1fr;
       }
 
       .blueprint-card strong {
@@ -1044,37 +1204,314 @@
           </div>
         </section>
 
-        <section class="blueprint-grid" id="dashboard">
-          <a class="panel blueprint-card" href="#dashboard">
-            <svg viewBox="0 0 80 60" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="4" width="72" height="52" rx="4" stroke="#1f2937" stroke-width="2" fill="#fffdf7"/><rect x="10" y="10" width="26" height="18" rx="2" fill="#fde68a" stroke="#1f2937" stroke-width="1.5"/><rect x="42" y="10" width="28" height="8" rx="2" fill="#fbf6ea" stroke="#1f2937" stroke-width="1.5"/><rect x="42" y="22" width="28" height="6" rx="2" fill="#fbf6ea" stroke="#1f2937" stroke-width="1.5"/><rect x="10" y="32" width="60" height="4" rx="1" fill="#b91c1c" opacity=".3"/><rect x="10" y="40" width="40" height="4" rx="1" fill="#1f2937" opacity=".15"/><rect x="10" y="47" width="25" height="4" rx="1" fill="#1f2937" opacity=".1"/></svg>
-            <strong>Dashboard</strong>
-            <span>Live overview of projects, runtime status, recent deployments, and quick-action buttons.</span>
-          </a>
-          <a class="panel blueprint-card" href="#applications">
-            <svg viewBox="0 0 80 60" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="4" width="72" height="52" rx="4" stroke="#1f2937" stroke-width="2" fill="#fffdf7"/><rect x="10" y="10" width="60" height="12" rx="2" fill="#fde68a" stroke="#1f2937" stroke-width="1.5"/><rect x="10" y="26" width="60" height="12" rx="2" fill="#fbf6ea" stroke="#1f2937" stroke-width="1.5"/><rect x="10" y="42" width="60" height="12" rx="2" fill="#fbf6ea" stroke="#1f2937" stroke-width="1.5"/><rect x="56" y="13" width="10" height="6" rx="2" fill="#b91c1c"/><rect x="56" y="29" width="10" height="6" rx="2" fill="#b91c1c" opacity=".4"/></svg>
-            <strong>Applications</strong>
-            <span>Deploy, rollback, or preview apps. Each row shows branch, last deploy status, and target nodes.</span>
-          </a>
-          <a class="panel blueprint-card" href="#servers">
-            <svg viewBox="0 0 80 60" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="4" width="72" height="52" rx="4" stroke="#1f2937" stroke-width="2" fill="#fffdf7"/><rect x="10" y="10" width="60" height="10" rx="2" fill="#fbf6ea" stroke="#1f2937" stroke-width="1.5"/><circle cx="16" cy="15" r="3" fill="#047857"/><rect x="24" y="12" width="20" height="3" rx="1" fill="#1f2937" opacity=".2"/><rect x="10" y="24" width="60" height="10" rx="2" fill="#fbf6ea" stroke="#1f2937" stroke-width="1.5"/><circle cx="16" cy="29" r="3" fill="#047857"/><rect x="24" y="26" width="20" height="3" rx="1" fill="#1f2937" opacity=".2"/><rect x="10" y="38" width="60" height="10" rx="2" fill="#fde68a" stroke="#1f2937" stroke-width="1.5"/><circle cx="16" cy="43" r="3" fill="#fde68a" stroke="#b91c1c" stroke-width="1"/></svg>
-            <strong>Servers</strong>
-            <span>Register SSH nodes, set remote paths, and mark a primary deploy target.</span>
-          </a>
-          <a class="panel blueprint-card" href="#host-connect">
-            <svg viewBox="0 0 80 60" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="4" width="72" height="52" rx="4" stroke="#1f2937" stroke-width="2" fill="#fffdf7"/><rect x="10" y="10" width="28" height="40" rx="2" fill="#f8fbff" stroke="#1f2937" stroke-width="1.5"/><rect x="14" y="16" width="20" height="4" rx="1" fill="#b91c1c" opacity=".3"/><rect x="14" y="24" width="16" height="3" rx="1" fill="#1f2937" opacity=".15"/><rect x="14" y="30" width="16" height="3" rx="1" fill="#1f2937" opacity=".15"/><rect x="42" y="10" width="28" height="14" rx="2" fill="#fde68a" stroke="#1f2937" stroke-width="1.5"/><rect x="42" y="28" width="28" height="10" rx="2" fill="#fbf6ea" stroke="#1f2937" stroke-width="1.5"/><rect x="42" y="42" width="28" height="8" rx="2" fill="#fbf6ea" stroke="#1f2937" stroke-width="1.5"/></svg>
-            <strong>Host Connect</strong>
-            <span>Step-by-step tooling installation for each host — Podman, Tailscale, Cloudflare, Nginx.</span>
-          </a>
-          <a class="panel blueprint-card" href="#databases">
-            <svg viewBox="0 0 80 60" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="4" width="72" height="52" rx="4" stroke="#1f2937" stroke-width="2" fill="#fffdf7"/><ellipse cx="40" cy="16" rx="22" ry="8" fill="#fde68a" stroke="#1f2937" stroke-width="1.5"/><path d="M18 16 Q18 28 40 28 Q62 28 62 16" stroke="#1f2937" stroke-width="1.5" fill="none"/><path d="M18 28 Q18 40 40 40 Q62 40 62 28" stroke="#1f2937" stroke-width="1.5" fill="none"/><path d="M18 40 Q18 52 40 52 Q62 52 62 40" stroke="#1f2937" stroke-width="1.5" fill="none"/></svg>
-            <strong>Databases &amp; Services</strong>
-            <span>Manage local Podman databases, remote endpoints, and background service workers in one view.</span>
-          </a>
-          <a class="panel blueprint-card" href="#auth">
-            <svg viewBox="0 0 80 60" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="4" width="72" height="52" rx="4" stroke="#1f2937" stroke-width="2" fill="#fffdf7"/><circle cx="40" cy="22" r="10" fill="#fde68a" stroke="#1f2937" stroke-width="1.5"/><rect x="22" y="36" width="36" height="14" rx="4" fill="#fbf6ea" stroke="#1f2937" stroke-width="1.5"/><circle cx="30" cy="41" r="3" fill="#b91c1c"/><circle cx="40" cy="41" r="3" fill="#b91c1c" opacity=".5"/><circle cx="50" cy="41" r="3" fill="#b91c1c" opacity=".25"/></svg>
-            <strong>Auth &amp; Team</strong>
-            <span>GitHub OAuth, API token, and org/team-based access control for the whole team.</span>
-          </a>
+        <section class="panel blueprint-section" id="dashboard">
+          <div class="blueprint-section-header">
+            <div>
+              <p class="section-label">Visual Blueprint</p>
+              <h2>Every screen, at a glance</h2>
+              <p>A wireframe overview of each page in WatchTower — what it shows and what you can do there.</p>
+            </div>
+            <span class="blueprint-count">6 screens</span>
+          </div>
+
+          <div class="blueprint-grid">
+
+            <!-- 01 Dashboard -->
+            <a class="blueprint-card" href="#dashboard">
+              <div class="blueprint-card-preview">
+                <svg viewBox="0 0 200 140" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <!-- App chrome -->
+                  <rect width="200" height="140" rx="6" fill="#f8faff"/>
+                  <!-- Topbar -->
+                  <rect width="200" height="22" rx="6" fill="#0f172a"/>
+                  <rect x="8" y="7" width="48" height="8" rx="2" fill="#fde68a" opacity=".9"/>
+                  <circle cx="181" cy="11" r="5" fill="#b91c1c"/>
+                  <circle cx="192" cy="11" r="5" fill="#1e293b"/>
+                  <!-- Sidebar strip -->
+                  <rect x="0" y="22" width="36" height="118" fill="#1e293b"/>
+                  <rect x="6" y="30" width="24" height="6" rx="2" fill="#fff" opacity=".15"/>
+                  <rect x="6" y="42" width="24" height="5" rx="2" fill="#fff" opacity=".08"/>
+                  <rect x="6" y="52" width="24" height="5" rx="2" fill="#fff" opacity=".08"/>
+                  <rect x="6" y="62" width="24" height="5" rx="2" fill="#fff" opacity=".08"/>
+                  <!-- Stats row -->
+                  <rect x="46" y="30" width="35" height="24" rx="3" fill="#fde68a" stroke="#1f2937" stroke-width="1"/>
+                  <rect x="87" y="30" width="35" height="24" rx="3" fill="#fff" stroke="#d7e0ec" stroke-width="1"/>
+                  <rect x="128" y="30" width="35" height="24" rx="3" fill="#fff" stroke="#d7e0ec" stroke-width="1"/>
+                  <rect x="169" y="30" width="25" height="24" rx="3" fill="#fff" stroke="#d7e0ec" stroke-width="1"/>
+                  <!-- Project list rows -->
+                  <rect x="46" y="62" width="148" height="14" rx="3" fill="#fff" stroke="#d7e0ec" stroke-width="1"/>
+                  <circle cx="55" cy="69" r="4" fill="#047857"/>
+                  <rect x="65" y="65" width="40" height="4" rx="1" fill="#0f172a" opacity=".3"/>
+                  <rect x="65" y="72" width="28" height="3" rx="1" fill="#64748b" opacity=".4"/>
+                  <rect x="165" y="65" width="22" height="6" rx="2" fill="#b91c1c"/>
+                  <rect x="46" y="80" width="148" height="14" rx="3" fill="#fff" stroke="#d7e0ec" stroke-width="1"/>
+                  <circle cx="55" cy="87" r="4" fill="#047857"/>
+                  <rect x="65" y="83" width="36" height="4" rx="1" fill="#0f172a" opacity=".3"/>
+                  <rect x="65" y="90" width="24" height="3" rx="1" fill="#64748b" opacity=".4"/>
+                  <rect x="165" y="83" width="22" height="6" rx="2" fill="#b91c1c" opacity=".5"/>
+                  <rect x="46" y="98" width="148" height="14" rx="3" fill="#fff" stroke="#d7e0ec" stroke-width="1"/>
+                  <circle cx="55" cy="105" r="4" fill="#fde68a" stroke="#b91c1c" stroke-width="1"/>
+                  <rect x="65" y="101" width="44" height="4" rx="1" fill="#0f172a" opacity=".3"/>
+                  <!-- Runtime panel -->
+                  <rect x="46" y="118" width="148" height="16" rx="3" fill="#f0fdf4" stroke="#059669" stroke-width="1" stroke-dasharray="2 2"/>
+                  <rect x="54" y="123" width="30" height="3" rx="1" fill="#047857" opacity=".5"/>
+                  <rect x="90" y="123" width="22" height="3" rx="1" fill="#047857" opacity=".3"/>
+                </svg>
+              </div>
+              <div class="blueprint-card-body">
+                <div class="blueprint-card-meta">
+                  <span class="blueprint-card-num">01</span>
+                  <span class="blueprint-card-tag">Live view</span>
+                </div>
+                <strong>Dashboard</strong>
+                <span>Project list, runtime health, stat cards, and quick-action buttons — your daily landing page.</span>
+                <span class="blueprint-card-cta">Read section</span>
+              </div>
+            </a>
+
+            <!-- 02 Applications -->
+            <a class="blueprint-card" href="#applications">
+              <div class="blueprint-card-preview">
+                <svg viewBox="0 0 200 140" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <rect width="200" height="140" rx="6" fill="#f8faff"/>
+                  <rect width="200" height="22" rx="6" fill="#0f172a"/>
+                  <rect x="8" y="7" width="52" height="8" rx="2" fill="#fde68a" opacity=".9"/>
+                  <!-- Table header -->
+                  <rect x="8" y="28" width="184" height="12" rx="2" fill="#f1f5f9"/>
+                  <rect x="12" y="32" width="20" height="4" rx="1" fill="#64748b" opacity=".5"/>
+                  <rect x="52" y="32" width="20" height="4" rx="1" fill="#64748b" opacity=".5"/>
+                  <rect x="98" y="32" width="16" height="4" rx="1" fill="#64748b" opacity=".5"/>
+                  <rect x="148" y="32" width="16" height="4" rx="1" fill="#64748b" opacity=".5"/>
+                  <!-- Row 1 — live -->
+                  <rect x="8" y="44" width="184" height="18" rx="2" fill="#fff" stroke="#d7e0ec" stroke-width="1"/>
+                  <rect x="12" y="49" width="32" height="5" rx="1" fill="#0f172a" opacity=".6"/>
+                  <rect x="52" y="50" width="20" height="4" rx="1" fill="#64748b" opacity=".35"/>
+                  <rect x="95" y="47" width="26" height="8" rx="3" fill="#d1fae5" stroke="#059669" stroke-width="1"/>
+                  <rect x="124" y="47" width="26" height="8" rx="3" fill="#fff" stroke="#d7e0ec" stroke-width="1"/>
+                  <rect x="159" y="47" width="26" height="8" rx="2" fill="#b91c1c"/>
+                  <!-- Row 2 — building -->
+                  <rect x="8" y="66" width="184" height="18" rx="2" fill="#fff" stroke="#d7e0ec" stroke-width="1"/>
+                  <rect x="12" y="71" width="28" height="5" rx="1" fill="#0f172a" opacity=".6"/>
+                  <rect x="52" y="72" width="20" height="4" rx="1" fill="#64748b" opacity=".35"/>
+                  <rect x="95" y="69" width="32" height="8" rx="3" fill="#dbeafe" stroke="#3b82f6" stroke-width="1"/>
+                  <rect x="159" y="69" width="26" height="8" rx="2" fill="#b91c1c" opacity=".4"/>
+                  <!-- Row 3 — failed -->
+                  <rect x="8" y="88" width="184" height="18" rx="2" fill="#fff" stroke="#d7e0ec" stroke-width="1"/>
+                  <rect x="12" y="93" width="36" height="5" rx="1" fill="#0f172a" opacity=".6"/>
+                  <rect x="52" y="94" width="20" height="4" rx="1" fill="#64748b" opacity=".35"/>
+                  <rect x="95" y="91" width="24" height="8" rx="3" fill="#fee2e2" stroke="#ef4444" stroke-width="1"/>
+                  <rect x="159" y="91" width="26" height="8" rx="2" fill="#b91c1c" opacity=".25"/>
+                  <!-- Add button -->
+                  <rect x="8" y="114" width="80" height="18" rx="3" fill="#b91c1c"/>
+                  <rect x="94" y="114" width="50" height="18" rx="3" fill="#fff" stroke="#d7e0ec" stroke-width="1"/>
+                </svg>
+              </div>
+              <div class="blueprint-card-body">
+                <div class="blueprint-card-meta">
+                  <span class="blueprint-card-num">02</span>
+                  <span class="blueprint-card-tag">Deploy</span>
+                </div>
+                <strong>Applications</strong>
+                <span>Deploy, rollback, or preview apps. Each row shows branch, live status badge, and assigned nodes.</span>
+                <span class="blueprint-card-cta">Read section</span>
+              </div>
+            </a>
+
+            <!-- 03 Servers -->
+            <a class="blueprint-card" href="#servers">
+              <div class="blueprint-card-preview">
+                <svg viewBox="0 0 200 140" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <rect width="200" height="140" rx="6" fill="#f8faff"/>
+                  <rect width="200" height="22" rx="6" fill="#0f172a"/>
+                  <rect x="8" y="7" width="38" height="8" rx="2" fill="#fde68a" opacity=".9"/>
+                  <!-- Page title -->
+                  <rect x="8" y="28" width="50" height="8" rx="2" fill="#0f172a" opacity=".6"/>
+                  <rect x="155" y="27" width="38" height="10" rx="3" fill="#b91c1c"/>
+                  <!-- Node row 1 — healthy -->
+                  <rect x="8" y="44" width="184" height="24" rx="3" fill="#fff" stroke="#d7e0ec" stroke-width="1"/>
+                  <circle cx="22" cy="56" r="7" fill="#d1fae5" stroke="#059669" stroke-width="1.5"/>
+                  <circle cx="22" cy="56" r="3" fill="#047857"/>
+                  <rect x="36" y="50" width="52" height="5" rx="1" fill="#0f172a" opacity=".6"/>
+                  <rect x="36" y="58" width="36" height="4" rx="1" fill="#64748b" opacity=".4"/>
+                  <rect x="102" y="51" width="36" height="4" rx="1" fill="#64748b" opacity=".3"/>
+                  <rect x="102" y="58" width="24" height="3" rx="1" fill="#64748b" opacity=".2"/>
+                  <rect x="156" y="50" width="14" height="10" rx="2" fill="#fff" stroke="#d7e0ec" stroke-width="1"/>
+                  <rect x="174" y="50" width="14" height="10" rx="2" fill="#fff" stroke="#d7e0ec" stroke-width="1"/>
+                  <!-- Node row 2 — healthy, primary -->
+                  <rect x="8" y="72" width="184" height="24" rx="3" fill="#fffbeb" stroke="#f59e0b" stroke-width="1"/>
+                  <circle cx="22" cy="84" r="7" fill="#d1fae5" stroke="#059669" stroke-width="1.5"/>
+                  <circle cx="22" cy="84" r="3" fill="#047857"/>
+                  <rect x="36" y="78" width="48" height="5" rx="1" fill="#0f172a" opacity=".6"/>
+                  <rect x="36" y="86" width="28" height="4" rx="1" fill="#64748b" opacity=".4"/>
+                  <rect x="88" y="77" width="28" height="8" rx="3" fill="#fde68a" stroke="#b45309" stroke-width="1"/>
+                  <rect x="156" y="78" width="14" height="10" rx="2" fill="#fff" stroke="#d7e0ec" stroke-width="1"/>
+                  <rect x="174" y="78" width="14" height="10" rx="2" fill="#fff" stroke="#d7e0ec" stroke-width="1"/>
+                  <!-- Node row 3 — offline -->
+                  <rect x="8" y="100" width="184" height="24" rx="3" fill="#fff" stroke="#d7e0ec" stroke-width="1"/>
+                  <circle cx="22" cy="112" r="7" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="1.5"/>
+                  <circle cx="22" cy="112" r="3" fill="#94a3b8"/>
+                  <rect x="36" y="106" width="44" height="5" rx="1" fill="#0f172a" opacity=".4"/>
+                  <rect x="36" y="114" width="30" height="4" rx="1" fill="#64748b" opacity=".3"/>
+                  <rect x="156" y="106" width="14" height="10" rx="2" fill="#fff" stroke="#d7e0ec" stroke-width="1"/>
+                  <rect x="174" y="106" width="14" height="10" rx="2" fill="#fff" stroke="#d7e0ec" stroke-width="1"/>
+                </svg>
+              </div>
+              <div class="blueprint-card-body">
+                <div class="blueprint-card-meta">
+                  <span class="blueprint-card-num">03</span>
+                  <span class="blueprint-card-tag">Infrastructure</span>
+                </div>
+                <strong>Servers</strong>
+                <span>Register SSH nodes, view health status at a glance, and mark a primary deploy target for each org.</span>
+                <span class="blueprint-card-cta">Read section</span>
+              </div>
+            </a>
+
+            <!-- 04 Host Connect -->
+            <a class="blueprint-card" href="#host-connect">
+              <div class="blueprint-card-preview">
+                <svg viewBox="0 0 200 140" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <rect width="200" height="140" rx="6" fill="#f8faff"/>
+                  <rect width="200" height="22" rx="6" fill="#0f172a"/>
+                  <rect x="8" y="7" width="56" height="8" rx="2" fill="#fde68a" opacity=".9"/>
+                  <!-- Sidebar list of tools -->
+                  <rect x="8" y="28" width="60" height="108" rx="3" fill="#fff" stroke="#d7e0ec" stroke-width="1"/>
+                  <rect x="14" y="34" width="42" height="10" rx="2" fill="#b91c1c" opacity=".12"/>
+                  <rect x="14" y="34" width="42" height="10" rx="2" stroke="#b91c1c" stroke-width="1"/>
+                  <rect x="18" y="37" width="28" height="4" rx="1" fill="#b91c1c" opacity=".6"/>
+                  <rect x="14" y="49" width="42" height="10" rx="2" fill="#fff" stroke="#d7e0ec" stroke-width="1"/>
+                  <rect x="18" y="52" width="28" height="4" rx="1" fill="#64748b" opacity=".4"/>
+                  <rect x="14" y="63" width="42" height="10" rx="2" fill="#fff" stroke="#d7e0ec" stroke-width="1"/>
+                  <rect x="18" y="66" width="28" height="4" rx="1" fill="#64748b" opacity=".4"/>
+                  <rect x="14" y="77" width="42" height="10" rx="2" fill="#fff" stroke="#d7e0ec" stroke-width="1"/>
+                  <rect x="18" y="80" width="28" height="4" rx="1" fill="#64748b" opacity=".4"/>
+                  <!-- Right panel: install steps -->
+                  <rect x="76" y="28" width="116" height="108" rx="3" fill="#fff" stroke="#d7e0ec" stroke-width="1"/>
+                  <rect x="82" y="34" width="60" height="7" rx="2" fill="#0f172a" opacity=".5"/>
+                  <rect x="82" y="45" width="100" height="22" rx="2" fill="#1e293b"/>
+                  <rect x="86" y="49" width="56" height="3" rx="1" fill="#4ade80" opacity=".7"/>
+                  <rect x="86" y="55" width="40" height="3" rx="1" fill="#94a3b8" opacity=".5"/>
+                  <rect x="82" y="72" width="78" height="8" rx="2" fill="#b91c1c"/>
+                  <rect x="82" y="84" width="104" height="4" rx="1" fill="#64748b" opacity=".3"/>
+                  <rect x="82" y="92" width="84" height="4" rx="1" fill="#64748b" opacity=".2"/>
+                  <rect x="82" y="100" width="90" height="4" rx="1" fill="#64748b" opacity=".2"/>
+                  <!-- Success indicator -->
+                  <rect x="82" y="110" width="100" height="18" rx="3" fill="#f0fdf4" stroke="#059669" stroke-width="1"/>
+                  <circle cx="91" cy="119" r="4" fill="#047857"/>
+                  <rect x="100" y="116" width="48" height="3" rx="1" fill="#047857" opacity=".5"/>
+                  <rect x="100" y="122" width="36" height="3" rx="1" fill="#047857" opacity=".3"/>
+                </svg>
+              </div>
+              <div class="blueprint-card-body">
+                <div class="blueprint-card-meta">
+                  <span class="blueprint-card-num">04</span>
+                  <span class="blueprint-card-tag">Tooling</span>
+                </div>
+                <strong>Host Connect</strong>
+                <span>Step-by-step tool installation per host — Podman, Tailscale, Cloudflare Tunnel, or Nginx.</span>
+                <span class="blueprint-card-cta">Read section</span>
+              </div>
+            </a>
+
+            <!-- 05 Databases & Services -->
+            <a class="blueprint-card" href="#databases">
+              <div class="blueprint-card-preview">
+                <svg viewBox="0 0 200 140" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <rect width="200" height="140" rx="6" fill="#f8faff"/>
+                  <rect width="200" height="22" rx="6" fill="#0f172a"/>
+                  <rect x="8" y="7" width="66" height="8" rx="2" fill="#fde68a" opacity=".9"/>
+                  <!-- Tab row -->
+                  <rect x="8" y="28" width="184" height="14" rx="0" fill="#f1f5f9"/>
+                  <rect x="8" y="28" width="46" height="14" fill="#fff" stroke="#d7e0ec" stroke-width="1"/>
+                  <rect x="12" y="33" width="32" height="4" rx="1" fill="#b91c1c" opacity=".6"/>
+                  <rect x="56" y="33" width="32" height="4" rx="1" fill="#64748b" opacity=".35"/>
+                  <rect x="106" y="33" width="32" height="4" rx="1" fill="#64748b" opacity=".35"/>
+                  <!-- DB cards -->
+                  <rect x="8" y="48" width="84" height="40" rx="3" fill="#fff" stroke="#d7e0ec" stroke-width="1"/>
+                  <ellipse cx="36" cy="60" rx="16" ry="6" fill="#fde68a" stroke="#1f2937" stroke-width="1"/>
+                  <path d="M20 60 Q20 70 36 70 Q52 70 52 60" stroke="#1f2937" stroke-width="1" fill="none"/>
+                  <rect x="14" y="73" width="40" height="4" rx="1" fill="#0f172a" opacity=".4"/>
+                  <rect x="62" y="56" width="24" height="8" rx="2" fill="#d1fae5" stroke="#059669" stroke-width="1"/>
+                  <rect x="112" y="48" width="80" height="40" rx="3" fill="#fff" stroke="#d7e0ec" stroke-width="1"/>
+                  <ellipse cx="140" cy="60" rx="16" ry="6" fill="#fde68a" stroke="#1f2937" stroke-width="1"/>
+                  <path d="M124 60 Q124 70 140 70 Q156 70 156 60" stroke="#1f2937" stroke-width="1" fill="none"/>
+                  <rect x="118" y="73" width="36" height="4" rx="1" fill="#0f172a" opacity=".4"/>
+                  <rect x="166" y="56" width="20" height="8" rx="2" fill="#fee2e2" stroke="#ef4444" stroke-width="1"/>
+                  <!-- Services section -->
+                  <rect x="8" y="96" width="184" height="8" rx="2" fill="#0f172a" opacity=".07"/>
+                  <rect x="8" y="108" width="184" height="12" rx="2" fill="#fff" stroke="#d7e0ec" stroke-width="1"/>
+                  <rect x="14" y="112" width="60" height="4" rx="1" fill="#0f172a" opacity=".4"/>
+                  <rect x="164" y="110" width="22" height="8" rx="3" fill="#d1fae5" stroke="#059669" stroke-width="1"/>
+                  <rect x="8" y="124" width="184" height="12" rx="2" fill="#fff" stroke="#d7e0ec" stroke-width="1"/>
+                  <rect x="14" y="128" width="52" height="4" rx="1" fill="#0f172a" opacity=".4"/>
+                  <rect x="164" y="126" width="22" height="8" rx="3" fill="#fee2e2" stroke="#ef4444" stroke-width="1"/>
+                </svg>
+              </div>
+              <div class="blueprint-card-body">
+                <div class="blueprint-card-meta">
+                  <span class="blueprint-card-num">05</span>
+                  <span class="blueprint-card-tag">Data layer</span>
+                </div>
+                <strong>Databases &amp; Services</strong>
+                <span>Local Podman databases, remote endpoints, and background service workers in one tabbed view.</span>
+                <span class="blueprint-card-cta">Read section</span>
+              </div>
+            </a>
+
+            <!-- 06 Auth & Team -->
+            <a class="blueprint-card" href="#auth">
+              <div class="blueprint-card-preview">
+                <svg viewBox="0 0 200 140" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <rect width="200" height="140" rx="6" fill="#f8faff"/>
+                  <rect width="200" height="22" rx="6" fill="#0f172a"/>
+                  <rect x="8" y="7" width="52" height="8" rx="2" fill="#fde68a" opacity=".9"/>
+                  <!-- Settings panel left -->
+                  <rect x="8" y="28" width="88" height="108" rx="3" fill="#fff" stroke="#d7e0ec" stroke-width="1"/>
+                  <rect x="14" y="35" width="48" height="6" rx="2" fill="#0f172a" opacity=".4"/>
+                  <!-- GitHub OAuth row -->
+                  <rect x="14" y="47" width="76" height="14" rx="2" fill="#f8faff" stroke="#d7e0ec" stroke-width="1"/>
+                  <rect x="18" y="51" width="28" height="4" rx="1" fill="#64748b" opacity=".5"/>
+                  <rect x="68" y="49" width="16" height="8" rx="3" fill="#b91c1c" opacity=".6"/>
+                  <!-- API token row -->
+                  <rect x="14" y="66" width="76" height="14" rx="2" fill="#f8faff" stroke="#d7e0ec" stroke-width="1"/>
+                  <rect x="18" y="70" width="36" height="4" rx="1" fill="#64748b" opacity=".5"/>
+                  <rect x="18" y="78" width="56" height="5" rx="2" fill="#1e293b"/>
+                  <!-- Org info -->
+                  <rect x="14" y="96" width="60" height="5" rx="1" fill="#0f172a" opacity=".4"/>
+                  <rect x="14" y="105" width="76" height="12" rx="2" fill="#fef3c7" stroke="#f59e0b" stroke-width="1"/>
+                  <rect x="18" y="109" width="36" height="4" rx="1" fill="#92400e" opacity=".5"/>
+                  <!-- Team panel right -->
+                  <rect x="104" y="28" width="88" height="108" rx="3" fill="#fff" stroke="#d7e0ec" stroke-width="1"/>
+                  <rect x="110" y="35" width="40" height="6" rx="2" fill="#0f172a" opacity=".4"/>
+                  <!-- Team members -->
+                  <circle cx="118" cy="56" r="8" fill="#fde68a" stroke="#1f2937" stroke-width="1"/>
+                  <rect x="132" y="51" width="44" height="4" rx="1" fill="#0f172a" opacity=".5"/>
+                  <rect x="132" y="58" width="28" height="3" rx="1" fill="#64748b" opacity=".35"/>
+                  <rect x="166" y="49" width="20" height="8" rx="3" fill="#d1fae5" stroke="#059669" stroke-width="1"/>
+                  <circle cx="118" cy="76" r="8" fill="#fde68a" stroke="#1f2937" stroke-width="1"/>
+                  <rect x="132" y="71" width="36" height="4" rx="1" fill="#0f172a" opacity=".5"/>
+                  <rect x="132" y="78" width="24" height="3" rx="1" fill="#64748b" opacity=".35"/>
+                  <rect x="166" y="69" width="20" height="8" rx="3" fill="#dbeafe" stroke="#3b82f6" stroke-width="1"/>
+                  <circle cx="118" cy="96" r="8" fill="#e2e8f0" stroke="#cbd5e1" stroke-width="1"/>
+                  <rect x="132" y="91" width="32" height="4" rx="1" fill="#0f172a" opacity=".4"/>
+                  <rect x="132" y="98" width="20" height="3" rx="1" fill="#64748b" opacity=".3"/>
+                  <!-- Invite button -->
+                  <rect x="110" y="114" width="76" height="14" rx="3" fill="#b91c1c"/>
+                  <rect x="118" y="118" width="44" height="4" rx="1" fill="#fff" opacity=".8"/>
+                </svg>
+              </div>
+              <div class="blueprint-card-body">
+                <div class="blueprint-card-meta">
+                  <span class="blueprint-card-num">06</span>
+                  <span class="blueprint-card-tag">Access control</span>
+                </div>
+                <strong>Auth &amp; Team</strong>
+                <span>GitHub OAuth, API token settings, and org/team member management with role-based access.</span>
+                <span class="blueprint-card-cta">Read section</span>
+              </div>
+            </a>
+
+          </div>
         </section>
 
         <div class="sections">

@@ -13,6 +13,8 @@ from . import (
     builds,
     deployments,
     enterprise,
+    envvars,
+    notifications,
     projects,
     runtime,
     setup,
@@ -98,3 +100,5 @@ app.include_router(webhooks.router)
 app.include_router(setup.router)
 app.include_router(enterprise.router)
 app.include_router(runtime.router)
+app.include_router(envvars.router)
+app.include_router(notifications.router)

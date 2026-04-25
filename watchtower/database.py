@@ -358,6 +358,7 @@ class OrgNode(Base):
     
     # Status Monitoring
     status = Column(Enum(NodeStatus), default=NodeStatus.OFFLINE)
+    status_message = Column(String, nullable=True)   # Last health-check message
     last_health_check = Column(DateTime, nullable=True)
     cpu_usage = Column(Integer, nullable=True)
     memory_usage = Column(Integer, nullable=True)
@@ -433,6 +434,22 @@ class DeploymentNode(Base):
     node = relationship("OrgNode", backref="deployments")
 
 
+class NotificationWebhook(Base):
+    """Discord / Slack webhook for deployment notifications per project."""
+    __tablename__ = "notification_webhooks"
+
+    id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    project_id = Column(Uuid(as_uuid=True), ForeignKey("projects.id"), nullable=True)
+    org_id = Column(Uuid(as_uuid=True), ForeignKey("organizations.id"), nullable=True)
+    provider = Column(String, default="discord")   # "discord" | "slack"
+    url = Column(String)                            # Webhook URL
+    label = Column(String, nullable=True)
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    project = relationship("Project", backref="notification_webhooks")
+
+
 # Dependency for getting DB session
 def get_db():
     db = SessionLocal()
@@ -495,6 +512,10 @@ def _ensure_org_node_columns():
     if "updated_by_user_id" not in existing_cols:
         alter_statements.append(
             "ALTER TABLE org_nodes ADD COLUMN updated_by_user_id UUID"
+        )
+    if "status_message" not in existing_cols:
+        alter_statements.append(
+            "ALTER TABLE org_nodes ADD COLUMN status_message VARCHAR"
         )
 
     if not alter_statements:

@@ -174,43 +174,109 @@ function VSCodeCard() {
   );
 }
 
-const Settings = () => (
-  <div className="flex-1 overflow-auto bg-slate-50">
-    <header
-      className="px-4 sm:px-6 lg:px-8 py-4 border-b"
-      style={{ borderColor: 'hsl(214 32% 88%)' }}
-    >
-      <h1 className="text-lg font-semibold text-slate-900">Settings</h1>
-      <p className="text-xs text-slate-600 mt-0.5">Configure your WatchTower instance</p>
-    </header>
+const Settings = () => {
+  const [showReportModal, setShowReportModal] = useState(false);
 
-    <main className="px-4 sm:px-6 lg:px-8 py-6 max-w-4xl mx-auto w-full space-y-4">
+  return (
+    <div className="flex-1 overflow-auto bg-slate-50">
+      <header
+        className="px-4 sm:px-6 lg:px-8 py-4 border-b flex items-center justify-between"
+        style={{ borderColor: 'hsl(214 32% 88%)' }}
+      >
+        <div>
+          <h1 className="text-lg font-semibold text-slate-900">Settings</h1>
+          <p className="text-xs text-slate-600 mt-0.5">Configure your WatchTower instance</p>
+        </div>
+        <button
+          onClick={() => setShowReportModal(true)}
+          className="text-xs px-3 py-1.5 rounded border border-slate-300 text-slate-600 hover:text-slate-900 hover:border-slate-400 transition-colors"
+          title="Report a problem or send feedback"
+        >
+          Report Problem
+        </button>
+      </header>
 
-      {/* VS Code Integration — prominent card */}
-      <VSCodeCard />
+      <main className="px-4 sm:px-6 lg:px-8 py-6 max-w-4xl mx-auto w-full space-y-4">
 
-      {/* Other settings groups */}
-      {[
-        { title: 'General', items: ['Instance name', 'Default branch', 'Build timeout'] },
-        { title: 'Authentication', items: ['GitHub OAuth', 'API tokens', 'Team access'] },
-        { title: 'Notifications', items: ['Email alerts', 'Discord webhook', 'Slack webhook'] },
-        { title: 'Backups', items: ['S3-compatible backup', 'Backup schedule', 'Retention policy'] },
-      ].map(({ title, items }) => (
-        <div key={title} className="rounded-xl border border-border bg-card p-5">
-          <h2 className="text-sm font-semibold text-slate-900 mb-3">{title}</h2>
-          <div className="space-y-2">
-            {items.map((item) => (
-              <div key={item}
-                className="flex items-center justify-between p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors cursor-pointer">
-                <span className="text-sm text-slate-900">{item}</span>
-                <span className="text-xs text-slate-600">Configure →</span>
+        {/* VS Code Integration — prominent card */}
+        <VSCodeCard />
+
+        {/* Other settings groups */}
+        {[
+          { title: 'General', items: ['Instance name', 'Default branch', 'Build timeout'] },
+          { title: 'Authentication', items: ['GitHub OAuth', 'API tokens', 'Team access'] },
+          { title: 'Notifications', items: ['Email alerts', 'Discord webhook', 'Slack webhook'] },
+          { title: 'Backups', items: ['S3-compatible backup', 'Backup schedule', 'Retention policy'] },
+        ].map(({ title, items }) => (
+          <div key={title} className="rounded-xl border border-border bg-card p-5">
+            <h2 className="text-sm font-semibold text-slate-900 mb-3">{title}</h2>
+            <div className="space-y-2">
+              {items.map((item) => (
+                <div key={item}
+                  className="flex items-center justify-between p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors cursor-pointer">
+                  <span className="text-sm text-slate-900">{item}</span>
+                  <span className="text-xs text-slate-600">Configure →</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+
+      </main>
+
+      {/* Report Problem Modal */}
+      {showReportModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg shadow-lg max-w-md w-full p-6 space-y-4">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-lg border border-slate-800 bg-red-700 flex items-center justify-center flex-shrink-0">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
+                  <path d="M10 19l-7-7m0 0l7-7m-7 7h18.5" />
+                </svg>
               </div>
-            ))}
+              <div>
+                <h3 className="font-semibold text-slate-900">Report Problem</h3>
+                <p className="text-xs text-slate-500 mt-0.5">Help us improve WatchTower</p>
+              </div>
+            </div>
+
+            <p className="text-sm text-slate-700">
+              Found an issue or have feedback? We'd love to hear from you.
+            </p>
+
+            <div className="bg-slate-50 rounded-lg p-3 space-y-2">
+              <p className="text-xs font-medium text-slate-900">Contact Support:</p>
+              <a
+                href="mailto:sinhaankur827@gmail.com?subject=WatchTower%20Problem%20Report"
+                className="flex items-center gap-2 text-sm text-red-700 hover:text-red-800 font-medium"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+                  <polyline points="22,6 12,13 2,6" />
+                </svg>
+                sinhaankur827@gmail.com
+              </a>
+            </div>
+
+            <div className="flex gap-2 pt-2">
+              <button
+                onClick={() => setShowReportModal(false)}
+                className="flex-1 py-2 px-3 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50 text-sm font-medium transition-colors"
+              >
+                Close
+              </button>
+              <a
+                href="mailto:sinhaankur827@gmail.com?subject=WatchTower%20Problem%20Report"
+                className="flex-1 py-2 px-3 rounded-lg bg-red-700 text-white hover:bg-red-800 text-sm font-medium transition-colors text-center"
+              >
+                Send Report
+              </a>
+            </div>
           </div>
         </div>
-      ))}
-    </main>
-  </div>
-);
+      )}
+    </div>
+  );
+};
 
 export default Settings;
