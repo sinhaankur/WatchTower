@@ -1,6 +1,7 @@
 /**
  * Integrations — shows live status of Docker, Podman, Coolify, Tailscale,
  * Cloudflare and Nginx, plus the Podman auto-restart watchdog toggle.
+ * Includes start / stop / restart / enable / disable controls for each service.
  */
 
 import { useEffect, useState, useCallback } from 'react';
@@ -117,6 +118,109 @@ function InstallBlock({ cmds }: { cmds: string[] }) {
       >
         {copied ? 'Copied!' : 'Copy'}
       </button>
+    </div>
+  );
+}
+
+// ─── Service controls ─────────────────────────────────────────────────────────
+
+type Action = 'start' | 'stop' | 'restart' | 'enable' | 'disable';
+
+type ControlsProps = {
+  service: string;
+  running: boolean;
+  /** systemd enabled state; undefined means the service doesn't support enable/disable */
+  enabled?: boolean;
+  /** Actions the service supports */
+  supportedActions: Action[];
+  onDone?: () => void;
+};
+
+function ServiceControls({ service, running, enabled, supportedActions, onDone }: ControlsProps) {
+  const [busy, setBusy] = useState<Action | null>(null);
+  const [msg, setMsg] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null);
+
+  const flashMsg = (kind: 'ok' | 'err', text: string) => {
+    setMsg({ kind, text });
+    setTimeout(() => setMsg(null), 4000);
+  };
+
+  const doAction = async (action: Action) => {
+    setBusy(action);
+    try {
+      const r = await apiClient.post(`/runtime/services/${service}/control`, { action });
+      const resp = r.data as { message: string };
+      flashMsg('ok', resp.message);
+      onDone?.();
+    } catch (err: any) {
+      const detail = err?.response?.data?.detail;
+      flashMsg('err', typeof detail === 'string' ? detail : `Failed to ${action} ${service}.`);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const has = (a: Action) => supportedActions.includes(a);
+
+  return (
+    <div className="mt-3 flex flex-col gap-2">
+      <div className="flex flex-wrap gap-1.5">
+        {/* Start / Stop toggle */}
+        {has('start') && !running && (
+          <button
+            onClick={() => void doAction('start')}
+            disabled={busy !== null}
+            className="px-3 py-1 text-xs font-medium rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50 transition-colors"
+          >
+            {busy === 'start' ? '…' : '▶ Start'}
+          </button>
+        )}
+        {has('stop') && running && (
+          <button
+            onClick={() => void doAction('stop')}
+            disabled={busy !== null}
+            className="px-3 py-1 text-xs font-medium rounded-lg bg-slate-700 text-white hover:bg-slate-800 disabled:opacity-50 transition-colors"
+          >
+            {busy === 'stop' ? '…' : '⏹ Stop'}
+          </button>
+        )}
+        {/* Restart */}
+        {has('restart') && running && (
+          <button
+            onClick={() => void doAction('restart')}
+            disabled={busy !== null}
+            className="px-3 py-1 text-xs font-medium rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-100 disabled:opacity-50 transition-colors"
+          >
+            {busy === 'restart' ? '…' : '↺ Restart'}
+          </button>
+        )}
+        {/* Enable / Disable (boot persistence) */}
+        {has('enable') && enabled === false && (
+          <button
+            onClick={() => void doAction('enable')}
+            disabled={busy !== null}
+            className="px-3 py-1 text-xs font-medium rounded-lg border border-blue-300 text-blue-700 hover:bg-blue-50 disabled:opacity-50 transition-colors"
+            title="Enable auto-start on boot"
+          >
+            {busy === 'enable' ? '…' : '🔒 Enable on boot'}
+          </button>
+        )}
+        {has('disable') && enabled === true && (
+          <button
+            onClick={() => void doAction('disable')}
+            disabled={busy !== null}
+            className="px-3 py-1 text-xs font-medium rounded-lg border border-amber-300 text-amber-700 hover:bg-amber-50 disabled:opacity-50 transition-colors"
+            title="Disable auto-start on boot"
+          >
+            {busy === 'disable' ? '…' : '🔓 Disable on boot'}
+          </button>
+        )}
+      </div>
+      {msg && (
+        <p className={`text-xs font-medium ${msg.kind === 'ok' ? 'text-emerald-700' : 'text-red-600'}`}>
+          {msg.kind === 'ok' ? '✓' : '✗'} {msg.text}
+        </p>
+      )}
     </div>
   );
 }
@@ -449,6 +553,14 @@ const Integrations = () => {
                   : undefined
               }
               installCmds={cmds['podman']}
+              extra={podman?.installed ? (
+                <ServiceControls
+                  service="podman"
+                  running={podman.running_containers > 0}
+                  supportedActions={['start', 'stop', 'restart', 'enable', 'disable']}
+                  onDone={() => void load()}
+                />
+              ) : undefined}
             />
             <IntegrationCard
               icon="🐳"
@@ -470,6 +582,14 @@ const Integrations = () => {
                   : undefined
               }
               installCmds={cmds['docker']}
+              extra={docker?.installed ? (
+                <ServiceControls
+                  service="docker"
+                  running={docker.daemon_available}
+                  supportedActions={['start', 'stop', 'restart', 'enable', 'disable']}
+                  onDone={() => void load()}
+                />
+              ) : undefined}
             />
           </div>
         </section>
@@ -493,6 +613,14 @@ const Integrations = () => {
               version={tailscale?.version ?? null}
               detail={tailscale?.hostname ? `Hostname: ${tailscale.hostname}` : null}
               installCmds={cmds['tailscale']}
+              extra={tailscale?.installed ? (
+                <ServiceControls
+                  service="tailscale"
+                  running={tailscale.connected}
+                  supportedActions={['start', 'stop', 'enable', 'disable']}
+                  onDone={() => void load()}
+                />
+              ) : undefined}
             />
             <IntegrationCard
               icon="☁️"
@@ -516,6 +644,14 @@ const Integrations = () => {
                     : null
               }
               installCmds={cmds['cloudflared']}
+              extra={cloudflared?.installed ? (
+                <ServiceControls
+                  service="cloudflared"
+                  running={cloudflared.authenticated}
+                  supportedActions={['start', 'stop', 'restart', 'enable', 'disable']}
+                  onDone={() => void load()}
+                />
+              ) : undefined}
             />
             <IntegrationCard
               icon="🔀"
@@ -539,6 +675,14 @@ const Integrations = () => {
                   : null
               }
               installCmds={cmds['nginx']}
+              extra={nginx?.installed ? (
+                <ServiceControls
+                  service="nginx"
+                  running={nginx.running}
+                  supportedActions={['start', 'stop', 'restart', 'enable', 'disable']}
+                  onDone={() => void load()}
+                />
+              ) : undefined}
             />
           </div>
         </section>
@@ -559,6 +703,14 @@ const Integrations = () => {
               }
               version={coolify?.version ?? null}
               installCmds={cmds['coolify']}
+              extra={coolify?.installed ? (
+                <ServiceControls
+                  service="coolify"
+                  running={coolify.installed}
+                  supportedActions={['start', 'stop', 'restart']}
+                  onDone={() => void load()}
+                />
+              ) : undefined}
             />
           </div>
         </section>

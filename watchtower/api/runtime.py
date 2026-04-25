@@ -1214,3 +1214,143 @@ async def terminal_execute(
     """Execute an allow-listed terminal command with encrypted auditing."""
     user_id = str(_current_user.get("id", "unknown"))
     return _execute_terminal_command(payload, user_id=user_id)
+
+
+# ── Service control ───────────────────────────────────────────────────────────
+
+ALLOWED_ACTIONS = frozenset({"start", "stop", "restart", "enable", "disable"})
+
+# Maps public service name → control strategy
+_SERVICE_MAP: dict[str, dict[str, Any]] = {
+    "nginx": {
+        "type": "systemd",
+        "unit": "nginx.service",
+        "actions": {"start", "stop", "restart", "enable", "disable"},
+    },
+    "tailscale": {
+        "type": "hybrid",
+        "unit": "tailscaled.service",
+        # start/stop use the tailscale CLI; enable/disable use systemd
+        "start_cmd": ["tailscale", "up"],
+        "stop_cmd": ["tailscale", "down"],
+        "actions": {"start", "stop", "enable", "disable"},
+    },
+    "cloudflared": {
+        "type": "systemd",
+        "unit": "cloudflared.service",
+        "actions": {"start", "stop", "restart", "enable", "disable"},
+    },
+    "podman": {
+        "type": "systemd",
+        "unit": "podman.socket",
+        "actions": {"start", "stop", "restart", "enable", "disable"},
+    },
+    "docker": {
+        "type": "systemd",
+        "unit": "docker.service",
+        "actions": {"start", "stop", "restart", "enable", "disable"},
+    },
+    "coolify": {
+        "type": "docker_container",
+        "container": "coolify",
+        "actions": {"start", "stop", "restart"},
+    },
+}
+
+
+class ServiceControlRequest(BaseModel):
+    action: str = Field(description="start | stop | restart | enable | disable")
+
+
+def _control_systemd(unit: str, action: str) -> tuple[bool, str]:
+    """Run a sudo systemctl action against a unit and return (ok, message)."""
+    ok, _, err, _ = _run_cmd(
+        ["sudo", "-n", "systemctl", action, unit], timeout=20
+    )
+    if ok:
+        return True, f"{unit}: {action} succeeded."
+    return False, err or f"systemctl {action} {unit} failed."
+
+
+def _do_service_control(service: str, action: str) -> dict[str, Any]:
+    cfg = _SERVICE_MAP[service]
+    allowed = cfg["actions"]
+
+    if action not in allowed:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"Action '{action}' is not supported for '{service}'. "
+                f"Allowed: {sorted(allowed)}"
+            ),
+        )
+
+    svc_type = cfg["type"]
+
+    if svc_type == "systemd":
+        ok, msg = _control_systemd(cfg["unit"], action)
+
+    elif svc_type == "hybrid":
+        # start/stop: use native CLI; enable/disable: use systemd
+        if action == "start":
+            cmd = cfg["start_cmd"]
+            ok, _, err, _ = _run_cmd(cmd, timeout=20)
+            msg = f"tailscale up succeeded." if ok else (err or "tailscale up failed.")
+        elif action == "stop":
+            cmd = cfg["stop_cmd"]
+            ok, _, err, _ = _run_cmd(cmd, timeout=20)
+            msg = "tailscale down succeeded." if ok else (err or "tailscale down failed.")
+        else:
+            ok, msg = _control_systemd(cfg["unit"], action)
+
+    elif svc_type == "docker_container":
+        container = cfg["container"]
+        ok, _, err, _ = _run_cmd(["docker", action, container], timeout=20)
+        msg = f"docker {action} {container} succeeded." if ok else (err or f"docker {action} failed.")
+
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Unknown service type for '{service}'.",
+        )
+
+    if not ok:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=msg,
+        )
+
+    return {"service": service, "action": action, "ok": True, "message": msg}
+
+
+@router.post("/services/{service}/control")
+async def service_control(
+    service: str,
+    payload: ServiceControlRequest,
+    _current_user: dict = Depends(util.get_current_user),
+):
+    """Start, stop, restart, enable or disable an integration service.
+
+    Supported services: nginx, tailscale, cloudflared, podman, docker, coolify.
+    Supported actions: start, stop, restart, enable, disable (per service).
+    """
+    if service not in _SERVICE_MAP:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=(
+                f"Unknown service '{service}'. "
+                f"Supported: {sorted(_SERVICE_MAP)}"
+            ),
+        )
+
+    action = payload.action.strip().lower()
+    if action not in ALLOWED_ACTIONS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"Invalid action '{action}'. "
+                f"Allowed: {sorted(ALLOWED_ACTIONS)}"
+            ),
+        )
+
+    return _do_service_control(service, action)
