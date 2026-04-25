@@ -24,11 +24,28 @@ def generate_webhook_secret() -> str:
 
 
 def _auth_signing_secret() -> str:
-    return (
+    secret = (
         os.getenv("WATCHTOWER_AUTH_SECRET")
         or os.getenv("WATCHTOWER_API_TOKEN")
-        or "watchtower-auth-dev-secret"
     )
+    if not secret:
+        # In insecure dev mode generate a random per-process secret so sessions
+        # are at least valid only for the lifetime of the process.
+        if os.getenv("WATCHTOWER_ALLOW_INSECURE_DEV_AUTH", "false").lower() == "true":
+            import logging as _logging
+            _logging.getLogger(__name__).warning(
+                "WATCHTOWER_AUTH_SECRET is not set. "
+                "Using a random ephemeral signing key — sessions will not survive restarts."
+            )
+            secret = secrets.token_hex(32)
+            # Cache on the module so all calls in this process use the same key.
+            os.environ["WATCHTOWER_AUTH_SECRET"] = secret
+        else:
+            raise RuntimeError(
+                "WATCHTOWER_AUTH_SECRET or WATCHTOWER_API_TOKEN must be set "
+                "before running WatchTower."
+            )
+    return secret
 
 
 def create_user_session_token(*, user_id: str, email: str, name: str) -> str:

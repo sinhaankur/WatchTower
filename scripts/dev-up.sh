@@ -111,7 +111,7 @@ if ! $PIP_BIN --version >/dev/null 2>&1; then
 fi
 
 $PIP_BIN install --upgrade pip >/dev/null
-$PIP_BIN install -r "$ROOT_DIR/requirements-new.txt" >/dev/null
+$PIP_BIN install -r "$ROOT_DIR/requirements.txt" >/dev/null
 
 if [[ ! -d "$ROOT_DIR/web/node_modules" ]]; then
   echo "Installing frontend dependencies..."
