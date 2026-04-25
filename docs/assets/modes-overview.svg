@@ -1,0 +1,76 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" role="img" aria-label="WatchTower modes overview">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#fffaf0" />
+      <stop offset="100%" stop-color="#f8fbff" />
+    </linearGradient>
+    <linearGradient id="hero" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#ffffff" />
+      <stop offset="100%" stop-color="#fff0bd" />
+    </linearGradient>
+    <style>
+      .title { font: 800 52px 'DM Sans', Arial, sans-serif; fill: #0f172a; }
+      .subtitle { font: 500 24px 'DM Sans', Arial, sans-serif; fill: #475569; }
+      .eyebrow { font: 700 20px 'Space Mono', monospace; letter-spacing: 2px; fill: #b91c1c; }
+      .card-title { font: 800 30px 'DM Sans', Arial, sans-serif; fill: #0f172a; }
+      .card-copy { font: 500 21px 'DM Sans', Arial, sans-serif; fill: #475569; }
+      .chip { font: 700 18px 'DM Sans', Arial, sans-serif; fill: #7f1d1d; }
+      .label { font: 700 18px 'Space Mono', monospace; fill: #0f172a; }
+      .metric { font: 700 20px 'DM Sans', Arial, sans-serif; fill: #0f172a; }
+    </style>
+  </defs>
+  <rect width="1600" height="900" fill="url(#bg)" />
+  <circle cx="180" cy="140" r="180" fill="#fde68a" opacity="0.22" />
+  <circle cx="1450" cy="90" r="140" fill="#dbeafe" opacity="0.45" />
+
+  <rect x="70" y="55" width="1460" height="180" rx="34" fill="url(#hero)" stroke="#1f2937" stroke-width="3" />
+  <rect x="110" y="95" width="58" height="58" rx="14" fill="#fde68a" stroke="#0f172a" stroke-width="3" />
+  <text x="128" y="132" font-family="DM Sans, Arial, sans-serif" font-size="28" font-weight="800" fill="#b91c1c">Wt</text>
+  <text x="200" y="110" class="eyebrow">WATCHTOWER BLUEPRINT</text>
+  <text x="110" y="170" class="title">Two operating modes, one control plane.</text>
+  <text x="110" y="208" class="subtitle">Use the same project for scheduled Podman updates or multi-node application delivery over SSH.</text>
+
+  <rect x="90" y="290" width="680" height="510" rx="28" fill="#ffffff" stroke="#1f2937" stroke-width="3" />
+  <rect x="830" y="290" width="680" height="510" rx="28" fill="#ffffff" stroke="#1f2937" stroke-width="3" />
+
+  <rect x="120" y="325" width="250" height="42" rx="21" fill="#fde68a" stroke="#1f2937" stroke-width="2" />
+  <text x="145" y="353" class="chip">Mode 1 · Podman Auto-Update</text>
+  <text x="120" y="415" class="card-title">Container Service</text>
+  <text x="120" y="453" class="card-copy">Poll running containers, compare images, roll forward safely, and keep hosts current without touching app release workflows.</text>
+
+  <rect x="120" y="505" width="180" height="86" rx="18" fill="#f8fafc" stroke="#1f2937" stroke-width="2.5" />
+  <text x="145" y="540" class="label">PODMAN</text>
+  <text x="145" y="572" class="metric">Running containers</text>
+  <rect x="360" y="505" width="180" height="86" rx="18" fill="#f8fafc" stroke="#1f2937" stroke-width="2.5" />
+  <text x="385" y="540" class="label">SCHEDULE</text>
+  <text x="385" y="572" class="metric">Interval checks</text>
+  <rect x="600" y="505" width="120" height="86" rx="18" fill="#ecfdf5" stroke="#10b981" stroke-width="2.5" />
+  <text x="630" y="540" class="label">SAFE</text>
+  <text x="622" y="572" class="metric">Health gate</text>
+
+  <line x1="210" y1="640" x2="630" y2="640" stroke="#1f2937" stroke-width="3" stroke-dasharray="8 10" />
+  <rect x="150" y="670" width="530" height="92" rx="18" fill="#fffdf7" stroke="#1f2937" stroke-width="2.5" />
+  <text x="180" y="710" class="metric">Best for host maintenance, unattended rollouts, and service-level drift control.</text>
+  <text x="180" y="742" class="card-copy">One config file, one updater loop, clear operator ergonomics.</text>
+
+  <rect x="860" y="325" width="260" height="42" rx="21" fill="#fde68a" stroke="#1f2937" stroke-width="2" />
+  <text x="886" y="353" class="chip">Mode 2 · App Center</text>
+  <text x="860" y="415" class="card-title">Deployment Control Plane</text>
+  <text x="860" y="453" class="card-copy">Register apps once, package from a dev machine, push to multiple nodes, and manage previews, blue-green, and runtime updates from one place.</text>
+
+  <rect x="860" y="505" width="180" height="86" rx="18" fill="#f8fafc" stroke="#1f2937" stroke-width="2.5" />
+  <text x="890" y="540" class="label">APPS.JSON</text>
+  <text x="892" y="572" class="metric">Named workloads</text>
+  <rect x="1100" y="505" width="180" height="86" rx="18" fill="#f8fafc" stroke="#1f2937" stroke-width="2.5" />
+  <text x="1128" y="540" class="label">SSH NODES</text>
+  <text x="1134" y="572" class="metric">Target fleet</text>
+  <rect x="1340" y="505" width="140" height="86" rx="18" fill="#eff6ff" stroke="#2563eb" stroke-width="2.5" />
+  <text x="1373" y="540" class="label">UI/API</text>
+  <text x="1366" y="572" class="metric">Triggers</text>
+
+  <polyline points="930,638 1050,638 1050,690 1170,690" fill="none" stroke="#1f2937" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+  <polyline points="1170,638 1290,638 1290,690 1410,690" fill="none" stroke="#1f2937" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+  <rect x="900" y="670" width="530" height="92" rx="18" fill="#fffdf7" stroke="#1f2937" stroke-width="2.5" />
+  <text x="928" y="710" class="metric">Best for website and API releases, dashboards, previews, and multi-node deployments.</text>
+  <text x="928" y="742" class="card-copy">Dev-machine driven packages, remote activation, and operator-visible flow.</text>
+</svg>

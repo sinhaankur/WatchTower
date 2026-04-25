@@ -590,6 +590,7 @@
     const tocContent = document.getElementById('toc-content');
     const prevDocLink = document.getElementById('prev-doc-link');
     const nextDocLink = document.getElementById('next-doc-link');
+    const resolvedSourceUrl = new URL(docMeta.source, window.location.href).href;
 
     pageTitle.textContent = docMeta.title;
     pageSubtitle.textContent = docMeta.subtitle;
@@ -709,6 +710,20 @@
       });
     };
 
+    const absolutizeRelativeMarkdownImages = () => {
+      content.querySelectorAll('img[src]').forEach((image) => {
+        const src = image.getAttribute('src');
+        if (!src || src.startsWith('http') || src.startsWith('data:')) {
+          return;
+        }
+        try {
+          image.src = new URL(src, resolvedSourceUrl).toString();
+        } catch {
+          // leave unresolved images unchanged
+        }
+      });
+    };
+
     const renderMarkdown = async () => {
       try {
         const response = await fetch(docMeta.source);
@@ -730,6 +745,7 @@
         });
 
         absolutizeRelativeMarkdownLinks();
+        absolutizeRelativeMarkdownImages();
         renderToc();
         observeHeadings();
       } catch (error) {

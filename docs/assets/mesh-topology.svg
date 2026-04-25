@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" role="img" aria-label="WatchTower mesh topology">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#fffaf0" />
+      <stop offset="100%" stop-color="#eef6ff" />
+    </linearGradient>
+    <style>
+      .title { font: 800 50px 'DM Sans', Arial, sans-serif; fill: #0f172a; }
+      .subtitle { font: 500 23px 'DM Sans', Arial, sans-serif; fill: #475569; }
+      .eyebrow { font: 700 20px 'Space Mono', monospace; letter-spacing: 2px; fill: #b91c1c; }
+      .nodeTitle { font: 800 24px 'DM Sans', Arial, sans-serif; fill: #0f172a; }
+      .nodeCopy { font: 500 19px 'DM Sans', Arial, sans-serif; fill: #475569; }
+      .tag { font: 700 17px 'DM Sans', Arial, sans-serif; }
+    </style>
+  </defs>
+  <rect width="1600" height="900" fill="url(#bg)" />
+  <circle cx="220" cy="150" r="160" fill="#fde68a" opacity="0.22" />
+  <circle cx="1420" cy="120" r="160" fill="#dbeafe" opacity="0.4" />
+
+  <text x="90" y="90" class="eyebrow">MESH TOPOLOGY</text>
+  <text x="90" y="150" class="title">Control previews, live traffic, and fleet edges in one map.</text>
+  <text x="90" y="188" class="subtitle">A visual summary of the mesh-oriented docs flow: operator entrypoint, control plane decisions, and staged traffic across edge nodes.</text>
+
+  <rect x="645" y="290" width="310" height="170" rx="30" fill="#ffffff" stroke="#1f2937" stroke-width="3" />
+  <text x="707" y="355" class="nodeTitle">WatchTower Control Plane</text>
+  <text x="698" y="392" class="nodeCopy">Dashboard, API, release decisions,</text>
+  <text x="732" y="422" class="nodeCopy">and node coordination.</text>
+
+  <rect x="160" y="300" width="250" height="150" rx="26" fill="#ffffff" stroke="#1f2937" stroke-width="3" />
+  <text x="238" y="360" class="nodeTitle">Developer</text>
+  <text x="210" y="396" class="nodeCopy">Triggers preview deploys and</text>
+  <text x="220" y="425" class="nodeCopy">reads rollout status.</text>
+
+  <rect x="1180" y="220" width="250" height="150" rx="26" fill="#ffffff" stroke="#1f2937" stroke-width="3" />
+  <text x="1248" y="280" class="nodeTitle">Traffic Layer</text>
+  <text x="1208" y="316" class="nodeCopy">Cloudflare, Caddy, or edge</text>
+  <text x="1220" y="345" class="nodeCopy">routing for live and preview.</text>
+
+  <rect x="1120" y="520" width="310" height="150" rx="26" fill="#ffffff" stroke="#1f2937" stroke-width="3" />
+  <text x="1190" y="580" class="nodeTitle">Live Nodes</text>
+  <text x="1150" y="616" class="nodeCopy">Current production set receiving</text>
+  <text x="1180" y="645" class="nodeCopy">stable public traffic.</text>
+
+  <rect x="170" y="560" width="310" height="150" rx="26" fill="#ffffff" stroke="#1f2937" stroke-width="3" />
+  <text x="237" y="620" class="nodeTitle">Preview Nodes</text>
+  <text x="205" y="656" class="nodeCopy">Candidate builds, branch previews,</text>
+  <text x="228" y="685" class="nodeCopy">or blue-green target sets.</text>
+
+  <line x1="410" y1="375" x2="645" y2="375" stroke="#1f2937" stroke-width="4" stroke-linecap="round" />
+  <polygon points="632,364 654,375 632,386" fill="#1f2937" />
+  <line x1="955" y1="350" x2="1180" y2="295" stroke="#1f2937" stroke-width="4" stroke-linecap="round" />
+  <polygon points="1166,289 1186,293 1171,307" fill="#1f2937" />
+  <line x1="880" y1="460" x2="1160" y2="520" stroke="#1f2937" stroke-width="4" stroke-linecap="round" />
+  <polygon points="1143,511 1168,522 1140,532" fill="#1f2937" />
+  <line x1="720" y1="460" x2="440" y2="560" stroke="#1f2937" stroke-width="4" stroke-linecap="round" />
+  <polygon points="451,542 432,563 459,563" fill="#1f2937" />
+  <line x1="1280" y1="370" x2="1280" y2="520" stroke="#10b981" stroke-width="5" stroke-dasharray="10 10" stroke-linecap="round" />
+  <line x1="300" y1="560" x2="300" y2="450" stroke="#2563eb" stroke-width="5" stroke-dasharray="10 10" stroke-linecap="round" />
+
+  <rect x="1110" y="710" width="270" height="44" rx="22" fill="#ecfdf5" stroke="#10b981" stroke-width="2" />
+  <text x="1180" y="738" class="tag" fill="#047857">Stable traffic path</text>
+  <rect x="160" y="730" width="300" height="44" rx="22" fill="#eff6ff" stroke="#2563eb" stroke-width="2" />
+  <text x="230" y="758" class="tag" fill="#1d4ed8">Preview and branch path</text>
+</svg>
