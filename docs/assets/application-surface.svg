@@ -1,58 +1,66 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" role="img" aria-label="WatchTower application and web app surface overview">
   <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#fffaf0" />
-      <stop offset="100%" stop-color="#eef6ff" />
-    </linearGradient>
-    <style>
-      .title { font: 800 50px 'DM Sans', Arial, sans-serif; fill: #0f172a; }
-      .subtitle { font: 500 23px 'DM Sans', Arial, sans-serif; fill: #475569; }
-      .eyebrow { font: 700 20px 'Space Mono', monospace; letter-spacing: 2px; fill: #b91c1c; }
-      .cardTitle { font: 800 24px 'DM Sans', Arial, sans-serif; fill: #0f172a; }
-      .cardCopy { font: 500 19px 'DM Sans', Arial, sans-serif; fill: #475569; }
-      .small { font: 700 16px 'Space Mono', monospace; fill: #b91c1c; }
-    </style>
+    <filter id="cs" x="-4%" y="-4%" width="112%" height="116%">
+      <feDropShadow dx="3" dy="3" stdDeviation="0" flood-color="#1f2937"/>
+    </filter>
+    <filter id="ps" x="-2%" y="-8%" width="108%" height="132%">
+      <feDropShadow dx="2" dy="2" stdDeviation="0" flood-color="#1f2937"/>
+    </filter>
   </defs>
-  <rect width="1600" height="900" fill="url(#bg)" />
-  <circle cx="180" cy="120" r="150" fill="#fde68a" opacity="0.22" />
-  <circle cx="1410" cy="130" r="160" fill="#dbeafe" opacity="0.42" />
-
-  <text x="90" y="92" class="eyebrow">APPLICATION SURFACE</text>
-  <text x="90" y="152" class="title">Show projects, web apps, and deploy paths in one product view.</text>
-  <text x="90" y="190" class="subtitle">A visual for application and web-application usage: project registry, dashboard actions, and the public surface that users actually reach.</text>
-
-  <rect x="110" y="260" width="480" height="520" rx="30" fill="#ffffff" stroke="#1f2937" stroke-width="3" />
-  <text x="150" y="318" class="small">WATCHTOWER DASHBOARD</text>
-  <text x="150" y="362" class="cardTitle">Applications and projects</text>
-  <text x="150" y="400" class="cardCopy">Track app records, project types, deployment state, runtime status, and quick actions from one control plane.</text>
-  <rect x="150" y="450" width="400" height="70" rx="16" fill="#f8fafc" stroke="#1f2937" stroke-width="2.5" />
-  <text x="180" y="494" class="cardTitle">Project registry</text>
-  <rect x="150" y="548" width="400" height="70" rx="16" fill="#f8fafc" stroke="#1f2937" stroke-width="2.5" />
-  <text x="180" y="592" class="cardTitle">Deploy and refresh actions</text>
-  <rect x="150" y="646" width="400" height="70" rx="16" fill="#f8fafc" stroke="#1f2937" stroke-width="2.5" />
-  <text x="180" y="690" class="cardTitle">Runtime and health feedback</text>
-
-  <rect x="670" y="330" width="250" height="160" rx="28" fill="#ffffff" stroke="#1f2937" stroke-width="3" />
-  <text x="718" y="394" class="cardTitle">Build Artifact</text>
-  <text x="715" y="430" class="cardCopy">Static site, SSR app,</text>
-  <text x="734" y="458" class="cardCopy">or Docker package.</text>
-
-  <rect x="1040" y="260" width="430" height="240" rx="30" fill="#ffffff" stroke="#1f2937" stroke-width="3" />
-  <text x="1080" y="318" class="small">PUBLIC EXPERIENCE</text>
-  <text x="1080" y="362" class="cardTitle">Web application surface</text>
-  <text x="1080" y="400" class="cardCopy">Users reach a deployed URL through the edge layer, while WatchTower keeps the release path operator-friendly.</text>
-  <rect x="1080" y="436" width="220" height="36" rx="18" fill="#fde68a" stroke="#1f2937" stroke-width="2" />
-  <text x="1122" y="460" class="small">HTTPS · domain · preview URL</text>
-
-  <rect x="980" y="580" width="490" height="180" rx="30" fill="#ffffff" stroke="#1f2937" stroke-width="3" />
-  <text x="1020" y="638" class="cardTitle">Project types supported</text>
-  <text x="1020" y="676" class="cardCopy">Static sites, web applications, APIs, and container-based services all fit the same visual delivery model.</text>
-  <text x="1020" y="714" class="cardCopy">That keeps documentation, UI, and release workflows aligned.</text>
-
-  <line x1="590" y1="470" x2="670" y2="410" stroke="#1f2937" stroke-width="4" stroke-linecap="round" />
-  <polygon points="654,405 678,403 666,423" fill="#1f2937" />
-  <line x1="920" y1="410" x2="1040" y2="380" stroke="#1f2937" stroke-width="4" stroke-linecap="round" />
-  <polygon points="1024,371 1048,378 1027,392" fill="#1f2937" />
-  <line x1="920" y1="470" x2="1030" y2="610" stroke="#1f2937" stroke-width="4" stroke-linecap="round" />
-  <polygon points="1008,602 1036,617 1017,590" fill="#1f2937" />
+  <rect width="1600" height="900" fill="#fbf6ea"/>
+  <circle cx="130" cy="130" r="120" fill="#fde68a" opacity="0.28"/>
+  <circle cx="1490" cy="160" r="160" fill="#dbeafe" opacity="0.35"/>
+    <text x="80" y="82" font-family="'Space Mono', monospace" font-size="18" font-weight="700" fill="#b91c1c" letter-spacing="2">APPLICATION SURFACE</text>
+    <text x="80" y="140" font-family="'DM Sans', Arial, sans-serif" font-size="42" font-weight="800" fill="#0f172a">Show projects, web apps, and deploy paths in one product view.</text>
+    <text x="80" y="180" font-family="'DM Sans', Arial, sans-serif" font-size="21" font-weight="500" fill="#475569">Project registry, dashboard actions, and the public surface that users actually reach.</text>
+  <!-- Dashboard panel (left tall) -->
+    <rect x="80" y="258" width="500" height="556" rx="20" fill="#ffffff" stroke="#1f2937" stroke-width="2" filter="url(#cs)"/>
+    <rect x="104" y="278" width="220" height="28" rx="14" fill="#fde68a" stroke="#1f2937" stroke-width="1.5" filter="url(#ps)"/>
+  <text x="116" y="297" font-family="'Space Mono', monospace" font-size="12" font-weight="700" fill="#7f1d1d">WATCHTOWER DASHBOARD</text>
+    <text x="104" y="360" font-family="'DM Sans', Arial, sans-serif" font-size="22" font-weight="800" fill="#0f172a">Applications and Projects</text>
+    <text x="104" y="398" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">Track app records, project types,</text>
+    <text x="104" y="422" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">deployment state, runtime status,</text>
+    <text x="104" y="446" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">and quick actions from one plane.</text>
+  <rect x="104" y="476" width="428" height="72" rx="14" fill="#f8fafc" stroke="#1f2937" stroke-width="2"/>
+    <text x="130" y="512" font-family="'Space Mono', monospace" font-size="14" font-weight="700" fill="#0f172a">PROJECT REGISTRY</text>
+    <text x="130" y="534" font-family="'DM Sans', Arial, sans-serif" font-size="15" font-weight="500" fill="#475569">Named workloads, types, and metadata.</text>
+  <rect x="104" y="566" width="428" height="72" rx="14" fill="#f8fafc" stroke="#1f2937" stroke-width="2"/>
+    <text x="130" y="602" font-family="'Space Mono', monospace" font-size="14" font-weight="700" fill="#0f172a">DEPLOY ACTIONS</text>
+    <text x="130" y="624" font-family="'DM Sans', Arial, sans-serif" font-size="15" font-weight="500" fill="#475569">Package, push, preview, and activate.</text>
+  <rect x="104" y="656" width="428" height="72" rx="14" fill="#f8fafc" stroke="#1f2937" stroke-width="2"/>
+    <text x="130" y="692" font-family="'Space Mono', monospace" font-size="14" font-weight="700" fill="#0f172a">HEALTH FEEDBACK</text>
+    <text x="130" y="714" font-family="'DM Sans', Arial, sans-serif" font-size="15" font-weight="500" fill="#475569">Runtime status and operator alerts.</text>
+  <rect x="104" y="746" width="428" height="44" rx="22" fill="#fde68a" stroke="#1f2937" stroke-width="2" filter="url(#ps)"/>
+    <text x="140" y="774" font-family="'Space Mono', monospace" font-size="14" font-weight="700" fill="#7f1d1d">watchtower.local / dashboard</text>
+  <!-- Build artifact (centre) -->
+    <rect x="648" y="318" width="280" height="200" rx="20" fill="#ffffff" stroke="#1f2937" stroke-width="2" filter="url(#cs)"/>
+    <rect x="672" y="338" width="120" height="28" rx="14" fill="#fde68a" stroke="#1f2937" stroke-width="1.5" filter="url(#ps)"/>
+  <text x="690" y="357" font-family="'Space Mono', monospace" font-size="12" font-weight="700" fill="#7f1d1d">ARTIFACT</text>
+    <text x="672" y="414" font-family="'DM Sans', Arial, sans-serif" font-size="22" font-weight="800" fill="#0f172a">Build Output</text>
+    <text x="672" y="452" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">Static site, SSR app,</text>
+    <text x="672" y="476" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">or Docker package.</text>
+  <!-- Public web surface -->
+    <rect x="996" y="258" width="524" height="280" rx="20" fill="#ffffff" stroke="#1f2937" stroke-width="2" filter="url(#cs)"/>
+    <rect x="1020" y="278" width="164" height="28" rx="14" fill="#fde68a" stroke="#1f2937" stroke-width="1.5" filter="url(#ps)"/>
+  <text x="1032" y="297" font-family="'Space Mono', monospace" font-size="12" font-weight="700" fill="#7f1d1d">PUBLIC EXPERIENCE</text>
+    <text x="1020" y="360" font-family="'DM Sans', Arial, sans-serif" font-size="22" font-weight="800" fill="#0f172a">Web Application Surface</text>
+    <text x="1020" y="398" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">Users reach a deployed URL through</text>
+    <text x="1020" y="422" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">the edge layer, while WatchTower</text>
+    <text x="1020" y="446" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">keeps the release path operator-friendly.</text>
+  <rect x="1020" y="474" width="460" height="36" rx="18" fill="#fde68a" stroke="#1f2937" stroke-width="1.5" filter="url(#ps)"/>
+    <text x="1052" y="498" font-family="'Space Mono', monospace" font-size="13" font-weight="700" fill="#7f1d1d">HTTPS · custom domain · preview URL</text>
+  <!-- Project types panel -->
+    <rect x="996" y="598" width="524" height="216" rx="20" fill="#ffffff" stroke="#1f2937" stroke-width="2" filter="url(#cs)"/>
+    <text x="1028" y="644" font-family="'DM Sans', Arial, sans-serif" font-size="20" font-weight="800" fill="#0f172a">Project types supported</text>
+    <text x="1028" y="682" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">Static sites, web applications, APIs, and</text>
+    <text x="1028" y="706" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">container-based services — all fit the same</text>
+    <text x="1028" y="730" font-family="'DM Sans', Arial, sans-serif" font-size="16" font-weight="500" fill="#475569">visual delivery model.</text>
+    <text x="1028" y="758" font-family="'DM Sans', Arial, sans-serif" font-size="15" font-weight="500" fill="#475569">Documentation, UI, and releases stay aligned.</text>
+  <!-- Arrows -->
+  <line x1="580" y1="460" x2="646" y2="430" stroke="#1f2937" stroke-width="4" stroke-linecap="round"/>
+  <polygon points="631,423 655,425 641,443" fill="#1f2937"/>
+  <line x1="930" y1="398" x2="992" y2="380" stroke="#1f2937" stroke-width="4" stroke-linecap="round"/>
+  <polygon points="979,370 1004,378 981,392" fill="#1f2937"/>
+  <line x1="930" y1="460" x2="990" y2="650" stroke="#1f2937" stroke-width="4" stroke-linecap="round"/>
+  <polygon points="975,638 998,656 970,658" fill="#1f2937"/>
 </svg>
