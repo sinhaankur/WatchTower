@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import apiClient from '@/lib/api';
+import { trackEvent } from '@/lib/analytics';
 import { Button } from '@/components/ui/button';
 import BrandLogo from '@/components/BrandLogo';
 
@@ -76,6 +77,7 @@ const Login = () => {
     try {
       localStorage.setItem('authToken', trimmed);
       await apiClient.get('/context');
+      trackEvent('login', { method: 'api_token' });
       navigate('/', { replace: true });
     } catch {
       localStorage.removeItem('authToken');
@@ -111,8 +113,10 @@ const Login = () => {
       const electron = (window as any).electronAPI;
       if (electron?.openOAuth) {
         electron.openOAuth(oauthUrl);
+        trackEvent('login', { method: 'github_oauth' });
         setLoading(false);
       } else {
+        trackEvent('login', { method: 'github_oauth' });
         window.location.assign(oauthUrl);
       }
     } catch {

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link /*, useNavigate*/ } from 'react-router-dom';
 import axios from 'axios';
 import apiClient from '@/lib/api';
+import { trackEvent } from '@/lib/analytics';
 
 type Project = {
   id: string;
@@ -127,6 +128,7 @@ const Applications = () => {
         branch,
         commit_sha: 'manual-trigger',
       });
+      trackEvent('deploy_triggered', { source: 'applications_page' });
       showMsg('success', 'Deployment queued. Refreshing…');
       await loadProjects();
     } catch (err) {

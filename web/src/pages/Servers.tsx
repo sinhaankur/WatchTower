@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import axios from 'axios';
 import apiClient from '@/lib/api';
 import { Input } from '@/components/ui/input';
@@ -312,6 +313,19 @@ const Servers = () => {
           </div>
         )}
 
+        {/* Use This PC shortcut */}
+        <Link
+          to="/servers/local"
+          className="flex items-center gap-4 rounded-xl border border-blue-200 bg-blue-50 hover:border-blue-400 hover:bg-blue-100 px-5 py-4 transition-colors group"
+        >
+          <div className="w-10 h-10 rounded-xl bg-white border border-blue-200 flex items-center justify-center text-xl shrink-0">💻</div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-blue-900">Use this PC as a server</p>
+            <p className="text-xs text-blue-700 mt-0.5">Register your current machine as a local deployment node — no SSH setup needed.</p>
+          </div>
+          <span className="text-blue-400 group-hover:text-blue-600 text-lg transition-colors">→</span>
+        </Link>
+
         {/* Server list */}
         <div className="rounded-xl border border-border bg-card p-5">
           <h2 className="text-sm font-semibold text-slate-900 mb-4">
@@ -325,12 +339,20 @@ const Servers = () => {
               </div>
               <p className="text-sm font-medium text-slate-900">No servers yet</p>
               <p className="text-xs text-slate-600 mt-1 mb-4">Add your first server to start deploying applications.</p>
-              <button
-                onClick={() => setShowForm(true)}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-red-700 hover:bg-red-800 text-white text-sm transition-colors border border-slate-800 shadow-[2px_2px_0_0_#1f2937]"
-              >
-                + Add Server
-              </button>
+              <div className="flex items-center justify-center gap-3">
+                <button
+                  onClick={() => setShowForm(true)}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-border text-slate-700 hover:bg-slate-100 text-sm transition-colors"
+                >
+                  + Add Remote Server
+                </button>
+                <Link
+                  to="/servers/local"
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-red-700 hover:bg-red-800 text-white text-sm transition-colors border border-slate-800 shadow-[2px_2px_0_0_#1f2937]"
+                >
+                  💻 Use This PC
+                </Link>
+              </div>
             </div>
           )}
 

@@ -1,11 +1,14 @@
 import { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { trackPageView } from '@/lib/analytics';
 import { QueryClientProvider, QueryClient } from '@tanstack/react-query';
 import SetupWizard from './pages/SetupWizard';
 import Dashboard from './pages/Dashboard';
+import ProjectDetail from './pages/ProjectDetail';
 import TeamManagement from './pages/TeamManagement';
 import Servers from './pages/Servers';
 import Applications from './pages/Applications';
+import LocalNode from './pages/LocalNode';
 import Databases from './pages/Databases';
 import Services from './pages/Services';
 import Settings from './pages/Settings';
@@ -17,6 +20,16 @@ import Layout from './components/Layout';
 import './App.css';
 
 const queryClient = new QueryClient();
+
+/** Fires a GA page_view on every client-side navigation. */
+function RouteTracker() {
+  const location = useLocation();
+  useEffect(() => {
+    // Strip query strings and hash to avoid sending PII.
+    trackPageView(location.pathname);
+  }, [location.pathname]);
+  return null;
+}
 
 function RequireAuth({ children }: { children: JSX.Element }) {
   const location = useLocation();
@@ -38,14 +51,15 @@ function App() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <Routes>
+      <BrowserRouter>          <RouteTracker />        <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/oauth/github/login/callback" element={<GitHubLoginCallback />} />
 
           {/* Pages with shared sidebar layout */}
           <Route path="/" element={<RequireAuth><Layout><Dashboard /></Layout></RequireAuth>} />
+          <Route path="/projects/:id" element={<RequireAuth><Layout><ProjectDetail /></Layout></RequireAuth>} />
           <Route path="/servers" element={<RequireAuth><Layout><Servers /></Layout></RequireAuth>} />
+          <Route path="/servers/local" element={<RequireAuth><Layout><LocalNode /></Layout></RequireAuth>} />
           <Route path="/applications" element={<RequireAuth><Layout><Applications /></Layout></RequireAuth>} />
           <Route path="/databases" element={<RequireAuth><Layout><Databases /></Layout></RequireAuth>} />
           <Route path="/services" element={<RequireAuth><Layout><Services /></Layout></RequireAuth>} />
