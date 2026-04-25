@@ -17,13 +17,23 @@ exec npm run desktop
 EOF
 chmod +x "$LAUNCHER"
 
+# Use largest available PNG icon if present, else fall back to SVG.
+ICON_PNG="$ROOT_DIR/desktop/build/icons/favicon-128.png"
+ICON_SVG="$ROOT_DIR/assets/wt-logo.svg"
+if [[ -f "$ICON_PNG" ]]; then
+  ICON_PATH="$ICON_PNG"
+else
+  ICON_PATH="$ICON_SVG"
+fi
+
 cat > "$DESKTOP_FILE" <<EOF
 [Desktop Entry]
 Version=1.0
 Type=Application
 Name=WatchTower
-Comment=WatchTower Desktop deployment manager
+Comment=WatchTower Desktop — deployment control plane
 Exec=$LAUNCHER
+Icon=$ICON_PATH
 Terminal=false
 Categories=Development;Utility;
 StartupNotify=true

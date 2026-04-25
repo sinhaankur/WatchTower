@@ -3,16 +3,24 @@
   "version": "1.2.2",
   "private": true,
   "description": "WatchTower Desktop",
-  "author": "WatchTower Contributors",
+  "author": {
+    "name": "WatchTower Contributors",
+    "email": "opensource@sinhaankur.dev"
+  },
+  "homepage": "https://github.com/sinhaankur/WatchTower",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
+    "icons": "icon-gen -i ../assets/wt-logo.svg -o build/icons",
+    "installer-images": "python3 scripts/gen-installer-images.py",
     "pack": "electron-builder --dir",
+    "predist": "npm run icons && npm run installer-images",
     "dist": "electron-builder"
   },
   "devDependencies": {
     "electron": "^31.7.7",
-    "electron-builder": "^24.13.3"
+    "electron-builder": "^24.13.3",
+    "icon-gen": "^5.0.0"
   },
   "build": {
     "appId": "com.watchtower.desktop",
@@ -21,10 +29,13 @@
     "directories": {
       "output": "dist"
     },
+    "icon": "build/icons/app",
     "files": [
-      "main.js"
+      "main.js",
+      "splash.html"
     ],
     "mac": {
+      "icon": "build/icons/app.icns",
       "target": [
         "dmg",
         "zip"
@@ -32,6 +43,8 @@
       "category": "public.app-category.developer-tools"
     },
     "linux": {
+      "maintainer": "WatchTower Contributors <opensource@sinhaankur.dev>",
+      "icon": "build/icons",
       "target": [
         "AppImage",
         "deb"
@@ -44,6 +57,7 @@
       }
     },
     "win": {
+      "icon": "build/icons/app.ico",
       "target": [
         "nsis",
         "zip"
@@ -55,7 +69,17 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "WatchTower"
+      "shortcutName": "WatchTower",
+      "installerSidebar": "build/installer/nsis-sidebar.png",
+      "uninstallerSidebar": "build/installer/nsis-sidebar.png"
+    },
+    "dmg": {
+      "background": "build/installer/dmg-background.png",
+      "window": { "width": 600, "height": 400 },
+      "contents": [
+        { "x": 156, "y": 200, "type": "file" },
+        { "x": 416, "y": 200, "type": "link", "path": "/Applications" }
+      ]
     },
     "publish": [
       {

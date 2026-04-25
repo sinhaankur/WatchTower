@@ -1,4 +1,4 @@
-const { app, BrowserWindow, dialog } = require('electron');
+const { app, BrowserWindow, dialog, nativeImage } = require('electron');
 const { spawn } = require('child_process');
 const crypto = require('crypto');
 const fs = require('fs');
@@ -15,8 +15,25 @@ const pythonUnix = path.join(repoRoot, '.venv', 'bin', 'python');
 const pythonWin = path.join(repoRoot, '.venv', 'Scripts', 'python.exe');
 const runtimeApiToken = process.env.WATCHTOWER_API_TOKEN || `wt-${crypto.randomBytes(24).toString('hex')}`;
 
+// Resolve the best available icon for this platform.
+const iconsDir = path.join(__dirname, 'build', 'icons');
+function resolveAppIcon() {
+  const candidates = [
+    path.join(iconsDir, 'app.icns'),  // macOS
+    path.join(iconsDir, 'app.ico'),   // Windows
+    path.join(iconsDir, 'favicon-128.png'), // Linux / fallback
+  ];
+  for (const f of candidates) {
+    if (fs.existsSync(f)) return f;
+  }
+  return undefined;
+}
+const APP_ICON = resolveAppIcon();
+
 let backendProcess;
 let frontendProcess;
+let splashWindow;
+let mainWindow;
 
 function resolvePython() {
   if (fs.existsSync(pythonUnix)) return pythonUnix;
@@ -27,21 +44,16 @@ function resolvePython() {
 function waitForUrl(url, timeoutMs = 45000) {
   return new Promise((resolve, reject) => {
     const startedAt = Date.now();
-
     const attempt = () => {
       const req = http.get(url, (res) => {
         res.resume();
-        if (res.statusCode && res.statusCode < 500) {
-          resolve();
-          return;
-        }
+        if (res.statusCode && res.statusCode < 500) { resolve(); return; }
         if (Date.now() - startedAt > timeoutMs) {
           reject(new Error(`Service check failed at ${url} (status ${res.statusCode})`));
           return;
         }
         setTimeout(attempt, 700);
       });
-
       req.on('error', () => {
         if (Date.now() - startedAt > timeoutMs) {
           reject(new Error(`Timed out waiting for ${url}`));
@@ -50,7 +62,6 @@ function waitForUrl(url, timeoutMs = 45000) {
         setTimeout(attempt, 700);
       });
     };
-
     attempt();
   });
 }
@@ -59,17 +70,7 @@ function startBackend() {
   const python = resolvePython();
   backendProcess = spawn(
     python,
-    [
-      '-m',
-      'uvicorn',
-      'watchtower.api:app',
-      '--app-dir',
-      repoRoot,
-      '--host',
-      HOST,
-      '--port',
-      String(BACKEND_PORT),
-    ],
+    ['-m', 'uvicorn', 'watchtower.api:app', '--app-dir', repoRoot, '--host', HOST, '--port', String(BACKEND_PORT)],
     {
       cwd: repoRoot,
       env: {
@@ -88,10 +89,7 @@ function startFrontend() {
     ['run', 'dev', '--', '--host', HOST, '--port', String(FRONTEND_PORT), '--strictPort'],
     {
       cwd: webRoot,
-      env: {
-        ...process.env,
-        VITE_API_TOKEN: process.env.VITE_API_TOKEN || runtimeApiToken,
-      },
+      env: { ...process.env, VITE_API_TOKEN: process.env.VITE_API_TOKEN || runtimeApiToken },
       stdio: 'inherit',
     }
   );
@@ -102,11 +100,48 @@ function stopProcesses() {
   if (frontendProcess && !frontendProcess.killed) frontendProcess.kill();
 }
 
-async function createWindow() {
+// ── Splash window ────────────────────────────────────────────────────────────
+function createSplash() {
+  splashWindow = new BrowserWindow({
+    width: 420,
+    height: 340,
+    resizable: false,
+    frame: false,
+    transparent: false,
+    alwaysOnTop: true,
+    center: true,
+    skipTaskbar: true,
+    backgroundColor: '#fbf6ea',
+    ...(APP_ICON ? { icon: APP_ICON } : {}),
+    webPreferences: { contextIsolation: true, nodeIntegration: false },
+  });
+  splashWindow.loadFile(path.join(__dirname, 'splash.html'));
+}
+
+// ── Main window ──────────────────────────────────────────────────────────────
+function createMainWindow() {
+  mainWindow = new BrowserWindow({
+    width: 1360,
+    height: 860,
+    minWidth: 1120,
+    minHeight: 740,
+    show: false,
+    autoHideMenuBar: true,
+    title: 'WatchTower',
+    backgroundColor: '#fbf6ea',
+    ...(APP_ICON ? { icon: APP_ICON } : {}),
+    webPreferences: { contextIsolation: true, nodeIntegration: false },
+  });
+  return mainWindow;
+}
+
+async function launch() {
+  createSplash();
+
   const backendHealthUrl = `http://${HOST}:${BACKEND_PORT}/health`;
   const frontendUrl = `http://${HOST}:${FRONTEND_PORT}/`;
 
-  // Reuse existing local services when available; otherwise start them.
+  // Start backend if not already running.
   try {
     await waitForUrl(backendHealthUrl, 1200);
   } catch {
@@ -114,6 +149,7 @@ async function createWindow() {
     await waitForUrl(backendHealthUrl);
   }
 
+  // Start frontend if not already running.
   try {
     await waitForUrl(frontendUrl, 1200);
   } catch {
@@ -121,27 +157,27 @@ async function createWindow() {
     await waitForUrl(frontendUrl);
   }
 
-  const mainWindow = new BrowserWindow({
-    width: 1360,
-    height: 860,
-    minWidth: 1120,
-    minHeight: 740,
-    autoHideMenuBar: true,
-    title: 'WatchTower',
-    backgroundColor: '#f9fafb',
-    webPreferences: {
-      contextIsolation: true,
-      nodeIntegration: false,
-    },
-  });
+  const win = createMainWindow();
+  await win.loadURL(frontendUrl);
 
-  await mainWindow.loadURL(frontendUrl);
+  // Fade from splash to main window.
+  win.once('ready-to-show', () => {
+    if (splashWindow && !splashWindow.isDestroyed()) splashWindow.close();
+    win.show();
+    win.focus();
+  });
+  // Fallback: if ready-to-show never fires, close splash after 3 s.
+  setTimeout(() => {
+    if (splashWindow && !splashWindow.isDestroyed()) splashWindow.close();
+    if (!win.isVisible()) win.show();
+  }, 3000);
 }
 
 app.whenReady().then(async () => {
   try {
-    await createWindow();
+    await launch();
   } catch (error) {
+    if (splashWindow && !splashWindow.isDestroyed()) splashWindow.close();
     dialog.showErrorBox('WatchTower failed to start', error.message);
     stopProcesses();
     app.quit();
