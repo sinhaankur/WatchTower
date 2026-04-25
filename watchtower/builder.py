@@ -6,11 +6,13 @@ Handles actual git clone → build → deploy pipeline for projects.
 import asyncio
 import logging
 import os
+import re
 import shutil
 import subprocess
 import tempfile
 import time
 import urllib.request
+from urllib.parse import urlsplit, urlunsplit
 import json as _json
 from datetime import datetime
 from pathlib import Path
@@ -25,6 +27,7 @@ from watchtower.database import (
     Deployment,
     DeploymentStatus,
     EnvironmentVariable,
+    GitHubConnection,
     NetlifeLikeConfig,
     OrgNode,
     Project,
@@ -101,8 +104,9 @@ async def _run_build(deployment_id: str) -> None:
 
         # ── Step 1: Clone / pull repo ──────────────────────────────────────
         repo_dir = workspace / "repo"
+        clone_url = _resolve_clone_url(db, project, _append)
         ok, err = await _clone_repo(
-            project.repo_url, deployment.branch, repo_dir, _append
+            clone_url, deployment.branch, repo_dir, _append, display_url=project.repo_url
         )
         if not ok:
             raise RuntimeError(f"Git clone failed: {err}")
@@ -185,10 +189,12 @@ async def _clone_repo(
     branch: str,
     dest: Path,
     append,
+    display_url: Optional[str] = None,
 ) -> tuple[bool, str]:
     if dest.exists():
         shutil.rmtree(dest)
-    append(f"[git] Cloning {repo_url} @ {branch}…")
+    shown = display_url or _redact_url(repo_url)
+    append(f"[git] Cloning {shown} @ {branch}…")
     proc = await asyncio.create_subprocess_exec(
         "git", "clone", "--depth=1", "--branch", branch, repo_url, str(dest),
         stdout=asyncio.subprocess.PIPE,
@@ -196,12 +202,94 @@ async def _clone_repo(
     )
     stdout, _ = await proc.communicate()
     output = stdout.decode(errors="replace").strip()
-    if output:
-        for line in output.splitlines():
+    # Make sure we never echo the embedded token back to logs.
+    safe_output = _redact_url(output) if output else output
+    if safe_output:
+        for line in safe_output.splitlines():
             append(f"[git] {line}")
     if proc.returncode != 0:
-        return False, output
+        return False, safe_output
     return True, ""
+
+
+def _redact_url(text: str) -> str:
+    """Strip credentials from any URL embedded in *text* before logging."""
+    return re.sub(
+        r"(https?://)([^/@\s]+)@",
+        lambda m: f"{m.group(1)}***@",
+        text,
+    )
+
+
+def _resolve_clone_url(db: Session, project: Project, append) -> str:
+    """Return a clone URL with an embedded PAT when one is available.
+
+    Looks up an active GitHubConnection on the project's org and rewrites
+    https://github.com/... or enterprise URLs to
+    https://x-access-token:<pat>@host/... so that private repos can be cloned
+    without requiring git credential helpers on the host.
+    """
+    repo_url = project.repo_url or ""
+    if not repo_url.startswith("https://"):
+        return repo_url  # ssh://, git@, file://, etc. — leave untouched
+
+    if not project.org_id:
+        return repo_url
+
+    try:
+        connection = (
+            db.query(GitHubConnection)
+            .filter(
+                GitHubConnection.org_id == project.org_id,
+                GitHubConnection.is_active == True,  # noqa: E712
+            )
+            .order_by(
+                GitHubConnection.is_primary.desc(),
+                GitHubConnection.created_at.desc(),
+            )
+            .first()
+        )
+    except Exception:
+        logger.exception("Failed to query GitHubConnection for org %s", project.org_id)
+        return repo_url
+
+    if not connection or not connection.github_access_token:
+        return repo_url
+
+    # Decrypt lazily — if the secret key isn't configured we silently fall
+    # back to an unauthenticated clone (which is fine for public repos).
+    try:
+        from watchtower.api import util as _util
+        token = _util.decrypt_secret(connection.github_access_token)
+    except Exception:
+        logger.warning("Could not decrypt GitHub token; proceeding without auth")
+        return repo_url
+
+    if not token:
+        return repo_url
+
+    # Only inject for the connection's host — never leak a token to
+    # arbitrary third-party hosts.
+    parts = urlsplit(repo_url)
+    target_host = parts.hostname or ""
+    expected_host = "github.com"
+    if connection.enterprise_url:
+        try:
+            expected_host = (urlsplit(connection.enterprise_url).hostname or expected_host)
+        except Exception:
+            pass
+    if target_host.lower() != expected_host.lower():
+        return repo_url
+
+    netloc = f"x-access-token:{token}@{target_host}"
+    if parts.port:
+        netloc += f":{parts.port}"
+    authed = urlunsplit((parts.scheme, netloc, parts.path, parts.query, parts.fragment))
+    try:
+        append(f"[git] Using stored GitHub credentials for @{connection.github_username or 'connected-account'}")
+    except Exception:
+        pass
+    return authed
 
 
 async def _run_cmd(

@@ -32,10 +32,61 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+def _ensure_secret_key() -> None:
+    """Auto-generate WATCHTOWER_SECRET_KEY on first run if not provided.
+
+    The key is persisted to ``~/.watchtower/secret.key`` (or
+    ``$WATCHTOWER_DATA_DIR/secret.key`` if set) with 0o600 permissions, so
+    that secrets stored in the database (GitHub PATs, etc.) remain decryptable
+    across restarts. Production deployments should set
+    ``WATCHTOWER_SECRET_KEY`` explicitly via environment / secret manager.
+    """
+    if os.getenv("WATCHTOWER_SECRET_KEY"):
+        return
+
+    data_dir = Path(
+        os.getenv("WATCHTOWER_DATA_DIR")
+        or os.path.join(os.path.expanduser("~"), ".watchtower")
+    )
+    key_path = data_dir / "secret.key"
+
+    try:
+        if key_path.exists():
+            key = key_path.read_text(encoding="utf-8").strip()
+        else:
+            try:
+                from cryptography.fernet import Fernet  # type: ignore
+            except Exception:  # pragma: no cover - cryptography is a hard dep
+                logger.warning(
+                    "cryptography not installed; cannot auto-generate "
+                    "WATCHTOWER_SECRET_KEY. Stored secrets will not work."
+                )
+                return
+            key = Fernet.generate_key().decode("utf-8")
+            data_dir.mkdir(parents=True, exist_ok=True)
+            key_path.write_text(key, encoding="utf-8")
+            try:
+                os.chmod(key_path, 0o600)
+            except OSError:
+                pass
+            logger.info(
+                "Generated WATCHTOWER_SECRET_KEY at %s (0600). "
+                "Set this env var explicitly in production.",
+                key_path,
+            )
+        os.environ["WATCHTOWER_SECRET_KEY"] = key
+    except Exception:
+        logger.exception(
+            "Failed to load or generate WATCHTOWER_SECRET_KEY; "
+            "secret storage will be unavailable."
+        )
+
+
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     logger.info("Starting WatchTower API")
     init_db()
+    _ensure_secret_key()
     # Security: warn loudly when running without a real API token in dev mode.
     if (
         os.getenv("WATCHTOWER_ALLOW_INSECURE_DEV_AUTH", "false").lower() == "true"
