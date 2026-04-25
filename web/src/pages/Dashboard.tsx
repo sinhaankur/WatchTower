@@ -162,12 +162,17 @@ const Dashboard = () => {
   const loadProjects = async () => {
     setLoading(true);
     setServerStatus('checking');
+    let apiReachable = false;
     try {
-      const [health, proj] = await Promise.all([
-        apiClient.get('/health'),
-        apiClient.get('/projects'),
-      ]);
-      setServerStatus(health.status < 300 ? 'online' : 'offline');
+      const health = await apiClient.get('/health');
+      apiReachable = health.status < 300;
+      setServerStatus(apiReachable ? 'online' : 'offline');
+    } catch {
+      setServerStatus('offline');
+    }
+
+    try {
+      const proj = await apiClient.get('/projects');
       const rows = (proj.data as any[]) ?? [];
       setProjects(rows.map((p) => ({
         id:               String(p.id),
@@ -182,8 +187,12 @@ const Dashboard = () => {
         created_at:       p.created_at ?? new Date().toISOString(),
       })));
       setDataSource('server');
-    } catch {
-      setServerStatus('offline');
+    } catch (err) {
+      if (apiReachable) {
+        // API is reachable, but the data fetch failed (auth/validation/etc).
+        // Keep the online indicator and fall back to local cache.
+        showNotice('error', parseApiError(err, 'Unable to load projects from API. Showing local cache.'));
+      }
       loadLocalProjects();
     } finally {
       setLoading(false);
