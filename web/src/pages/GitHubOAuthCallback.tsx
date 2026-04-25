@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import apiClient from '@/lib/api';
 import { Button } from '@/components/ui/button';
 
@@ -7,6 +7,7 @@ const GitHubOAuthCallback = () => {
   const [searchParams] = useSearchParams();
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
   const [detail, setDetail] = useState('');
+  const navigate = useNavigate();
 
   useEffect(() => {
     const code = searchParams.get('code');
@@ -30,8 +31,11 @@ const GitHubOAuthCallback = () => {
     const complete = async () => {
       try {
         const redirectUri = `${window.location.origin}/oauth/github/callback`;
-        await apiClient.post('/github/oauth/callback', { code, state, redirect_uri: redirectUri });
+        const resp = await apiClient.post('/github/oauth/callback', { code, state, redirect_uri: redirectUri });
+        const data = resp.data as { redirect_to?: string };
         setStatus('success');
+        const nextPath = data?.redirect_to && data.redirect_to.startsWith('/') ? data.redirect_to : '/team';
+        setTimeout(() => navigate(nextPath, { replace: true }), 1200);
       } catch {
         setStatus('error');
         setDetail('The server could not complete the OAuth exchange. Make sure GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET are configured, then try again.');
