@@ -7,6 +7,7 @@ import asyncio
 import logging
 import os
 import re
+import shlex
 import shutil
 import subprocess
 import tempfile
@@ -324,13 +325,24 @@ async def _run_cmd(
 
 
 async def _rsync_to_node(node: OrgNode, src: Path, append) -> tuple[bool, str]:
+    # All node-* fields below originate from an authenticated org admin via
+    # the API, but we still treat them as untrusted because rsync's ``-e``
+    # flag is parsed by a shell on the local machine. Quote every piece
+    # that lands inside the ``-e`` string to prevent command injection like
+    # ``ssh_key_path = "/tmp/k; rm -rf /"`` (CWE-78).
+    port = int(node.port)  # cast → ValueError on injection attempt
     dest = f"{node.user}@{node.host}:{node.remote_path}/"
-    ssh_opts = f"-p {node.port}"
+    ssh_parts = [
+        "ssh",
+        "-o", "StrictHostKeyChecking=accept-new",
+        "-p", str(port),
+    ]
     if node.ssh_key_path:
-        ssh_opts += f" -i {node.ssh_key_path}"
+        ssh_parts += ["-i", node.ssh_key_path]
+    ssh_e = " ".join(shlex.quote(p) for p in ssh_parts)
     cmd = [
         "rsync", "-az", "--delete",
-        "-e", f"ssh -o StrictHostKeyChecking=accept-new {ssh_opts}",
+        "-e", ssh_e,
         f"{src}/", dest,
     ]
     append(f"[rsync] → {dest}")

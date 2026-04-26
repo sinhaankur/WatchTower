@@ -152,3 +152,33 @@ async def delete_project(
     db.commit()
     
     return None
+
+
+@router.post("/{project_id}/rotate-webhook-secret")
+async def rotate_webhook_secret(
+    project_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(util.get_current_user),
+):
+    """Generate a fresh webhook secret for a project.
+
+    Returns the new secret in the response body so the caller can paste it
+    into GitHub's webhook config. After rotation, all old signed payloads
+    will fail signature verification — the replay cache becomes irrelevant
+    for that secret because the HMAC won't match.
+    """
+    user_id = UUID(str(current_user["user_id"]))
+    project = db.query(Project).filter(
+        Project.id == project_id,
+        Project.owner_id == user_id,
+    ).first()
+    if not project:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Project not found",
+        )
+    new_secret = util.generate_webhook_secret()
+    project.webhook_secret = new_secret
+    db.commit()
+    logger.info("Webhook secret rotated for project %s", project_id)
+    return {"webhook_secret": new_secret}

@@ -6,6 +6,9 @@ import hmac
 import hashlib
 import json
 import logging
+import time
+from collections import OrderedDict
+from threading import Lock
 from uuid import UUID
 
 from fastapi import APIRouter, BackgroundTasks, Request, Header, HTTPException, status, Depends
@@ -19,6 +22,38 @@ from watchtower import builder as build_runner
 
 router = APIRouter(prefix="/api/webhooks", tags=["Webhooks"])
 logger = logging.getLogger(__name__)
+
+
+# In-memory bounded cache of recent ``X-GitHub-Delivery`` IDs to reject
+# replayed webhook payloads. Each delivery ID is a UUID and is unique per
+# GitHub send attempt — but a leaked signed body could otherwise be replayed
+# until the next secret rotation. 1024 entries × ~5 minute window is enough
+# for the typical commit/PR rate of a small instance.
+_REPLAY_TTL_SECONDS = 600
+_REPLAY_MAX_ENTRIES = 1024
+_replay_cache: "OrderedDict[str, float]" = OrderedDict()
+_replay_lock = Lock()
+# 5 MB hard cap on incoming webhook bodies to prevent DoS via huge payloads.
+_MAX_WEBHOOK_BODY = 5 * 1024 * 1024
+
+
+def _seen_delivery(delivery_id: str) -> bool:
+    """Return True if ``delivery_id`` was already processed recently."""
+    if not delivery_id:
+        return False
+    now = time.time()
+    with _replay_lock:
+        # Drop stale entries opportunistically.
+        stale = [k for k, ts in _replay_cache.items() if now - ts > _REPLAY_TTL_SECONDS]
+        for k in stale:
+            _replay_cache.pop(k, None)
+        if delivery_id in _replay_cache:
+            return True
+        _replay_cache[delivery_id] = now
+        # Cap size — drop oldest.
+        while len(_replay_cache) > _REPLAY_MAX_ENTRIES:
+            _replay_cache.popitem(last=False)
+    return False
 
 
 def verify_webhook_signature(
@@ -47,6 +82,7 @@ async def github_webhook(
     request: Request,
     background_tasks: BackgroundTasks,
     x_hub_signature_256: str = Header(None),
+    x_github_delivery: str = Header(None),
     db: Session = Depends(get_db)
 ):
     """
@@ -62,15 +98,32 @@ async def github_webhook(
                 detail="Project not found"
             )
         
-        # Read request body
+        # Read request body (with size cap to prevent DoS)
         body = await request.body()
+        if len(body) > _MAX_WEBHOOK_BODY:
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail="Webhook payload too large",
+            )
         
         # Verify webhook signature
         if not verify_webhook_signature(body, project.webhook_secret, x_hub_signature_256):
+            logger.warning(
+                "Webhook signature mismatch for project %s (delivery=%s)",
+                project_id, x_github_delivery,
+            )
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid webhook signature"
             )
+
+        # Replay protection: reject repeated X-GitHub-Delivery values.
+        if _seen_delivery(x_github_delivery or ""):
+            logger.warning(
+                "Duplicate webhook delivery ignored: project=%s delivery=%s",
+                project_id, x_github_delivery,
+            )
+            return {"message": "Duplicate delivery ignored"}
         
         # Parse payload
         payload = json.loads(body)
