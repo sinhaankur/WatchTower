@@ -1067,6 +1067,10 @@ async def list_github_user_repos(
         )
 
     base_url = connection.enterprise_url.rstrip("/") if connection.enterprise_url else "https://api.github.com"
+    # Defence-in-depth: a stored enterprise_url could pre-date the SSRF
+    # validation added at connection creation. Re-check here before any
+    # outbound request so legacy rows can't pivot to internal services.
+    util.assert_safe_external_url(base_url)
     api_url = f"{base_url}/orgs/{org}/repos" if org else f"{base_url}/user/repos"
 
     resp = requests.get(
@@ -1135,6 +1139,7 @@ async def list_github_user_orgs(
         )
 
     base_url = connection.enterprise_url.rstrip("/") if connection.enterprise_url else "https://api.github.com"
+    util.assert_safe_external_url(base_url)
     headers = {
         "Authorization": f"Bearer {token}",
         "Accept": "application/json",
