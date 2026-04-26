@@ -271,16 +271,31 @@ def get_current_user(
     if session_user:
         return session_user
 
-    if expected_token:
-        if not hmac.compare_digest(provided_token, expected_token):
+    # Token-based fallback (CI scripts, curl, the Electron shell). Always
+    # require an explicit ``WATCHTOWER_API_TOKEN`` and a constant-time match.
+    # Previously, when ``WATCHTOWER_ALLOW_INSECURE_DEV_AUTH=true`` was set
+    # *without* an API token, ANY Bearer string was accepted — that gave
+    # full project / deployment / shell-exec access to anyone who could
+    # reach the port. Now dev mode only relaxes the "must be set" check
+    # to a clear startup error message.
+    if not expected_token:
+        if allow_insecure_dev:
             raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid authentication token"
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=(
+                    "WATCHTOWER_API_TOKEN must be set even in dev mode. "
+                    "Pick any non-empty value and restart."
+                ),
             )
-    elif not allow_insecure_dev:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Authentication is not configured"
+            detail="Authentication is not configured",
+        )
+
+    if not hmac.compare_digest(provided_token, expected_token):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authentication token",
         )
 
     user_id = str(uuid.uuid5(uuid.NAMESPACE_URL, f"watchtower:{provided_token}"))
