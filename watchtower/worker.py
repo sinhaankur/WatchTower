@@ -25,10 +25,8 @@ import watchtower  # noqa: F401  (side-effect import for sys.path)
 
 
 def main() -> None:
-    logging.basicConfig(
-        level=os.getenv("LOG_LEVEL", "INFO"),
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    )
+    from watchtower.log_config import setup_logging
+    setup_logging()
     logger = logging.getLogger(__name__)
 
     redis_url = os.getenv("REDIS_URL")
