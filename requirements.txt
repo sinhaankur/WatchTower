@@ -32,3 +32,7 @@ rq==1.16.2
 # LiteLLM, etc. Operators pick their own LLM via WATCHTOWER_LLM_BASE_URL
 # — WatchTower itself is provider-agnostic.
 openai>=1.50.0
+
+# Rate limiting — protects auth and webhook endpoints from brute force /
+# DoS even on single-operator installs without a CDN/WAF in front.
+slowapi>=0.1.9

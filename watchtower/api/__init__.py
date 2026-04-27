@@ -10,6 +10,8 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from watchtower.database import init_db
@@ -26,6 +28,7 @@ from . import (
     setup,
     webhooks,
 )
+from .rate_limit import limiter, rate_limit_exceeded_handler
 
 
 logging.basicConfig(
@@ -153,6 +156,15 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "Accept", "X-Requested-With"],
 )
+
+# ── Rate limiting ────────────────────────────────────────────────────────────
+# slowapi reads `app.state.limiter`, applies @limiter.limit(...) decorators
+# on individual routes, and handles RateLimitExceeded via the handler we
+# install below. Default budget for everything else is governed by the
+# Limiter's default_limits (see watchtower/api/rate_limit.py).
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
+app.add_middleware(SlowAPIMiddleware)
 
 
 # ── Global error handlers ────────────────────────────────────────────────────
