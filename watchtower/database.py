@@ -434,6 +434,32 @@ class DeploymentNode(Base):
     node = relationship("OrgNode", backref="deployments")
 
 
+class ProjectRelation(Base):
+    """A directional dependency between two projects.
+
+    When project ``project_id`` is launched via the "run with related" endpoint,
+    every project in this row's ``related_project_id`` is also queued for
+    deployment, ordered by ``order_index`` (lower first). This is *not*
+    transitive — only direct relations are followed, so cycles cannot loop.
+    """
+    __tablename__ = "project_relations"
+
+    id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    project_id = Column(Uuid(as_uuid=True), ForeignKey("projects.id"), index=True)
+    related_project_id = Column(Uuid(as_uuid=True), ForeignKey("projects.id"))
+    order_index = Column(Integer, default=0)
+    note = Column(String, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint(
+            "project_id",
+            "related_project_id",
+            name="uq_project_relation_pair",
+        ),
+    )
+
+
 class NotificationWebhook(Base):
     """Discord / Slack webhook for deployment notifications per project."""
     __tablename__ = "notification_webhooks"
@@ -464,6 +490,7 @@ def init_db():
     Base.metadata.create_all(bind=engine)
     _ensure_project_columns()
     _ensure_org_node_columns()
+    _ensure_project_relations_table()
 
 
 def _ensure_project_columns():
@@ -494,6 +521,18 @@ def _ensure_project_columns():
     with engine.begin() as conn:
         for stmt in alter_statements:
             conn.execute(text(stmt))
+
+
+def _ensure_project_relations_table():
+    """Idempotent fallback: create project_relations on installations whose
+    schema predates the model. ``Base.metadata.create_all`` already handles
+    the fresh-install case; this exists so an upgraded installation that ran
+    ``init_db()`` once before the model existed still picks up the table.
+    """
+    inspector = inspect(engine)
+    if "project_relations" in inspector.get_table_names():
+        return
+    ProjectRelation.__table__.create(bind=engine)
 
 
 def _ensure_org_node_columns():
