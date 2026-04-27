@@ -20,3 +20,9 @@ podman==5.0.0; sys_platform == "linux"
 
 # HTTP client (used in tests and health checks)
 httpx==0.25.2
+
+# Build queue — durable across API restarts. The watchtower.queue module
+# falls back to in-process execution when REDIS_URL is unset, so dev /
+# desktop installs without Redis still work.
+redis==5.0.1
+rq==1.16.2

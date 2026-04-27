@@ -138,6 +138,15 @@ SQLite by default (`./watchtower.db`), Postgres-capable via `DATABASE_URL`. ORM 
 
 The deployment runner: clones a project's git repo into `$WATCHTOWER_BUILD_DIR` (defaults to `/tmp/watchtower-builds`), runs the build, packages an artifact, rsyncs to each `OrgNode` over SSH (via `fabric`), runs the node's reload command, and updates `Deployment.status`. Triggered by webhooks (`api/webhooks.py`), manual API calls (`api/deployments.py`), or `watchtower-deploy deploy-now`.
 
+### Build queue (`watchtower/queue.py` + `watchtower/worker.py`)
+
+Two execution modes, transparently selected at submit time by `enqueue_build()`:
+
+- **`REDIS_URL` set + reachable** → enqueue onto an RQ queue (`watchtower-builds`); a separate `python -m watchtower.worker` process drains it. Builds survive API restarts.
+- **No Redis** → fall back to FastAPI `BackgroundTasks` (the legacy in-process path). Lets `./run.sh` and the desktop launcher work without Redis.
+
+Probe failure is cached for the process lifetime so a missing/flapping broker doesn't add a 2-second connect timeout to every webhook hit. The compose stack runs a dedicated `worker` service alongside the API; production deployments without compose should run `python -m watchtower.worker` separately.
+
 ### Related-app bundles (`ProjectRelation`)
 
 A project may declare other projects in the same org that should deploy alongside it. `POST /api/projects/{id}/run-with-related` queues a `Deployment` for every direct relation (ordered by `ProjectRelation.order_index` ascending — dependencies first) and then for the trigger project itself. The relation graph is *not* followed transitively — only direct edges, so cycles cannot loop. Cross-org links are blocked at write time. Managed in the UI under the "Related" tab on `ProjectDetail`.

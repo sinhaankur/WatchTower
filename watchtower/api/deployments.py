@@ -24,6 +24,7 @@ from watchtower.database import (
 from watchtower import schemas
 from watchtower.api import util
 from watchtower import builder as build_runner
+from watchtower.queue import enqueue_build
 
 router = APIRouter(prefix="/api/projects", tags=["Deployments"])
 logger = logging.getLogger(__name__)
@@ -170,7 +171,7 @@ async def trigger_deployment(
         db.commit()
         db.refresh(deployment)
 
-        background_tasks.add_task(build_runner.run_build_async, str(deployment.id))
+        enqueue_build(str(deployment.id), background_tasks)
 
         return deployment
     
@@ -209,6 +210,7 @@ async def get_deployment(
 @router.post("/deployments/{deployment_id}/rollback", response_model=schemas.DeploymentResponse)
 async def rollback_deployment(
     deployment_id: UUID,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: dict = Depends(util.get_current_user)
 ):
@@ -258,9 +260,9 @@ async def rollback_deployment(
     db.commit()
     db.refresh(rollback)
 
-    # Schedule the rollback build asynchronously
-    import asyncio
-    asyncio.ensure_future(build_runner.run_build_async(str(rollback.id)))
+    # Route through the queue so rollback builds get the same durable
+    # scheduling (or in-process fallback) as forward deploys.
+    enqueue_build(str(rollback.id), background_tasks)
 
     return rollback
 
