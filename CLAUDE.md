@@ -131,7 +131,7 @@ python3 scripts/sync_versions.py   # fan version from watchtower/__init__.py to 
 
 SQLite by default (`./watchtower.db`), Postgres-capable via `DATABASE_URL`. ORM models live in `watchtower/database.py`. Two key behaviours:
 
-- `init_db()` runs `Base.metadata.create_all()` plus `_ensure_project_columns()` and `_ensure_org_node_columns()` — these are **manual ALTER TABLE migrations** for columns added to existing installations. There is no Alembic in active use even though `alembic` is in requirements. If you add a column, also add a backfill statement in one of those `_ensure_*` functions.
+- `init_db()` is **Alembic-driven**. On startup it inspects the target DB and either runs `alembic upgrade head` (fresh or already-managed DBs) or stamps an existing pre-Alembic schema at `head` (for installations that pre-date adoption — the baseline migration matches the final state of the old `_ensure_*_columns()` helpers). To add a column or change a schema: edit the model, then `alembic revision --autogenerate -m "<desc>"`, review the generated file in `alembic/versions/`, commit. SQLite needs `render_as_batch=True` (already configured in `alembic/env.py`) and explicit constraint names for any FK changes.
 - All UUID columns use `Uuid(as_uuid=True)`. Routers should coerce caller-provided IDs through `util.to_uuid()` rather than manual `UUID(str(...))` — that pattern was the source of past bugs (see commit 5c6dbcf).
 
 ### Build pipeline (`watchtower/builder.py`)
