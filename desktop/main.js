@@ -765,17 +765,46 @@ ipcMain.handle('wt:isMaximized', () => mainWindow?.isMaximized() ?? false);
 // ── GitHub OAuth popup ───────────────────────────────────────────────────────
 let oauthPopup = null;
 
-// Allowlisted GitHub OAuth origins — reject anything the renderer sends that
-// isn't a real GitHub login URL (prevents open-redirect / XSS via IPC).
-const OAUTH_ALLOWED_ORIGINS = new Set(['https://github.com']);
+// Allowed origins for the OAuth popup. Two valid kinds:
+//   1) The WatchTower API server itself (loopback only) — Login.tsx points
+//      the popup at /api/auth/github/login, which then 302s to github.com.
+//      Without this, the popup is silently rejected and "Sign in" appears
+//      to do nothing in the desktop app.
+//   2) GitHub itself (or a self-hosted GitHub Enterprise host the operator
+//      configured) — for the redirected page once GitHub takes over.
+//
+// Anything else (e.g. an attacker-controlled URL passed via IPC) is rejected
+// to prevent the popup from being weaponised as an open-redirect surface.
+function isAllowedOAuthOrigin(parsed) {
+  const proto = parsed.protocol;
+  const host = parsed.hostname;
+  const port = parsed.port;
+
+  // GitHub.com proper.
+  if (proto === 'https:' && host === 'github.com') return true;
+
+  // Local API server: HTTP on loopback at the configured backend port.
+  // (BACKEND_PORT is the constant the rest of main.js uses — by default 8000.)
+  if (proto === 'http:' && (host === '127.0.0.1' || host === 'localhost')) {
+    if (!port || Number(port) === BACKEND_PORT) return true;
+  }
+
+  // Self-hosted GitHub Enterprise: operators set WATCHTOWER_GHE_HOST so the
+  // popup can also load their internal GHES login page after redirect.
+  const gheHost = (process.env.WATCHTOWER_GHE_HOST || '').trim().toLowerCase();
+  if (gheHost && proto === 'https:' && host === gheHost) return true;
+
+  return false;
+}
 
 ipcMain.on('wt:openOAuth', (_event, url) => {
   // Validate before opening any window.
   let parsed;
   try { parsed = new URL(url); } catch { return; }
-  const origin = `${parsed.protocol}//${parsed.hostname}`;
-  if (!OAUTH_ALLOWED_ORIGINS.has(origin)) {
-    console.warn(`[WatchTower] Blocked OAuth popup to untrusted origin: ${origin}`);
+  if (!isAllowedOAuthOrigin(parsed)) {
+    console.warn(
+      `[WatchTower] Blocked OAuth popup to untrusted origin: ${parsed.protocol}//${parsed.host}`
+    );
     return;
   }
 
