@@ -47,6 +47,24 @@ type Webhook = {
   is_active: boolean;
 };
 
+type RelatedProject = {
+  id: string;
+  project_id: string;
+  related_project_id: string;
+  related_project_name: string | null;
+  related_project_branch: string | null;
+  order_index: number;
+  note: string | null;
+};
+
+type RunResultItem = {
+  project_id: string;
+  project_name: string;
+  deployment_id: string | null;
+  status: 'queued' | 'skipped' | 'error';
+  detail: string | null;
+};
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 const STATUS_COLOR: Record<string, string> = {
@@ -75,7 +93,7 @@ function fmtDate(s: string | null) {
 
 // ── Tabs ──────────────────────────────────────────────────────────────────────
 
-const TABS = ['Overview', 'Deployments', 'Build Logs', 'Env Vars', 'Webhooks'] as const;
+const TABS = ['Overview', 'Deployments', 'Build Logs', 'Env Vars', 'Webhooks', 'Related'] as const;
 type Tab = typeof TABS[number];
 
 // ── Main component ────────────────────────────────────────────────────────────
@@ -148,6 +166,7 @@ export default function ProjectDetail() {
         {tab === 'Build Logs'   && <BuildLogsTab projectId={project.id} />}
         {tab === 'Env Vars'     && <EnvVarsTab projectId={project.id} />}
         {tab === 'Webhooks'     && <WebhooksTab projectId={project.id} />}
+        {tab === 'Related'      && <RelatedTab projectId={project.id} />}
       </div>
     </div>
   );
@@ -651,6 +670,224 @@ function WebhooksTab({ projectId }: { projectId: string }) {
                   <td className="px-4 py-3 text-right">
                     <button
                       onClick={() => deleteHook(h.id)}
+                      className="text-xs text-red-600 hover:text-red-700 hover:underline"
+                    >
+                      Remove
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── RelatedTab ────────────────────────────────────────────────────────────────
+
+function RelatedTab({ projectId }: { projectId: string }) {
+  const [relations, setRelations] = useState<RelatedProject[]>([]);
+  const [allProjects, setAllProjects] = useState<Project[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [chosenId, setChosenId] = useState('');
+  const [order, setOrder] = useState(0);
+  const [note, setNote] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [running, setRunning] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [runResults, setRunResults] = useState<RunResultItem[] | null>(null);
+
+  async function load() {
+    try {
+      const [rel, projs] = await Promise.all([
+        apiClient.get(`/projects/${projectId}/related`),
+        apiClient.get(`/projects`),
+      ]);
+      setRelations(rel.data);
+      setAllProjects(projs.data);
+    } catch {
+      setError('Failed to load related projects');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => { load(); }, [projectId]);
+
+  // Eligible: every other project, minus ones already linked.
+  const linked = new Set(relations.map(r => r.related_project_id));
+  const candidates = allProjects.filter(p => p.id !== projectId && !linked.has(p.id));
+
+  async function add() {
+    if (!chosenId) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await apiClient.post(`/projects/${projectId}/related`, {
+        related_project_id: chosenId,
+        order_index: order,
+        note: note.trim() || undefined,
+      });
+      setChosenId('');
+      setOrder(0);
+      setNote('');
+      await load();
+    } catch (e: any) {
+      setError(e?.response?.data?.detail ?? 'Failed to add relation');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function remove(relatedId: string) {
+    if (!confirm('Remove this related project?')) return;
+    try {
+      await apiClient.delete(`/projects/${projectId}/related/${relatedId}`);
+      await load();
+    } catch {
+      setError('Failed to remove relation');
+    }
+  }
+
+  async function runBundle() {
+    setRunning(true);
+    setError(null);
+    setRunResults(null);
+    try {
+      const r = await apiClient.post(`/projects/${projectId}/run-with-related`);
+      setRunResults(r.data.results);
+    } catch (e: any) {
+      setError(e?.response?.data?.detail ?? 'Failed to start bundle');
+    } finally {
+      setRunning(false);
+    }
+  }
+
+  if (loading) return <p className="text-sm text-muted-foreground">Loading…</p>;
+
+  return (
+    <div className="max-w-3xl flex flex-col gap-6">
+      <div className="rounded-xl border border-border bg-card p-5">
+        <div className="flex items-start justify-between gap-3 mb-1">
+          <div>
+            <h3 className="text-sm font-semibold">Related Applications</h3>
+            <p className="text-xs text-muted-foreground mt-1">
+              Other projects that should be deployed when you run this one. Lower order runs first; this project runs last.
+            </p>
+          </div>
+          <button
+            onClick={runBundle}
+            disabled={running}
+            className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-medium disabled:opacity-50 transition-colors whitespace-nowrap"
+          >
+            {running ? 'Queueing…' : 'Run with Related'}
+          </button>
+        </div>
+        {error && <p className="text-xs text-red-600 mt-3">{error}</p>}
+
+        {runResults && (
+          <div className="mt-4 rounded-lg border border-border overflow-hidden">
+            <table className="w-full text-xs">
+              <thead className="bg-muted/40 text-muted-foreground">
+                <tr>
+                  <th className="px-3 py-2 text-left">Project</th>
+                  <th className="px-3 py-2 text-left">Status</th>
+                  <th className="px-3 py-2 text-left">Detail</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {runResults.map(r => (
+                  <tr key={r.project_id}>
+                    <td className="px-3 py-2 font-medium">{r.project_name}</td>
+                    <td className="px-3 py-2">
+                      <span className={
+                        r.status === 'queued' ? 'text-emerald-700' :
+                        r.status === 'error'  ? 'text-red-700' :
+                                                'text-amber-700'
+                      }>
+                        {r.status}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2 text-muted-foreground">{r.detail ?? (r.deployment_id ? r.deployment_id.slice(0, 8) : '—')}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      <div className="rounded-xl border border-border bg-card p-5">
+        <h3 className="text-sm font-semibold mb-4">Add Related Project</h3>
+        {candidates.length === 0 ? (
+          <p className="text-xs text-muted-foreground">No other projects available to link.</p>
+        ) : (
+          <div className="flex gap-2 flex-wrap">
+            <select
+              value={chosenId}
+              onChange={e => setChosenId(e.target.value)}
+              className="flex-1 min-w-[220px] border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 bg-card"
+            >
+              <option value="">Choose a project…</option>
+              {candidates.map(p => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+            <input
+              type="number"
+              value={order}
+              onChange={e => setOrder(parseInt(e.target.value || '0', 10))}
+              placeholder="Order"
+              className="w-24 border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 bg-background"
+              title="Lower = runs first"
+            />
+            <input
+              value={note}
+              onChange={e => setNote(e.target.value)}
+              placeholder="Note (optional)"
+              className="flex-1 min-w-[180px] border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 bg-background"
+            />
+            <button
+              onClick={add}
+              disabled={saving || !chosenId}
+              className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-medium disabled:opacity-50 transition-colors"
+            >
+              {saving ? 'Saving…' : 'Add'}
+            </button>
+          </div>
+        )}
+      </div>
+
+      {relations.length === 0 ? (
+        <p className="text-sm text-muted-foreground">No related projects yet.</p>
+      ) : (
+        <div className="rounded-xl border border-border overflow-hidden">
+          <table className="w-full text-sm">
+            <thead className="bg-muted/50 text-xs uppercase text-muted-foreground">
+              <tr>
+                <th className="px-4 py-3 text-left w-16">Order</th>
+                <th className="px-4 py-3 text-left">Project</th>
+                <th className="px-4 py-3 text-left">Branch</th>
+                <th className="px-4 py-3 text-left">Note</th>
+                <th className="px-4 py-3 text-left"></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {relations.map(r => (
+                <tr key={r.id} className="hover:bg-muted/30 transition-colors">
+                  <td className="px-4 py-3 font-mono text-xs">{r.order_index}</td>
+                  <td className="px-4 py-3 font-medium">
+                    <Link to={`/projects/${r.related_project_id}`} className="hover:underline">
+                      {r.related_project_name ?? r.related_project_id.slice(0, 8)}
+                    </Link>
+                  </td>
+                  <td className="px-4 py-3 font-mono text-xs">{r.related_project_branch ?? '—'}</td>
+                  <td className="px-4 py-3 text-xs text-muted-foreground">{r.note ?? '—'}</td>
+                  <td className="px-4 py-3 text-right">
+                    <button
+                      onClick={() => remove(r.related_project_id)}
                       className="text-xs text-red-600 hover:text-red-700 hover:underline"
                     >
                       Remove
