@@ -138,6 +138,15 @@ SQLite by default (`./watchtower.db`), Postgres-capable via `DATABASE_URL`. ORM 
 
 The deployment runner: clones a project's git repo into `$WATCHTOWER_BUILD_DIR` (defaults to `/tmp/watchtower-builds`), runs the build, packages an artifact, rsyncs to each `OrgNode` over SSH (via `fabric`), runs the node's reload command, and updates `Deployment.status`. Triggered by webhooks (`api/webhooks.py`), manual API calls (`api/deployments.py`), or `watchtower-deploy deploy-now`.
 
+### Logging (`watchtower/log_config.py`)
+
+`setup_logging()` is idempotent and the only place logging gets configured — `api/__init__.py`, `deploy_server.py`, and `worker.py` all call it instead of `logging.basicConfig` (the audit flagged a silent double-init that caused log lines to drop). Two formats:
+
+- `WATCHTOWER_LOG_FORMAT=text` (default) — human-readable, includes `[req=<id>]` per line
+- `WATCHTOWER_LOG_FORMAT=json` — one JSON record per line for log aggregators
+
+The FastAPI `request_id_middleware` generates a UUID4 per request (or reuses the client's `X-Request-ID` header if present so upstream trace IDs propagate), binds it to a contextvar that the formatter reads, and echoes it back as `X-Request-ID` on every response. Look up logs by request ID end-to-end without grep heuristics.
+
 ### Build queue (`watchtower/queue.py` + `watchtower/worker.py`)
 
 Two execution modes, transparently selected at submit time by `enqueue_build()`:
