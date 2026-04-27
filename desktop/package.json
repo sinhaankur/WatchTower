@@ -11,7 +11,8 @@
   "main": "main.js",
   "scripts": {
     "start": "electron --no-sandbox .",
-    "icons": "icon-gen -i ../assets/wt-logo.svg -o build/icons",
+    "prep:icons": "node -e \"require('fs').mkdirSync('build/icons',{recursive:true})\"",
+    "icons": "npm run prep:icons && icon-gen -i ../assets/wt-logo.svg -o build/icons",
     "installer-images": "python3 scripts/gen-installer-images.py",
     "pack": "electron-builder --dir",
     "predist": "npm run icons && npm run installer-images",

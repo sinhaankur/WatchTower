@@ -1,5 +1,13 @@
 """Generate branded installer images for NSIS (Windows) and DMG (macOS)."""
 import os
+import sys
+# Python 3.11 on Windows GitHub runners defaults stdout to cp1252, which cannot
+# encode the U+2713 checkmark used in our progress prints. Reconfigure to UTF-8
+# so the same script runs on Windows, macOS, and Linux without per-line guards.
+try:
+    sys.stdout.reconfigure(encoding="utf-8")
+except (AttributeError, OSError):
+    pass
 from PIL import Image, ImageDraw, ImageFont
 
 os.makedirs("build/installer", exist_ok=True)
