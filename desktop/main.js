@@ -227,8 +227,28 @@ function compareVersions(a, b) {
 //              entirely. For a dashboard app the CPU rendering overhead is
 //              negligible. ARM (Pi) and headless also use this path.
 if (process.platform === 'linux') {
+  // Disable Chromium's Linux sandbox layers.
+  //
+  // On kernel 6.x (notably 6.17 on Ubuntu 24.04) Electron 31's namespace +
+  // seccomp sandbox aborts every renderer with ESRCH ("Creating shared
+  // memory in /tmp/... failed: No such process") before the page can load,
+  // so the user sees no window at all when launching the app — only the
+  // splash + zygote/gpu helper processes start. The chrome-sandbox SUID
+  // helper is also frequently missing the SUID bit in npm-installed
+  // node_modules, AppImage runs, Snap/Flatpak, or distros that disable
+  // unprivileged user namespaces. All four flags are required together;
+  // --no-sandbox alone is not enough on kernel 6.17. Disabling the sandbox
+  // is safe for WatchTower because the window only loads local, trusted
+  // content (the bundled frontend on 127.0.0.1).
+  //
+  // These switches must be set before app.whenReady().
+  app.commandLine.appendSwitch('no-sandbox');
+  app.commandLine.appendSwitch('disable-setuid-sandbox');
+  app.commandLine.appendSwitch('disable-namespace-sandbox');
+  app.commandLine.appendSwitch('disable-seccomp-filter-sandbox');
+
   if (process.env.WAYLAND_DISPLAY && !process.argv.includes('--no-gpu') && process.env.WATCHTOWER_NO_GPU !== '1') {
-    // Wayland: native GPU isolation — no sandbox workarounds needed.
+    // Wayland: native GPU isolation — no further workarounds needed.
     app.commandLine.appendSwitch('enable-features', 'WaylandWindowDecorations');
     app.commandLine.appendSwitch('ozone-platform-hint', 'auto');
   } else {
@@ -238,7 +258,6 @@ if (process.platform === 'linux') {
     app.disableHardwareAcceleration();
     app.commandLine.appendSwitch('disable-gpu');
     app.commandLine.appendSwitch('disable-gpu-sandbox');
-    app.commandLine.appendSwitch('no-sandbox');
     app.commandLine.appendSwitch('disable-dev-shm-usage');
   }
 }
@@ -559,7 +578,7 @@ function startStaticServer(distDir) {
 function resolvePython() {
   if (fs.existsSync(pythonUnix)) return pythonUnix;
   if (fs.existsSync(pythonWin)) return pythonWin;
-  return 'python3';
+  return null; // signal "no venv" — caller surfaces a clear error to the user
 }
 
 function waitForUrl(url, timeoutMs = 45000) {
@@ -591,8 +610,29 @@ async function startBackend() {
   // Kill any process already holding the backend port (stale uvicorn, container, etc.)
   await killPortProcesses(BACKEND_PORT);
 
-  electronSpawnedBackend = true;
   const python = resolvePython();
+  if (!python) {
+    // No project venv. Spawning system python3 here would fail later with
+    // a cryptic "No module named uvicorn" buried in journald — the symptom
+    // the user reports as "fails to load." Surface the real cause now.
+    throw new Error(
+      `Python virtualenv not found at ${pythonUnix}. ` +
+      `Run ./run.sh once from a terminal to install dependencies, then re-launch the app.`
+    );
+  }
+
+  // Tee backend stdout/stderr to .dev/desktop-backend.log so users can
+  // diagnose without journalctl. stdio:'inherit' was sending output to a
+  // detached terminal that doesn't exist when launched from a .desktop file.
+  const devDir = path.join(repoRoot, '.dev');
+  try { fs.mkdirSync(devDir, { recursive: true }); } catch {}
+  const backendLogPath = path.join(devDir, 'desktop-backend.log');
+  const backendLogFd = fs.openSync(backendLogPath, 'a');
+  try {
+    fs.writeSync(backendLogFd, `\n--- desktop launch ${new Date().toISOString()} ---\n`);
+  } catch {}
+
+  electronSpawnedBackend = true;
   backendProcess = spawn(
     python,
     [
@@ -622,9 +662,16 @@ async function startBackend() {
         // Do NOT propagate dev-only overrides into the desktop process.
         WATCHTOWER_ALLOW_INSECURE_DEV_AUTH: undefined,
       },
-      stdio: 'inherit',
+      stdio: ['ignore', backendLogFd, backendLogFd],
     }
   );
+
+  // Capture an early-exit so launch() doesn't sit in waitForUrl for 45s.
+  backendProcess.once('exit', (code, signal) => {
+    if (code !== 0 && code !== null) {
+      console.warn(`[WatchTower] backend exited early (code=${code} signal=${signal}). See ${backendLogPath}`);
+    }
+  });
 }
 
 async function startFrontend() {
@@ -908,7 +955,11 @@ app.whenReady().then(async () => {
     });
   } catch (error) {
     if (splashWindow && !splashWindow.isDestroyed()) splashWindow.close();
-    dialog.showErrorBox('WatchTower failed to start', error.message);
+    const backendLogPath = path.join(repoRoot, '.dev', 'desktop-backend.log');
+    const detail = fs.existsSync(backendLogPath)
+      ? `\n\nSee backend log:\n${backendLogPath}`
+      : '';
+    dialog.showErrorBox('WatchTower failed to start', `${error.message}${detail}`);
     stopProcesses();
     app.quit();
   }
