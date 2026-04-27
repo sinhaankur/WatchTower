@@ -180,12 +180,26 @@ async def _unhandled_exception_handler(request: Request, exc: Exception):
     return JSONResponse(status_code=500, content={"detail": "Internal server error"})
 
 
+# index.html references the asset bundle by content-hashed filename
+# (`/assets/index-XXXX.js`). The hashed assets are immutable and safe to
+# cache forever; index.html itself MUST NOT be cached, or after a deploy
+# the browser keeps serving the old HTML that points at JS files which
+# no longer exist on disk → blank screen / "doesn't load" until the
+# user manually clears the Electron cache. Forcing revalidation on
+# every load fixes this for every install permanently.
+_INDEX_NO_CACHE_HEADERS = {
+    "Cache-Control": "no-cache, no-store, must-revalidate",
+    "Pragma": "no-cache",
+    "Expires": "0",
+}
+
+
 @app.get("/", tags=["Health"], include_in_schema=False)
 async def root():
     """Serve the React SPA, or a JSON fallback if web/dist is not built."""
     index = Path(__file__).resolve().parents[2] / "web" / "dist" / "index.html"
     if index.is_file():
-        return FileResponse(str(index))
+        return FileResponse(str(index), headers=_INDEX_NO_CACHE_HEADERS)
     return {"message": "WatchTower API", "version": "2.0.0", "docs": "/docs"}
 
 
@@ -232,8 +246,14 @@ if _WEB_DIST.is_dir():
             candidate = (_WEB_DIST / filename).resolve()
             candidate.relative_to(web_root)
         except (ValueError, OSError):
-            # Outside the web root → fall through to SPA index.
-            return FileResponse(str(_WEB_DIST / "index.html"))
+            # Outside the web root → fall through to SPA index (no-cache).
+            return FileResponse(str(_WEB_DIST / "index.html"), headers=_INDEX_NO_CACHE_HEADERS)
         if candidate.is_file():
+            # Public root files (favicon, manifest, robots.txt) are content-stable
+            # but not hashed — cache them briefly so they don't go stale across
+            # deploys. The hashed /assets/* mount handles long-cached JS/CSS.
             return FileResponse(str(candidate))
-        return FileResponse(str(_WEB_DIST / "index.html"))
+        # SPA route fallback — the request is for a React Router path
+        # (e.g. /servers, /agent), so serve index.html with no-cache so a
+        # post-deploy reload doesn't keep pointing at deleted JS bundles.
+        return FileResponse(str(_WEB_DIST / "index.html"), headers=_INDEX_NO_CACHE_HEADERS)
