@@ -485,81 +485,50 @@ def get_db():
         db.close()
 
 
-# Create all tables
-def init_db():
-    Base.metadata.create_all(bind=engine)
-    _ensure_project_columns()
-    _ensure_org_node_columns()
-    _ensure_project_relations_table()
+def init_db() -> None:
+    """Bring the database schema to the current version.
 
+    Strategy:
+      1. **Empty DB** → run ``alembic upgrade head`` to create everything
+         from scratch via the migration scripts. Ensures fresh installs
+         run the same SQL the migration history records.
+      2. **DB pre-dates Alembic adoption** (has tables but no
+         ``alembic_version``) → ``stamp head`` so subsequent migrations
+         apply incrementally. The pre-Alembic ``_ensure_*_columns()``
+         helpers used to keep these schemas current; the baseline
+         migration matches that final state, so stamping is safe.
+      3. **DB already managed by Alembic** → ``upgrade head`` is a no-op
+         when on the latest revision, otherwise applies pending changes.
 
-def _ensure_project_columns():
-    """Add newly introduced project columns in existing databases."""
-    inspector = inspect(engine)
-    if "projects" not in inspector.get_table_names():
-        return
-
-    existing_cols = {col["name"] for col in inspector.get_columns("projects")}
-    alter_statements = []
-
-    if "source_type" not in existing_cols:
-        alter_statements.append(
-            "ALTER TABLE projects ADD COLUMN source_type VARCHAR DEFAULT 'github'"
-        )
-    if "local_folder_path" not in existing_cols:
-        alter_statements.append(
-            "ALTER TABLE projects ADD COLUMN local_folder_path VARCHAR"
-        )
-    if "launch_url" not in existing_cols:
-        alter_statements.append(
-            "ALTER TABLE projects ADD COLUMN launch_url VARCHAR"
-        )
-
-    if not alter_statements:
-        return
-
-    with engine.begin() as conn:
-        for stmt in alter_statements:
-            conn.execute(text(stmt))
-
-
-def _ensure_project_relations_table():
-    """Idempotent fallback: create project_relations on installations whose
-    schema predates the model. ``Base.metadata.create_all`` already handles
-    the fresh-install case; this exists so an upgraded installation that ran
-    ``init_db()`` once before the model existed still picks up the table.
+    Production deployments can bypass this and invoke ``alembic upgrade``
+    explicitly during release; ``init_db`` exists so single-process
+    desktop / dev / test starts "just work."
     """
     inspector = inspect(engine)
-    if "project_relations" in inspector.get_table_names():
-        return
-    ProjectRelation.__table__.create(bind=engine)
+    existing_tables = set(inspector.get_table_names())
+    has_app_tables = bool(existing_tables - {"alembic_version"})
+    has_alembic_table = "alembic_version" in existing_tables
+
+    cfg = _alembic_config()
+    if has_app_tables and not has_alembic_table:
+        # Adopt: assume the existing schema matches baseline. The previous
+        # _ensure_*_columns() helpers kept this true.
+        from alembic import command
+        command.stamp(cfg, "head")
+    else:
+        from alembic import command
+        command.upgrade(cfg, "head")
 
 
-def _ensure_org_node_columns():
-    """Backfill new org_nodes columns in existing databases."""
-    inspector = inspect(engine)
-    if "org_nodes" not in inspector.get_table_names():
-        return
+def _alembic_config():
+    """Build an Alembic Config that points at the in-tree ``alembic/`` dir
+    and uses the runtime ``DATABASE_URL`` (so the runner and migration
+    layer always agree on the target database)."""
+    from pathlib import Path
+    from alembic.config import Config
 
-    existing_cols = {col["name"] for col in inspector.get_columns("org_nodes")}
-    alter_statements = []
-
-    if "created_by_user_id" not in existing_cols:
-        alter_statements.append(
-            "ALTER TABLE org_nodes ADD COLUMN created_by_user_id UUID"
-        )
-    if "updated_by_user_id" not in existing_cols:
-        alter_statements.append(
-            "ALTER TABLE org_nodes ADD COLUMN updated_by_user_id UUID"
-        )
-    if "status_message" not in existing_cols:
-        alter_statements.append(
-            "ALTER TABLE org_nodes ADD COLUMN status_message VARCHAR"
-        )
-
-    if not alter_statements:
-        return
-
-    with engine.begin() as conn:
-        for stmt in alter_statements:
-            conn.execute(text(stmt))
+    repo_root = Path(__file__).resolve().parents[1]
+    cfg = Config(str(repo_root / "alembic.ini"))
+    cfg.set_main_option("script_location", str(repo_root / "alembic"))
+    cfg.set_main_option("sqlalchemy.url", str(engine.url))
+    return cfg
