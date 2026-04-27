@@ -21,7 +21,8 @@ from watchtower.database import (
 )
 from watchtower import schemas
 from watchtower.api import util
-from watchtower import builder as build_runner
+from watchtower import builder as build_runner  # noqa: F401  (kept for sync wrapper imports elsewhere)
+from watchtower.queue import enqueue_build
 
 router = APIRouter(prefix="/api/projects", tags=["Projects"])
 logger = logging.getLogger(__name__)
@@ -406,7 +407,7 @@ async def run_project_with_related(
             db.add(deployment)
             db.commit()
             db.refresh(deployment)
-            background_tasks.add_task(build_runner.run_build_async, str(deployment.id))
+            enqueue_build(str(deployment.id), background_tasks)
             triggered.append(
                 schemas.RunWithRelatedResultItem(
                     project_id=proj.id,

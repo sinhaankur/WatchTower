@@ -15,10 +15,10 @@ from fastapi import APIRouter, BackgroundTasks, Request, Header, HTTPException, 
 from sqlalchemy.orm import Session
 
 from watchtower.database import (
-    get_db, Project, Deployment, DeploymentStatus, 
+    get_db, Project, Deployment, DeploymentStatus,
     DeploymentTrigger
 )
-from watchtower import builder as build_runner
+from watchtower.queue import enqueue_build
 
 router = APIRouter(prefix="/api/webhooks", tags=["Webhooks"])
 logger = logging.getLogger(__name__)
@@ -154,7 +154,7 @@ async def github_webhook(
             db.commit()
             db.refresh(deployment)
 
-            background_tasks.add_task(build_runner.run_build_async, str(deployment.id))
+            enqueue_build(str(deployment.id), background_tasks)
 
             return {
                 "message": "Deployment queued",
@@ -185,7 +185,7 @@ async def github_webhook(
             db.commit()
             db.refresh(deployment)
 
-            background_tasks.add_task(build_runner.run_build_async, str(deployment.id))
+            enqueue_build(str(deployment.id), background_tasks)
 
             return {
                 "message": "Preview deployment queued",
