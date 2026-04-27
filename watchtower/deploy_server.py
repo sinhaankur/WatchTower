@@ -27,10 +27,10 @@ from fastapi import FastAPI, Header, HTTPException
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 
-logging.basicConfig(
-    level=os.getenv("WATCHTOWER_LOG_LEVEL", "INFO"),
-    format="%(asctime)s %(levelname)s %(message)s",
-)
+from watchtower.log_config import setup_logging
+
+# Idempotent — if the FastAPI app already set this up, no-op.
+setup_logging()
 logger = logging.getLogger("watchtower")
 
 

@@ -15,6 +15,7 @@ from slowapi.middleware import SlowAPIMiddleware
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from watchtower.database import init_db
+from watchtower.log_config import request_id_middleware, setup_logging
 
 from . import (
     agent,
@@ -31,10 +32,9 @@ from . import (
 from .rate_limit import limiter, rate_limit_exceeded_handler
 
 
-logging.basicConfig(
-    level=os.getenv("LOG_LEVEL", "INFO"),
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-)
+# Idempotent — safe to call again from deploy_server / worker entrypoints
+# (the audit flagged a silent double-init that lost whichever ran second).
+setup_logging()
 logger = logging.getLogger(__name__)
 
 
@@ -156,6 +156,15 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "Accept", "X-Requested-With"],
 )
+
+# ── Request ID + structured logging ──────────────────────────────────────────
+# Adds X-Request-ID to every response (re-using a client-supplied header when
+# present so an upstream proxy's trace ID flows through). The contextvar set
+# inside this middleware is read by the JSON log formatter, so every log line
+# emitted during the request carries the ID.
+# Registered first so it runs OUTERMOST — every later middleware (rate limit,
+# CORS) and every handler is wrapped in this context.
+app.middleware("http")(request_id_middleware)
 
 # ── Rate limiting ────────────────────────────────────────────────────────────
 # slowapi reads `app.state.limiter`, applies @limiter.limit(...) decorators
