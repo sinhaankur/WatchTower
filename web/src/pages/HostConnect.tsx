@@ -268,7 +268,7 @@ const HostConnect = () => {
   }, [integrations]);
 
   const missingTools = useMemo(
-    () => TOOL_ORDER.filter((name) => !Boolean((integrations?.[name] as IntegrationStatus | undefined)?.installed)),
+    () => TOOL_ORDER.filter((name) => !(integrations?.[name] as IntegrationStatus | undefined)?.installed),
     [integrations],
   );
 
