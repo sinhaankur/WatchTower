@@ -92,6 +92,61 @@ export function useProjectRelations(projectId: string | undefined) {
   });
 }
 
+export type AddRelationInput = {
+  related_project_id: string;
+  order_index?: number;
+  note?: string;
+};
+
+export function useAddRelation(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation<ProjectRelation, unknown, AddRelationInput>({
+    mutationFn: async (input) =>
+      (await apiClient.post<ProjectRelation>(`/projects/${projectId}/related`, input)).data,
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.projectRelated(projectId) });
+    },
+  });
+}
+
+export function useRemoveRelation(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation<void, unknown, string>({
+    mutationFn: async (relatedId) => {
+      await apiClient.delete(`/projects/${projectId}/related/${relatedId}`);
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.projectRelated(projectId) });
+    },
+  });
+}
+
+export type RunWithRelatedResult = {
+  triggered_count: number;
+  skipped_count: number;
+  results: Array<{
+    project_id: string;
+    project_name: string;
+    deployment_id: string | null;
+    status: 'queued' | 'skipped' | 'error';
+    detail: string | null;
+  }>;
+};
+
+export function useRunWithRelated(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation<RunWithRelatedResult, unknown, void>({
+    mutationFn: async () =>
+      (await apiClient.post<RunWithRelatedResult>(`/projects/${projectId}/run-with-related`)).data,
+    onSuccess: () => {
+      // A successful run creates new Deployment rows for each project in
+      // the bundle. Invalidate the deployments list per project so the
+      // Deployments tab reflects them on next focus.
+      void qc.invalidateQueries({ queryKey: ['project'], exact: false });
+    },
+  });
+}
+
 // ── Integrations ─────────────────────────────────────────────────────────────
 
 export type VSCodeStatus = {
