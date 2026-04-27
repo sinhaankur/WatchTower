@@ -175,7 +175,9 @@ React 19 + Vite + React Query + Zustand + Tailwind. Path alias `@` → `web/src`
 - 401 responses clear the token and redirect to `/login?next=...` — but **only if there was a session token**, so anonymous calls on `/login` don't infinite-loop.
 - `baseURL = '/api'` so the backend's `/api/health` alias exists alongside `/health`.
 
-`RequireAuth` in `App.tsx` gates every route except `/login` and the OAuth callbacks. New routes go through it.
+`RequireAuth` in `App.tsx` gates every route except `/login` and the OAuth callbacks. New routes go through it. A top-level `<ErrorBoundary>` wraps the entire route tree — uncaught render errors get a recoverable fallback instead of a white screen.
+
+**Server-state pattern**: new page code should use the React Query hooks in `web/src/hooks/queries.ts` rather than hand-rolled `useState`/`useEffect`/`apiClient.get` triples. Existing pages still use the old pattern; convert them page-by-page when they're touched. The hooks file owns the query-key shape — invalidating after a mutation requires using the same key reference, so always import `queryKeys` from there.
 
 ### Desktop (`desktop/`)
 
