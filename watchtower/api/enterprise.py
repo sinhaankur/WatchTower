@@ -10,7 +10,7 @@ import base64
 import hashlib
 import subprocess
 from urllib.parse import urlencode
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import func
@@ -25,6 +25,7 @@ from watchtower.database import (
 )
 from watchtower import schemas_enterprise as schemas
 from watchtower.api import util
+from watchtower.api.rate_limit import limiter
 
 router = APIRouter(prefix="/api", tags=["Enterprise"])
 logger = logging.getLogger(__name__)
@@ -609,7 +610,9 @@ async def start_github_login_oauth(
 
 
 @router.get("/auth/github/login")
+@limiter.limit("20/minute")
 async def redirect_github_login_oauth(
+    request: Request,  # for slowapi key extraction
     redirect_uri: str,
     next_path: Optional[str] = None,
 ):
@@ -703,7 +706,8 @@ async def github_login_oauth_callback(
 
 
 @router.post("/auth/github/device/start")
-async def start_github_device_flow():
+@limiter.limit("20/minute")
+async def start_github_device_flow(request: Request):
     """Begin GitHub Device Flow. Returns a user code + verification URL."""
     client_id = _device_flow_client_id()
     if not client_id:
@@ -760,7 +764,9 @@ class DevicePollRequest(_PydBaseModel):
 
 
 @router.post("/auth/github/device/poll")
+@limiter.limit("120/minute")  # legitimate clients poll every 5s = 12/min; 10x margin
 async def poll_github_device_flow(
+    request: Request,
     payload: DevicePollRequest,
     db: Session = Depends(get_db),
 ):
