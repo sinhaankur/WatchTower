@@ -124,6 +124,41 @@ class ProjectResponse(ProjectBase):
         from_attributes = True
 
 
+# Project Relation Schemas
+class ProjectRelationCreate(BaseModel):
+    related_project_id: UUID
+    order_index: int = 0
+    note: Optional[str] = None
+
+
+class ProjectRelationResponse(BaseModel):
+    id: UUID
+    project_id: UUID
+    related_project_id: UUID
+    related_project_name: Optional[str] = None
+    related_project_branch: Optional[str] = None
+    order_index: int
+    note: Optional[str] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class RunWithRelatedResultItem(BaseModel):
+    project_id: UUID
+    project_name: str
+    deployment_id: Optional[UUID] = None
+    status: str  # "queued" | "skipped" | "error"
+    detail: Optional[str] = None
+
+
+class RunWithRelatedResponse(BaseModel):
+    triggered_count: int
+    skipped_count: int
+    results: List[RunWithRelatedResultItem]
+
+
 # Deployment Schemas
 class DeploymentBase(BaseModel):
     commit_sha: str
