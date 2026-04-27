@@ -26,3 +26,9 @@ httpx==0.25.2
 # desktop installs without Redis still work.
 redis==5.0.1
 rq==1.16.2
+
+# Agent — talks to ANY OpenAI-compatible chat-completions endpoint.
+# Works with Ollama, LM Studio, vLLM, llama.cpp, OpenAI, OpenRouter,
+# LiteLLM, etc. Operators pick their own LLM via WATCHTOWER_LLM_BASE_URL
+# — WatchTower itself is provider-agnostic.
+openai>=1.50.0

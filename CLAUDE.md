@@ -147,6 +147,17 @@ Two execution modes, transparently selected at submit time by `enqueue_build()`:
 
 Probe failure is cached for the process lifetime so a missing/flapping broker doesn't add a 2-second connect timeout to every webhook hit. The compose stack runs a dedicated `worker` service alongside the API; production deployments without compose should run `python -m watchtower.worker` separately.
 
+### LLM agent (`watchtower/api/agent.py`)
+
+Provider-agnostic by design — talks to **any OpenAI-compatible chat-completions endpoint** (Ollama, LM Studio, vLLM, llama.cpp, OpenAI, OpenRouter, LiteLLM, etc.). The operator picks the LLM via env vars; WatchTower itself ships with no model bundled.
+
+- `WATCHTOWER_LLM_BASE_URL` — required (e.g. `http://localhost:11434/v1` for Ollama)
+- `WATCHTOWER_LLM_API_KEY` — local servers usually accept any non-empty string
+- `WATCHTOWER_LLM_MODEL` — default `gpt-4o-mini`; override per-deploy
+- `WATCHTOWER_AGENT_READONLY=true` — blocks destructive tools (filtered from the tool list AND re-checked at execution time as defence-in-depth)
+
+`POST /api/agent/chat` returns Server-Sent Events. Tool registry wraps existing API operations (`list_projects`, `list_deployments`, `view_build_logs`, `trigger_deployment`, etc.) and runs every tool under the authenticated user's identity — the agent can only do what the user can do, no privilege escalation. `GET /api/agent/config` lets the SPA detect "operator hasn't configured an LLM yet" and show setup UI. If `WATCHTOWER_LLM_BASE_URL` is unset, `/chat` returns 503 with an actionable message.
+
 ### Related-app bundles (`ProjectRelation`)
 
 A project may declare other projects in the same org that should deploy alongside it. `POST /api/projects/{id}/run-with-related` queues a `Deployment` for every direct relation (ordered by `ProjectRelation.order_index` ascending — dependencies first) and then for the trigger project itself. The relation graph is *not* followed transitively — only direct edges, so cycles cannot loop. Cross-org links are blocked at write time. Managed in the UI under the "Related" tab on `ProjectDetail`.
