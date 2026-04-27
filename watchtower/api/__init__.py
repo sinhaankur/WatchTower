@@ -15,6 +15,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from watchtower.database import init_db
 
 from . import (
+    agent,
     builds,
     deployments,
     enterprise,
@@ -208,6 +209,7 @@ app.include_router(enterprise.router)
 app.include_router(runtime.router)
 app.include_router(envvars.router)
 app.include_router(notifications.router)
+app.include_router(agent.router)
 
 # ── Serve React SPA from web/dist (same-origin, no proxy needed) ──────────────
 _WEB_DIST = Path(__file__).resolve().parents[2] / "web" / "dist"
