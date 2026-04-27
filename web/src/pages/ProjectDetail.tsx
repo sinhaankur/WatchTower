@@ -1,6 +1,19 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams, Link /*, useNavigate*/ } from 'react-router-dom';
 import apiClient from '@/lib/api';
+import {
+  useProjects,
+  useProjectRelations,
+  useAddRelation,
+  useRemoveRelation,
+  useRunWithRelated,
+} from '@/hooks/queries';
+
+/** Pull a 'detail' message out of an axios-shaped error, with fallback. */
+function extractDetail(err: unknown, fallback: string): string {
+  const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+  return typeof detail === 'string' && detail.length > 0 ? detail : fallback;
+}
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -47,23 +60,8 @@ type Webhook = {
   is_active: boolean;
 };
 
-type RelatedProject = {
-  id: string;
-  project_id: string;
-  related_project_id: string;
-  related_project_name: string | null;
-  related_project_branch: string | null;
-  order_index: number;
-  note: string | null;
-};
-
-type RunResultItem = {
-  project_id: string;
-  project_name: string;
-  deployment_id: string | null;
-  status: 'queued' | 'skipped' | 'error';
-  detail: string | null;
-};
+// (RelatedProject + RunResultItem types now come from web/src/hooks/queries.ts
+// — they're owned by the hook layer to keep the API contract in one place.)
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -688,33 +686,30 @@ function WebhooksTab({ projectId }: { projectId: string }) {
 // ── RelatedTab ────────────────────────────────────────────────────────────────
 
 function RelatedTab({ projectId }: { projectId: string }) {
-  const [relations, setRelations] = useState<RelatedProject[]>([]);
-  const [allProjects, setAllProjects] = useState<Project[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Server state via React Query — fetch, cache, invalidate are owned here.
+  const relationsQ = useProjectRelations(projectId);
+  const projectsQ = useProjects();
+  const addMutation = useAddRelation(projectId);
+  const removeMutation = useRemoveRelation(projectId);
+  const runMutation = useRunWithRelated(projectId);
+
+  // Form state stays as local useState — that's a UI concern, not a server one.
   const [chosenId, setChosenId] = useState('');
   const [order, setOrder] = useState(0);
   const [note, setNote] = useState('');
-  const [saving, setSaving] = useState(false);
-  const [running, setRunning] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [runResults, setRunResults] = useState<RunResultItem[] | null>(null);
 
-  async function load() {
-    try {
-      const [rel, projs] = await Promise.all([
-        apiClient.get(`/projects/${projectId}/related`),
-        apiClient.get(`/projects`),
-      ]);
-      setRelations(rel.data);
-      setAllProjects(projs.data);
-    } catch {
-      setError('Failed to load related projects');
-    } finally {
-      setLoading(false);
-    }
-  }
+  const relations = relationsQ.data ?? [];
+  const allProjects = projectsQ.data ?? [];
+  const loading = relationsQ.isLoading || projectsQ.isLoading;
+  const runResults = runMutation.data?.results ?? null;
 
-  useEffect(() => { load(); }, [projectId]);
+  // Surface the most recent error from any mutation or query.
+  const error =
+    addMutation.error ? extractDetail(addMutation.error, 'Failed to add relation') :
+    removeMutation.error ? 'Failed to remove relation' :
+    runMutation.error ? extractDetail(runMutation.error, 'Failed to start bundle') :
+    relationsQ.error || projectsQ.error ? 'Failed to load related projects' :
+    null;
 
   // Eligible: every other project, minus ones already linked.
   const linked = new Set(relations.map(r => r.related_project_id));
@@ -722,48 +717,28 @@ function RelatedTab({ projectId }: { projectId: string }) {
 
   async function add() {
     if (!chosenId) return;
-    setSaving(true);
-    setError(null);
-    try {
-      await apiClient.post(`/projects/${projectId}/related`, {
-        related_project_id: chosenId,
-        order_index: order,
-        note: note.trim() || undefined,
-      });
+    await addMutation.mutateAsync({
+      related_project_id: chosenId,
+      order_index: order,
+      note: note.trim() || undefined,
+    }).then(() => {
       setChosenId('');
       setOrder(0);
       setNote('');
-      await load();
-    } catch (e: any) {
-      setError(e?.response?.data?.detail ?? 'Failed to add relation');
-    } finally {
-      setSaving(false);
-    }
+    }).catch(() => { /* error surfaces via addMutation.error */ });
   }
 
   async function remove(relatedId: string) {
     if (!confirm('Remove this related project?')) return;
-    try {
-      await apiClient.delete(`/projects/${projectId}/related/${relatedId}`);
-      await load();
-    } catch {
-      setError('Failed to remove relation');
-    }
+    await removeMutation.mutateAsync(relatedId).catch(() => { /* surfaces via .error */ });
   }
 
   async function runBundle() {
-    setRunning(true);
-    setError(null);
-    setRunResults(null);
-    try {
-      const r = await apiClient.post(`/projects/${projectId}/run-with-related`);
-      setRunResults(r.data.results);
-    } catch (e: any) {
-      setError(e?.response?.data?.detail ?? 'Failed to start bundle');
-    } finally {
-      setRunning(false);
-    }
+    await runMutation.mutateAsync().catch(() => { /* surfaces via .error */ });
   }
+
+  const saving = addMutation.isPending;
+  const running = runMutation.isPending;
 
   if (loading) return <p className="text-sm text-muted-foreground">Loading…</p>;
 
