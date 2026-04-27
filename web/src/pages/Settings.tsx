@@ -1,12 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import apiClient from '@/lib/api';
-
-type VSCodeStatus = {
-  installed: boolean;
-  version: string | null;
-  root_dir: string;
-  install_instructions: { linux: string; macos: string; windows: string };
-};
+import { useVSCodeStatus } from '@/hooks/queries';
 
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
@@ -21,17 +15,11 @@ function CopyButton({ text }: { text: string }) {
 }
 
 function VSCodeCard() {
-  const [status, setStatus] = useState<VSCodeStatus | null>(null);
-  const [loading, setLoading] = useState(true);
+  // React Query handles fetch / cache / loading / error / unmount-cancel.
+  // status is undefined while loading, then either the payload or undefined on error.
+  const { data: status, isLoading: loading } = useVSCodeStatus();
   const [openLoading, setOpenLoading] = useState(false);
   const [openResult, setOpenResult] = useState<{ ok: boolean; msg: string } | null>(null);
-
-  useEffect(() => {
-    apiClient.get<VSCodeStatus>('/runtime/integrations/vscode/status')
-      .then((r) => setStatus(r.data))
-      .catch(() => setStatus(null))
-      .finally(() => setLoading(false));
-  }, []);
 
   const openRoot = async () => {
     if (!status) return;
