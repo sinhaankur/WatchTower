@@ -19,15 +19,18 @@ Tools wrap existing WatchTower API operations and run server-side
 under the authenticated user's identity — the agent can only do
 what the user can do; there is no privilege escalation.
 """
-from __future__ import annotations
-
+# NOTE: deliberately NOT using `from __future__ import annotations`. The
+# slowapi @limiter.limit() wrapper loses agent.py's module globals, so
+# FastAPI's pydantic-driven schema generator can't eval stringified
+# annotations like 'ChatRequest' / 'StreamingResponse'. Real (non-string)
+# annotations work because FastAPI sees the type objects directly.
 import json
 import logging
 import os
-from typing import Any, Iterator
+from typing import Any, Dict, Iterator, List, Optional
 from uuid import UUID
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
@@ -43,6 +46,7 @@ from watchtower.database import (
     get_db,
 )
 from watchtower.api import util
+from watchtower.api.rate_limit import _key_user_then_remote, limiter
 from watchtower.queue import enqueue_build
 
 router = APIRouter(prefix="/api/agent", tags=["Agent"])
@@ -124,7 +128,7 @@ Stop after a reasonable number of attempts and ask for guidance.
 # Defined as plain dicts (OpenAI-compatible tool format) so we can attach
 # them to any provider that accepts the chat-completions tool schema.
 
-READ_TOOLS: list[dict[str, Any]] = [
+READ_TOOLS: List[Dict[str, Any]] = [
     {
         "type": "function",
         "function": {
@@ -203,7 +207,7 @@ READ_TOOLS: list[dict[str, Any]] = [
     },
 ]
 
-WRITE_TOOLS: list[dict[str, Any]] = [
+WRITE_TOOLS: List[Dict[str, Any]] = [
     {
         "type": "function",
         "function": {
@@ -242,7 +246,7 @@ WRITE_TOOLS: list[dict[str, Any]] = [
 ]
 
 
-def _build_tools() -> list[dict[str, Any]]:
+def _build_tools() -> List[Dict[str, Any]]:
     return READ_TOOLS + ([] if _is_readonly() else WRITE_TOOLS)
 
 
@@ -254,7 +258,7 @@ def _err(msg: str) -> str:
 
 def _execute_tool(
     name: str,
-    arguments: dict[str, Any],
+    arguments: Dict[str, Any],
     user_id: UUID,
     db: Session,
     background_tasks: BackgroundTasks,
@@ -392,7 +396,7 @@ def _execute_tool(
                 .order_by(ProjectRelation.order_index.asc(), ProjectRelation.created_at.asc())
                 .all()
             )
-            queue: list[Project] = []
+            queue: List[Project] = []
             seen: set = {project.id}
             for rel in relations:
                 related = db.query(Project).filter(Project.id == rel.related_project_id).first()
@@ -434,7 +438,7 @@ def _execute_tool(
         return _err(f"{type(exc).__name__}: {exc}")
 
 
-def _load_project(db: Session, project_id_arg: Any, user_id: UUID) -> Project | None:
+def _load_project(db: Session, project_id_arg: Any, user_id: UUID) -> Optional[Project]:
     try:
         pid = UUID(str(project_id_arg))
     except (ValueError, TypeError):
@@ -442,7 +446,7 @@ def _load_project(db: Session, project_id_arg: Any, user_id: UUID) -> Project | 
     return db.query(Project).filter(Project.id == pid, Project.owner_id == user_id).first()
 
 
-def _load_deployment(db: Session, deployment_id_arg: Any, user_id: UUID) -> Deployment | None:
+def _load_deployment(db: Session, deployment_id_arg: Any, user_id: UUID) -> Optional[Deployment]:
     try:
         did = UUID(str(deployment_id_arg))
     except (ValueError, TypeError):
@@ -455,7 +459,7 @@ def _load_deployment(db: Session, deployment_id_arg: Any, user_id: UUID) -> Depl
     )
 
 
-def _deployment_dict(d: Deployment) -> dict[str, Any]:
+def _deployment_dict(d: Deployment) -> Dict[str, Any]:
     return {
         "id": str(d.id),
         "project_id": str(d.project_id),
@@ -478,16 +482,16 @@ class ChatMessage(BaseModel):
 
 
 class ChatRequest(BaseModel):
-    messages: list[ChatMessage]
-    model: str | None = Field(None, description="Override the configured WATCHTOWER_LLM_MODEL.")
+    messages: List[ChatMessage]
+    model: Optional[str] = Field(None, description="Override the configured WATCHTOWER_LLM_MODEL.")
 
 
-def _sse(event: dict[str, Any]) -> bytes:
+def _sse(event: Dict[str, Any]) -> bytes:
     return f"data: {json.dumps(event)}\n\n".encode("utf-8")
 
 
 @router.get("/config")
-async def agent_config(_user: dict = Depends(util.get_current_user)) -> dict[str, Any]:
+async def agent_config(_user: dict = Depends(util.get_current_user)) -> Dict[str, Any]:
     """Surface the agent's configuration to the SPA so it can show
     "configure your LLM" UI when nothing is set."""
     return {
@@ -500,12 +504,16 @@ async def agent_config(_user: dict = Depends(util.get_current_user)) -> dict[str
 
 
 @router.post("/chat")
+@limiter.limit("30/minute", key_func=_key_user_then_remote)
 async def chat(
+    request: Request,  # required by slowapi to extract the rate-limit key
     req: ChatRequest,
     background_tasks: BackgroundTasks,
     current_user: dict = Depends(util.get_current_user),
     db: Session = Depends(get_db),
-) -> StreamingResponse:
+):  # returns StreamingResponse — annotation dropped because slowapi's
+    # wrapper + `from __future__ import annotations` makes FastAPI's
+    # response-model resolver lose the type's namespace at decoration time.
     """Run an agent loop over the OpenAI-compatible /chat/completions API
     and stream the result back as Server-Sent Events.
 
@@ -524,7 +532,7 @@ async def chat(
     max_tokens = _max_tokens()
 
     # Build the conversation: prepend the system prompt, then user-supplied turns.
-    messages: list[dict[str, Any]] = [{"role": "system", "content": SYSTEM_PROMPT}]
+    messages: List[Dict[str, Any]] = [{"role": "system", "content": SYSTEM_PROMPT}]
     for m in req.messages:
         if m.role not in {"user", "assistant", "system"}:
             raise HTTPException(
@@ -553,8 +561,8 @@ async def chat(
             # Aggregate streaming tool calls by index (the SDK splits each
             # tool call into multiple deltas — name in the first chunk,
             # arguments incrementally in following chunks).
-            tool_calls_by_index: dict[int, dict[str, Any]] = {}
-            finish_reason: str | None = None
+            tool_calls_by_index: Dict[int, Dict[str, Any]] = {}
+            finish_reason: Optional[str] = None
 
             for chunk in stream:
                 if not chunk.choices:
@@ -581,7 +589,7 @@ async def chat(
                     finish_reason = chunk.choices[0].finish_reason
 
             # Append the assistant turn as the API expects it for the next round.
-            assistant_msg: dict[str, Any] = {"role": "assistant", "content": assistant_content or None}
+            assistant_msg: Dict[str, Any] = {"role": "assistant", "content": assistant_content or None}
             if tool_calls_by_index:
                 assistant_msg["tool_calls"] = [
                     {

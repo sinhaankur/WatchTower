@@ -19,6 +19,7 @@ from watchtower.database import (
     DeploymentTrigger
 )
 from watchtower.queue import enqueue_build
+from watchtower.api.rate_limit import limiter
 
 router = APIRouter(prefix="/api/webhooks", tags=["Webhooks"])
 logger = logging.getLogger(__name__)
@@ -77,6 +78,7 @@ def verify_webhook_signature(
 
 
 @router.post("/github/{project_id}")
+@limiter.limit("60/minute")
 async def github_webhook(
     project_id: UUID,
     request: Request,
