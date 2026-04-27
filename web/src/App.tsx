@@ -18,6 +18,7 @@ import GitHubOAuthCallback from './pages/GitHubOAuthCallback';
 import GitHubLoginCallback from './pages/GitHubLoginCallback';
 import Login from './pages/Login';
 import Layout from './components/Layout';
+import ErrorBoundary from './components/ErrorBoundary';
 import './App.css';
 
 const queryClient = new QueryClient();
@@ -51,6 +52,7 @@ function App() {
   }, []);
 
   return (
+    <ErrorBoundary>
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>          <RouteTracker />        <Routes>
           <Route path="/login" element={<Login />} />
@@ -76,6 +78,7 @@ function App() {
         </Routes>
       </BrowserRouter>
     </QueryClientProvider>
+    </ErrorBoundary>
   );
 }
 
