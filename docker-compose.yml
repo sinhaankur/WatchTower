@@ -89,6 +89,41 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  # WatchTower Build Worker
+  # Drains the watchtower-builds RQ queue. When this is running, build jobs
+  # survive API restarts; when it's not, watchtower.queue silently falls
+  # back to in-process FastAPI BackgroundTasks (still works, less durable).
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    init: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    tmpfs:
+      - /tmp
+    environment:
+      DATABASE_URL: postgresql://watchtower:watchtower-dev@postgres:5432/watchtower
+      REDIS_URL: redis://redis:6379
+      LOG_LEVEL: INFO
+      WATCHTOWER_API_TOKEN: ${WATCHTOWER_API_TOKEN:-}
+    command: python -m watchtower.worker
+    volumes:
+      - .:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    stop_grace_period: 30s
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+
   # WatchTower Web UI
   web:
     image: docker.io/library/node:20-alpine
