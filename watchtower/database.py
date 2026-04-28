@@ -460,6 +460,48 @@ class ProjectRelation(Base):
     )
 
 
+class AuditEvent(Base):
+    """Append-only record of who did what, when, and from where.
+
+    Captures mutations across the API surface so an operator can answer
+    "who changed prod env vars at 2am" without grep'ing log files. Linked
+    to the per-request ``X-Request-ID`` (from log_config) so a single
+    audit row points at every log line in the same HTTP request.
+
+    Conventions:
+      * ``action`` is dotted: ``"project.create"``, ``"deployment.trigger"``
+      * ``entity_type`` matches the model: ``"project"``, ``"deployment"``
+      * ``actor_*`` fields are nullable — webhook-triggered or system
+        events have no human actor
+      * Cross-org reads are blocked at the read endpoint, but rows are
+        still written with their org_id for auditing operator overrides
+    """
+    __tablename__ = "audit_events"
+
+    id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+
+    # Who
+    actor_user_id = Column(Uuid(as_uuid=True), ForeignKey("users.id"), nullable=True, index=True)
+    actor_email = Column(String, nullable=True)
+
+    # What
+    action = Column(String, index=True)             # e.g. "project.create"
+    entity_type = Column(String, nullable=True, index=True)  # "project", "deployment"
+    entity_id = Column(Uuid(as_uuid=True), nullable=True, index=True)
+
+    # Org scope (so the read endpoint can filter without joining)
+    org_id = Column(Uuid(as_uuid=True), ForeignKey("organizations.id"), nullable=True, index=True)
+
+    # Trace correlation
+    request_id = Column(String, nullable=True)
+    ip_address = Column(String, nullable=True)
+
+    # Free-form context (action-specific). Stored as JSON text; never use
+    # for query predicates — that's what the structured columns are for.
+    extra_json = Column(Text, nullable=True)
+
+
 class NotificationWebhook(Base):
     """Discord / Slack webhook for deployment notifications per project."""
     __tablename__ = "notification_webhooks"
