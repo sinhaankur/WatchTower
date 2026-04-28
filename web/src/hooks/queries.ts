@@ -215,6 +215,8 @@ export type Me = {
   can_manage_deployments: boolean;
   can_manage_nodes: boolean;
   can_create_projects: boolean;
+  is_guest: boolean;
+  is_github_authenticated: boolean;
 };
 
 export function useMe() {

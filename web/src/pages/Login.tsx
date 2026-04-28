@@ -172,6 +172,34 @@ const Login = () => {
     }
   };
 
+  const continueAsGuest = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      // The guest endpoint mints a signed session for the shared local
+      // "Guest" identity. No GitHub OAuth required, but the server gates
+      // privileged operations (remote node creation, etc.) on the
+      // is_github_authenticated flag.
+      const resp = await apiClient.post<{ token: string; user: { name?: string; email?: string } }>(
+        '/auth/guest'
+      );
+      const token = resp.data?.token;
+      if (!token) throw new Error('Guest session token missing');
+      localStorage.setItem('authToken', token);
+      trackEvent('login', { method: 'guest' });
+      showSuccessAndRedirect(
+        { name: resp.data.user?.name ?? 'Guest', email: resp.data.user?.email },
+        1200,
+        resolveNextPath(),
+      );
+    } catch (e: unknown) {
+      localStorage.removeItem('authToken');
+      const detail = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      setError(detail || 'Guest mode is unavailable. Sign in with GitHub or use an API token.');
+      setLoading(false);
+    }
+  };
+
   const loginWithGitHub = async () => {
     setLoading(true);
     setError('');
@@ -548,6 +576,31 @@ const Login = () => {
                   )}
                 </>
               )}
+            </div>
+
+            <div className="my-5 flex items-center gap-3">
+              <div className="h-px flex-1 bg-slate-200" />
+              <span className="text-[11px] text-slate-400 uppercase tracking-wider">or</span>
+              <div className="h-px flex-1 bg-slate-200" />
+            </div>
+
+            {/* Guest mode — no login required, but limited capabilities */}
+            <div className="text-left">
+              <Button
+                onClick={() => void continueAsGuest()}
+                disabled={loading}
+                variant="outline"
+                className="w-full rounded-lg gap-2 py-5 text-sm font-medium flex items-center justify-center border-slate-300 text-slate-700 hover:bg-slate-50"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                  <circle cx="12" cy="7" r="4" />
+                </svg>
+                <span>Continue as Guest</span>
+              </Button>
+              <p className="mt-1.5 text-[11px] text-slate-500 text-center">
+                Browse and run local builds without an account. Adding remote deployment servers requires a GitHub sign-in.
+              </p>
             </div>
 
             <div className="my-5 flex items-center gap-3">
