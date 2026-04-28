@@ -845,7 +845,6 @@ async function launch() {
   createSplash();
 
   const backendHealthUrl = `http://${HOST}:${BACKEND_PORT}/health`;
-  const frontendUrl = `http://${HOST}:${FRONTEND_PORT}/`;
 
   // Start backend if not already running.
   try {
@@ -855,13 +854,30 @@ async function launch() {
     await waitForUrl(backendHealthUrl);
   }
 
-  // Start frontend if not already running.
-  try {
-    await waitForUrl(frontendUrl, 1200);
-  } catch {
-    await startFrontend();
-    // Static server resolves when listening; Vite dev still needs a poll.
-    if (frontendProcess) await waitForUrl(frontendUrl);
+  // The FastAPI backend already serves the React SPA from web/dist
+  // (see watchtower/api/__init__.py). Pointing the main window directly
+  // at the backend eliminates the secondary :5222 server and the entire
+  // class of "Timed out waiting for http://127.0.0.1:5222/" failures
+  // that came from stale processes, slow Vite cold-starts, or a
+  // missing web/dist on the secondary path.
+  //
+  // Set WATCHTOWER_DESKTOP_LEGACY_FRONTEND=1 to opt back into the
+  // separate static-server-on-5222 architecture (preserves the per-
+  // origin CSP isolation that the static server applied).
+  const useLegacyFrontend = process.env.WATCHTOWER_DESKTOP_LEGACY_FRONTEND === '1';
+  const frontendUrl = useLegacyFrontend
+    ? `http://${HOST}:${FRONTEND_PORT}/`
+    : `http://${HOST}:${BACKEND_PORT}/`;
+
+  if (useLegacyFrontend) {
+    // Start frontend server if not already running.
+    try {
+      await waitForUrl(frontendUrl, 1200);
+    } catch {
+      await startFrontend();
+      // Static server resolves when listening; Vite dev still needs a poll.
+      if (frontendProcess) await waitForUrl(frontendUrl);
+    }
   }
 
   const win = createMainWindow();
@@ -985,10 +1001,19 @@ app.whenReady().then(async () => {
   } catch (error) {
     if (splashWindow && !splashWindow.isDestroyed()) splashWindow.close();
     const backendLogPath = path.join(repoRoot, '.dev', 'desktop-backend.log');
-    const detail = fs.existsSync(backendLogPath)
-      ? `\n\nSee backend log:\n${backendLogPath}`
-      : '';
-    dialog.showErrorBox('WatchTower failed to start', `${error.message}${detail}`);
+    const distIndex = path.join(webRoot, 'dist', 'index.html');
+    const distExists = fs.existsSync(distIndex);
+    const parts = [error.message];
+    if (!distExists) {
+      parts.push(
+        `\nFrontend bundle not found at:\n  ${distIndex}\n` +
+        `Build it once with:\n  npm --prefix web install && npm --prefix web run build`
+      );
+    }
+    if (fs.existsSync(backendLogPath)) {
+      parts.push(`\nBackend log:\n  ${backendLogPath}`);
+    }
+    dialog.showErrorBox('WatchTower failed to start', parts.join('\n'));
     stopProcesses();
     app.quit();
   }

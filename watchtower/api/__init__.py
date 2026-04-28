@@ -210,10 +210,41 @@ async def _unhandled_exception_handler(request: Request, exc: Exception):
 # no longer exist on disk → blank screen / "doesn't load" until the
 # user manually clears the Electron cache. Forcing revalidation on
 # every load fixes this for every install permanently.
+# Strict same-origin CSP for the SPA. Mirrors what the desktop static
+# server (`desktop/main.js:startStaticServer`) ships in browser-mode so
+# the security posture is identical regardless of which entrypoint
+# serves the bundle. `connect-src` lets the SPA reach the API over the
+# same origin and (when the React bundle hits an absolute backend URL
+# in dev) localhost.
+_SPA_SECURITY_HEADERS = {
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "Content-Security-Policy": (
+        "default-src 'self'; "
+        "script-src 'self'; "
+        "style-src 'self' 'unsafe-inline'; "
+        "img-src 'self' data: https:; "
+        "font-src 'self' data:; "
+        "connect-src 'self' http://127.0.0.1:* ws://127.0.0.1:* "
+        "http://localhost:* ws://localhost:*; "
+        "frame-ancestors 'none'; "
+        "base-uri 'self'; "
+        "form-action 'self'"
+    ),
+}
+
 _INDEX_NO_CACHE_HEADERS = {
     "Cache-Control": "no-cache, no-store, must-revalidate",
     "Pragma": "no-cache",
     "Expires": "0",
+    **_SPA_SECURITY_HEADERS,
+}
+
+_PUBLIC_ASSET_HEADERS = {
+    # Favicon / manifest / robots are content-stable but not hashed —
+    # cache briefly (15 min) so they don't go stale across deploys.
+    "Cache-Control": "public, max-age=900",
+    **_SPA_SECURITY_HEADERS,
 }
 
 
@@ -274,10 +305,7 @@ if _WEB_DIST.is_dir():
             # Outside the web root → fall through to SPA index (no-cache).
             return FileResponse(str(_WEB_DIST / "index.html"), headers=_INDEX_NO_CACHE_HEADERS)
         if candidate.is_file():
-            # Public root files (favicon, manifest, robots.txt) are content-stable
-            # but not hashed — cache them briefly so they don't go stale across
-            # deploys. The hashed /assets/* mount handles long-cached JS/CSS.
-            return FileResponse(str(candidate))
+            return FileResponse(str(candidate), headers=_PUBLIC_ASSET_HEADERS)
         # SPA route fallback — the request is for a React Router path
         # (e.g. /servers, /agent), so serve index.html with no-cache so a
         # post-deploy reload doesn't keep pointing at deleted JS bundles.
