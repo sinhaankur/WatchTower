@@ -483,7 +483,17 @@ async function killPortProcesses(port) {
   console.log(`[WatchTower] Port ${port} is now free.`);
 }
 
-const repoRoot = path.resolve(__dirname, '..');
+// Where to find the Python backend + the SPA bundle. Resolution order:
+//   1. WATCHTOWER_APP_DIR env override — explicit user choice (e.g. point
+//      a packaged AppImage at a separately-installed dev clone).
+//   2. ../ relative to main.js — the dev-clone layout (~/.../WatchTower/desktop/main.js
+//      → repoRoot = ~/.../WatchTower/). Works when running from source.
+//
+// For packaged builds the relative-path resolution lands INSIDE the asar,
+// where there's no .venv or web/dist. resolvePython() and resolveWebRoot()
+// fall back to a system Python and to a per-user data directory (~/.watchtower)
+// so the AppImage works even without a source clone.
+const repoRoot = process.env.WATCHTOWER_APP_DIR || path.resolve(__dirname, '..');
 const webRoot = path.join(repoRoot, 'web');
 const pythonUnix = path.join(repoRoot, '.venv', 'bin', 'python');
 const pythonWin = path.join(repoRoot, '.venv', 'Scripts', 'python.exe');
@@ -701,10 +711,40 @@ function startStaticServer(distDir) {
   });
 }
 
+/**
+ * Pick a Python interpreter that has the watchtower backend importable.
+ *
+ * Resolution order:
+ *   1. Project-local `.venv/bin/python` — present in dev clones; preferred
+ *      because it has the exact pinned dependency versions.
+ *   2. `WATCHTOWER_PYTHON` env override — explicit user choice.
+ *   3. System `python3` / `python` — covers users who installed the
+ *      backend via `pip install watchtower-podman` system-wide. We
+ *      probe `import watchtower` to confirm the package is reachable
+ *      before trusting it; otherwise the spawn would later fail with a
+ *      cryptic ModuleNotFoundError.
+ *   4. Return null — signals "no python found" to startBackend(), which
+ *      raises a clean dialog telling the user how to install the deps.
+ */
 function resolvePython() {
   if (fs.existsSync(pythonUnix)) return pythonUnix;
   if (fs.existsSync(pythonWin)) return pythonWin;
-  return null; // signal "no venv" — caller surfaces a clear error to the user
+
+  const explicit = process.env.WATCHTOWER_PYTHON;
+  if (explicit && fs.existsSync(explicit)) return explicit;
+
+  const candidates = process.platform === 'win32'
+    ? ['python3.exe', 'python.exe', 'python']
+    : ['python3', 'python'];
+  for (const cmd of candidates) {
+    try {
+      // Probe for both the binary AND the watchtower package — a system
+      // python without `pip install watchtower-podman` is useless to us.
+      execSync(`${cmd} -c "import watchtower"`, { stdio: 'ignore', timeout: 5000 });
+      return cmd;
+    } catch { /* not this one */ }
+  }
+  return null; // surfaced as a clear error in startBackend()
 }
 
 // Tracks whether the backend process has died — wired up by startBackend().
@@ -755,12 +795,22 @@ async function startBackend() {
 
   const python = resolvePython();
   if (!python) {
-    // No project venv. Spawning system python3 here would fail later with
-    // a cryptic "No module named uvicorn" buried in journald — the symptom
-    // the user reports as "fails to load." Surface the real cause now.
+    // No usable Python interpreter found. Three paths the user can take:
+    //   * pip install watchtower-podman   (recommended for end users)
+    //   * Set WATCHTOWER_PYTHON to an existing python with watchtower
+    //   * Set WATCHTOWER_APP_DIR to a source clone with .venv built
     throw new Error(
-      `Python virtualenv not found at ${pythonUnix}. ` +
-      `Run ./run.sh once from a terminal to install dependencies, then re-launch the app.`
+      "Python backend not found. WatchTower needs Python with the\n" +
+      "'watchtower' package installed. Pick one:\n\n" +
+      "  1. Install system-wide:\n" +
+      "       pip install watchtower-podman\n\n" +
+      "  2. Use a source clone:\n" +
+      "       git clone https://github.com/sinhaankur/WatchTower\n" +
+      "       cd WatchTower && ./run.sh   (creates .venv)\n" +
+      "       Then set WATCHTOWER_APP_DIR=/path/to/WatchTower\n\n" +
+      "  3. Point at a custom Python:\n" +
+      "       export WATCHTOWER_PYTHON=/path/to/python\n\n" +
+      "Searched: " + pythonUnix
     );
   }
 
