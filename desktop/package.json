@@ -1,6 +1,6 @@
 {
   "name": "watchtower-desktop",
-  "version": "1.5.3",
+  "version": "1.5.4",
   "private": true,
   "description": "WatchTower Desktop",
   "author": {
@@ -39,12 +39,13 @@
       "preload.js",
       "splash.html"
     ],
-    "publish": {
-      "provider": "github",
-      "owner": "sinhaankur",
-      "repo": "WatchTower",
-      "releaseType": "release"
-    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "sinhaankur",
+        "repo": "WatchTower"
+      }
+    ],
     "mac": {
       "icon": "build/icons/app.icns",
       "target": [
@@ -139,13 +140,6 @@
           "path": "/Applications"
         }
       ]
-    },
-    "publish": [
-      {
-        "provider": "github",
-        "owner": "sinhaankur",
-        "repo": "WatchTower"
-      }
-    ]
+    }
   }
 }
