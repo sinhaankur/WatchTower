@@ -5,6 +5,7 @@ import apiClient from '@/lib/api';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { StatusPill, nodeStatusTone } from '@/components/ui/status-pill';
+import { useMe } from '@/hooks/queries';
 
 type OrgNode = {
   id: string;
@@ -48,6 +49,8 @@ function UsageBar({ label, value }: { label: string; value?: number }) {
 const STEP_LABELS = ['Basic Info', 'SSH Access', 'Deployment'];
 
 const Servers = () => {
+  const { data: me } = useMe();
+  const isGuest = me?.is_guest === true || me?.is_github_authenticated === false;
   const [orgId, setOrgId]           = useState('');
   const [orgName, setOrgName]       = useState('');
   const [nodes, setNodes]           = useState<OrgNode[]>([]);
@@ -188,16 +191,44 @@ const Servers = () => {
               ↺ Retry
             </button>
           )}
-          <button
-            onClick={() => setShowForm((v) => !v)}
-            className="px-4 py-1.5 rounded-lg bg-red-700 hover:bg-red-800 text-white text-sm font-medium transition-colors border border-slate-800 shadow-[2px_2px_0_0_#1f2937]"
-          >
-            {showForm ? 'Cancel' : '+ Add Server'}
-          </button>
+          {isGuest ? (
+            <Link
+              to="/login"
+              title="Sign in with GitHub to add remote deployment servers"
+              className="px-4 py-1.5 rounded-lg border border-slate-300 bg-white text-slate-600 text-sm font-medium transition-colors hover:bg-slate-50 inline-flex items-center gap-1.5"
+            >
+              <svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor" aria-hidden="true">
+                <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z" />
+              </svg>
+              Sign in to add servers
+            </Link>
+          ) : (
+            <button
+              onClick={() => setShowForm((v) => !v)}
+              className="px-4 py-1.5 rounded-lg bg-red-700 hover:bg-red-800 text-white text-sm font-medium transition-colors border border-slate-800 shadow-[2px_2px_0_0_#1f2937]"
+            >
+              {showForm ? 'Cancel' : '+ Add Server'}
+            </button>
+          )}
         </div>
       </header>
 
       <main className="px-4 sm:px-6 lg:px-8 py-6 space-y-6 max-w-5xl mx-auto w-full">
+        {/* Guest-mode notice */}
+        {isGuest && (
+          <div className="flex items-start gap-3 rounded-xl border border-slate-300 bg-slate-50 px-4 py-3">
+            <svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor" aria-hidden="true" className="text-slate-500 mt-0.5 shrink-0">
+              <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z" />
+            </svg>
+            <div className="text-sm">
+              <p className="text-slate-800 font-medium">Guest mode — local deployments only.</p>
+              <p className="text-xs text-slate-600 mt-0.5">
+                Adding a remote server requires a GitHub-authenticated session so the audit trail attributes the change to a real identity. <Link to="/login" className="text-red-700 hover:text-red-800 font-medium">Sign in with GitHub</Link>.
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Notices */}
         {pageError && (
           <div className="flex items-start gap-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3">
@@ -417,12 +448,14 @@ const Servers = () => {
               <p className="text-sm font-medium text-slate-900">No servers yet</p>
               <p className="text-xs text-slate-600 mt-1 mb-4">Add your first server to start deploying applications.</p>
               <div className="flex items-center justify-center gap-3">
-                <button
-                  onClick={() => setShowForm(true)}
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-border text-slate-700 hover:bg-slate-100 text-sm transition-colors"
-                >
-                  + Add Remote Server
-                </button>
+                {!isGuest && (
+                  <button
+                    onClick={() => setShowForm(true)}
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-border text-slate-700 hover:bg-slate-100 text-sm transition-colors"
+                  >
+                    + Add Remote Server
+                  </button>
+                )}
                 <Link
                   to="/servers/local"
                   className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-red-700 hover:bg-red-800 text-white text-sm transition-colors border border-slate-800 shadow-[2px_2px_0_0_#1f2937]"
