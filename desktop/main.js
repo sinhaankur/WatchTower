@@ -846,12 +846,17 @@ async function launch() {
 
   const backendHealthUrl = `http://${HOST}:${BACKEND_PORT}/health`;
 
-  // Start backend if not already running.
+  // Start backend if not already running. Use a 120s post-spawn wait —
+  // the FastAPI lifespan runs init_db() which can take 30-90s on first-
+  // run when Alembic migrations stamp/upgrade an empty database on a
+  // slow disk. The default 45s in waitForUrl was too tight: users on
+  // SD-card-backed Pis or HDD-backed laptops would hit "Timed out
+  // waiting for http://127.0.0.1:8000/health" on first launch only.
   try {
     await waitForUrl(backendHealthUrl, 1200);
   } catch {
     await startBackend();
-    await waitForUrl(backendHealthUrl);
+    await waitForUrl(backendHealthUrl, 120000);
   }
 
   // The FastAPI backend already serves the React SPA from web/dist

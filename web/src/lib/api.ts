@@ -23,13 +23,21 @@ apiClient.interceptors.request.use((config) => {
 // Centralised response handling: surface auth failures consistently and
 // avoid silent UI hangs. We only redirect on 401 when there's actually a
 // session token in localStorage (so anonymous /login page calls don't loop).
+//
+// Idempotency: if a page fires N parallel requests and they all 401 (token
+// expired mid-session is the common case), `redirecting` ensures only the
+// first one triggers `window.location.replace` — without this guard the
+// browser console fills with "navigation throttled" warnings and the URL
+// can race with the page unload.
+let redirecting = false;
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
     const status = error?.response?.status;
     if (status === 401) {
       const hadSession = !!localStorage.getItem('authToken');
-      if (hadSession) {
+      if (hadSession && !redirecting) {
+        redirecting = true;
         try {
           localStorage.removeItem('authToken');
         } catch {
