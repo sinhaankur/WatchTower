@@ -259,6 +259,12 @@ export default function LocalNode() {
               <p className="text-xs text-slate-600 mt-1">
                 WatchTower will run as a background service. Pick the resource profile that fits your machine.
               </p>
+              {autoDetectedProfile && (
+                <p className="text-[11px] text-emerald-700 mt-2 inline-flex items-center gap-1">
+                  <span>✓</span>
+                  Auto-detected: <strong>{autoDetectedProfile}</strong> based on your CPU + RAM. Override below if you prefer.
+                </p>
+              )}
             </div>
 
             <div className="space-y-2">
