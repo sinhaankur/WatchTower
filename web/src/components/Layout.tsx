@@ -175,20 +175,33 @@ function IconPuzzle() {
   );
 }
 
+// Sidebar information architecture:
+//   PRIMARY = "what am I working with?" — daily-flow surfaces in the
+//   order a new user encounters them: Dashboard (status) → Applications
+//   (your projects) → Servers (deployment targets) → Services
+//   (catalogue of self-hostable tools, including databases).
+//   SECONDARY = "configure / inspect" — admin surfaces.
+//
+// What was removed (still reachable via direct URL or contextual links):
+//   - /databases    → folded into /services as a category filter.
+//                     Previously a separate nav link for what is just
+//                     "the DB subset of self-hostable services."
+//   - /host-connect → folded into /integrations. Both pages dealt with
+//                     the same content (Tailscale, Cloudflare, Podman
+//                     install commands, domain wiring); two nav entries
+//                     for one concept was confusing.
 const PRIMARY_NAV: NavItem[] = [
   { path: '/',              label: 'Dashboard',     Icon: IconDashboard },
-  { path: '/servers',       label: 'Servers',        Icon: IconServer },
-  { path: '/applications',  label: 'Applications',   Icon: IconBox },
-  { path: '/databases',     label: 'Databases',      Icon: IconDatabase },
-  { path: '/integrations',  label: 'Integrations',   Icon: IconPuzzle },
-  { path: '/services',      label: 'Services',       Icon: IconLayers },
+  { path: '/applications',  label: 'Applications',  Icon: IconBox },
+  { path: '/servers',       label: 'Servers',       Icon: IconServer },
+  { path: '/services',      label: 'Services',      Icon: IconLayers },
 ];
 
 const SECONDARY_NAV: NavItem[] = [
-  { path: '/host-connect', label: 'Host Connect', Icon: IconLink },
-  { path: '/team',     label: 'Team',     Icon: IconUsers },
-  { path: '/audit',    label: 'Audit Log', Icon: IconShield },
-  { path: '/settings', label: 'Settings', Icon: IconSettings },
+  { path: '/integrations', label: 'Integrations', Icon: IconPuzzle },
+  { path: '/team',         label: 'Team',         Icon: IconUsers },
+  { path: '/audit',        label: 'Audit Log',    Icon: IconShield },
+  { path: '/settings',     label: 'Settings',     Icon: IconSettings },
 ];
 
 function NavLink({ item, pathname, onClick }: { item: NavItem; pathname: string; onClick?: () => void }) {
@@ -313,14 +326,10 @@ export default function Layout({ children }: { children: ReactNode }) {
               </div>
             </div>
             )}
-            <div className="flex items-center justify-between px-1">
-              <Link
-                to="/team"
-                onClick={onNavClick}
-                className="text-[11px] text-slate-600 hover:text-slate-900 transition-colors"
-              >
-                Team
-              </Link>
+            {/* Team used to live here too, but it was a duplicate of
+                the SECONDARY_NAV item — sidebar footer now only carries
+                the action that doesn't fit anywhere else: Sign out. */}
+            <div className="flex justify-end px-1">
               <button
                 type="button"
                 onClick={() => { handleLogout(); onNavClick?.(); }}

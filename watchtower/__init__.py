@@ -2,5 +2,5 @@
 WatchTower - Podman Container Management Service
 """
 
-__version__ = "1.5.6"
+__version__ = "1.5.7"
 __author__ = "WatchTower Contributors"
