@@ -26,6 +26,7 @@ from typing import Any, List, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from sqlalchemy import event
 from sqlalchemy.orm import Session
 
 from watchtower.database import AuditEvent, get_db
@@ -34,6 +35,38 @@ from watchtower.log_config import get_request_id
 
 router = APIRouter(prefix="/api/audit", tags=["Audit"])
 logger = logging.getLogger(__name__)
+
+
+# ── Append-only enforcement ──────────────────────────────────────────────────
+# An audit log is only meaningful if rows can't be tampered with after the
+# fact. The existing `record()` helper writes via `db.flush()` and never
+# updates or deletes — but ORM-level enforcement closes off accidental code
+# paths and intentional bugs that try to clean up the table. A `before_*`
+# event hook raises before the change reaches the database.
+#
+# DB-level immutability (revoking UPDATE/DELETE on the table for the API
+# role, or a Postgres BEFORE-DELETE trigger) is still recommended in
+# production — that's outside the application's reach but documented in
+# CLAUDE.md.
+
+class AuditLogImmutableError(RuntimeError):
+    """Raised when code attempts to modify an existing AuditEvent row."""
+
+
+@event.listens_for(AuditEvent, "before_update")
+def _block_audit_update(_mapper, _connection, _target):  # pragma: no cover - guard
+    raise AuditLogImmutableError(
+        "AuditEvent rows are append-only — UPDATE is forbidden. "
+        "If you intended to add a new event, call audit.record() instead."
+    )
+
+
+@event.listens_for(AuditEvent, "before_delete")
+def _block_audit_delete(_mapper, _connection, _target):  # pragma: no cover - guard
+    raise AuditLogImmutableError(
+        "AuditEvent rows are append-only — DELETE is forbidden. "
+        "Aged-out events should be exported, not deleted from the table."
+    )
 
 
 # ── Recording ────────────────────────────────────────────────────────────────
