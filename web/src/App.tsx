@@ -13,6 +13,7 @@ import Databases from './pages/Databases';
 import Services from './pages/Services';
 import Integrations from './pages/Integrations';
 import Settings from './pages/Settings';
+import AuditLog from './pages/AuditLog';
 import HostConnect from './pages/HostConnect';
 import GitHubOAuthCallback from './pages/GitHubOAuthCallback';
 import GitHubLoginCallback from './pages/GitHubLoginCallback';
@@ -70,6 +71,7 @@ function App() {
           <Route path="/host-connect" element={<RequireAuth><Layout><HostConnect /></Layout></RequireAuth>} />
           <Route path="/team" element={<RequireAuth><Layout><TeamManagement /></Layout></RequireAuth>} />
           <Route path="/settings" element={<RequireAuth><Layout><Settings /></Layout></RequireAuth>} />
+          <Route path="/audit" element={<RequireAuth><Layout><AuditLog /></Layout></RequireAuth>} />
           {/* Legacy redirect */}
           <Route path="/nodes" element={<Navigate to="/servers" replace />} />
           {/* Full-screen pages (wizard & oauth flow — no sidebar) */}
