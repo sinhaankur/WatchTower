@@ -346,20 +346,55 @@ function BuildLogsTab({ projectId }: { projectId: string }) {
     if (!selectedBuild) return;
     setLiveLog(selectedBuild.build_output ?? '');
 
-    // If build is running, open WebSocket for live stream
-    if (selectedBuild.status === 'running') {
-      if (wsRef.current) wsRef.current.close();
-      const wsUrl = `${window.location.origin.replace('http', 'ws')}/api/ws/builds/${selectedBuild.id}/logs`;
+    if (selectedBuild.status !== 'running') return;
+
+    // Reconnect with exponential backoff up to ~32s. The previous code
+    // had ws.onclose = () => {} which silently froze the log viewer
+    // whenever the backend restarted mid-build. Now the stream resumes
+    // automatically; the user only notices the brief pause.
+    let cancelled = false;
+    let attempt = 0;
+    let socket: WebSocket | null = null;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+    const buildId = selectedBuild.id;
+
+    const open = () => {
+      if (cancelled) return;
+      const wsUrl = `${window.location.origin.replace('http', 'ws')}/api/ws/builds/${buildId}/logs`;
       const ws = new WebSocket(wsUrl);
+      socket = ws;
       wsRef.current = ws;
+
+      ws.onopen = () => {
+        attempt = 0;  // reset backoff on a successful connect
+      };
       ws.onmessage = (e) => {
         setLiveLog(prev => prev + e.data);
         if (logsRef.current) logsRef.current.scrollTop = logsRef.current.scrollHeight;
       };
-      ws.onerror = () => {};
-      ws.onclose = () => {};
-      return () => ws.close();
-    }
+      ws.onclose = () => {
+        if (cancelled) return;
+        const delay = Math.min(1000 * 2 ** attempt, 32000);
+        attempt += 1;
+        retryTimer = setTimeout(open, delay);
+      };
+      ws.onerror = () => {
+        // Force the browser to fire onclose so reconnect logic runs.
+        try { ws.close(); } catch { /* ignore */ }
+      };
+    };
+
+    open();
+
+    return () => {
+      cancelled = true;
+      if (retryTimer) clearTimeout(retryTimer);
+      if (socket) {
+        socket.onclose = null;
+        socket.onerror = null;
+        try { socket.close(); } catch { /* ignore */ }
+      }
+    };
   }, [selectedBuild]);
 
   // Auto-scroll on log update
