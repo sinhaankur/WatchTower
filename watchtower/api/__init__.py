@@ -332,7 +332,20 @@ app.include_router(audit.router)
 app.include_router(me.router)
 
 # ── Serve React SPA from web/dist (same-origin, no proxy needed) ──────────────
-_WEB_DIST = Path(__file__).resolve().parents[2] / "web" / "dist"
+# Resolution order:
+#   1. WATCHTOWER_WEB_DIST env override — used by the desktop launcher to
+#      point at the SPA bundle inside the AppImage's extraResources.
+#   2. ../../web/dist relative to this file — works in dev clones where
+#      watchtower is installed via `pip install -e .` from a checkout.
+# When the watchtower package is pip-installed from a wheel, the wheel
+# does NOT ship web/dist, so the relative path resolves to a missing
+# directory and we fall through to the JSON health response. That's
+# the right behaviour for headless server installs; the desktop
+# launcher overrides via env so the AppImage serves the real SPA.
+_WEB_DIST = Path(
+    os.getenv("WATCHTOWER_WEB_DIST")
+    or (Path(__file__).resolve().parents[2] / "web" / "dist")
+)
 
 if _WEB_DIST.is_dir():
     # Static assets (JS/CSS/images) served under /assets

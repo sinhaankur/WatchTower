@@ -25,11 +25,51 @@ import uuid
 from datetime import datetime
 import enum
 
-# Database URL (self-hosted uses SQLite, can be overridden for PostgreSQL)
-DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    "sqlite:///./watchtower.db"
-)
+def _default_database_url() -> str:
+    """Pick a default DATABASE_URL that's actually writable.
+
+    The previous default — ``sqlite:///./watchtower.db`` — assumed the
+    process's cwd was writable. That holds for source-clone runs but
+    breaks for pip-installed installs (cwd is wherever the user
+    happened to be, often non-writable) and *especially* for packaged
+    AppImage launches (cwd is the AppImage's read-only FUSE mount —
+    SQLite can't open a writable connection, init_db throws, the
+    backend never reaches /health, the smoke test sees a hang).
+
+    Resolution order:
+      1. ``DATABASE_URL`` env var (production: Postgres URL).
+      2. ``WATCHTOWER_DATA_DIR/watchtower.db`` if the env var is set.
+      3. ``~/.watchtower/watchtower.db`` — same data dir as the Fernet
+         secret key, always writable.
+      4. ``./watchtower.db`` only if cwd is writable AND already has
+         the file (preserves dev-clone behaviour where you've been
+         running with the cwd-relative path for ages).
+
+    The dev-clone fallback is last so a user who already has a populated
+    ``./watchtower.db`` in their source clone keeps using it instead of
+    silently switching to ~/.watchtower/.
+    """
+    env_url = os.getenv("DATABASE_URL")
+    if env_url:
+        return env_url
+
+    data_dir = os.getenv("WATCHTOWER_DATA_DIR")
+    if not data_dir:
+        # Preserve dev-clone behaviour: if a SQLite file already exists
+        # in cwd, use it. Avoids unexpectedly migrating to a new DB.
+        cwd_db = os.path.abspath("./watchtower.db")
+        if os.path.exists(cwd_db) and os.access(os.path.dirname(cwd_db), os.W_OK):
+            return f"sqlite:///{cwd_db}"
+        data_dir = os.path.join(os.path.expanduser("~"), ".watchtower")
+
+    try:
+        os.makedirs(data_dir, exist_ok=True)
+    except OSError:
+        pass
+    return f"sqlite:///{os.path.join(data_dir, 'watchtower.db')}"
+
+
+DATABASE_URL = _default_database_url()
 
 # Create engine
 engine = create_engine(

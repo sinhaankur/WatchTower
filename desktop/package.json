@@ -39,6 +39,13 @@
       "preload.js",
       "splash.html"
     ],
+    "extraResources": [
+      {
+        "from": "../web/dist",
+        "to": "web-dist",
+        "filter": ["**/*"]
+      }
+    ],
     "publish": [
       {
         "provider": "github",

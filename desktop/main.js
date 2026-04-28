@@ -5,6 +5,7 @@ const fs = require('fs');
 const http = require('http');
 const https = require('https');
 const net = require('net');
+const os = require('os');
 const path = require('path');
 
 // ── Resolve npm binary ───────────────────────────────────────────────────────
@@ -483,6 +484,45 @@ async function killPortProcesses(port) {
   console.log(`[WatchTower] Port ${port} is now free.`);
 }
 
+/**
+ * Resolve a writable directory for the backend's data files (SQLite DB,
+ * Fernet secret key, etc.). Honours WATCHTOWER_DATA_DIR if set, else
+ * defaults to ~/.watchtower (always writable; same place
+ * `_ensure_secret_key()` already uses).
+ */
+function writableDataDir() {
+  const explicit = process.env.WATCHTOWER_DATA_DIR;
+  if (explicit) return explicit;
+  const home = process.env.HOME || process.env.USERPROFILE || os.tmpdir();
+  return path.join(home, '.watchtower');
+}
+
+/**
+ * Resolve where the SPA bundle (web/dist) lives.
+ *
+ * Priority:
+ *   1. dev-clone path: <repoRoot>/web/dist — used when running from a
+ *      source checkout (./run.sh desktop).
+ *   2. extraResources path: <process.resourcesPath>/web-dist — used when
+ *      running from a packaged AppImage / dmg / nsis. electron-builder
+ *      copies web/dist into resources/web-dist (see
+ *      desktop/package.json's `extraResources`).
+ *
+ * Without (2), a packaged build would have no SPA at all — the
+ * pip-installed watchtower wheel doesn't include web/dist, and the
+ * relative-path fallback in `api/__init__.py:_WEB_DIST` would
+ * resolve to a missing site-packages/web/dist.
+ */
+function resolveWebDist() {
+  const devPath = path.join(repoRoot, 'web', 'dist');
+  if (fs.existsSync(path.join(devPath, 'index.html'))) return devPath;
+  const packagedPath = path.join(process.resourcesPath || '', 'web-dist');
+  if (fs.existsSync(path.join(packagedPath, 'index.html'))) return packagedPath;
+  // Returning the dev path as the last resort lets the backend fall back
+  // to its JSON health response gracefully if neither location exists.
+  return devPath;
+}
+
 // Where to find the Python backend + the SPA bundle. Resolution order:
 //   1. WATCHTOWER_APP_DIR env override — explicit user choice (e.g. point
 //      a packaged AppImage at a separately-installed dev clone).
@@ -837,7 +877,14 @@ async function startBackend() {
       '--timeout-keep-alive', '5',
     ],
     {
-      cwd: repoRoot,
+      // cwd MUST be writable — the backend's default DATABASE_URL used to be
+      // sqlite:///./watchtower.db, which would try to create the file in cwd.
+      // For packaged AppImages the natural cwd (the AppImage's FUSE mount)
+      // is read-only and SQLite can't open a writable connection. We override
+      // DATABASE_URL below so cwd doesn't actually matter for the DB any more,
+      // but plenty of Python libs still log/cache things relative to cwd, so
+      // point it at the writable data dir.
+      cwd: writableDataDir(),
       env: {
         ...process.env,
         WATCHTOWER_API_TOKEN: runtimeApiToken,
@@ -854,6 +901,12 @@ async function startBackend() {
         WATCHTOWER_INSTALL_OWNER_MODE: process.env.WATCHTOWER_INSTALL_OWNER_MODE || 'false',
         // Do NOT propagate dev-only overrides into the desktop process.
         WATCHTOWER_ALLOW_INSECURE_DEV_AUTH: undefined,
+        // Tell the backend where to keep its data + where to find the SPA
+        // bundle. Without these, a packaged AppImage either crashes
+        // (sqlite write to read-only mount) or serves the JSON health
+        // shell instead of the React SPA (the wheel doesn't ship web/dist).
+        WATCHTOWER_DATA_DIR: writableDataDir(),
+        WATCHTOWER_WEB_DIST: process.env.WATCHTOWER_WEB_DIST || resolveWebDist(),
       },
       stdio: ['ignore', backendLogFd, backendLogFd],
     }
