@@ -20,6 +20,7 @@ import GitHubLoginCallback from './pages/GitHubLoginCallback';
 import Login from './pages/Login';
 import Layout from './components/Layout';
 import ErrorBoundary from './components/ErrorBoundary';
+import { Toaster } from './lib/toast';
 import './App.css';
 
 const queryClient = new QueryClient();
@@ -81,6 +82,7 @@ function App() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>
+      <Toaster />
     </QueryClientProvider>
     </ErrorBoundary>
   );

@@ -24,6 +24,7 @@ from . import (
     deployments,
     enterprise,
     envvars,
+    me,
     notifications,
     projects,
     runtime,
@@ -247,6 +248,7 @@ app.include_router(envvars.router)
 app.include_router(notifications.router)
 app.include_router(agent.router)
 app.include_router(audit.router)
+app.include_router(me.router)
 
 # ── Serve React SPA from web/dist (same-origin, no proxy needed) ──────────────
 _WEB_DIST = Path(__file__).resolve().parents[2] / "web" / "dist"
