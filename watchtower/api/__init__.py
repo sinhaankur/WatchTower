@@ -40,6 +40,40 @@ setup_logging()
 logger = logging.getLogger(__name__)
 
 
+def _ensure_dev_api_token() -> None:
+    """Auto-set a known dev API token so the app "just works" in dev mode.
+
+    The history: ``WATCHTOWER_ALLOW_INSECURE_DEV_AUTH=true`` used to mean
+    "accept any bearer". That was removed in a security commit (3f645d0)
+    because it was too permissive. Now dev mode requires both the env
+    var AND ``WATCHTOWER_API_TOKEN`` to be set — and if you forget the
+    second one, every request 503s with
+    "WATCHTOWER_API_TOKEN must be set even in dev mode."
+
+    That trips users up a lot — running uvicorn directly without
+    sourcing ``.env`` is enough. So at startup, if dev-auth is on and
+    ``WATCHTOWER_API_TOKEN`` is missing, we set a known shared dev
+    value (``dev-watchtower-token``, the value already shipped in
+    ``.env``) and log a clear warning. The shared value matches what
+    the SPA already uses in dev fallback paths, so the auth flow
+    "just works" on first run.
+
+    Production paths (no ``WATCHTOWER_ALLOW_INSECURE_DEV_AUTH``) are
+    unchanged — the original 401/503 contract still applies.
+    """
+    if os.getenv("WATCHTOWER_API_TOKEN"):
+        return
+    if os.getenv("WATCHTOWER_ALLOW_INSECURE_DEV_AUTH", "false").lower() != "true":
+        return
+    os.environ["WATCHTOWER_API_TOKEN"] = "dev-watchtower-token"
+    logger.warning(
+        "Dev mode self-heal: WATCHTOWER_API_TOKEN was unset; defaulting to "
+        "'dev-watchtower-token' (the value shipped in .env). The SPA's dev "
+        "fallback uses the same string, so auth will work. Set "
+        "WATCHTOWER_API_TOKEN explicitly in production."
+    )
+
+
 def _ensure_secret_key() -> None:
     """Auto-generate WATCHTOWER_SECRET_KEY on first run if not provided.
 
@@ -107,19 +141,20 @@ def _ensure_secret_key() -> None:
         )
 
 
-# ── Database migration: run BEFORE the FastAPI app object exists ─────────────
-#
-# This *was* in the FastAPI lifespan (`async def lifespan: ... init_db() ...`),
-# but Alembic's ``command.upgrade()`` running inside uvicorn's lifespan task
-# hangs after it returns — uvicorn never receives the
-# ``lifespan.startup.complete`` event, so the backend never starts answering
-# ``/health`` and the desktop launcher sits on the splash for the full 120 s
-# timeout before erroring out. Reproducible with the smallest possible
-# lifespan that calls ``command.upgrade``; running the same call as a
-# subprocess or at module load time works fine. Suspected interaction
-# between Alembic 1.13.x and uvicorn 0.29's lifespan implementation; root
-# cause unclear, but the workaround (run migrations at import time) is
-# robust and removes the entire failure mode.
+# ── Module-level startup steps ───────────────────────────────────────────────
+# These run once when uvicorn (or any importer) loads the package, BEFORE
+# the FastAPI app object is constructed. We do them here rather than inside
+# the lifespan because:
+#   * `init_db()` calls Alembic's `command.upgrade(...)` and has been
+#     observed to deadlock uvicorn's lifespan implementation on Alembic
+#     1.13 / uvicorn 0.29 — the call returns but uvicorn never receives
+#     `lifespan.startup.complete`. Running it at import time avoids the
+#     interaction entirely.
+#   * `_ensure_dev_api_token()` materialises the dev token early so the
+#     auth signing secret is stable across restarts (sessions survive)
+#     and so /api/me + every other authed endpoint stops 503ing in dev.
+
+_ensure_dev_api_token()
 init_db()
 
 

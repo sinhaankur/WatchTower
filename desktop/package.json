@@ -43,7 +43,8 @@
       {
         "provider": "github",
         "owner": "sinhaankur",
-        "repo": "WatchTower"
+        "repo": "WatchTower",
+        "releaseType": "release"
       }
     ],
     "mac": {
