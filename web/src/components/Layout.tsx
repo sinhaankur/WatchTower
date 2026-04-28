@@ -187,19 +187,33 @@ const SECONDARY_NAV: NavItem[] = [
   { path: '/settings',     label: 'Settings',     Icon: IconSettings },
 ];
 
+// A small, opinionated section header. Slate-400 + uppercase +
+// letter-spaced is the classic SaaS-sidebar pattern (Linear, Vercel,
+// Stripe Dashboard, GitHub) — gives navigation a clear "kinds of
+// things" mental map without screaming for attention.
+function NavSectionLabel({ children }: { children: ReactNode }) {
+  return (
+    <div className="px-3 pt-3 pb-1.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-400">
+      {children}
+    </div>
+  );
+}
+
 function NavLink({ item, pathname, onClick }: { item: NavItem; pathname: string; onClick?: () => void }) {
   const active = item.path === '/' ? pathname === '/' : pathname.startsWith(item.path);
   return (
     <Link
       to={item.path}
       onClick={onClick}
-      className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+      className={`group flex items-center gap-2.5 px-3 py-1.5 rounded-md text-[13px] font-medium transition-colors ${
         active
-          ? 'bg-red-50 text-red-700 border-l-2 border-red-700 pl-[10px] shadow-sm'
-          : 'text-slate-600 hover:bg-white hover:text-slate-900 border-l-2 border-transparent pl-[10px]'
+          ? 'bg-slate-900 text-white'
+          : 'text-slate-600 hover:bg-slate-100/80 hover:text-slate-900'
       }`}
     >
-      <item.Icon />
+      <span className={active ? 'text-white' : 'text-slate-400 group-hover:text-slate-700'}>
+        <item.Icon />
+      </span>
       {item.label}
     </Link>
   );
@@ -235,21 +249,26 @@ export default function Layout({ children }: { children: ReactNode }) {
         <Link
           to="/setup"
           onClick={onNavClick}
-          className="flex items-center justify-center gap-2 w-full py-2 px-3 rounded-xl bg-red-700 hover:bg-red-800 border border-slate-800 shadow-[2px_2px_0_0_#1f2937] transition-colors text-white text-sm font-semibold"
+          className="flex items-center justify-center gap-2 w-full py-1.5 px-3 rounded-md bg-slate-900 hover:bg-slate-800 transition-colors text-white text-[13px] font-medium"
         >
           <IconPlus />
           New Resource
         </Link>
       </div>
 
-      <nav className="flex-1 px-3 py-2 space-y-0.5 overflow-y-auto">
-        {PRIMARY_NAV.map((item) => (
-          <NavLink key={item.path} item={item} pathname={pathname} onClick={onNavClick} />
-        ))}
-        <div className="my-3 border-t" style={{ borderColor: 'hsl(214 32% 88%)' }} />
-        {SECONDARY_NAV.map((item) => (
-          <NavLink key={item.path} item={item} pathname={pathname} onClick={onNavClick} />
-        ))}
+      <nav className="flex-1 px-2 pt-1 pb-2 overflow-y-auto">
+        <NavSectionLabel>Workspace</NavSectionLabel>
+        <div className="space-y-px">
+          {PRIMARY_NAV.map((item) => (
+            <NavLink key={item.path} item={item} pathname={pathname} onClick={onNavClick} />
+          ))}
+        </div>
+        <NavSectionLabel>Admin</NavSectionLabel>
+        <div className="space-y-px">
+          {SECONDARY_NAV.map((item) => (
+            <NavLink key={item.path} item={item} pathname={pathname} onClick={onNavClick} />
+          ))}
+        </div>
       </nav>
 
       <div className="px-3 py-3 border-t" style={{ borderColor: 'hsl(214 32% 88%)' }}>
@@ -327,14 +346,24 @@ export default function Layout({ children }: { children: ReactNode }) {
             Sign in with GitHub →
           </Link>
         )}
-        <p className="text-[10px] text-slate-500 mt-3 px-1">
-          WatchTower{versionLabel ? ` ${versionLabel}` : ''}
+        {/* Version line — quiet, single line, separates from chrome with
+            a thin top border. The "update available" affordance is the
+            only thing meant to draw the eye when relevant. */}
+        <div className="mt-3 pt-2 px-1 border-t border-slate-200/70 flex items-center justify-between">
+          <span className="text-[10px] text-slate-400 tracking-wide">
+            WatchTower{versionLabel ? ` ${versionLabel}` : ''}
+          </span>
           {updateData?.has_update && (
-            <Link to="/settings" className="ml-1 text-amber-700 hover:text-amber-900 font-medium">
-              · update available
+            <Link
+              to="/settings"
+              className="text-[10px] text-amber-700 hover:text-amber-900 font-medium inline-flex items-center gap-1"
+              title={`Update to ${updateData.latest} available`}
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+              Update
             </Link>
           )}
-        </p>
+        </div>
       </div>
     </>
   );
