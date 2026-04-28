@@ -75,6 +75,8 @@ function App() {
           {/* Full-screen pages (wizard & oauth flow — no sidebar) */}
           <Route path="/setup" element={<RequireAuth><SetupWizard /></RequireAuth>} />
           <Route path="/oauth/github/callback" element={<RequireAuth><GitHubOAuthCallback /></RequireAuth>} />
+          {/* Catch-all: redirect any unmatched path to home instead of showing a blank page */}
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>
     </QueryClientProvider>
