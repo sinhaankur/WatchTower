@@ -3,7 +3,7 @@ Projects API endpoints
 """
 
 import logging
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from typing import List
@@ -20,6 +20,7 @@ from watchtower.database import (
     User,
 )
 from watchtower import schemas
+from watchtower.api import audit as audit_log
 from watchtower.api import util
 from watchtower import builder as build_runner  # noqa: F401  (kept for sync wrapper imports elsewhere)
 from watchtower.queue import enqueue_build
@@ -41,6 +42,7 @@ async def list_projects(
 
 @router.post("", response_model=schemas.ProjectResponse, status_code=status.HTTP_201_CREATED)
 async def create_project(
+    request: Request,
     project_data: schemas.ProjectCreate,
     db: Session = Depends(get_db),
     current_user: dict = Depends(util.get_current_user)
@@ -71,11 +73,21 @@ async def create_project(
         )
         
         db.add(db_project)
+        db.flush()  # so audit_log gets the assigned UUID
+        audit_log.record_for_user(
+            db, current_user,
+            action="project.create",
+            entity_type="project",
+            entity_id=db_project.id,
+            org_id=org.id,
+            request=request,
+            extra={"name": db_project.name, "repo_url": db_project.repo_url},
+        )
         db.commit()
         db.refresh(db_project)
-        
+
         return db_project
-    
+
     except Exception:
         db.rollback()
         logger.exception("Project creation failed")
@@ -109,6 +121,7 @@ async def get_project(
 
 @router.put("/{project_id}", response_model=schemas.ProjectResponse)
 async def update_project(
+    request: Request,
     project_id: UUID,
     project_data: schemas.ProjectUpdate,
     db: Session = Depends(get_db),
@@ -127,22 +140,36 @@ async def update_project(
             detail="Project not found"
         )
     
-    # Update fields
-    if project_data.name:
+    changes: dict = {}
+    if project_data.name and project_data.name != project.name:
+        changes["name"] = {"from": project.name, "to": project_data.name}
         project.name = project_data.name
-    if project_data.repo_branch:
+    if project_data.repo_branch and project_data.repo_branch != project.repo_branch:
+        changes["repo_branch"] = {"from": project.repo_branch, "to": project_data.repo_branch}
         project.repo_branch = project_data.repo_branch
-    if project_data.is_active is not None:
+    if project_data.is_active is not None and project_data.is_active != project.is_active:
+        changes["is_active"] = {"from": project.is_active, "to": project_data.is_active}
         project.is_active = project_data.is_active
-    
+
+    if changes:
+        audit_log.record_for_user(
+            db, current_user,
+            action="project.update",
+            entity_type="project",
+            entity_id=project.id,
+            org_id=project.org_id,
+            request=request,
+            extra={"changes": changes},
+        )
     db.commit()
     db.refresh(project)
-    
+
     return project
 
 
 @router.delete("/{project_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_project(
+    request: Request,
     project_id: UUID,
     db: Session = Depends(get_db),
     current_user: dict = Depends(util.get_current_user)
@@ -160,9 +187,18 @@ async def delete_project(
             detail="Project not found"
         )
     
+    audit_log.record_for_user(
+        db, current_user,
+        action="project.delete",
+        entity_type="project",
+        entity_id=project.id,
+        org_id=project.org_id,
+        request=request,
+        extra={"name": project.name, "repo_url": project.repo_url},
+    )
     db.delete(project)
     db.commit()
-    
+
     return None
 
 
