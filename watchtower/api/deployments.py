@@ -3,7 +3,7 @@ Deployments API endpoints
 """
 
 import logging
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
 from fastapi.exceptions import HTTPException as FastAPIHTTPException
 from sqlalchemy.orm import Session
 from typing import List
@@ -24,6 +24,7 @@ from watchtower.database import (
 from watchtower import schemas
 from watchtower.api import util
 from watchtower import builder as build_runner
+from watchtower.api import audit as audit_log
 from watchtower.queue import enqueue_build
 
 router = APIRouter(prefix="/api/projects", tags=["Deployments"])
@@ -95,6 +96,7 @@ async def list_deployments(
 
 @router.post("/{project_id}/deployments", response_model=schemas.DeploymentResponse, status_code=status.HTTP_201_CREATED)
 async def trigger_deployment(
+    request: Request,
     project_id: UUID,
     deploy_data: schemas.DeploymentTriggerRequest,
     background_tasks: BackgroundTasks,
@@ -168,6 +170,20 @@ async def trigger_deployment(
                 )
             )
 
+        audit_log.record_for_user(
+            db, current_user,
+            action="deployment.trigger",
+            entity_type="deployment",
+            entity_id=deployment.id,
+            org_id=project.org_id,
+            request=request,
+            extra={
+                "project_id": str(project.id),
+                "branch": deploy_data.branch,
+                "commit_sha": deployment.commit_sha,
+                "node_ids": [str(n.id) for n in target_nodes],
+            },
+        )
         db.commit()
         db.refresh(deployment)
 
@@ -209,6 +225,7 @@ async def get_deployment(
 
 @router.post("/deployments/{deployment_id}/rollback", response_model=schemas.DeploymentResponse)
 async def rollback_deployment(
+    request: Request,
     deployment_id: UUID,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
@@ -257,6 +274,19 @@ async def rollback_deployment(
     
     db.add(rollback)
     deployment.status = DeploymentStatus.ROLLED_BACK
+    db.flush()
+    audit_log.record_for_user(
+        db, current_user,
+        action="deployment.rollback",
+        entity_type="deployment",
+        entity_id=rollback.id,
+        org_id=deployment.project.org_id,
+        request=request,
+        extra={
+            "rolled_back_from": str(deployment.id),
+            "to_commit_sha": rollback.commit_sha,
+        },
+    )
     db.commit()
     db.refresh(rollback)
 

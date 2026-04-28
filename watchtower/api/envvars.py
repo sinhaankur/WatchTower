@@ -5,7 +5,7 @@ Environment Variables API — CRUD per project.
 import logging
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from typing import List, Optional
@@ -16,6 +16,7 @@ from watchtower.database import (
     get_db,
     Project,
 )
+from watchtower.api import audit as audit_log
 from watchtower.api import util
 
 router = APIRouter(prefix="/api/projects", tags=["Environment Variables"])
@@ -98,6 +99,7 @@ async def list_env_vars(
 
 @router.post("/{project_id}/env", response_model=EnvVarResponse, status_code=status.HTTP_201_CREATED)
 async def create_env_var(
+    request: Request,
     project_id: UUID,
     data: EnvVarCreate,
     db: Session = Depends(get_db),
@@ -105,7 +107,7 @@ async def create_env_var(
 ):
     """Create a new environment variable (or overwrite if key already exists)."""
     user_id = UUID(str(current_user["user_id"]))
-    _get_project_or_404(db, project_id, user_id)
+    project = _get_project_or_404(db, project_id, user_id)
 
     if not data.key.strip():
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Key cannot be empty")
@@ -119,9 +121,9 @@ async def create_env_var(
 
     if existing:
         existing.value = data.value
-        db.commit()
-        db.refresh(existing)
+        db.flush()
         row = existing
+        action = "envvar.update"
     else:
         row = EnvironmentVariable(
             project_id=project_id,
@@ -130,8 +132,23 @@ async def create_env_var(
             environment=data.environment,
         )
         db.add(row)
-        db.commit()
-        db.refresh(row)
+        db.flush()
+        action = "envvar.create"
+
+    # Audit captures the KEY but never the VALUE — this is critical: the audit
+    # log is queryable by org members, and the whole point of env vars is that
+    # values are secret. Recording the value would defeat the purpose.
+    audit_log.record_for_user(
+        db, current_user,
+        action=action,
+        entity_type="envvar",
+        entity_id=row.id,
+        org_id=project.org_id,
+        request=request,
+        extra={"key": row.key, "environment": data.environment, "project_id": str(project_id)},
+    )
+    db.commit()
+    db.refresh(row)
 
     return EnvVarResponse(
         id=row.id,
@@ -144,6 +161,7 @@ async def create_env_var(
 
 @router.put("/{project_id}/env/{env_var_id}", response_model=EnvVarResponse)
 async def update_env_var(
+    request: Request,
     project_id: UUID,
     env_var_id: UUID,
     data: EnvVarUpdate,
@@ -152,7 +170,7 @@ async def update_env_var(
 ):
     """Update an existing environment variable value."""
     user_id = UUID(str(current_user["user_id"]))
-    _get_project_or_404(db, project_id, user_id)
+    project = _get_project_or_404(db, project_id, user_id)
 
     row = db.query(EnvironmentVariable).filter(
         EnvironmentVariable.id == env_var_id,
@@ -162,6 +180,15 @@ async def update_env_var(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Environment variable not found")
 
     row.value = data.value
+    audit_log.record_for_user(
+        db, current_user,
+        action="envvar.update",
+        entity_type="envvar",
+        entity_id=row.id,
+        org_id=project.org_id,
+        request=request,
+        extra={"key": row.key, "project_id": str(project_id)},
+    )
     db.commit()
     db.refresh(row)
 
@@ -176,6 +203,7 @@ async def update_env_var(
 
 @router.delete("/{project_id}/env/{env_var_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_env_var(
+    request: Request,
     project_id: UUID,
     env_var_id: UUID,
     db: Session = Depends(get_db),
@@ -183,7 +211,7 @@ async def delete_env_var(
 ):
     """Delete an environment variable."""
     user_id = UUID(str(current_user["user_id"]))
-    _get_project_or_404(db, project_id, user_id)
+    project = _get_project_or_404(db, project_id, user_id)
 
     row = db.query(EnvironmentVariable).filter(
         EnvironmentVariable.id == env_var_id,
@@ -192,6 +220,15 @@ async def delete_env_var(
     if not row:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Environment variable not found")
 
+    audit_log.record_for_user(
+        db, current_user,
+        action="envvar.delete",
+        entity_type="envvar",
+        entity_id=row.id,
+        org_id=project.org_id,
+        request=request,
+        extra={"key": row.key, "project_id": str(project_id)},
+    )
     db.delete(row)
     db.commit()
     return None
