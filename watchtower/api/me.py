@@ -36,6 +36,8 @@ class MeResponse(BaseModel):
     can_manage_deployments: bool = False
     can_manage_nodes: bool = False
     can_create_projects: bool = False
+    is_guest: bool = False
+    is_github_authenticated: bool = False
 
 
 @router.get("/me", response_model=MeResponse)
@@ -86,6 +88,9 @@ async def get_me(
         # we still return their identity dict so the UI can render.
         pass
 
+    is_github_authenticated = bool(github_id)
+    is_guest = (not is_github_authenticated) and (email == "guest@watchtower.local")
+
     return MeResponse(
         user_id=user_id,
         email=email,
@@ -97,6 +102,10 @@ async def get_me(
         role=role,
         can_manage_team=can_manage_team,
         can_manage_deployments=can_manage_deployments,
-        can_manage_nodes=can_manage_nodes,
+        # Guests can NOT register remote nodes — UI hides the affordance
+        # too, but enforce here as well so direct API calls also fail.
+        can_manage_nodes=can_manage_nodes and is_github_authenticated,
         can_create_projects=can_create_projects,
+        is_guest=is_guest,
+        is_github_authenticated=is_github_authenticated,
     )
