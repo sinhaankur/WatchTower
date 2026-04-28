@@ -581,10 +581,23 @@ function resolvePython() {
   return null; // signal "no venv" — caller surfaces a clear error to the user
 }
 
+// Tracks whether the backend process has died — wired up by startBackend().
+// waitForUrl checks this and rejects immediately so we don't sit on the
+// splash for 120 s waiting for a process that's already gone.
+let backendExited = false;
+let backendExitReason = '';
+
 function waitForUrl(url, timeoutMs = 45000) {
   return new Promise((resolve, reject) => {
     const startedAt = Date.now();
     const attempt = () => {
+      // Backend died while we were polling — fail the wait now instead of
+      // exhausting the timeout. The exit reason is captured by the
+      // backendProcess.on('exit') hook in startBackend().
+      if (backendExited) {
+        reject(new Error(`Backend exited before responding: ${backendExitReason}`));
+        return;
+      }
       const req = http.get(url, (res) => {
         res.resume();
         if (res.statusCode && res.statusCode < 500) { resolve(); return; }
@@ -595,6 +608,10 @@ function waitForUrl(url, timeoutMs = 45000) {
         setTimeout(attempt, 300);
       });
       req.on('error', () => {
+        if (backendExited) {
+          reject(new Error(`Backend exited before responding: ${backendExitReason}`));
+          return;
+        }
         if (Date.now() - startedAt > timeoutMs) {
           reject(new Error(`Timed out waiting for ${url}`));
           return;
@@ -666,10 +683,19 @@ async function startBackend() {
     }
   );
 
-  // Capture an early-exit so launch() doesn't sit in waitForUrl for 45s.
+  // Capture an early exit so waitForUrl fails immediately instead of
+  // burning the full 120 s timeout. The flag is read by waitForUrl on
+  // every poll; the message surfaces in the "WatchTower failed to start"
+  // dialog so users see the real cause (segfault, ImportError, port in
+  // use, etc.) instead of the generic "Timed out".
+  backendExited = false;
+  backendExitReason = '';
   backendProcess.once('exit', (code, signal) => {
+    backendExited = true;
+    backendExitReason =
+      `exit code=${code} signal=${signal}. See ${backendLogPath} for details.`;
     if (code !== 0 && code !== null) {
-      console.warn(`[WatchTower] backend exited early (code=${code} signal=${signal}). See ${backendLogPath}`);
+      console.warn(`[WatchTower] backend exited early — ${backendExitReason}`);
     }
   });
 }
