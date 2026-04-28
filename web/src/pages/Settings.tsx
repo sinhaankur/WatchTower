@@ -1,6 +1,13 @@
 import { useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import apiClient from '@/lib/api';
-import { useVSCodeStatus } from '@/hooks/queries';
+import {
+  useVSCodeStatus,
+  useUpdateCheck,
+  isAutoUpdateCheckEnabled,
+  setAutoUpdateCheckEnabled,
+  queryKeys,
+} from '@/hooks/queries';
 
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
@@ -162,6 +169,117 @@ function VSCodeCard() {
   );
 }
 
+function UpdateCheckCard() {
+  const [autoCheck, setAutoCheckState] = useState<boolean>(() => isAutoUpdateCheckEnabled());
+  const qc = useQueryClient();
+  const { data, isFetching, refetch, error } = useUpdateCheck({ autoCheck });
+
+  const handleToggleAuto = (next: boolean) => {
+    setAutoCheckState(next);
+    setAutoUpdateCheckEnabled(next);
+    if (next) void refetch();
+  };
+
+  const handleCheckNow = async () => {
+    // Force a live re-fetch from GitHub (backend bypasses its hourly cache
+    // when force=true), then warm the regular query so the banner / card
+    // update without an extra round-trip.
+    const fresh = (await apiClient.get(`/runtime/version?force=true`)).data;
+    qc.setQueryData(queryKeys.updateCheck, fresh);
+  };
+
+  const current = data?.current ?? '—';
+  const latest = data?.latest;
+  const checked = data?.checked_at ? new Date(data.checked_at).toLocaleString() : null;
+
+  return (
+    <div className="rounded-xl border border-slate-800 bg-card p-5 shadow-[2px_2px_0_0_#1f2937]">
+      <div className="flex items-center gap-3 mb-4">
+        <div className="w-9 h-9 rounded-lg border border-slate-800 bg-slate-900 flex items-center justify-center shadow-[1px_1px_0_0_#1f2937]">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="23 4 23 10 17 10" />
+            <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+          </svg>
+        </div>
+        <div className="flex-1 min-w-0">
+          <h2 className="text-sm font-semibold text-slate-900">WatchTower Updates</h2>
+          <p className="text-xs text-slate-500">
+            Current version <span className="font-mono text-slate-700">{current}</span>
+            {latest && latest !== current && (
+              <> · Latest <span className="font-mono text-slate-700">{latest}</span></>
+            )}
+          </p>
+        </div>
+        {data?.has_update ? (
+          <span className="text-xs px-2 py-0.5 rounded-full border font-medium border-amber-300 bg-amber-50 text-amber-800">
+            Update available
+          </span>
+        ) : data?.latest ? (
+          <span className="text-xs px-2 py-0.5 rounded-full border font-medium border-emerald-300 bg-emerald-50 text-emerald-700">
+            Up to date
+          </span>
+        ) : null}
+      </div>
+
+      {data?.has_update && data.release_url && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 mb-3 flex items-start gap-3">
+          <div className="flex-1">
+            <p className="text-xs text-amber-900">
+              <strong>{data.release_name ?? `v${data.latest}`}</strong> is available.
+            </p>
+            <p className="text-[11px] text-amber-800 mt-0.5">
+              Review the release notes before updating.
+            </p>
+          </div>
+          <a
+            href={data.release_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs px-3 py-1.5 rounded-lg border border-amber-700 bg-white text-amber-800 hover:bg-amber-100 font-medium"
+          >
+            Release notes →
+          </a>
+        </div>
+      )}
+
+      {error && (
+        <p className="text-xs text-red-600 mb-3">
+          Could not reach GitHub to check for updates.
+        </p>
+      )}
+      {data?.error && (
+        <p className="text-xs text-amber-700 mb-3">{data.error}</p>
+      )}
+
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <label className="flex items-center gap-2 text-xs text-slate-700 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={autoCheck}
+            onChange={(e) => handleToggleAuto(e.target.checked)}
+            className="w-3.5 h-3.5 accent-slate-800"
+          />
+          Check for updates automatically
+        </label>
+        <div className="flex items-center gap-3">
+          {checked && (
+            <span className="text-[11px] text-slate-500" title={`Last checked ${checked}`}>
+              Checked {checked}
+            </span>
+          )}
+          <button
+            onClick={() => void handleCheckNow()}
+            disabled={isFetching}
+            className="text-xs px-3 py-1.5 rounded-lg border border-slate-800 bg-white hover:bg-slate-50 text-slate-800 font-medium shadow-[1px_1px_0_0_#1f2937] disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isFetching ? 'Checking…' : 'Check for Updates'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const Settings = () => {
   const [showReportModal, setShowReportModal] = useState(false);
 
@@ -186,29 +304,11 @@ const Settings = () => {
 
       <main className="px-4 sm:px-6 lg:px-8 py-6 max-w-4xl mx-auto w-full space-y-4">
 
+        {/* WatchTower version + update check */}
+        <UpdateCheckCard />
+
         {/* VS Code Integration — prominent card */}
         <VSCodeCard />
-
-        {/* Other settings groups */}
-        {[
-          { title: 'General', items: ['Instance name', 'Default branch', 'Build timeout'] },
-          { title: 'Authentication', items: ['GitHub OAuth', 'API tokens', 'Team access'] },
-          { title: 'Notifications', items: ['Email alerts', 'Discord webhook', 'Slack webhook'] },
-          { title: 'Backups', items: ['S3-compatible backup', 'Backup schedule', 'Retention policy'] },
-        ].map(({ title, items }) => (
-          <div key={title} className="rounded-xl border border-border bg-card p-5">
-            <h2 className="text-sm font-semibold text-slate-900 mb-3">{title}</h2>
-            <div className="space-y-2">
-              {items.map((item) => (
-                <div key={item}
-                  className="flex items-center justify-between p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors cursor-pointer">
-                  <span className="text-sm text-slate-900">{item}</span>
-                  <span className="text-xs text-slate-600">Configure →</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        ))}
 
       </main>
 
