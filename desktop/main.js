@@ -1317,7 +1317,26 @@ app.whenReady().then(async () => {
     });
   } catch (error) {
     if (splashWindow && !splashWindow.isDestroyed()) splashWindow.close();
-    const backendLogPath = path.join(repoRoot, '.dev', 'desktop-backend.log');
+    // Pick the first existing log path: dev-clone preferred, fallback to
+    // writable data dir (matches the resolution order in startBackend()).
+    const candidateLogs = [
+      path.join(repoRoot, '.dev', 'desktop-backend.log'),
+      path.join(writableDataDir(), 'logs', 'desktop-backend.log'),
+    ];
+    const backendLogPath = candidateLogs.find((p) => fs.existsSync(p));
+
+    // Surface the failure on stderr too so headless launches (CI, .desktop
+    // file with no terminal) leave a trace in journald / xvfb-run output
+    // rather than disappearing into a dialog nobody sees.
+    console.error('[WatchTower] launch failed:', error.message);
+    if (backendLogPath) {
+      try {
+        const tail = fs.readFileSync(backendLogPath, 'utf-8').split('\n').slice(-30).join('\n');
+        console.error('[WatchTower] last 30 lines of backend log:');
+        console.error(tail);
+      } catch { /* ignore */ }
+    }
+
     const distIndex = path.join(webRoot, 'dist', 'index.html');
     const distExists = fs.existsSync(distIndex);
     const parts = [error.message];
@@ -1327,7 +1346,7 @@ app.whenReady().then(async () => {
         `Build it once with:\n  npm --prefix web install && npm --prefix web run build`
       );
     }
-    if (fs.existsSync(backendLogPath)) {
+    if (backendLogPath) {
       parts.push(`\nBackend log:\n  ${backendLogPath}`);
     }
     dialog.showErrorBox('WatchTower failed to start', parts.join('\n'));

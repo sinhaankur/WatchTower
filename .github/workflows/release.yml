@@ -210,10 +210,32 @@ jobs:
             fi
             if ! kill -0 "$APP_PID" 2>/dev/null; then
               echo "::error::Desktop process exited before backend responded."
+              for log in "$HOME/.watchtower/logs/desktop-backend.log" \
+                         "$HOME/sandbox/.dev/desktop-backend.log"; do
+                if [ -f "$log" ]; then
+                  echo "::group::Backend log ($log)"
+                  cat "$log"
+                  echo "::endgroup::"
+                fi
+              done
               exit 1
             fi
             sleep 2
           done
 
           echo "::error::Backend never reached /health within 90 s."
+          # Print every backend log we can find so the failure mode is
+          # actually diagnosable from the workflow output. Without this
+          # we'd cut another release tag just to add prints.
+          echo "::group::Searching for backend logs..."
+          find "$HOME" -name 'desktop-backend.log' 2>/dev/null || true
+          echo "::endgroup::"
+          for log in "$HOME/.watchtower/logs/desktop-backend.log" \
+                     "$HOME/sandbox/.dev/desktop-backend.log"; do
+            if [ -f "$log" ]; then
+              echo "::group::Backend log ($log)"
+              cat "$log"
+              echo "::endgroup::"
+            fi
+          done
           exit 1
