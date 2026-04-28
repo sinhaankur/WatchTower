@@ -218,7 +218,7 @@ export default function Layout({ children }: { children: ReactNode }) {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const { data: updateData } = useUpdateCheck();
   const versionLabel = updateData?.current ? `v${updateData.current}` : '';
-  const { data: me } = useMe();
+  const { data: me, isLoading: meLoading } = useMe();
 
   const handleLogout = () => {
     localStorage.removeItem('authToken');
@@ -260,6 +260,15 @@ export default function Layout({ children }: { children: ReactNode }) {
         {hasSessionToken ? (
           <>
             {/* Identity badge — who am I, in which org */}
+            {meLoading && !me ? (
+              <div className="flex items-center gap-2 px-2 py-2 rounded-lg bg-white border border-border mb-2 animate-pulse">
+                <div className="w-7 h-7 rounded-full bg-slate-200 shrink-0" />
+                <div className="min-w-0 flex-1 space-y-1">
+                  <div className="h-2.5 w-24 bg-slate-200 rounded" />
+                  <div className="h-2 w-32 bg-slate-100 rounded" />
+                </div>
+              </div>
+            ) : (
             <div className="flex items-center gap-2 px-2 py-2 rounded-lg bg-white border border-border mb-2">
               {me?.avatar_url ? (
                 <img
@@ -303,6 +312,7 @@ export default function Layout({ children }: { children: ReactNode }) {
                 </p>
               </div>
             </div>
+            )}
             <div className="flex items-center justify-between px-1">
               <Link
                 to="/team"
