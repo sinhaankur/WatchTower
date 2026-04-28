@@ -107,10 +107,25 @@ def _ensure_secret_key() -> None:
         )
 
 
+# ── Database migration: run BEFORE the FastAPI app object exists ─────────────
+#
+# This *was* in the FastAPI lifespan (`async def lifespan: ... init_db() ...`),
+# but Alembic's ``command.upgrade()`` running inside uvicorn's lifespan task
+# hangs after it returns — uvicorn never receives the
+# ``lifespan.startup.complete`` event, so the backend never starts answering
+# ``/health`` and the desktop launcher sits on the splash for the full 120 s
+# timeout before erroring out. Reproducible with the smallest possible
+# lifespan that calls ``command.upgrade``; running the same call as a
+# subprocess or at module load time works fine. Suspected interaction
+# between Alembic 1.13.x and uvicorn 0.29's lifespan implementation; root
+# cause unclear, but the workaround (run migrations at import time) is
+# robust and removes the entire failure mode.
+init_db()
+
+
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     logger.info("Starting WatchTower API")
-    init_db()
     _ensure_secret_key()
     # Security: warn loudly when running without a real API token in dev mode.
     if (

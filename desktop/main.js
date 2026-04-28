@@ -581,10 +581,23 @@ function resolvePython() {
   return null; // signal "no venv" — caller surfaces a clear error to the user
 }
 
+// Tracks whether the backend process has died — wired up by startBackend().
+// waitForUrl checks this and rejects immediately so we don't sit on the
+// splash for 120 s waiting for a process that's already gone.
+let backendExited = false;
+let backendExitReason = '';
+
 function waitForUrl(url, timeoutMs = 45000) {
   return new Promise((resolve, reject) => {
     const startedAt = Date.now();
     const attempt = () => {
+      // Backend died while we were polling — fail the wait now instead of
+      // exhausting the timeout. The exit reason is captured by the
+      // backendProcess.on('exit') hook in startBackend().
+      if (backendExited) {
+        reject(new Error(`Backend exited before responding: ${backendExitReason}`));
+        return;
+      }
       const req = http.get(url, (res) => {
         res.resume();
         if (res.statusCode && res.statusCode < 500) { resolve(); return; }
@@ -595,6 +608,10 @@ function waitForUrl(url, timeoutMs = 45000) {
         setTimeout(attempt, 300);
       });
       req.on('error', () => {
+        if (backendExited) {
+          reject(new Error(`Backend exited before responding: ${backendExitReason}`));
+          return;
+        }
         if (Date.now() - startedAt > timeoutMs) {
           reject(new Error(`Timed out waiting for ${url}`));
           return;
@@ -666,38 +683,85 @@ async function startBackend() {
     }
   );
 
-  // Capture an early-exit so launch() doesn't sit in waitForUrl for 45s.
+  // Capture an early exit so waitForUrl fails immediately instead of
+  // burning the full 120 s timeout. The flag is read by waitForUrl on
+  // every poll; the message surfaces in the "WatchTower failed to start"
+  // dialog so users see the real cause (segfault, ImportError, port in
+  // use, etc.) instead of the generic "Timed out".
+  backendExited = false;
+  backendExitReason = '';
   backendProcess.once('exit', (code, signal) => {
+    backendExited = true;
+    backendExitReason =
+      `exit code=${code} signal=${signal}. See ${backendLogPath} for details.`;
     if (code !== 0 && code !== null) {
-      console.warn(`[WatchTower] backend exited early (code=${code} signal=${signal}). See ${backendLogPath}`);
+      console.warn(`[WatchTower] backend exited early — ${backendExitReason}`);
     }
   });
 }
 
 async function startFrontend() {
-  // Kill any process already holding the frontend port (stale Vite, previous run, etc.)
+  // Legacy path — only reached when WATCHTOWER_DESKTOP_LEGACY_FRONTEND=1
+  // is explicitly set. The default (since v1.5.2) loads the SPA from
+  // the backend directly on :8000. Kept around so users who want
+  // origin-isolated CSP across processes can opt back in.
   await killPortProcesses(FRONTEND_PORT);
 
   const distIndex = path.join(webRoot, 'dist', 'index.html');
   if (fs.existsSync(distIndex)) {
     // Fast path: serve the pre-built static files (<100 ms startup)
     staticServer = await startStaticServer(path.join(webRoot, 'dist'));
-  } else {
-    // Fallback: Vite dev server (first-run / dev mode)
-    frontendProcess = spawn(
-      NPM_BIN,
-      ['run', 'dev', '--', '--host', HOST, '--port', String(FRONTEND_PORT), '--strictPort'],
-      {
-        cwd: webRoot,
-        env: {
-          ...process.env,
-          VITE_API_TOKEN: runtimeApiToken,
-          VITE_API_URL: `http://${HOST}:${BACKEND_PORT}/api`,
-        },
-        stdio: 'inherit',
-      }
+    return;
+  }
+
+  // The Vite-dev fallback only makes sense in an unpackaged dev clone
+  // where `npm` is on PATH. Packaged builds don't ship npm or web/src,
+  // so falling through to `spawn(NPM_BIN)` would crash the main process
+  // with a "spawn npm ENOENT" Electron error dialog. Fail with a clear
+  // message instead.
+  if (app.isPackaged) {
+    throw new Error(
+      `Frontend bundle not found at ${distIndex}. The packaged build is missing web/dist — please reinstall WatchTower.`
     );
   }
+
+  // Probe npm before spawning so we surface a clean error instead of a
+  // dialog about "spawn npm ENOENT" (Electron doesn't inherit the
+  // shell PATH on Linux/macOS).
+  const npmAvailable =
+    NPM_BIN !== 'npm' || (() => {
+      try { execSync('npm --version', { stdio: 'ignore', timeout: 2000 }); return true; }
+      catch { return false; }
+    })();
+  if (!npmAvailable) {
+    throw new Error(
+      `Frontend bundle not found at ${distIndex}, and npm is not on PATH so the Vite ` +
+      `dev fallback can't be used. Run \`npm --prefix web run build\` once from a terminal, ` +
+      `then re-launch the app.`
+    );
+  }
+
+  frontendProcess = spawn(
+    NPM_BIN,
+    ['run', 'dev', '--', '--host', HOST, '--port', String(FRONTEND_PORT), '--strictPort'],
+    {
+      cwd: webRoot,
+      env: {
+        ...process.env,
+        VITE_API_TOKEN: runtimeApiToken,
+        VITE_API_URL: `http://${HOST}:${BACKEND_PORT}/api`,
+      },
+      stdio: 'inherit',
+    }
+  );
+
+  // If the spawn itself fails (rare — usually caught by the npmAvailable
+  // probe above, but covers cases where npm exists but the project's
+  // node_modules are missing), reject the launch so the user sees the
+  // actual error instead of the splash hanging.
+  frontendProcess.on('error', (err) => {
+    console.warn('[WatchTower] npm/Vite spawn failed:', err.message);
+  });
 }
 
 function stopProcesses() {
