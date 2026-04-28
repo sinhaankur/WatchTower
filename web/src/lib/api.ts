@@ -2,7 +2,11 @@ import axios from 'axios';
 
 const API_BASE_URL = (import.meta as any).env?.VITE_API_URL || '/api';
 const API_TOKEN = (import.meta as any).env?.VITE_API_TOKEN;
-const DEV_FALLBACK_TOKEN = (import.meta as any).env?.DEV ? 'dev-token' : undefined;
+// Must match the value the backend defaults to in dev mode
+// (`_ensure_dev_api_token()` in watchtower/api/__init__.py) and the value
+// shipped in `.env`. Previously this was 'dev-token', which never matched
+// either side — every dev session 401'd until the user manually signed in.
+const DEV_FALLBACK_TOKEN = (import.meta as any).env?.DEV ? 'dev-watchtower-token' : undefined;
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
