@@ -11,7 +11,7 @@ import time
 import base64
 import hashlib
 from typing import Optional
-from fastapi import Header, HTTPException, status
+from fastapi import Header, HTTPException, Request, status
 
 try:
     from cryptography.fernet import Fernet
@@ -241,7 +241,8 @@ def decrypt_secret(value: str) -> str:
 
 
 def get_current_user(
-    authorization: str = Header(None)
+    request: Request,
+    authorization: str = Header(None),
 ):
     """
     Get current user from API key or token.
@@ -269,6 +270,12 @@ def get_current_user(
 
     session_user = _parse_user_session_token(provided_token)
     if session_user:
+        # Surface the resolved user_id on request.state so the
+        # rate-limit key extractor (_key_user_then_remote in
+        # rate_limit.py) keys per-user instead of silently falling
+        # back to the IP — without this, two users behind the same
+        # NAT share a budget.
+        request.state.user_id = session_user.get("user_id")
         return session_user
 
     # Token-based fallback (CI scripts, curl, the Electron shell). Always
@@ -299,6 +306,7 @@ def get_current_user(
         )
 
     user_id = str(uuid.uuid5(uuid.NAMESPACE_URL, f"watchtower:{provided_token}"))
+    request.state.user_id = user_id
     return {
         "user_id": user_id,
         "email": os.getenv("WATCHTOWER_DEFAULT_USER_EMAIL", "developer@watchtower.local"),
