@@ -4,7 +4,8 @@ import BrandLogo from './BrandLogo';
 import TitleBar from './TitleBar';
 import ActivityBar from './ActivityBar';
 import { PageTransition } from './PageTransition';
-import { useUpdateCheck, useMe } from '@/hooks/queries';
+import { useUpdateCheck, useMe, useActiveDeploymentCount } from '@/hooks/queries';
+import { CommandPalette, openCommandPalette } from './CommandPalette';
 
 const UPDATE_BANNER_DISMISSED_KEY = 'watchtower:updateBannerDismissed';
 
@@ -199,13 +200,52 @@ function NavSectionLabel({ children }: { children: ReactNode }) {
   );
 }
 
-function NavLink({ item, pathname, onClick }: { item: NavItem; pathname: string; onClick?: () => void }) {
+// Numeric badge for nav items with live counts (e.g. running deploys
+// next to "Applications"). Stays subtle on inactive rows; the active
+// row inverts to a slate-700 fill against the white text so it doesn't
+// vanish on the dark active background.
+function NavBadge({ count, active }: { count: number; active: boolean }) {
+  if (count <= 0) return null;
+  const display = count > 99 ? '99+' : String(count);
+  return (
+    <span
+      aria-label={`${count} active`}
+      className={`ml-auto text-[10px] font-semibold tabular-nums px-1.5 py-0.5 rounded-full transition-colors ${
+        active
+          ? 'bg-white/15 text-white'
+          : 'bg-slate-200 text-slate-700'
+      }`}
+    >
+      {display}
+    </span>
+  );
+}
+
+type NavLinkProps = {
+  item: NavItem;
+  pathname: string;
+  onClick?: () => void;
+  /** When true: render only the icon (icon-rail mode). Tooltip shows label. */
+  rail?: boolean;
+  /** Optional badge count rendered to the right of the label. */
+  badge?: number;
+};
+
+function NavLink({ item, pathname, onClick, rail, badge }: NavLinkProps) {
   const active = item.path === '/' ? pathname === '/' : pathname.startsWith(item.path);
+  // Always-on title attribute = native browser tooltip when fully expanded
+  // AND when in rail mode (icon-only). Native tooltips are accessible by
+  // default and don't require a portal.
+  const tooltip = rail ? item.label : undefined;
   return (
     <Link
       to={item.path}
       onClick={onClick}
-      className={`group flex items-center gap-2.5 px-3 py-1.5 rounded-md text-[13px] font-medium transition-colors ${
+      title={tooltip}
+      aria-label={rail ? item.label : undefined}
+      className={`group flex items-center gap-2.5 rounded-md text-[13px] font-medium transition-colors ${
+        rail ? 'justify-center px-2 py-2' : 'px-3 py-1.5'
+      } ${
         active
           ? 'bg-slate-900 text-white'
           : 'text-slate-600 hover:bg-slate-100/80 hover:text-slate-900'
@@ -214,7 +254,21 @@ function NavLink({ item, pathname, onClick }: { item: NavItem; pathname: string;
       <span className={active ? 'text-white' : 'text-slate-400 group-hover:text-slate-700'}>
         <item.Icon />
       </span>
-      {item.label}
+      {!rail && (
+        <>
+          <span className="truncate">{item.label}</span>
+          {typeof badge === 'number' && <NavBadge count={badge} active={active} />}
+        </>
+      )}
+      {/* Rail-mode badge — small dot in the upper-right of the icon when
+          there's something pending. The number is shown via the title
+          tooltip so the rail stays compact. */}
+      {rail && typeof badge === 'number' && badge > 0 && (
+        <span
+          aria-hidden="true"
+          className="absolute mt-[-12px] ml-[12px] w-2 h-2 rounded-full bg-amber-500 ring-2 ring-white"
+        />
+      )}
     </Link>
   );
 }
@@ -224,54 +278,152 @@ export default function Layout({ children }: { children: ReactNode }) {
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const hasSessionToken = Boolean(localStorage.getItem('authToken'));
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+
+  // Three-state sidebar: 'full' (text + icons), 'rail' (icons only,
+  // ~56px wide, label as tooltip), or 'hidden' (no sidebar).
+  // Persisted per-user so reopening the app respects the choice.
+  const SIDEBAR_PREF_KEY = 'watchtower:sidebarMode';
+  type SidebarMode = 'full' | 'rail' | 'hidden';
+  const [sidebarMode, setSidebarMode] = useState<SidebarMode>(() => {
+    try {
+      const v = localStorage.getItem(SIDEBAR_PREF_KEY);
+      return (v === 'rail' || v === 'hidden' || v === 'full') ? v : 'full';
+    } catch { return 'full'; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem(SIDEBAR_PREF_KEY, sidebarMode); } catch { /* ignore */ }
+  }, [sidebarMode]);
+  const cycleSidebar = () => setSidebarMode((m) =>
+    m === 'full' ? 'rail' : m === 'rail' ? 'hidden' : 'full'
+  );
+
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const { data: updateData } = useUpdateCheck();
   const versionLabel = updateData?.current ? `v${updateData.current}` : '';
   const { data: me, isLoading: meLoading } = useMe();
+  const { data: activeDeploys } = useActiveDeploymentCount();
+  const activeBuildCount = activeDeploys?.active ?? 0;
 
   const handleLogout = () => {
     localStorage.removeItem('authToken');
     navigate('/login');
   };
 
+  // Wire badge counts per nav path. Right now we only badge
+  // /applications with the active deployment count, but this is the
+  // place to add more later (e.g. /audit recent events, /servers
+  // unhealthy nodes).
+  const navBadgeFor = (path: string): number | undefined => {
+    if (path === '/applications') return activeBuildCount;
+    return undefined;
+  };
+
   // Shared sidebar content used in both desktop sidebar and mobile drawer
-  const SidebarInner = ({ onNavClick }: { onNavClick?: () => void }) => (
+  const SidebarInner = ({ onNavClick, rail }: { onNavClick?: () => void; rail?: boolean }) => (
     <>
-      {!isElectron && (
+      {!isElectron && !rail && (
         <div className="px-4 py-5 border-b" style={{ borderColor: 'hsl(214 32% 88%)' }}>
           <BrandLogo withLabel size="md" />
         </div>
       )}
+      {!isElectron && rail && (
+        <div className="px-3 py-4 flex items-center justify-center border-b" style={{ borderColor: 'hsl(214 32% 88%)' }}>
+          <BrandLogo size="sm" />
+        </div>
+      )}
       {isElectron && <div className="h-3" />}
 
-      <div className="px-3 pt-3 pb-2">
+      <div className={rail ? 'px-2 pt-3 pb-2' : 'px-3 pt-3 pb-2'}>
         <Link
           to="/setup"
           onClick={onNavClick}
-          className="flex items-center justify-center gap-2 w-full py-1.5 px-3 rounded-md bg-slate-900 hover:bg-slate-800 transition-colors text-white text-[13px] font-medium"
+          title={rail ? 'New Resource' : undefined}
+          className={`flex items-center justify-center gap-2 w-full ${
+            rail ? 'py-2' : 'py-1.5 px-3'
+          } rounded-md bg-slate-900 hover:bg-slate-800 transition-colors text-white text-[13px] font-medium`}
         >
           <IconPlus />
-          New Resource
+          {!rail && <>New Resource</>}
         </Link>
       </div>
 
-      <nav className="flex-1 px-2 pt-1 pb-2 overflow-y-auto">
-        <NavSectionLabel>Workspace</NavSectionLabel>
+      {!rail && (
+        <button
+          type="button"
+          onClick={openCommandPalette}
+          className="mx-3 mb-2 flex items-center gap-2 px-3 py-1.5 rounded-md border border-slate-200 bg-white hover:bg-slate-50 text-[12px] text-slate-500 hover:text-slate-700 transition-colors"
+        >
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+          </svg>
+          <span className="flex-1 text-left">Search…</span>
+          <kbd className="text-[10px] font-mono text-slate-400 border border-slate-200 px-1 rounded">⌘K</kbd>
+        </button>
+      )}
+
+      <nav className={`flex-1 ${rail ? 'px-1.5' : 'px-2'} pt-1 pb-2 overflow-y-auto`}>
+        {!rail && <NavSectionLabel>Workspace</NavSectionLabel>}
         <div className="space-y-px">
           {PRIMARY_NAV.map((item) => (
-            <NavLink key={item.path} item={item} pathname={pathname} onClick={onNavClick} />
+            <NavLink
+              key={item.path}
+              item={item}
+              pathname={pathname}
+              onClick={onNavClick}
+              rail={rail}
+              badge={navBadgeFor(item.path)}
+            />
           ))}
         </div>
-        <NavSectionLabel>Admin</NavSectionLabel>
+        {rail ? (
+          <div className="my-2 mx-3 border-t border-slate-200" />
+        ) : (
+          <NavSectionLabel>Admin</NavSectionLabel>
+        )}
         <div className="space-y-px">
           {SECONDARY_NAV.map((item) => (
-            <NavLink key={item.path} item={item} pathname={pathname} onClick={onNavClick} />
+            <NavLink
+              key={item.path}
+              item={item}
+              pathname={pathname}
+              onClick={onNavClick}
+              rail={rail}
+              badge={navBadgeFor(item.path)}
+            />
           ))}
         </div>
       </nav>
 
-      <div className="px-3 py-3 border-t" style={{ borderColor: 'hsl(214 32% 88%)' }}>
+      {/* Rail-mode footer: just the avatar + version dot. Full identity
+          card and version line render in 'full' mode below. */}
+      {rail && (
+        <div className="px-2 py-3 border-t flex flex-col items-center gap-2" style={{ borderColor: 'hsl(214 32% 88%)' }}>
+          {hasSessionToken && me?.avatar_url ? (
+            <img
+              src={me.avatar_url}
+              alt={me?.name ?? me?.email ?? 'Account'}
+              title={me?.email ?? me?.name ?? 'Account'}
+              className="w-7 h-7 rounded-full border border-slate-200"
+            />
+          ) : hasSessionToken ? (
+            <div
+              title={me?.email ?? me?.name ?? 'Account'}
+              className="w-7 h-7 rounded-full bg-slate-200 text-slate-600 text-xs font-semibold flex items-center justify-center uppercase"
+            >
+              {(me?.name ?? me?.email ?? '?').slice(0, 1)}
+            </div>
+          ) : null}
+          {updateData?.has_update && (
+            <Link
+              to="/settings"
+              title={`Update v${updateData.latest} available`}
+              className="w-2 h-2 rounded-full bg-amber-500 ring-2 ring-white"
+            />
+          )}
+        </div>
+      )}
+
+      <div className={`px-3 py-3 border-t ${rail ? 'hidden' : ''}`} style={{ borderColor: 'hsl(214 32% 88%)' }}>
         {hasSessionToken ? (
           <>
             {/* Identity badge — who am I, in which org */}
@@ -400,30 +552,42 @@ export default function Layout({ children }: { children: ReactNode }) {
       <div className="flex flex-1 min-h-0 overflow-hidden">
         {isElectron && <ActivityBar />}
 
-        {/* Desktop sidebar */}
-        {sidebarOpen && (
+        {/* Desktop sidebar — three modes: full (224px), rail (56px,
+            icons only), or hidden. Width animates via Tailwind class
+            so the transition feels designed instead of janky. */}
+        {sidebarMode !== 'hidden' && (
           <aside
-            className="hidden lg:flex shrink-0 flex-col border-r backdrop-blur-sm"
-            style={{ width: 224, background: 'hsl(214 55% 98%)', borderColor: 'hsl(214 32% 88%)' }}
+            className={`hidden lg:flex shrink-0 flex-col border-r backdrop-blur-sm transition-[width] duration-200 ${
+              sidebarMode === 'rail' ? 'w-14' : 'w-56'
+            }`}
+            style={{ background: 'hsl(214 55% 98%)', borderColor: 'hsl(214 32% 88%)' }}
           >
-            <SidebarInner />
+            <SidebarInner rail={sidebarMode === 'rail'} />
           </aside>
         )}
 
-        {/* Desktop sidebar toggle */}
+        {/* Sidebar mode-cycle toggle (full → rail → hidden → full).
+            Same mechanism as before, but now three states; the icon
+            rotates to communicate the next direction. */}
         <button
-          title={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
-          onClick={() => setSidebarOpen((v) => !v)}
+          title={
+            sidebarMode === 'full' ? 'Collapse to icons (rail)'
+              : sidebarMode === 'rail' ? 'Hide sidebar'
+              : 'Show sidebar'
+          }
+          onClick={cycleSidebar}
           className="hidden lg:flex absolute z-10 items-center justify-center w-4 h-10 bg-slate-100 border border-slate-200 hover:bg-slate-200 transition-colors text-slate-500"
           style={{
-            left: isElectron ? (sidebarOpen ? 48 + 224 : 48) : (sidebarOpen ? 224 : 0),
+            left: isElectron
+              ? (sidebarMode === 'full' ? 48 + 224 : sidebarMode === 'rail' ? 48 + 56 : 48)
+              : (sidebarMode === 'full' ? 224 : sidebarMode === 'rail' ? 56 : 0),
             top: '50%',
             transform: 'translateY(-50%)',
             borderRadius: '0 4px 4px 0',
           }}
         >
           <svg width="8" height="12" viewBox="0 0 8 12" fill="none" stroke="currentColor" strokeWidth="1.5">
-            {sidebarOpen ? (
+            {sidebarMode !== 'hidden' ? (
               <><line x1="6" y1="1" x2="2" y2="6" /><line x1="2" y1="6" x2="6" y2="11" /></>
             ) : (
               <><line x1="2" y1="1" x2="6" y2="6" /><line x1="6" y1="6" x2="2" y2="11" /></>
@@ -460,6 +624,7 @@ export default function Layout({ children }: { children: ReactNode }) {
 
           <UpdateBanner />
           <PageTransition>{children}</PageTransition>
+          <CommandPalette />
         </div>
       </div>
     </div>
