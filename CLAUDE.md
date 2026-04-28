@@ -138,6 +138,17 @@ SQLite by default (`./watchtower.db`), Postgres-capable via `DATABASE_URL`. ORM 
 
 The deployment runner: clones a project's git repo into `$WATCHTOWER_BUILD_DIR` (defaults to `/tmp/watchtower-builds`), runs the build, packages an artifact, rsyncs to each `OrgNode` over SSH (via `fabric`), runs the node's reload command, and updates `Deployment.status`. Triggered by webhooks (`api/webhooks.py`), manual API calls (`api/deployments.py`), or `watchtower-deploy deploy-now`.
 
+### Audit log (`watchtower/api/audit.py` + `AuditEvent` model)
+
+Append-only record of who-did-what across mutating endpoints. Closes audit-review item #10.
+
+- `audit_log.record_for_user(db, current_user, action="project.create", entity_id=..., org_id=..., request=request, extra={...})` — call inside any mutating handler. Uses `db.flush()` (not commit) so the audit row lives or dies with the user-facing write.
+- `GET /api/audit?entity_type=...&entity_id=...&action=...&days=30&limit=100` — read endpoint scoped to caller's organization.
+- Each row records: actor (user_id + email), action (dotted: `project.create`, `deployment.trigger`, `envvar.update`), entity_type + entity_id, org_id, request_id (from log_config — for cross-correlation with logs), client IP, action-specific JSON metadata in `extra`.
+- **`extra` NEVER stores secret values.** Env-var audits record the key + environment but never the value. Tested explicitly so future changes can't regress.
+
+Currently instrumented: `project.{create,update,delete}`, `deployment.{trigger,rollback}`, `envvar.{create,update,delete}`. Add new actions by calling `audit_log.record_for_user()` inside the handler before its `db.commit()`.
+
 ### Logging (`watchtower/log_config.py`)
 
 `setup_logging()` is idempotent and the only place logging gets configured — `api/__init__.py`, `deploy_server.py`, and `worker.py` all call it instead of `logging.basicConfig` (the audit flagged a silent double-init that caused log lines to drop). Two formats:
