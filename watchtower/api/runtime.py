@@ -1520,3 +1520,122 @@ async def runtime_version(
     Settings "Check for Updates" button so the user gets a live answer).
     """
     return _check_for_update(force=force)
+
+
+# ── Local node auto-config ──────────────────────────────────────────────────
+# Powers the "Use This PC as a Server" LocalNode page. Without this, users
+# have to know off the top of their head: which deploy path to use, the
+# right reload command for their init system, the right profile for their
+# hardware. The existing form has *some* defaults (per-OS deploy path) but
+# everything else is blank. This endpoint probes the local host and
+# returns a fully-pre-filled config so the user just clicks "Register".
+
+import platform as _platform
+import socket as _socket
+
+
+def _detect_local_profile() -> dict:
+    """Light/Standard/Full based on detected CPU + RAM."""
+    try:
+        cpus = os.cpu_count() or 1
+    except Exception:
+        cpus = 1
+    ram_gb = 0
+    try:
+        # /proc/meminfo on Linux; falls back gracefully on macOS/Windows.
+        with open("/proc/meminfo", "r", encoding="utf-8") as f:
+            for line in f:
+                if line.startswith("MemTotal:"):
+                    ram_gb = int(line.split()[1]) / (1024 * 1024)
+                    break
+    except (OSError, ValueError):
+        pass
+
+    if cpus >= 4 and ram_gb >= 4:
+        chosen = "full"
+        concurrency = 4
+    elif cpus >= 2 and ram_gb >= 2:
+        chosen = "standard"
+        concurrency = 2
+    else:
+        chosen = "light"
+        concurrency = 1
+    return {
+        "id": chosen,
+        "concurrency": concurrency,
+        "detected_cpus": cpus,
+        "detected_ram_gb": round(ram_gb, 1),
+    }
+
+
+def _detect_reload_command(detected: dict[str, dict]) -> str:
+    """Pick the most appropriate reload command from what's installed."""
+    # Prefer Podman if installed (project's primary container runtime).
+    if detected.get("podman", {}).get("installed"):
+        return "systemctl --user restart watchtower-agent.service || podman generate kube"
+    if detected.get("docker", {}).get("installed"):
+        return "sudo systemctl restart docker || docker compose restart"
+    # Fall back to a generic systemd unit name; harmless if the unit
+    # doesn't exist — the deployer will just get a clean error.
+    return "sudo systemctl restart watchtower-agent"
+
+
+def _detect_deploy_path(os_type: str) -> str:
+    if os_type == "windows":
+        return "C:\\WatchTower\\agent"
+    if os_type == "darwin":
+        return "/usr/local/var/watchtower/agent"
+    # Linux / other Unix
+    return os.path.join(os.path.expanduser("~"), ".watchtower", "agent")
+
+
+def _suggest_node_name() -> str:
+    try:
+        host = _socket.gethostname() or "this-pc"
+    except Exception:
+        host = "this-pc"
+    return f"{host}-local"
+
+
+@router.get("/local-node/suggest-config")
+async def local_node_suggest_config(
+    _current_user: dict = Depends(util.get_current_user),
+):
+    """Return a fully-pre-filled "Use This PC as a Server" config.
+
+    The LocalNode page calls this on mount and uses every field as the
+    default form value. Probes the local host in two ways:
+      * `_detect_local_profile()` → resource-class (Light/Standard/Full)
+      * `_podman_status()` / `_docker_status()` → container runtime →
+        appropriate reload command
+    Anything the probe can't determine falls back to a sensible default.
+    """
+    os_type = _platform.system().lower()  # 'linux' | 'darwin' | 'windows'
+    detected = {
+        "podman": _podman_status(),
+        "docker": _docker_status(),
+    }
+    profile = _detect_local_profile()
+    return {
+        "os_type": os_type,
+        "node_name": _suggest_node_name(),
+        "deploy_path": _detect_deploy_path(os_type),
+        "user": "SYSTEM" if os_type == "windows" else os.getenv("USER", "watchtower"),
+        "host": "127.0.0.1",
+        "port": 22,
+        # SSH key isn't actually used for the local-loopback case but the
+        # OrgNode model still requires the field. Send a sentinel that
+        # clearly signals "not used" rather than a believable-looking
+        # path that would confuse anyone debugging later.
+        "ssh_key_path": "none" if os_type == "windows" else "~/.ssh/id_rsa",
+        "reload_command": _detect_reload_command(detected),
+        "profile_id": profile["id"],
+        "max_concurrent_deployments": profile["concurrency"],
+        "is_primary": True,
+        "detected": {
+            "podman_installed": detected["podman"].get("installed", False),
+            "docker_installed": detected["docker"].get("installed", False),
+            "cpus": profile["detected_cpus"],
+            "ram_gb": profile["detected_ram_gb"],
+        },
+    }
