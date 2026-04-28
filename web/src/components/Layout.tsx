@@ -4,7 +4,7 @@ import BrandLogo from './BrandLogo';
 import TitleBar from './TitleBar';
 import ActivityBar from './ActivityBar';
 import { PageTransition } from './PageTransition';
-import { useUpdateCheck } from '@/hooks/queries';
+import { useUpdateCheck, useMe } from '@/hooks/queries';
 
 const UPDATE_BANNER_DISMISSED_KEY = 'watchtower:updateBannerDismissed';
 
@@ -218,6 +218,7 @@ export default function Layout({ children }: { children: ReactNode }) {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const { data: updateData } = useUpdateCheck();
   const versionLabel = updateData?.current ? `v${updateData.current}` : '';
+  const { data: me } = useMe();
 
   const handleLogout = () => {
     localStorage.removeItem('authToken');
@@ -255,31 +256,55 @@ export default function Layout({ children }: { children: ReactNode }) {
         ))}
       </nav>
 
-      <div className="px-4 py-4 border-t" style={{ borderColor: 'hsl(214 32% 88%)' }}>
+      <div className="px-3 py-3 border-t" style={{ borderColor: 'hsl(214 32% 88%)' }}>
         {hasSessionToken ? (
-          <div className="space-y-2">
-            <Link
-              to="/team"
-              onClick={onNavClick}
-              className="block text-xs text-slate-600 hover:text-slate-900 transition-colors"
-            >
-              GitHub Connections
-            </Link>
-            <button
-              type="button"
-              onClick={() => { handleLogout(); onNavClick?.(); }}
-              className="block text-xs text-slate-600 hover:text-red-600 transition-colors"
-            >
-              Sign out
-            </button>
-          </div>
+          <>
+            {/* Identity badge — who am I, in which org */}
+            <div className="flex items-center gap-2 px-2 py-2 rounded-lg bg-white border border-border mb-2">
+              {me?.avatar_url ? (
+                <img
+                  src={me.avatar_url}
+                  alt=""
+                  className="w-7 h-7 rounded-full border border-slate-200 shrink-0"
+                />
+              ) : (
+                <div className="w-7 h-7 rounded-full bg-slate-200 text-slate-600 text-xs font-semibold flex items-center justify-center shrink-0 uppercase">
+                  {(me?.email ?? me?.name ?? '?').slice(0, 1)}
+                </div>
+              )}
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] font-medium text-slate-900 truncate" title={me?.email ?? ''}>
+                  {me?.email ?? me?.name ?? 'Signed in'}
+                </p>
+                <p className="text-[10px] text-slate-500 truncate" title={me?.org_name ?? ''}>
+                  {me?.org_name ? `${me.org_name}${me.role ? ` · ${me.role}` : ''}` : 'WatchTower'}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center justify-between px-1">
+              <Link
+                to="/team"
+                onClick={onNavClick}
+                className="text-[11px] text-slate-600 hover:text-slate-900 transition-colors"
+              >
+                Team
+              </Link>
+              <button
+                type="button"
+                onClick={() => { handleLogout(); onNavClick?.(); }}
+                className="text-[11px] text-slate-600 hover:text-red-600 transition-colors"
+              >
+                Sign out
+              </button>
+            </div>
+          </>
         ) : (
-          <Link to="/login" onClick={onNavClick} className="block text-xs text-slate-600 hover:text-red-700 transition-colors">
+          <Link to="/login" onClick={onNavClick} className="block text-xs text-slate-600 hover:text-red-700 transition-colors px-1">
             Sign in with GitHub →
           </Link>
         )}
-        <p className="text-[10px] text-slate-500 mt-3">
-          WatchTower Cloud Mesh{versionLabel ? ` ${versionLabel}` : ''}
+        <p className="text-[10px] text-slate-500 mt-3 px-1">
+          WatchTower{versionLabel ? ` ${versionLabel}` : ''}
           {updateData?.has_update && (
             <Link to="/settings" className="ml-1 text-amber-700 hover:text-amber-900 font-medium">
               · update available

@@ -25,6 +25,7 @@ export const queryKeys = {
   vscodeStatus: ['vscode-status'] as const,
   health: ['health'] as const,
   updateCheck: ['runtime', 'version'] as const,
+  me: ['me'] as const,
 } as const;
 
 // ── Project queries ──────────────────────────────────────────────────────────
@@ -197,6 +198,32 @@ export function setAutoUpdateCheckEnabled(enabled: boolean): void {
   } catch {
     /* localStorage unavailable — silently fall back to defaults */
   }
+}
+
+// ── Identity ─────────────────────────────────────────────────────────────────
+
+export type Me = {
+  user_id: string;
+  email: string | null;
+  name: string | null;
+  github_id: string | null;
+  avatar_url: string | null;
+  org_id: string | null;
+  org_name: string | null;
+  role: string | null;
+  can_manage_team: boolean;
+  can_manage_deployments: boolean;
+  can_manage_nodes: boolean;
+  can_create_projects: boolean;
+};
+
+export function useMe() {
+  return useQuery<Me>({
+    queryKey: queryKeys.me,
+    queryFn: async () => (await apiClient.get<Me>('/me')).data,
+    staleTime: 5 * 60 * 1000, // identity is cheap and rarely changes mid-session
+    retry: false,
+  });
 }
 
 /**
