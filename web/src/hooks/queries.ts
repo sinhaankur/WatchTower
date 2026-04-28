@@ -24,6 +24,7 @@ export const queryKeys = {
   projectRelated: (id: string) => ['project', id, 'related'] as const,
   vscodeStatus: ['vscode-status'] as const,
   health: ['health'] as const,
+  updateCheck: ['runtime', 'version'] as const,
 } as const;
 
 // ── Project queries ──────────────────────────────────────────────────────────
@@ -162,5 +163,57 @@ export function useVSCodeStatus() {
     queryFn: async () => (await apiClient.get<VSCodeStatus>('/runtime/integrations/vscode/status')).data,
     // Probe doesn't change often.
     staleTime: 60_000,
+  });
+}
+
+// ── Update check ─────────────────────────────────────────────────────────────
+
+export type UpdateCheck = {
+  current: string;
+  latest: string | null;
+  has_update: boolean;
+  release_url: string | null;
+  release_name?: string | null;
+  published_at: string | null;
+  checked_at: string;
+  error?: string;
+};
+
+export const AUTO_UPDATE_CHECK_KEY = 'watchtower:autoUpdateCheck';
+
+export function isAutoUpdateCheckEnabled(): boolean {
+  // Default ON — users opt out via Settings.
+  try {
+    const v = localStorage.getItem(AUTO_UPDATE_CHECK_KEY);
+    return v === null ? true : v === 'true';
+  } catch {
+    return true;
+  }
+}
+
+export function setAutoUpdateCheckEnabled(enabled: boolean): void {
+  try {
+    localStorage.setItem(AUTO_UPDATE_CHECK_KEY, enabled ? 'true' : 'false');
+  } catch {
+    /* localStorage unavailable — silently fall back to defaults */
+  }
+}
+
+/**
+ * Fetches current vs latest GitHub release. Honors the user's
+ * auto-check preference: when disabled, the query stays idle until
+ * something forces it (e.g. clicking "Check for Updates").
+ */
+export function useUpdateCheck(opts?: { autoCheck?: boolean; force?: boolean }) {
+  const auto = opts?.autoCheck ?? isAutoUpdateCheckEnabled();
+  const force = opts?.force ?? false;
+  return useQuery<UpdateCheck>({
+    queryKey: force ? [...queryKeys.updateCheck, 'force'] : queryKeys.updateCheck,
+    queryFn: async () =>
+      (await apiClient.get<UpdateCheck>(`/runtime/version${force ? '?force=true' : ''}`)).data,
+    enabled: auto,
+    // Backend caches for 1h; UI cache for 30 min so a fresh tab gets a recheck-ish.
+    staleTime: 30 * 60 * 1000,
+    retry: false,
   });
 }

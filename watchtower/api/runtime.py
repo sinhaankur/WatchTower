@@ -3,20 +3,26 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import signal
 import shlex
 import subprocess
 import sys
+import threading
 import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+import requests
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
+import watchtower
 from watchtower.api import util
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/runtime", tags=["Runtime"])
 
@@ -1354,3 +1360,131 @@ async def service_control(
         )
 
     return _do_service_control(service, action)
+
+
+# ── Update check (GitHub Releases) ──────────────────────────────────────────
+# The desktop wrapper has electron-updater, but browser-mode users (and
+# self-hosted operators) need a way to see "your version is out of date" too.
+# This endpoint queries the public GitHub Releases API and caches the result
+# for an hour to stay well under the 60-req/hr unauthenticated rate limit.
+
+_GITHUB_RELEASES_URL = (
+    "https://api.github.com/repos/sinhaankur/WatchTower/releases/latest"
+)
+_UPDATE_CACHE_TTL_SEC = 3600  # 1 hour
+_update_cache: dict[str, Any] = {"value": None, "fetched_at": 0.0}
+_update_cache_lock = threading.Lock()
+
+
+def _normalize_version(tag: str) -> str:
+    """Strip a leading ``v`` from a GitHub tag like ``v1.4.0`` → ``1.4.0``."""
+    return tag[1:] if tag.startswith("v") else tag
+
+
+def _parse_semver(v: str) -> tuple[int, ...] | None:
+    """Coarse semver parse — returns (major, minor, patch) or None if it
+    doesn't look like a numeric semver. Pre-release suffixes (``-rc.1``)
+    drop to the numeric prefix so a release of ``1.5.0-rc.1`` is still
+    treated as 1.5.0 for ordering vs an installed ``1.4.0``."""
+    base = v.split("-", 1)[0].split("+", 1)[0]
+    parts = base.split(".")
+    try:
+        return tuple(int(p) for p in parts[:3])
+    except ValueError:
+        return None
+
+
+def _fetch_latest_release() -> dict[str, Any] | None:
+    try:
+        resp = requests.get(
+            _GITHUB_RELEASES_URL,
+            headers={
+                "Accept": "application/vnd.github+json",
+                "User-Agent": f"WatchTower/{watchtower.__version__}",
+            },
+            timeout=5,
+        )
+    except requests.RequestException as exc:
+        logger.info("Update check: GitHub request failed: %s", exc)
+        return None
+    if resp.status_code != 200:
+        logger.info("Update check: GitHub returned %s", resp.status_code)
+        return None
+    try:
+        body = resp.json()
+    except ValueError:
+        return None
+    tag = body.get("tag_name")
+    if not isinstance(tag, str) or not tag:
+        return None
+    return {
+        "latest": _normalize_version(tag),
+        "tag_name": tag,
+        "release_url": body.get("html_url"),
+        "published_at": body.get("published_at"),
+        "name": body.get("name") or tag,
+    }
+
+
+def _check_for_update(force: bool = False) -> dict[str, Any]:
+    current = watchtower.__version__
+    now = time.time()
+    with _update_cache_lock:
+        cached = _update_cache["value"]
+        fresh = (now - _update_cache["fetched_at"]) < _UPDATE_CACHE_TTL_SEC
+        if cached and fresh and not force:
+            latest_info: dict[str, Any] | None = cached
+        else:
+            latest_info = _fetch_latest_release()
+            if latest_info:
+                _update_cache["value"] = latest_info
+                _update_cache["fetched_at"] = now
+            elif not cached:
+                # Fetch failed and we have nothing — return a degraded
+                # response rather than 5xx so the UI can show "couldn't
+                # check" without being noisy.
+                return {
+                    "current": current,
+                    "latest": None,
+                    "has_update": False,
+                    "release_url": None,
+                    "published_at": None,
+                    "checked_at": datetime.now(timezone.utc).isoformat(),
+                    "error": "Could not reach GitHub to check for updates.",
+                }
+            else:
+                latest_info = cached  # use stale cache on transient failure
+
+    has_update = False
+    if latest_info:
+        cur = _parse_semver(current)
+        latest = _parse_semver(latest_info["latest"])
+        if cur is not None and latest is not None:
+            has_update = latest > cur
+        else:
+            has_update = latest_info["latest"] != current
+
+    return {
+        "current": current,
+        "latest": latest_info["latest"] if latest_info else None,
+        "has_update": has_update,
+        "release_url": latest_info.get("release_url") if latest_info else None,
+        "published_at": (
+            latest_info.get("published_at") if latest_info else None
+        ),
+        "release_name": latest_info.get("name") if latest_info else None,
+        "checked_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+@router.get("/version")
+async def runtime_version(
+    force: bool = False,
+    _current_user: dict = Depends(util.get_current_user),
+):
+    """Report the running version and whether a newer GitHub release exists.
+
+    Pass ``?force=true`` to bypass the in-process cache (used by the
+    Settings "Check for Updates" button so the user gets a live answer).
+    """
+    return _check_for_update(force=force)
