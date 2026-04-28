@@ -142,16 +142,32 @@ function checkForUpdatesViaGitHubAPI(win, interactive) {
 
         if (isNewer) {
           if (win.isDestroyed()) return;
+          // Update Now is offered in two modes:
+          //   - Packaged build: trigger electron-updater's download+install
+          //     so the user doesn't have to visit the release page at all.
+          //   - Dev clone (./run.sh desktop, npm start): run `git pull`
+          //     plus the deps/build steps and restart the app in-place,
+          //     so iterating on a dev branch is one click instead of a
+          //     terminal session.
           dialog.showMessageBox(win, {
             type: 'info',
             title: 'Update Available',
             message: `WatchTower ${latestTag} is available (you have ${currentVersion})`,
-            detail: `${releaseNotes}\n\nVisit the release page to download the latest installer.`,
-            buttons: ['Open Release Page', 'Later'],
+            detail: `${releaseNotes}\n\n` +
+              (app.isPackaged
+                ? 'Click Update Now to download and install in the background.'
+                : 'Click Update Now to git pull + rebuild + restart from this dev clone.'),
+            buttons: ['Update Now', 'Open Release Page', 'Later'],
             defaultId: 0,
-            cancelId: 1,
+            cancelId: 2,
           }).then(({ response }) => {
-            if (response === 0) shell.openExternal(releaseUrl);
+            if (response === 1) {
+              shell.openExternal(releaseUrl);
+              return;
+            }
+            if (response === 0) {
+              void runUpdateNow(win, releaseUrl);
+            }
           });
         } else if (interactive) {
           if (win.isDestroyed()) return;
@@ -194,6 +210,116 @@ function checkForUpdatesViaGitHubAPI(win, interactive) {
     console.warn('[WatchTower] GitHub update check timed out.');
   });
 }
+
+/**
+ * Apply an available update.
+ *
+ * Two execution paths:
+ *
+ *   - **Packaged build**: hand off to electron-updater. Existing handlers
+ *     in checkForAppUpdates wire `update-downloaded` → "Restart Now"
+ *     prompt. We just kick off the download and let those hooks fire.
+ *
+ *   - **Dev clone (unpackaged)**: shell out to ``git pull`` from the repo
+ *     root, then ``npm --prefix web install && run build`` so the SPA
+ *     bundle reflects the new commit, then `app.relaunch()` + `app.exit()`.
+ *     This is what `./run.sh update` does — wired into the UI so the
+ *     "click here to update" path doesn't require a terminal.
+ *
+ * Errors fall back to the release page (same affordance the user had
+ * before this button existed).
+ */
+async function runUpdateNow(win, releaseUrl) {
+  if (app.isPackaged) {
+    if (!autoUpdater) {
+      shell.openExternal(releaseUrl);
+      return;
+    }
+    try {
+      // checkForUpdates() emits 'update-available' which the listener
+      // installed in checkForAppUpdates() will pick up. Once downloaded,
+      // it shows the "Restart Now" prompt.
+      await autoUpdater.checkForUpdates();
+      dialog.showMessageBox(win, {
+        type: 'info',
+        title: 'Updating WatchTower',
+        message: 'Downloading update in the background.',
+        detail: "You'll be prompted to restart when the download completes.",
+        buttons: ['OK'],
+      });
+    } catch (err) {
+      console.warn('[WatchTower] autoUpdater download failed:', err.message);
+      shell.openExternal(releaseUrl);
+    }
+    return;
+  }
+
+  // Dev clone path — run `git pull`, install, build, relaunch.
+  const repoRoot = path.resolve(__dirname, '..');
+  const gitDir = path.join(repoRoot, '.git');
+  if (!fs.existsSync(gitDir)) {
+    dialog.showMessageBox(win, {
+      type: 'warning',
+      title: 'Update Now unavailable',
+      message: 'This install is not a git clone — open the release page to download the new installer.',
+      buttons: ['Open Release Page', 'Cancel'],
+      defaultId: 0,
+    }).then(({ response }) => {
+      if (response === 0) shell.openExternal(releaseUrl);
+    });
+    return;
+  }
+
+  // Run `./run.sh update` — handles git pull + reinstall + rebuild.
+  const updateScript = path.join(repoRoot, 'run.sh');
+  if (!fs.existsSync(updateScript)) {
+    shell.openExternal(releaseUrl);
+    return;
+  }
+
+  // Show a non-cancellable progress dialog while the update runs. Don't
+  // try to make this fancy — the script is the source of truth.
+  const progressMsg = dialog.showMessageBox(win, {
+    type: 'info',
+    title: 'Updating WatchTower',
+    message: 'Pulling latest changes and rebuilding…',
+    detail: 'This may take a minute on first run. The app will restart automatically.',
+    buttons: [],
+  });
+
+  try {
+    await new Promise((resolve, reject) => {
+      const child = spawn('bash', [updateScript, 'update'], {
+        cwd: repoRoot,
+        env: process.env,
+        stdio: 'pipe',
+      });
+      let stderr = '';
+      child.stderr.on('data', (chunk) => { stderr += chunk.toString(); });
+      child.on('exit', (code) => {
+        if (code === 0) resolve();
+        else reject(new Error(`run.sh update exited with code ${code}: ${stderr.slice(-500)}`));
+      });
+      child.on('error', reject);
+    });
+    // Give the dialog a moment to dismiss before we relaunch.
+    await new Promise((r) => setTimeout(r, 200));
+    app.relaunch();
+    app.exit(0);
+  } catch (err) {
+    console.error('[WatchTower] Update Now failed:', err.message);
+    dialog.showErrorBox(
+      'Update Now failed',
+      `${err.message}\n\nFalling back to the release page so you can install manually.`
+    );
+    shell.openExternal(releaseUrl);
+  }
+
+  // Mark the dialog promise as awaited even if the user is fast (rare,
+  // since stdio buffering keeps this around for at least a few seconds).
+  void progressMsg;
+}
+
 
 /**
  * Simple semver comparison. Returns 1 if a > b, -1 if a < b, 0 if equal.
