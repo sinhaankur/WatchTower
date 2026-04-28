@@ -4,6 +4,7 @@ import axios from 'axios';
 import apiClient from '@/lib/api';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { StatusPill, nodeStatusTone } from '@/components/ui/status-pill';
 
 type OrgNode = {
   id: string;
@@ -464,9 +465,7 @@ const Servers = () => {
                       </div>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
-                      <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${meta.badge}`}>
-                        {meta.label}
-                      </span>
+                      <StatusPill tone={nodeStatusTone(node.status)} label={meta.label} />
                       <button
                         onClick={() => void checkHealth(node.id)}
                         disabled={healthLoading === node.id}
