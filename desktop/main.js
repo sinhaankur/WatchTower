@@ -854,13 +854,32 @@ async function startBackend() {
     );
   }
 
-  // Tee backend stdout/stderr to .dev/desktop-backend.log so users can
-  // diagnose without journalctl. stdio:'inherit' was sending output to a
-  // detached terminal that doesn't exist when launched from a .desktop file.
-  const devDir = path.join(repoRoot, '.dev');
-  try { fs.mkdirSync(devDir, { recursive: true }); } catch {}
-  const backendLogPath = path.join(devDir, 'desktop-backend.log');
-  const backendLogFd = fs.openSync(backendLogPath, 'a');
+  // Tee backend stdout/stderr to a log file so users can diagnose without
+  // journalctl. stdio:'inherit' would send output to a detached terminal
+  // that doesn't exist when launched from a .desktop file.
+  //
+  // Path resolution: prefer the dev clone's `.dev/` (preserves existing
+  // diagnostic UX for source-clone runs), but fall back to the writable
+  // data dir (`~/.watchtower/logs/`) when the dev clone is read-only —
+  // i.e. always for packaged AppImage launches, where repoRoot lives
+  // inside the FUSE mount.
+  // Without this fallback, `fs.openSync(... 'a')` throws on the
+  // read-only mount, startBackend() aborts before spawning, and the
+  // splash hangs (or the desktop smoke test times out at 90 s with no
+  // backend ever having been launched).
+  let backendLogPath;
+  let backendLogFd;
+  const devCloneLogDir = path.join(repoRoot, '.dev');
+  try {
+    fs.mkdirSync(devCloneLogDir, { recursive: true });
+    backendLogPath = path.join(devCloneLogDir, 'desktop-backend.log');
+    backendLogFd = fs.openSync(backendLogPath, 'a');
+  } catch {
+    const fallbackDir = path.join(writableDataDir(), 'logs');
+    fs.mkdirSync(fallbackDir, { recursive: true });
+    backendLogPath = path.join(fallbackDir, 'desktop-backend.log');
+    backendLogFd = fs.openSync(backendLogPath, 'a');
+  }
   try {
     fs.writeSync(backendLogFd, `\n--- desktop launch ${new Date().toISOString()} ---\n`);
   } catch {}
