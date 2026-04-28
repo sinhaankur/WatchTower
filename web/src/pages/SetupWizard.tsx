@@ -96,6 +96,9 @@ const SetupWizard = () => {
     }
   }, [searchParams, ghConnected]);
 
+  // (Auto-open repo picker effect lives after `data` is declared below.)
+  const [autoOpened, setAutoOpened] = useState(false);
+
   // Fetch repos when picker opens or org changes
   useEffect(() => {
     if (!ghPickerOpen) return;
@@ -218,6 +221,25 @@ const SetupWizard = () => {
     target_nodes: 'default',
     custom_domain: '',
   });
+
+  // Auto-open the repo picker as soon as the user selects "GitHub
+  // Repository" (which is the default source_type). Previously this
+  // was hidden behind a separate "Browse GitHub Repos" click — a
+  // redundant gate that made every new project a multi-step dance.
+  // Only auto-opens once per page lifetime (autoOpened gate) so
+  // closing the picker doesn't immediately reopen it.
+  useEffect(() => {
+    if (
+      data.source_type === 'github' &&
+      ghConnected &&
+      !ghPickerOpen &&
+      !autoOpened &&
+      !data.repo_url
+    ) {
+      setGhPickerOpen(true);
+      setAutoOpened(true);
+    }
+  }, [data.source_type, ghConnected, ghPickerOpen, autoOpened, data.repo_url]);
 
   const activateQuickMode = () => {
     setQuickMode(true);
