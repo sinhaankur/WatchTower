@@ -157,6 +157,7 @@ Thumbs.db
 watchtower.db
 watchtower_test.db
 .dev/
+.claude/
 *.bak
 MoonTracker UI /
 node_modules/
