@@ -144,3 +144,76 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # Ensure electron-builder finds the pre-built frontend
           WEB_DIST: ${{ github.workspace }}/web/dist
+
+      # ── Smoke test (Linux x64 only): launch the AppImage headless,
+      # confirm the bundled launcher resolves a Python with the watchtower
+      # backend installed, and verify /health responds within 90 s.
+      #
+      # Catches the regressions that broke v1.5.0–1.5.5 (lifespan deadlock,
+      # spawn npm ENOENT, missing web/dist, etc.) AND the structural
+      # "AppImage has no .venv" issue — by simulating an end-user install
+      # where the only Python with watchtower available is the system one,
+      # not a sibling source clone.
+      #
+      # Only x64 because cross-arch AppImages can't run on the x86_64 runner.
+      - name: Smoke-test Linux AppImage
+        if: matrix.os == 'ubuntu-latest' && contains(matrix.eb_args, '--x64')
+        run: |
+          set -eo pipefail
+
+          APPIMAGE=$(ls desktop/dist/*x86_64*.AppImage 2>/dev/null | head -1)
+          if [ -z "$APPIMAGE" ]; then
+            echo "::error::No x86_64 AppImage produced — desktop build silently failed."
+            exit 1
+          fi
+          chmod +x "$APPIMAGE"
+          echo "Smoke-testing: $APPIMAGE"
+
+          sudo apt-get update -q
+          sudo apt-get install -y --no-install-recommends xvfb libfuse2 python3-pip
+
+          # Install the backend system-wide so resolvePython() finds it
+          # via the system-python fallback. This simulates a real
+          # end-user install (`pip install watchtower-podman` after
+          # downloading the AppImage). We use `pip install -e .` from
+          # the checked-out source instead of pulling from PyPI so we
+          # test the code in this commit, not whatever's on PyPI.
+          python3 -m pip install --break-system-packages --upgrade pip
+          python3 -m pip install --break-system-packages -r requirements.txt
+          python3 -m pip install --break-system-packages -e .
+          python3 -c "import watchtower; print('backend importable')"
+
+          # Move the dev clone's .venv aside so resolvePython() can't fall
+          # back to it — we want to verify the system-python path works.
+          if [ -d .venv ]; then mv .venv .venv-hidden-during-smoke-test; fi
+
+          export HOME=$(mktemp -d)
+          export WATCHTOWER_DATA_DIR="$HOME/.watchtower"
+          # Run from the AppImage's own working dir, not the source clone,
+          # so repoRoot resolution exercises the system-python path.
+          mkdir -p "$HOME/sandbox"
+          cp "$APPIMAGE" "$HOME/sandbox/"
+          cd "$HOME/sandbox"
+
+          xvfb-run -a "./$(basename "$APPIMAGE")" --no-sandbox &
+          APP_PID=$!
+          trap 'kill $APP_PID 2>/dev/null || true' EXIT
+
+          DEADLINE=$((SECONDS + 90))
+          while [ $SECONDS -lt $DEADLINE ]; do
+            if curl -fsS -m 3 http://127.0.0.1:8000/health > /tmp/health.json 2>/dev/null; then
+              echo "::notice::Backend responded within $SECONDS s:"
+              cat /tmp/health.json
+              grep -q '"watchtower-api"' /tmp/health.json
+              echo "::notice::Smoke test passed."
+              exit 0
+            fi
+            if ! kill -0 "$APP_PID" 2>/dev/null; then
+              echo "::error::Desktop process exited before backend responded."
+              exit 1
+            fi
+            sleep 2
+          done
+
+          echo "::error::Backend never reached /health within 90 s."
+          exit 1
