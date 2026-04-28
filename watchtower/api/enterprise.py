@@ -75,13 +75,18 @@ def _guest_mode_enabled() -> bool:
 
 
 @router.post("/auth/guest")
-async def auth_guest():
+@limiter.limit("10/minute")
+async def auth_guest(request: Request):
     """Issue a signed session token for an anonymous "Guest" identity.
 
     Lets users into the app without a GitHub login. Guest sessions can
     browse, build local projects, and manage their local environment,
     but the frontend (and node-creation route below) gates remote-node
     creation on a real GitHub-authenticated identity.
+
+    Rate-limited at 10/minute per IP. Without a limit an attacker can
+    cheaply mint unlimited valid signed tokens, burn HMAC CPU, and
+    inflate the audit table for every guest action they then perform.
     """
     if not _guest_mode_enabled():
         raise HTTPException(

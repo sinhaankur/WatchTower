@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 import signal
 import shlex
 import subprocess
@@ -133,26 +134,57 @@ def _truncate_terminal_output(text: str) -> str:
     return text[: TERMINAL_MAX_OUTPUT - len(suffix)] + suffix
 
 
+# Hand-curated allowlist of short, well-known credential flags. The regex
+# below catches the long-form variants (--api-key, --bearer, etc.) — this
+# set covers single-letter or non-suffix flags the regex won't match.
+_SENSITIVE_SHORT_FLAGS = {"-p", "-P", "-T"}
+
+# A flag whose name ends in PASSWORD/SECRET/TOKEN/KEY/PWD/PASSWD or starts
+# with BEARER. Matches "--password", "--api-key", "--bearer-token",
+# "-API_TOKEN", "--gh-pat" via PAT, etc. Case-insensitive so YAML-style
+# "--Api-Key" is caught too. The optional ``[A-Za-z0-9_-]*`` lets bare
+# suffixes like "--password" match (no prefix between dashes and suffix).
+_SENSITIVE_FLAG_RE = re.compile(
+    r"^--?[A-Za-z0-9_-]*"
+    r"(PASSWORD|PASSWD|PWD|SECRET|TOKEN|KEY|BEARER|PAT)$",
+    re.IGNORECASE,
+)
+
+# Match "FOO_TOKEN=bar", "API_KEY=bar", "password=bar", etc. — anything
+# whose key half ends in a credential-y suffix.
+_SENSITIVE_KV_RE = re.compile(
+    r"^([A-Za-z][A-Za-z0-9_-]*"
+    r"(?:PASSWORD|PASSWD|PWD|SECRET|TOKEN|KEY|BEARER|PAT))=",
+    re.IGNORECASE,
+)
+
+
 def _redact_sensitive_tokens(args: list[str]) -> list[str]:
+    """Drop secrets from a command-line argv before it lands in audit logs.
+
+    Three patterns are redacted:
+      1. Known short flags (``-p``) — the *next* token becomes ``***``.
+      2. Long-form credential flags matched by ``_SENSITIVE_FLAG_RE``
+         (``--api-key``, ``--bearer-token``, etc.) — same: next token
+         redacted.
+      3. ``KEY=value`` style where the key half ends in a credential
+         suffix — the whole token becomes ``KEY=***`` so the key name
+         is preserved for triage but the value is gone.
+    """
     redact_next = False
     redacted: list[str] = []
-    sensitive_flags = {
-        "--password",
-        "--token",
-        "--secret",
-        "-p",
-    }
     for value in args:
         if redact_next:
             redacted.append("***")
             redact_next = False
             continue
-        if value in sensitive_flags:
+        if value in _SENSITIVE_SHORT_FLAGS or _SENSITIVE_FLAG_RE.match(value):
             redacted.append(value)
             redact_next = True
             continue
-        if "password=" in value.lower() or "token=" in value.lower():
-            redacted.append("***")
+        kv_match = _SENSITIVE_KV_RE.match(value)
+        if kv_match:
+            redacted.append(f"{kv_match.group(1)}=***")
             continue
         redacted.append(value)
     return redacted
