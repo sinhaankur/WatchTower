@@ -95,13 +95,47 @@ export default function LocalNode() {
   const [nodeId, setNodeId] = useState('');
   const [copied, setCopied] = useState(false);
 
-  /* detect OS & prefill node name */
+  // Custom reload command + key path (when the user has tweaked the
+  // suggested defaults from the backend probe).
+  const [reloadCommand, setReloadCommand] = useState('');
+  const [sshKeyPath, setSshKeyPath] = useState('~/.ssh/id_rsa');
+  const [autoDetectedProfile, setAutoDetectedProfile] = useState<string | null>(null);
+
+  /* detect OS, then ask the backend to fully pre-fill from the local probe */
   useEffect(() => {
     const detected = detectOs();
     setOs(detected);
+    // Ahead-of-API client-side fallbacks so the form isn't blank if the
+    // probe is slow.
     if (detected === 'windows') setDeployPath('C:\\WatchTower\\agent');
     if (detected === 'macos') setDeployPath('/usr/local/var/watchtower/agent');
     setNodeName(`${window.location.hostname || 'this-pc'}-local`);
+
+    // Server-side probe — knows what's actually installed (Podman / Docker /
+    // systemd) and picks a profile from real CPU + RAM. Falls back to the
+    // client defaults silently on error.
+    (async () => {
+      try {
+        const r = await apiClient.get('/runtime/local-node/suggest-config');
+        const cfg = r.data as {
+          node_name: string; deploy_path: string; reload_command: string;
+          ssh_key_path: string; profile_id: 'light' | 'standard' | 'full';
+          max_concurrent_deployments: number;
+          detected: { podman_installed: boolean; docker_installed: boolean; cpus: number; ram_gb: number };
+        };
+        if (cfg.node_name) setNodeName(cfg.node_name);
+        if (cfg.deploy_path) setDeployPath(cfg.deploy_path);
+        if (cfg.reload_command) setReloadCommand(cfg.reload_command);
+        if (cfg.ssh_key_path) setSshKeyPath(cfg.ssh_key_path);
+        const matched = PROFILES.find((p) => p.id === cfg.profile_id);
+        if (matched) {
+          setProfile(matched);
+          setAutoDetectedProfile(matched.label);
+        }
+      } catch {
+        /* keep client-side fallbacks */
+      }
+    })();
   }, []);
 
   /* load org ID */
@@ -139,10 +173,12 @@ export default function LocalNode() {
         user: os === 'windows' ? 'SYSTEM' : 'watchtower',
         port: 22,
         remote_path: deployPath,
-        ssh_key_path: os === 'windows' ? 'none' : '~/.ssh/id_rsa',
-        reload_command: os === 'windows'
-          ? 'Restart-Service WatchTowerAgent'
-          : 'sudo systemctl restart watchtower-agent',
+        ssh_key_path: sshKeyPath || (os === 'windows' ? 'none' : '~/.ssh/id_rsa'),
+        reload_command: reloadCommand || (
+          os === 'windows'
+            ? 'Restart-Service WatchTowerAgent'
+            : 'sudo systemctl restart watchtower-agent'
+        ),
         is_primary: true,
         max_concurrent_deployments: profile.concurrency,
       };
