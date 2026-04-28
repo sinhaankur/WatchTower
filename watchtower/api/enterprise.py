@@ -15,6 +15,7 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from typing import List, Optional
+import uuid as uuid_module
 from uuid import UUID
 from datetime import datetime
 import requests
@@ -53,6 +54,64 @@ def _device_flow_client_id() -> Optional[str]:
         or DEFAULT_DEVICE_CLIENT_ID
         or None
     )
+
+
+_GUEST_NAMESPACE = uuid_module.UUID("a85f1e64-5f3b-4db8-9c1a-9f7c2c5b0001")
+_GUEST_EMAIL = "guest@watchtower.local"
+_GUEST_NAME = "Guest"
+
+
+def _guest_mode_enabled() -> bool:
+    """Guest mode is on by default. Operators of shared instances should
+    set ``WATCHTOWER_ALLOW_GUEST_MODE=false`` to disable.
+
+    The threat model: a guest gets a signed session token tied to a
+    shared local user. They cannot register remote nodes, manage other
+    users, or do anything that requires GitHub identity (private repo
+    access, OAuth-gated org claims). Anything bound to GitHub identity
+    will reject them naturally because ``github_id`` is None.
+    """
+    return os.getenv("WATCHTOWER_ALLOW_GUEST_MODE", "true").lower() != "false"
+
+
+@router.post("/auth/guest")
+async def auth_guest():
+    """Issue a signed session token for an anonymous "Guest" identity.
+
+    Lets users into the app without a GitHub login. Guest sessions can
+    browse, build local projects, and manage their local environment,
+    but the frontend (and node-creation route below) gates remote-node
+    creation on a real GitHub-authenticated identity.
+    """
+    if not _guest_mode_enabled():
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=(
+                "Guest mode is disabled on this server. "
+                "Sign in with GitHub or use an API token instead."
+            ),
+        )
+
+    # Stable, deterministic user_id so a guest's projects survive across
+    # repeated "Continue as Guest" clicks. All guests on a single instance
+    # share this identity — appropriate for the single-user desktop
+    # context where guest mode is meaningful.
+    guest_uid = str(uuid_module.uuid5(_GUEST_NAMESPACE, _GUEST_EMAIL))
+    token = util.create_user_session_token(
+        user_id=guest_uid,
+        email=_GUEST_EMAIL,
+        name=_GUEST_NAME,
+        github_id=None,
+    )
+    return {
+        "token": token,
+        "user": {
+            "user_id": guest_uid,
+            "email": _GUEST_EMAIL,
+            "name": _GUEST_NAME,
+            "is_guest": True,
+        },
+    }
 
 
 @router.get("/auth/status")
@@ -1422,6 +1481,19 @@ async def add_org_node(
     """Add deployment node to organization"""
     user_id = _current_user_uuid(current_user)
     _user, canonical_org, member = _ensure_user_org_member(db, current_user)
+
+    # Guest sessions can browse + manage local resources but cannot register
+    # remote SSH nodes — that's a privileged operation that needs a real
+    # GitHub identity on the audit trail. Enforce server-side too so direct
+    # API calls don't bypass the UI gate.
+    if not current_user.get("github_id"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=(
+                "Adding remote deployment nodes requires a GitHub-"
+                "authenticated session. Sign in with GitHub to continue."
+            ),
+        )
 
     # Resolve the target org: if the caller passed their canonical org_id use
     # the member we already resolved; otherwise look up a separate membership.
