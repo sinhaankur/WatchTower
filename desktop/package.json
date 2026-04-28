@@ -39,6 +39,12 @@
       "preload.js",
       "splash.html"
     ],
+    "publish": {
+      "provider": "github",
+      "owner": "sinhaankur",
+      "repo": "WatchTower",
+      "releaseType": "release"
+    },
     "mac": {
       "icon": "build/icons/app.icns",
       "target": [
