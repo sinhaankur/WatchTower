@@ -77,7 +77,7 @@ async def list_env_vars(
     current_user: dict = Depends(util.get_current_user),
 ):
     """List environment variables for a project (values are masked)."""
-    user_id = UUID(str(current_user["user_id"]))
+    user_id = util.canonical_user_id(db, current_user)
     _get_project_or_404(db, project_id, user_id)
 
     q = db.query(EnvironmentVariable).filter(EnvironmentVariable.project_id == project_id)
@@ -106,7 +106,7 @@ async def create_env_var(
     current_user: dict = Depends(util.get_current_user),
 ):
     """Create a new environment variable (or overwrite if key already exists)."""
-    user_id = UUID(str(current_user["user_id"]))
+    user_id = util.canonical_user_id(db, current_user)
     project = _get_project_or_404(db, project_id, user_id)
 
     if not data.key.strip():
@@ -169,7 +169,7 @@ async def update_env_var(
     current_user: dict = Depends(util.get_current_user),
 ):
     """Update an existing environment variable value."""
-    user_id = UUID(str(current_user["user_id"]))
+    user_id = util.canonical_user_id(db, current_user)
     project = _get_project_or_404(db, project_id, user_id)
 
     row = db.query(EnvironmentVariable).filter(
@@ -210,7 +210,7 @@ async def delete_env_var(
     current_user: dict = Depends(util.get_current_user),
 ):
     """Delete an environment variable."""
-    user_id = UUID(str(current_user["user_id"]))
+    user_id = util.canonical_user_id(db, current_user)
     project = _get_project_or_404(db, project_id, user_id)
 
     row = db.query(EnvironmentVariable).filter(

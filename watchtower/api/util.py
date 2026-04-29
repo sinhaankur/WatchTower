@@ -42,6 +42,51 @@ def to_uuid(value) -> uuid.UUID:
         ) from exc
 
 
+def canonical_user_id(db, current_user: dict) -> uuid.UUID:
+    """Resolve ``current_user`` to its canonical DB ``User.id``.
+
+    The static-token auth path derives ``user_id`` deterministically from
+    the token via UUID5. When the operator rotates ``WATCHTOWER_API_TOKEN``
+    (or Electron generates a fresh per-launch token) the synthetic id
+    diverges from any User row already in the DB — but the email stays
+    the same. Without this resolver the read-path filters
+    (``Project.owner_id == synthetic``) silently match nothing and the
+    user's projects vanish from the UI even though they were saved.
+
+    Resolution order:
+      1. Synthetic id directly matches a ``User.id``  → return as-is.
+      2. Email (case-insensitive) matches a ``User``  → return canonical id.
+      3. Neither matches                              → return synthetic id.
+
+    The (3) fallback is deliberate: ``_ensure_user_org_member`` uses the
+    synthetic id when it creates a User row on first use, so a genuinely-
+    new caller's first write needs to flow through with the synthetic id
+    so create-then-read works in the same request. Don't "fix" this to
+    raise — that breaks first-time onboarding.
+    """
+    # Local imports to avoid a circular dependency at module import time:
+    # database imports util (for encrypt_secret) at app startup.
+    from sqlalchemy import func
+    from watchtower.database import User
+
+    syn_id = to_uuid(current_user.get("user_id"))
+    user = db.query(User).filter(User.id == syn_id).first()
+    if user:
+        return user.id
+
+    email = current_user.get("email")
+    if email:
+        user = (
+            db.query(User)
+            .filter(func.lower(User.email) == email.lower())
+            .first()
+        )
+        if user:
+            return user.id
+
+    return syn_id
+
+
 def assert_safe_external_url(url: str) -> str:
     """Validate ``url`` for use in server-side outbound HTTP requests.
 

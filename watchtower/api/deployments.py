@@ -78,7 +78,7 @@ async def list_deployments(
     """List deployments for a project"""
     project = db.query(Project).filter(
         Project.id == project_id,
-        Project.owner_id == UUID(str(current_user["user_id"]))
+        Project.owner_id == util.canonical_user_id(db, current_user)
     ).first()
     
     if not project:
@@ -211,7 +211,7 @@ async def get_deployment(
     """Get deployment details"""
     deployment = db.query(Deployment).join(Project).filter(
         Deployment.id == deployment_id,
-        Project.owner_id == UUID(str(current_user["user_id"]))
+        Project.owner_id == util.canonical_user_id(db, current_user)
     ).first()
     
     if not deployment:
@@ -234,7 +234,7 @@ async def rollback_deployment(
     """Rollback to previous deployment"""
     deployment = db.query(Deployment).join(Project).filter(
         Deployment.id == deployment_id,
-        Project.owner_id == UUID(str(current_user["user_id"]))
+        Project.owner_id == util.canonical_user_id(db, current_user)
     ).first()
     
     if not deployment:
@@ -306,7 +306,7 @@ async def list_deployment_targets(
     """List recommended deployment nodes for project-triggered deployments."""
     project = db.query(Project).filter(
         Project.id == project_id,
-        Project.owner_id == UUID(str(current_user["user_id"])),
+        Project.owner_id == util.canonical_user_id(db, current_user),
     ).first()
     if not project:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")

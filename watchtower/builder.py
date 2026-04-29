@@ -65,9 +65,24 @@ async def run_build_async(deployment_id: str) -> None:
 # ---------------------------------------------------------------------------
 
 
-async def _run_build(deployment_id: str) -> None:
+async def _run_build(deployment_id) -> None:
     db: Session = SessionLocal()
     workspace: Optional[Path] = None
+    # Coerce string IDs to UUID. enqueue_build always passes str(deployment.id)
+    # so that the value survives RQ's JSON-serialised job payload, but the
+    # `Deployment.id` column is Uuid(as_uuid=True) and SQLAlchemy's UUID type
+    # processor calls `.hex` on the parameter — works on UUID objects, blows
+    # up with `'str' object has no attribute 'hex'` on bare strings. Without
+    # this coercion every queued build dies on the very first query and the
+    # deployment row sits at PENDING forever (the FastAPI BackgroundTasks
+    # runner swallows the exception silently). See CLAUDE.md → "Things that
+    # bite" → UUID coercion.
+    if isinstance(deployment_id, str):
+        try:
+            deployment_id = UUID(deployment_id)
+        except (ValueError, AttributeError):
+            logger.error("Build runner: malformed deployment id %r", deployment_id)
+            return
     try:
         deployment = db.query(Deployment).filter(Deployment.id == deployment_id).first()
         if not deployment:
