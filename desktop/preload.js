@@ -30,5 +30,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Trigger an in-app update. Packaged: electron-updater download+install.
   // Dev clone: git pull + rebuild + relaunch via run.sh update.
   updateNow: (releaseUrl) => ipcRenderer.invoke('wt:updateNow', releaseUrl),
+  // Native folder picker. Returns { ok, path? , canceled?, error? }.
+  // Used by the SetupWizard's local-folder source option so users
+  // don't have to type an absolute path.
+  selectFolder: (opts) => ipcRenderer.invoke('wt:selectFolder', opts ?? {}),
+  // Fire an OS-level notification (visible even if WatchTower is
+  // minimized / in another workspace). Pass {title, body, silent?}.
+  showNotification: (payload) => ipcRenderer.send('wt:showNotification', payload ?? {}),
   platform: process.platform,
 });

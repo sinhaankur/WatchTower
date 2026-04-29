@@ -628,7 +628,37 @@ const SetupWizard = () => {
                 ) : (
                   <div>
                     <Label htmlFor="local_folder_path">Local Folder Path *</Label>
-                    <Input id="local_folder_path" value={data.local_folder_path} onChange={(e) => setField('local_folder_path', e.target.value)} className="mt-1.5 rounded-md border-border bg-white" placeholder="/home/you/my-app" />
+                    <div className="mt-1.5 flex gap-2">
+                      <Input
+                        id="local_folder_path"
+                        value={data.local_folder_path}
+                        onChange={(e) => setField('local_folder_path', e.target.value)}
+                        className="flex-1 rounded-md border-border bg-white"
+                        placeholder="/home/you/my-app"
+                      />
+                      {/* Native folder picker (desktop only) — typing an
+                          absolute path is the kind of friction that makes
+                          a desktop app feel like a wrapped web page.
+                          Falls back to plain text input in browser mode. */}
+                      {Boolean((window as unknown as { electronAPI?: { selectFolder?: unknown } }).electronAPI?.selectFolder) && (
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            const electron = (window as unknown as { electronAPI?: { selectFolder?: (opts: { defaultPath?: string }) => Promise<{ ok: boolean; path?: string }> } }).electronAPI;
+                            if (!electron?.selectFolder) return;
+                            const result = await electron.selectFolder({
+                              defaultPath: data.local_folder_path || undefined,
+                            });
+                            if (result?.ok && result.path) {
+                              setField('local_folder_path', result.path);
+                            }
+                          }}
+                          className="px-3 py-2 text-sm rounded-md border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 font-medium whitespace-nowrap"
+                        >
+                          Browse…
+                        </button>
+                      )}
+                    </div>
                     <p className="text-xs text-slate-600 mt-1">Use an absolute path to your app folder on this machine.</p>
                   </div>
                 )}
