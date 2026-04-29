@@ -44,6 +44,10 @@ const GitHubLoginCallback = () => {
         }
 
         localStorage.setItem('authToken', data.token);
+        // Clear the sign-out sentinel so the next app launch auto-logs
+        // back in (the user just deliberately signed in, so they want
+        // the saved-session experience again).
+        localStorage.removeItem('wt:explicitlySignedOut');
         const nextPath = data.redirect_to && data.redirect_to.startsWith('/') ? data.redirect_to : '/';
 
         setStatus('success');

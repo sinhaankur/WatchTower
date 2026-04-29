@@ -154,6 +154,10 @@ class User(Base):
     email = Column(String, unique=True, index=True)
     github_id = Column(Integer, nullable=True, unique=True)
     name = Column(String)
+    # Optional: GitHub avatar URL captured on OAuth upsert. The sidebar
+    # identity badge falls back to an initial-letter placeholder when
+    # missing (token-auth / guest sessions never have one).
+    avatar_url = Column(String, nullable=True)
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
