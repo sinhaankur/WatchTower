@@ -240,7 +240,7 @@ const Dashboard = () => {
       {/* Page header */}
       <header
         className="px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between gap-3 border-b sticky top-0 z-10 backdrop-blur-sm"
-        style={{ borderColor: 'hsl(214 32% 88%)', background: 'rgba(248, 251, 255, 0.9)' }}
+        style={{ borderColor: 'hsl(var(--border-soft))', background: 'hsl(var(--surface-soft) / 0.9)' }}
       >
         <div className="min-w-0">
           <h1 className="text-lg font-semibold text-slate-900">Dashboard</h1>
@@ -250,10 +250,10 @@ const Dashboard = () => {
           <span
             className={`hidden sm:inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border font-medium ${
               serverStatus === 'online'
-                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+                ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
                 : serverStatus === 'offline'
-                  ? 'bg-red-500/10 text-red-400 border-red-500/30'
-                  : 'bg-slate-500/10 text-slate-400 border-slate-500/30'
+                  ? 'bg-red-50 text-red-800 border-red-300'
+                  : 'bg-slate-100 text-slate-700 border-slate-300'
             }`}
           >
             <StatusDot running={serverStatus === 'online'} />
