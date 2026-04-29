@@ -1,28 +1,41 @@
-import { useEffect, type ReactElement } from 'react';
+import { lazy, Suspense, useEffect, type ReactElement } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { trackPageView } from '@/lib/analytics';
 import { QueryClientProvider, QueryClient, MutationCache, QueryCache } from '@tanstack/react-query';
 import { toast } from './lib/toast';
-import SetupWizard from './pages/SetupWizard';
+// Eager — first-paint critical (login screen, then Dashboard for the
+// authed cold start), plus the chrome that wraps every authed page.
 import Dashboard from './pages/Dashboard';
-import ProjectDetail from './pages/ProjectDetail';
-import TeamManagement from './pages/TeamManagement';
-import Servers from './pages/Servers';
-import Applications from './pages/Applications';
-import LocalNode from './pages/LocalNode';
-import Databases from './pages/Databases';
-import Services from './pages/Services';
-import Integrations from './pages/Integrations';
-import Settings from './pages/Settings';
-import AuditLog from './pages/AuditLog';
-import HostConnect from './pages/HostConnect';
-import GitHubOAuthCallback from './pages/GitHubOAuthCallback';
-import GitHubLoginCallback from './pages/GitHubLoginCallback';
 import Login from './pages/Login';
 import Layout from './components/Layout';
 import ErrorBoundary from './components/ErrorBoundary';
 import { Toaster } from './lib/toast';
 import './App.css';
+
+// Lazy — split out of the main bundle. ~50ms first-click penalty per
+// page on a desktop, invisible vs. the savings on the cold-start
+// bundle. The Suspense fallback is a faint full-height div so route
+// switches don't flash a giant spinner mid-layout.
+const SetupWizard          = lazy(() => import('./pages/SetupWizard'));
+const ProjectDetail        = lazy(() => import('./pages/ProjectDetail'));
+const TeamManagement       = lazy(() => import('./pages/TeamManagement'));
+const Servers              = lazy(() => import('./pages/Servers'));
+const Applications         = lazy(() => import('./pages/Applications'));
+const LocalNode            = lazy(() => import('./pages/LocalNode'));
+const Databases            = lazy(() => import('./pages/Databases'));
+const Services             = lazy(() => import('./pages/Services'));
+const Integrations         = lazy(() => import('./pages/Integrations'));
+const Settings             = lazy(() => import('./pages/Settings'));
+const AuditLog             = lazy(() => import('./pages/AuditLog'));
+const HostConnect          = lazy(() => import('./pages/HostConnect'));
+const GitHubOAuthCallback  = lazy(() => import('./pages/GitHubOAuthCallback'));
+const GitHubLoginCallback  = lazy(() => import('./pages/GitHubLoginCallback'));
+
+function RouteFallback() {
+  // Subtle blank panel — a spinner mid-layout flashes more than it
+  // helps. Lazy chunks load in well under 100 ms on local files.
+  return <div className="flex-1 bg-slate-50" aria-busy="true" />;
+}
 
 // Surface query/mutation failures via toast so a 500/network error
 // doesn't disappear into the React Query cache. We skip 401s because
@@ -91,31 +104,35 @@ function App() {
   return (
     <ErrorBoundary>
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter>          <RouteTracker />        <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route path="/oauth/github/login/callback" element={<GitHubLoginCallback />} />
+      <BrowserRouter>
+        <RouteTracker />
+        <Suspense fallback={<RouteFallback />}>
+          <Routes>
+            <Route path="/login" element={<Login />} />
+            <Route path="/oauth/github/login/callback" element={<GitHubLoginCallback />} />
 
-          {/* Pages with shared sidebar layout */}
-          <Route path="/" element={<RequireAuth><Layout><Dashboard /></Layout></RequireAuth>} />
-          <Route path="/projects/:id" element={<RequireAuth><Layout><ProjectDetail /></Layout></RequireAuth>} />
-          <Route path="/servers" element={<RequireAuth><Layout><Servers /></Layout></RequireAuth>} />
-          <Route path="/servers/local" element={<RequireAuth><Layout><LocalNode /></Layout></RequireAuth>} />
-          <Route path="/applications" element={<RequireAuth><Layout><Applications /></Layout></RequireAuth>} />
-          <Route path="/databases" element={<RequireAuth><Layout><Databases /></Layout></RequireAuth>} />
-          <Route path="/services" element={<RequireAuth><Layout><Services /></Layout></RequireAuth>} />
-          <Route path="/integrations" element={<RequireAuth><Layout><Integrations /></Layout></RequireAuth>} />
-          <Route path="/host-connect" element={<RequireAuth><Layout><HostConnect /></Layout></RequireAuth>} />
-          <Route path="/team" element={<RequireAuth><Layout><TeamManagement /></Layout></RequireAuth>} />
-          <Route path="/settings" element={<RequireAuth><Layout><Settings /></Layout></RequireAuth>} />
-          <Route path="/audit" element={<RequireAuth><Layout><AuditLog /></Layout></RequireAuth>} />
-          {/* Legacy redirect */}
-          <Route path="/nodes" element={<Navigate to="/servers" replace />} />
-          {/* Full-screen pages (wizard & oauth flow — no sidebar) */}
-          <Route path="/setup" element={<RequireAuth><SetupWizard /></RequireAuth>} />
-          <Route path="/oauth/github/callback" element={<RequireAuth><GitHubOAuthCallback /></RequireAuth>} />
-          {/* Catch-all: redirect any unmatched path to home instead of showing a blank page */}
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+            {/* Pages with shared sidebar layout */}
+            <Route path="/" element={<RequireAuth><Layout><Dashboard /></Layout></RequireAuth>} />
+            <Route path="/projects/:id" element={<RequireAuth><Layout><ProjectDetail /></Layout></RequireAuth>} />
+            <Route path="/servers" element={<RequireAuth><Layout><Servers /></Layout></RequireAuth>} />
+            <Route path="/servers/local" element={<RequireAuth><Layout><LocalNode /></Layout></RequireAuth>} />
+            <Route path="/applications" element={<RequireAuth><Layout><Applications /></Layout></RequireAuth>} />
+            <Route path="/databases" element={<RequireAuth><Layout><Databases /></Layout></RequireAuth>} />
+            <Route path="/services" element={<RequireAuth><Layout><Services /></Layout></RequireAuth>} />
+            <Route path="/integrations" element={<RequireAuth><Layout><Integrations /></Layout></RequireAuth>} />
+            <Route path="/host-connect" element={<RequireAuth><Layout><HostConnect /></Layout></RequireAuth>} />
+            <Route path="/team" element={<RequireAuth><Layout><TeamManagement /></Layout></RequireAuth>} />
+            <Route path="/settings" element={<RequireAuth><Layout><Settings /></Layout></RequireAuth>} />
+            <Route path="/audit" element={<RequireAuth><Layout><AuditLog /></Layout></RequireAuth>} />
+            {/* Legacy redirect */}
+            <Route path="/nodes" element={<Navigate to="/servers" replace />} />
+            {/* Full-screen pages (wizard & oauth flow — no sidebar) */}
+            <Route path="/setup" element={<RequireAuth><SetupWizard /></RequireAuth>} />
+            <Route path="/oauth/github/callback" element={<RequireAuth><GitHubOAuthCallback /></RequireAuth>} />
+            {/* Catch-all: redirect any unmatched path to home instead of showing a blank page */}
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </Suspense>
       </BrowserRouter>
       <Toaster />
     </QueryClientProvider>

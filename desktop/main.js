@@ -1,4 +1,4 @@
-const { app, BrowserWindow, dialog, ipcMain, Menu, shell, Tray, nativeImage } = require('electron');
+const { app, BrowserWindow, dialog, ipcMain, Menu, Notification, shell, Tray, nativeImage } = require('electron');
 const { spawn, execSync, execFileSync } = require('child_process');
 const crypto = require('crypto');
 const fs = require('fs');
@@ -1073,6 +1073,57 @@ ipcMain.on('wt:maximize', () => {
 });
 ipcMain.on('wt:close', () => mainWindow?.close());
 ipcMain.handle('wt:isMaximized', () => mainWindow?.isMaximized() ?? false);
+
+// Native folder picker — used by the SetupWizard's "Local folder" source
+// option. A native dialog beats typing an absolute path manually: user
+// gets file-system completion, can't typo, and the OS validates the
+// folder exists before we even see the path. The renderer receives the
+// path string only; we deliberately don't read the folder here — that
+// happens in the build pipeline once the user has confirmed.
+ipcMain.handle('wt:selectFolder', async (_event, opts = {}) => {
+  if (!mainWindow || mainWindow.isDestroyed()) return { ok: false, error: 'no-window' };
+  try {
+    const result = await dialog.showOpenDialog(mainWindow, {
+      title: typeof opts.title === 'string' ? opts.title : 'Select project folder',
+      defaultPath: typeof opts.defaultPath === 'string' ? opts.defaultPath : app.getPath('home'),
+      properties: ['openDirectory', 'createDirectory'],
+      buttonLabel: typeof opts.buttonLabel === 'string' ? opts.buttonLabel : 'Use this folder',
+    });
+    if (result.canceled || !result.filePaths.length) return { ok: false, canceled: true };
+    return { ok: true, path: result.filePaths[0] };
+  } catch (err) {
+    return { ok: false, error: err?.message ?? String(err) };
+  }
+});
+
+// Native OS notification — surfaced from the renderer when long-running
+// work finishes (deploy succeeded, build failed, update available, etc).
+// The point is desktop affordance: a notification fires even when the
+// WatchTower window is minimized or the user is in another workspace,
+// which a web app can't do as reliably.
+ipcMain.on('wt:showNotification', (_event, payload = {}) => {
+  if (!Notification.isSupported()) return;
+  const title = typeof payload.title === 'string' ? payload.title : 'WatchTower';
+  const body = typeof payload.body === 'string' ? payload.body : '';
+  const silent = Boolean(payload.silent);
+  try {
+    const n = new Notification({
+      title,
+      body,
+      silent,
+      ...(APP_ICON ? { icon: APP_ICON } : {}),
+    });
+    n.on('click', () => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        if (!mainWindow.isVisible()) mainWindow.show();
+        mainWindow.focus();
+      }
+    });
+    n.show();
+  } catch (err) {
+    console.warn('[WatchTower] Notification failed:', err.message);
+  }
+});
 
 // In-app "Update Now" — same code path as the native modal that fires on
 // startup, so the user can trigger an update from a button in the SPA
