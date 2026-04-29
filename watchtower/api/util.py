@@ -184,8 +184,14 @@ def create_user_session_token(
     email: str,
     name: str,
     github_id: Optional[int] = None,
+    avatar_url: Optional[str] = None,
 ) -> str:
-    """Create a signed user session token for browser login flows."""
+    """Create a signed user session token for browser login flows.
+
+    ``avatar_url`` rides along so /api/me can render the GitHub avatar
+    in the sidebar without re-querying the User row on every request —
+    the token is the SPA's identity cache.
+    """
     now = int(time.time())
     ttl_hours = int(os.getenv("WATCHTOWER_SESSION_TTL_HOURS", "12"))
     payload = {
@@ -193,6 +199,7 @@ def create_user_session_token(
         "email": email,
         "name": name,
         "gid": github_id,
+        "av": avatar_url,
         "iat": now,
         "exp": now + (ttl_hours * 3600),
     }
@@ -232,6 +239,7 @@ def _parse_user_session_token(token: str):
         "email": email,
         "name": name or "WatchTower User",
         "github_id": payload.get("gid"),
+        "avatar_url": payload.get("av"),
     }
 
 

@@ -326,6 +326,14 @@ export default function Layout({ children }: { children: ReactNode }) {
   const activeBuildCount = activeDeploys?.active ?? 0;
 
   const handleLogout = () => {
+    // Clear the saved session AND set a sentinel so Login.tsx's auto-login
+    // doesn't immediately re-authenticate from VITE_API_TOKEN. Without the
+    // sentinel, sign-out was a no-op in dev / Electron — Login mounted,
+    // saw the env-baked token, and bounced the user straight back to the
+    // dashboard. The sentinel persists across reloads/launches; it's
+    // cleared on the next deliberate sign-in (GitHub OAuth, guest, manual
+    // token), so signing in again just works.
+    localStorage.setItem('wt:explicitlySignedOut', '1');
     localStorage.removeItem('authToken');
     navigate('/login');
   };

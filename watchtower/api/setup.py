@@ -5,12 +5,11 @@ Setup Wizard API endpoints
 import logging
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from uuid import UUID
 
 from watchtower.database import (
-    get_db, Project, Organization, User,
+    get_db, Project,
     NetlifeLikeConfig, VericelLikeConfig, DockerPlatformConfig,
-    EnvironmentVariable, Environment
+    EnvironmentVariable,
 )
 from watchtower import schemas
 from watchtower.api import util
@@ -107,28 +106,6 @@ async def complete_setup_wizard(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Error completing setup"
-        )
-
-
-@router.get("/wizard/validate-repo")
-async def validate_repository(
-    repo_url: str,
-    branch: str = "main"
-):
-    """
-    Validate that a repository is accessible
-    """
-    try:
-        # TODO: Validate GitHub/GitLab repo access
-        return {
-            "valid": True,
-            "message": "Repository is accessible"
-        }
-    except Exception:
-        logger.exception("Repository validation failed")
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Repository validation failed"
         )
 
 
