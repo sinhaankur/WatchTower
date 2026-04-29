@@ -1896,10 +1896,9 @@ async def active_deployments_count(
 ):
     """Count of deployments in non-terminal states across all projects
     the caller owns. Polled every 8s by the SPA's sidebar badge."""
-    from uuid import UUID
     from watchtower.database import Deployment, DeploymentStatus, Project
 
-    user_id = UUID(str(current_user["user_id"]))
+    user_id = util.canonical_user_id(db, current_user)
     in_flight_states = (
         DeploymentStatus.PENDING,
         DeploymentStatus.BUILDING,
