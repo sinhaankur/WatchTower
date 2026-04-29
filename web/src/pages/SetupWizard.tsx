@@ -62,6 +62,12 @@ const SetupWizard = () => {
   const [ghRepos, setGhRepos] = useState<GHRepo[]>([]);
   const [repoSearch, setRepoSearch] = useState('');
   const [ghConnected, setGhConnected] = useState(false);
+  // Port suggestion from /api/runtime/recommend-port. `null` while loading,
+  // a number when fetched, `'error'` if the endpoint failed (we don't want
+  // to silently fall back to "3000" the way the legacy code did — better
+  // to tell the user we couldn't pick).
+  const [recommendedPort, setRecommendedPort] = useState<number | null | 'error'>(null);
+  const [portEditOpen, setPortEditOpen] = useState(false);
   const navigate = useNavigate();
 
   // Check if any deployment nodes exist so we can warn before wasting the user's time
@@ -86,6 +92,37 @@ const SetupWizard = () => {
       }
     };
     void checkNodes();
+  }, []);
+
+  // Fetch a recommended port up-front so the wizard can show "we'll use
+  // port X" instead of demanding the user pick one. Surface failure
+  // explicitly — silent fallback to 3000 is the same UX trap that
+  // detect-framework had.
+  useEffect(() => {
+    const fetchPort = async () => {
+      try {
+        const res = await apiClient.get('/runtime/recommend-port');
+        const port = (res.data as { port?: number })?.port;
+        if (typeof port === 'number') {
+          setRecommendedPort(port);
+          // Wire into the form fields the user might submit. Don't
+          // overwrite if the user already typed something.
+          setData((prev) => {
+            const launchUrlIsDefault = prev.launch_url === 'http://localhost:3000' || prev.launch_url === '';
+            return {
+              ...prev,
+              exposed_port: prev.exposed_port === 3000 ? port : prev.exposed_port,
+              launch_url: launchUrlIsDefault ? `http://localhost:${port}` : prev.launch_url,
+            };
+          });
+        } else {
+          setRecommendedPort('error');
+        }
+      } catch {
+        setRecommendedPort('error');
+      }
+    };
+    void fetchPort();
   }, []);
 
   // Auto-open repo picker when returning from GitHub OAuth
@@ -337,6 +374,9 @@ const SetupWizard = () => {
         exposed_port: data.exposed_port,
         target_nodes: data.target_nodes,
         custom_domain: data.custom_domain || undefined,
+        // Persist the suggested (or user-edited) port on Project so the
+        // local-podman runner can read it as the source of truth.
+        recommended_port: data.exposed_port,
       });
     } catch {
       // Local-first mode keeps setup usable while backend is unavailable.
@@ -751,19 +791,73 @@ const SetupWizard = () => {
                   </Card>
                 )}
 
+                {/* Universal port suggestion. The wizard previously hid
+                    the port input inside a docker-only card, so non-docker
+                    projects never saw a recommendation at all. Now it's
+                    always visible: shows "We'll use port X" prominently,
+                    with Edit to override. Surfaces failure explicitly
+                    instead of silently falling back to 3000. */}
+                <Card className="electron-card-solid rounded-md shadow-none">
+                  <CardContent className="py-4 space-y-3">
+                    <p className="text-xs font-medium uppercase tracking-wide electron-accent">Port</p>
+                    {recommendedPort === null ? (
+                      <p className="text-sm text-slate-600">Picking a free port…</p>
+                    ) : recommendedPort === 'error' ? (
+                      <div className="flex items-center gap-3">
+                        <p className="text-sm text-amber-800">
+                          Couldn't auto-pick a port (no free port in 3000-3999, or the API is unreachable).
+                        </p>
+                        <Input
+                          id="exposed_port_fallback"
+                          type="number"
+                          value={data.exposed_port}
+                          onChange={(e) => setField('exposed_port', Number(e.target.value || 3000))}
+                          className="w-24 rounded-md border-border bg-white"
+                        />
+                      </div>
+                    ) : portEditOpen ? (
+                      <div className="flex items-center gap-3">
+                        <Label htmlFor="exposed_port" className="text-sm">Use port</Label>
+                        <Input
+                          id="exposed_port"
+                          type="number"
+                          value={data.exposed_port}
+                          onChange={(e) => setField('exposed_port', Number(e.target.value || 3000))}
+                          className="w-24 rounded-md border-border bg-white"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setPortEditOpen(false)}
+                          className="text-xs text-slate-600 hover:text-slate-900 underline"
+                        >
+                          Done
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-3">
+                        <p className="text-sm text-slate-700">
+                          We'll deploy on <span className="font-mono font-semibold text-slate-900">port {data.exposed_port}</span>{' '}
+                          <span className="text-slate-500">(free, picked from 3000-3999)</span>
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => setPortEditOpen(true)}
+                          className="text-xs text-slate-600 hover:text-slate-900 underline"
+                        >
+                          Edit
+                        </button>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
                 {data.use_case === 'docker_platform' && (
                   <Card className="electron-card-solid rounded-md shadow-none">
                     <CardContent className="py-4 space-y-3">
                       <p className="text-xs font-medium uppercase tracking-wide electron-accent">Container Runtime</p>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <Label htmlFor="dockerfile_path">Dockerfile Path</Label>
-                          <Input id="dockerfile_path" value={data.dockerfile_path} onChange={(e) => setField('dockerfile_path', e.target.value)} className="mt-1.5 rounded-md border-border bg-white" />
-                        </div>
-                        <div>
-                          <Label htmlFor="exposed_port">Exposed Port</Label>
-                          <Input id="exposed_port" type="number" value={data.exposed_port} onChange={(e) => setField('exposed_port', Number(e.target.value || 3000))} className="mt-1.5 rounded-md border-border bg-white" />
-                        </div>
+                      <div>
+                        <Label htmlFor="dockerfile_path">Dockerfile Path</Label>
+                        <Input id="dockerfile_path" value={data.dockerfile_path} onChange={(e) => setField('dockerfile_path', e.target.value)} className="mt-1.5 rounded-md border-border bg-white" />
                       </div>
                     </CardContent>
                   </Card>
