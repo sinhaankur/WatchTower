@@ -68,6 +68,17 @@ type WatchdogStatus = {
   active: boolean;
   enabled: boolean;
   state: string;
+  installed?: boolean;
+};
+
+type WatchtowerConfig = {
+  path: string;
+  exists: boolean;
+  interval: number;
+  monitor_only: boolean;
+  cleanup: boolean;
+  include: string[];
+  exclude: string[];
 };
 
 type InstallCommands = {
@@ -424,6 +435,268 @@ function WatchdogCard({ podmanInstalled }: { podmanInstalled: boolean }) {
   );
 }
 
+// ─── WatchTower service card (auto-update daemon) ─────────────────────────────
+// Sibling of WatchdogCard. The Podman watchdog brings containers BACK after
+// reboot; this service keeps them up to DATE while running. Same UX shape.
+
+function WatchTowerServiceCard() {
+  const [status, setStatus] = useState<WatchdogStatus | null>(null);
+  const [toggling, setToggling] = useState(false);
+  const [msg, setMsg] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null);
+
+  const load = useCallback(async () => {
+    try {
+      const r = await apiClient.get('/runtime/watchtower-service/status');
+      setStatus(r.data as WatchdogStatus);
+    } catch { /* non-fatal — endpoint may 503 if systemctl missing */ }
+  }, []);
+
+  useEffect(() => { void load(); }, [load]);
+
+  const showMsg = (kind: 'ok' | 'err', text: string) => {
+    setMsg({ kind, text });
+    setTimeout(() => setMsg((c) => (c?.text === text ? null : c)), 4000);
+  };
+
+  const toggle = async () => {
+    if (!status) return;
+    setToggling(true);
+    try {
+      const endpoint = status.enabled
+        ? '/runtime/watchtower-service/disable'
+        : '/runtime/watchtower-service/enable';
+      const r = await apiClient.post(endpoint);
+      const resp = r.data as { watchdog: WatchdogStatus; message: string };
+      setStatus(resp.watchdog);
+      showMsg('ok', resp.message);
+    } catch (err: any) {
+      const detail = err?.response?.data?.detail ?? 'Failed to toggle service.';
+      showMsg('err', typeof detail === 'string' ? detail : JSON.stringify(detail));
+    } finally {
+      setToggling(false);
+    }
+  };
+
+  const enabled = status?.enabled ?? false;
+  const installed = status?.installed ?? false;
+
+  return (
+    <div className={`rounded-xl border p-5 transition-all ${
+      enabled ? 'border-emerald-300 bg-emerald-50/40' : 'border-slate-200 bg-white'
+    }`}>
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex items-start gap-3 min-w-0 flex-1">
+          <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0 border ${
+            enabled ? 'bg-emerald-50 border-emerald-200' : 'bg-slate-50 border-slate-200'
+          }`}>🛡️</div>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h3 className="text-sm font-semibold text-slate-900">Auto-Update Daemon</h3>
+              <span className={`text-[10px] px-1.5 py-0.5 rounded-full border ${
+                enabled
+                  ? 'bg-emerald-50 border-emerald-300 text-emerald-700'
+                  : installed
+                    ? 'bg-slate-50 border-slate-300 text-slate-600'
+                    : 'bg-amber-50 border-amber-300 text-amber-800'
+              }`}>
+                {enabled ? 'Enabled on boot' : installed ? 'Disabled' : 'Not installed'}
+              </span>
+            </div>
+            <p className="text-xs text-slate-600 mt-0.5">
+              The <code className="font-mono bg-slate-100 px-1 rounded">watchtower.service</code> systemd unit polls running containers, pulls newer images, and restarts safely. Without it, container updates require manual <code className="font-mono bg-slate-100 px-1 rounded">watchtower update-now</code>.
+            </p>
+          </div>
+        </div>
+        {installed && (
+          <button
+            onClick={toggle}
+            disabled={toggling}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors shrink-0 ${
+              enabled
+                ? 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+                : 'bg-emerald-700 text-white border-emerald-800 hover:bg-emerald-800'
+            } disabled:opacity-50`}
+          >
+            {toggling ? '…' : enabled ? 'Disable' : 'Enable'}
+          </button>
+        )}
+      </div>
+
+      {!installed && (
+        <div className="mt-3 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-900">
+          The systemd unit isn't installed. Run <code className="font-mono bg-white border border-amber-200 px-1 rounded">scripts/install-watchtower-linux-full.sh</code> once from the source tree to install <code className="font-mono">watchtower.service</code>, then come back here to enable it.
+        </div>
+      )}
+
+      {msg && (
+        <p className={`mt-3 text-xs ${msg.kind === 'ok' ? 'text-emerald-700' : 'text-red-700'}`}>
+          {msg.text}
+        </p>
+      )}
+    </div>
+  );
+}
+
+// ─── Watchtower config card (watchtower.yml editable from UI) ─────────────────
+
+function WatchtowerConfigCard() {
+  const [cfg, setCfg] = useState<WatchtowerConfig | null>(null);
+  const [draft, setDraft] = useState<WatchtowerConfig | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null);
+  const [includeText, setIncludeText] = useState('');
+  const [excludeText, setExcludeText] = useState('');
+
+  const load = useCallback(async () => {
+    try {
+      const r = await apiClient.get('/runtime/watchtower/config');
+      const data = r.data as WatchtowerConfig;
+      setCfg(data);
+      setDraft(data);
+      setIncludeText((data.include ?? []).join('\n'));
+      setExcludeText((data.exclude ?? []).join('\n'));
+    } catch { /* non-fatal */ }
+  }, []);
+
+  useEffect(() => { void load(); }, [load]);
+
+  if (!cfg || !draft) return null;
+
+  const dirty =
+    draft.interval !== cfg.interval ||
+    draft.monitor_only !== cfg.monitor_only ||
+    draft.cleanup !== cfg.cleanup ||
+    includeText.trim() !== (cfg.include ?? []).join('\n').trim() ||
+    excludeText.trim() !== (cfg.exclude ?? []).join('\n').trim();
+
+  const save = async () => {
+    setSaving(true);
+    setMsg(null);
+    try {
+      const payload = {
+        interval: draft.interval,
+        monitor_only: draft.monitor_only,
+        cleanup: draft.cleanup,
+        include: includeText.split('\n').map((s) => s.trim()).filter(Boolean),
+        exclude: excludeText.split('\n').map((s) => s.trim()).filter(Boolean),
+      };
+      const r = await apiClient.put('/runtime/watchtower/config', payload);
+      const resp = r.data as { restart: string };
+      const restartLabel =
+        resp.restart === 'restarted' ? ' Service restarted to apply.'
+          : resp.restart === 'restart_failed' ? ' Settings saved but service restart failed — restart manually.'
+          : ' Service is not running; settings will apply on next start.';
+      setMsg({ kind: 'ok', text: `Saved.${restartLabel}` });
+      await load();
+    } catch (err: any) {
+      const detail = err?.response?.data?.detail ?? 'Failed to save config.';
+      setMsg({ kind: 'err', text: typeof detail === 'string' ? detail : JSON.stringify(detail) });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white p-5">
+      <div className="flex items-start justify-between gap-4 mb-4">
+        <div className="min-w-0">
+          <h3 className="text-sm font-semibold text-slate-900">Auto-Update Settings</h3>
+          <p className="text-xs text-slate-600 mt-0.5">
+            Edit <code className="font-mono bg-slate-100 px-1 rounded text-[11px]">{cfg.path}</code>.
+            Changes apply immediately if the service is running.
+          </p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Poll interval */}
+        <div>
+          <label className="text-xs font-medium text-slate-700 block mb-1">
+            Poll interval (seconds)
+          </label>
+          <input
+            type="number"
+            min={30}
+            max={86400}
+            value={draft.interval}
+            onChange={(e) => setDraft({ ...draft, interval: Number(e.target.value) })}
+            className="w-full text-sm rounded-md border border-slate-300 bg-white px-2 py-1.5"
+          />
+          <p className="text-[11px] text-slate-500 mt-1">
+            Default 300 (5 min). Lower = faster updates + more API load.
+          </p>
+        </div>
+
+        {/* Toggles */}
+        <div className="space-y-2">
+          <label className="flex items-start gap-2 text-xs text-slate-700 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={draft.monitor_only}
+              onChange={(e) => setDraft({ ...draft, monitor_only: e.target.checked })}
+              className="w-3.5 h-3.5 mt-0.5 accent-slate-800"
+            />
+            <span>
+              <span className="font-medium">Monitor-only</span>
+              <span className="block text-[11px] text-slate-500">Check for updates but don't apply them. Useful for testing.</span>
+            </span>
+          </label>
+          <label className="flex items-start gap-2 text-xs text-slate-700 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={draft.cleanup}
+              onChange={(e) => setDraft({ ...draft, cleanup: e.target.checked })}
+              className="w-3.5 h-3.5 mt-0.5 accent-slate-800"
+            />
+            <span>
+              <span className="font-medium">Clean up old images</span>
+              <span className="block text-[11px] text-slate-500">After a successful update, remove the previous image.</span>
+            </span>
+          </label>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+        <div>
+          <label className="text-xs font-medium text-slate-700 block mb-1">Include (one pattern per line)</label>
+          <textarea
+            rows={3}
+            value={includeText}
+            onChange={(e) => setIncludeText(e.target.value)}
+            placeholder="(empty = all containers)&#10;web-*&#10;api-prod"
+            className="w-full text-xs font-mono rounded-md border border-slate-300 bg-white px-2 py-1.5"
+          />
+        </div>
+        <div>
+          <label className="text-xs font-medium text-slate-700 block mb-1">Exclude (one pattern per line)</label>
+          <textarea
+            rows={3}
+            value={excludeText}
+            onChange={(e) => setExcludeText(e.target.value)}
+            placeholder="postgres-*&#10;redis-prod"
+            className="w-full text-xs font-mono rounded-md border border-slate-300 bg-white px-2 py-1.5"
+          />
+        </div>
+      </div>
+
+      <div className="flex items-center justify-end gap-3 mt-4">
+        {msg && (
+          <p className={`text-xs ${msg.kind === 'ok' ? 'text-emerald-700' : 'text-red-700'}`}>
+            {msg.text}
+          </p>
+        )}
+        <button
+          onClick={() => void save()}
+          disabled={!dirty || saving}
+          className="px-3 py-1.5 rounded-lg text-xs font-medium border bg-slate-900 text-white border-slate-800 hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {saving ? 'Saving…' : 'Save settings'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 const Integrations = () => {
@@ -529,10 +802,14 @@ const Integrations = () => {
           </div>
         )}
 
-        {/* Podman watchdog — primary feature */}
+        {/* Watchdogs + auto-update — the autonomy story */}
         <section>
-          <h2 className="text-sm font-semibold text-slate-900 mb-3">Auto-Restart Watchdog</h2>
-          <WatchdogCard podmanInstalled={podman?.installed ?? false} />
+          <h2 className="text-sm font-semibold text-slate-900 mb-3">Autonomous Operation</h2>
+          <div className="space-y-3">
+            <WatchdogCard podmanInstalled={podman?.installed ?? false} />
+            <WatchTowerServiceCard />
+            <WatchtowerConfigCard />
+          </div>
         </section>
 
         {/* Integration cards */}
