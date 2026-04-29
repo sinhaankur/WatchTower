@@ -1225,6 +1225,247 @@ async def disable_podman_watchdog(
     }
 
 
+# ── WatchTower auto-update daemon (watchtower.service) ──────────────────────
+# Sibling of the Podman watchdog above. Where podman-restart.service brings
+# user containers back after a reboot, watchtower.service keeps them up to
+# date (the `watchtower start` poll-pull-restart loop). Same UX shape:
+# read status, toggle enable/disable. Configured via config/watchtower.yml
+# which has its own GET/PUT endpoints further down.
+
+_WATCHTOWER_SERVICE = "watchtower.service"
+
+
+def _watchtower_service_status() -> dict[str, Any]:
+    state = _systemd_status(_WATCHTOWER_SERVICE)
+    enabled_ok, enabled_out, _, _ = _run_cmd(
+        ["systemctl", "is-enabled", _WATCHTOWER_SERVICE], timeout=5
+    )
+    enabled_value = enabled_out.strip() if enabled_ok else ""
+    return {
+        "service": _WATCHTOWER_SERVICE,
+        "active": state == "active",
+        "enabled": enabled_value in ("enabled", "enabled-runtime"),
+        "state": state,
+        # The unit might not be installed at all (manual `pip install` users
+        # never ran the install script). Surface that distinctly so the UI
+        # can show "install the unit file" instead of an enable toggle.
+        "installed": enabled_value not in ("", "not-found"),
+    }
+
+
+@router.get("/watchtower-service/status")
+async def get_watchtower_service_status(
+    _current_user: dict = Depends(util.get_current_user),
+):
+    """Status of the watchtower.service systemd unit."""
+    return _watchtower_service_status()
+
+
+@router.post("/watchtower-service/enable")
+async def enable_watchtower_service(
+    _current_user: dict = Depends(util.get_current_user),
+):
+    """Enable + start watchtower.service so the auto-update daemon
+    runs on boot. Idempotent — calling repeatedly is safe.
+    """
+    ok, _, err, _ = _run_cmd(
+        ["sudo", "-n", "systemctl", "enable", "--now", _WATCHTOWER_SERVICE],
+        timeout=20,
+    )
+    if not ok:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=(
+                f"Failed to enable {_WATCHTOWER_SERVICE}. "
+                f"Make sure the unit file is installed (run "
+                f"scripts/install-watchtower-linux-full.sh once) and that "
+                f"the API host has passwordless sudo for systemctl. "
+                f"Error: {err}"
+            ),
+        )
+    return {
+        "status": "enabled",
+        "message": f"{_WATCHTOWER_SERVICE} is enabled and active. "
+                   "Auto-update will run on boot.",
+        "watchdog": _watchtower_service_status(),
+    }
+
+
+@router.post("/watchtower-service/disable")
+async def disable_watchtower_service(
+    _current_user: dict = Depends(util.get_current_user),
+):
+    """Stop + disable watchtower.service. Containers will not be
+    auto-updated until the service is re-enabled.
+    """
+    ok, _, err, _ = _run_cmd(
+        ["sudo", "-n", "systemctl", "disable", "--now", _WATCHTOWER_SERVICE],
+        timeout=20,
+    )
+    if not ok:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to disable {_WATCHTOWER_SERVICE}: {err}",
+        )
+    return {
+        "status": "disabled",
+        "message": f"{_WATCHTOWER_SERVICE} disabled. "
+                   "Containers will not be auto-updated until you re-enable.",
+        "watchdog": _watchtower_service_status(),
+    }
+
+
+# ── WatchTower auto-update config (watchtower.yml) ──────────────────────────
+# The config file the watchtower CLI reads. Until now users had to SSH in
+# and edit it by hand. These endpoints expose a curated subset of the
+# settings that matter for end-user control: poll interval, dry-run
+# mode, image cleanup, and include/exclude container patterns.
+
+import yaml as _yaml  # noqa: E402  (late import — yaml isn't a hot path)
+
+
+def _config_search_paths() -> list[Path]:
+    """Same priority order the CLI uses, plus the user data dir."""
+    return [
+        Path(p) for p in (
+            os.getenv("WATCHTOWER_CONFIG"),
+            "/etc/watchtower/watchtower.yml",
+            "/opt/watchtower/config/watchtower.yml",
+            os.path.join(os.path.expanduser("~"), ".watchtower", "watchtower.yml"),
+            "config/watchtower.yml",
+            "watchtower.yml",
+        ) if p
+    ]
+
+
+def _resolve_config_path() -> Path:
+    """Pick the path to read/write the watchtower.yml.
+
+    Priority:
+      1. WATCHTOWER_CONFIG env — explicit override always wins (even if
+         the file doesn't exist yet, it's the user's intended location).
+      2. Existing file at any of the standard search paths.
+      3. Default write location: WATCHTOWER_DATA_DIR/watchtower.yml or
+         ~/.watchtower/watchtower.yml.
+    """
+    explicit = os.getenv("WATCHTOWER_CONFIG")
+    if explicit:
+        return Path(explicit)
+    for p in _config_search_paths():
+        if p.is_file():
+            return p
+    # Default write location — mirrors what _ensure_secret_key uses.
+    data_dir = Path(
+        os.getenv("WATCHTOWER_DATA_DIR")
+        or os.path.join(os.path.expanduser("~"), ".watchtower")
+    )
+    data_dir.mkdir(parents=True, exist_ok=True)
+    return data_dir / "watchtower.yml"
+
+
+class WatchtowerConfigUpdate(BaseModel):
+    """Subset of watchtower.yml that's safe to edit from the UI.
+
+    We don't expose the notifications block here (SMTP creds belong in
+    a different flow) or arbitrary YAML keys (would break the loader).
+    """
+    interval: int = Field(300, ge=30, le=86400)
+    monitor_only: bool = False
+    cleanup: bool = True
+    include: List[str] = []
+    exclude: List[str] = []
+
+
+@router.get("/watchtower/config")
+async def get_watchtower_config(
+    _current_user: dict = Depends(util.get_current_user),
+):
+    """Return the current watchtower.yml settings (safe subset)."""
+    path = _resolve_config_path()
+    cfg: dict[str, Any] = {}
+    if path.is_file():
+        try:
+            cfg = _yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+        except Exception as exc:  # pragma: no cover — diagnostic surface
+            logger.exception("Failed to parse %s", path)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Could not parse {path}: {exc}",
+            )
+
+    wt = cfg.get("watchtower", {}) if isinstance(cfg, dict) else {}
+    containers = cfg.get("containers", {}) if isinstance(cfg, dict) else {}
+    return {
+        "path": str(path),
+        "exists": path.is_file(),
+        "interval": int(wt.get("interval", 300)),
+        "monitor_only": bool(wt.get("monitor_only", False)),
+        "cleanup": bool(wt.get("cleanup", True)),
+        "include": list(containers.get("include") or []),
+        "exclude": list(containers.get("exclude") or []),
+    }
+
+
+@router.put("/watchtower/config")
+async def put_watchtower_config(
+    data: WatchtowerConfigUpdate,
+    _current_user: dict = Depends(util.get_current_user),
+):
+    """Write the watchtower.yml settings the user just changed.
+
+    Preserves any keys we don't expose (notifications, etc.) by
+    round-tripping through the existing file when one exists.
+    Triggers a `systemctl restart` if the watchtower.service is
+    currently active so the new settings take effect immediately.
+    """
+    path = _resolve_config_path()
+
+    existing: dict[str, Any] = {}
+    if path.is_file():
+        try:
+            existing = _yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+        except Exception:
+            existing = {}
+
+    if not isinstance(existing, dict):
+        existing = {}
+    existing.setdefault("watchtower", {})
+    existing.setdefault("containers", {})
+    existing["watchtower"]["interval"] = data.interval
+    existing["watchtower"]["monitor_only"] = data.monitor_only
+    existing["watchtower"]["cleanup"] = data.cleanup
+    existing["containers"]["include"] = data.include
+    existing["containers"]["exclude"] = data.exclude
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        _yaml.safe_dump(existing, sort_keys=False, default_flow_style=False),
+        encoding="utf-8",
+    )
+
+    # If the service is running, restart so the new config takes effect.
+    # No-op (and silent) if the service isn't installed / isn't running.
+    restart_status = "skipped"
+    if _systemd_status(_WATCHTOWER_SERVICE) == "active":
+        ok, _, _, _ = _run_cmd(
+            ["sudo", "-n", "systemctl", "restart", _WATCHTOWER_SERVICE],
+            timeout=15,
+        )
+        restart_status = "restarted" if ok else "restart_failed"
+
+    return {
+        "path": str(path),
+        "restart": restart_status,
+        "config": {
+            "interval": data.interval,
+            "monitor_only": data.monitor_only,
+            "cleanup": data.cleanup,
+            "include": data.include,
+            "exclude": data.exclude,
+        },
+    }
+
+
 @router.get("/terminal/policy")
 async def terminal_policy(
     _current_user: dict = Depends(util.get_current_user),
