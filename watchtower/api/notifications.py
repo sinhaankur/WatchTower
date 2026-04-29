@@ -57,7 +57,7 @@ async def list_webhooks(
     db: Session = Depends(get_db),
     current_user: dict = Depends(util.get_current_user),
 ):
-    _get_project_or_404(db, project_id, UUID(str(current_user["user_id"])))
+    _get_project_or_404(db, project_id, util.canonical_user_id(db, current_user))
     hooks = db.query(NotificationWebhook).filter_by(project_id=project_id).all()
     return hooks
 
@@ -69,7 +69,7 @@ async def create_webhook(
     db: Session = Depends(get_db),
     current_user: dict = Depends(util.get_current_user),
 ):
-    _get_project_or_404(db, project_id, UUID(str(current_user["user_id"])))
+    _get_project_or_404(db, project_id, util.canonical_user_id(db, current_user))
 
     if data.provider not in ("discord", "slack"):
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -94,7 +94,7 @@ async def delete_webhook(
     db: Session = Depends(get_db),
     current_user: dict = Depends(util.get_current_user),
 ):
-    _get_project_or_404(db, project_id, UUID(str(current_user["user_id"])))
+    _get_project_or_404(db, project_id, util.canonical_user_id(db, current_user))
     hook = db.query(NotificationWebhook).filter_by(
         id=webhook_id, project_id=project_id
     ).first()
