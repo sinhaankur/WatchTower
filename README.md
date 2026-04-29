@@ -113,6 +113,46 @@ The project is intentionally lightweight. It is not trying to replace a full Paa
 - **Explicit deploy flow:** operators can see app selection, artifact creation, sync, activation, and health verification as separate steps.
 - **Own-your-infrastructure model:** deploy to your own Linux nodes over SSH instead of handing control to a hosted platform.
 - **Consistent UX:** the desktop app, web UI, GitHub Pages docs, and architecture diagrams all explain the same product model.
+- **Desktop-first, AI-agent ready:** ships as a real Electron app with system-tray integration, native folder pickers, OS-level notifications, and a built-in agent surface — not a web app dressed up as a desktop one.
+
+---
+
+## What's New in 1.5.12
+
+The 1.5.x series — and especially the 1.5.10 → 1.5.12 cluster — moved WatchTower decisively in the *desktop-first, integrate-don't-rebuild* direction. Highlights:
+
+### Setup that actually works
+
+- **Auto-recommended ports.** Setup wizard picks a free port from 3000–3999 (race-free `bind`-and-release, skips ports already assigned to your other projects) and surfaces it as *"We'll deploy on port X"* with a single-click **Edit** override. No more silent fallback to a port that's already in use.
+- **Native folder picker for local-source projects.** Click **Browse…** in the Setup Wizard's *Local folder* tab — get the OS file dialog instead of typing absolute paths. (Desktop only; browser mode falls back to a text input.)
+- **GitHub avatars + names show up after sign-in.** Previously the sidebar identity badge fell back to the initial-letter placeholder forever; now the user's GitHub avatar persists across sessions and refreshes on every login.
+- **Sign out is sticky.** A new `wt:explicitlySignedOut` sentinel prevents the dev / Electron auto-token path from silently re-authenticating you the moment you click Sign out. Sentinel clears on any deliberate sign-in (GitHub OAuth, guest, manual token, device flow).
+
+### Build pipeline foundations
+
+- **Nixpacks bundled into the desktop installer.** ~36 MB of platform-specific binaries (Linux x64/arm64, macOS x64/arm64) ship inside the Electron app via `electron-builder` `extraResources` so users can deploy without first installing Rust + Cargo + Nix. Resolution order is `WATCHTOWER_NIXPACKS_BIN` → bundled → system PATH. (The local-Podman runner that *consumes* this lands in 1.5.13.)
+- **`GET /api/runtime/nixpacks-status`** exposes `{available, source, path, version, version_drift, platform_supported}` so the SPA can surface an actionable banner instead of silently failing a build.
+- **Build queue stops dropping deploys at PENDING.** A long-standing bug where `enqueue_build` passed `str(deployment.id)` to a SQLAlchemy `Uuid` column (which calls `.hex` on the parameter) silently killed every queued build at the first DB query. Fixed at the top of `_run_build` with proper UUID coercion.
+
+### UI that doesn't lie to the user
+
+- **Projects no longer vanish from the dashboard.** Created projects were filed under the canonical user id (resolved via email) but read paths filtered by the token-synthetic UUID5, so projects disappeared the instant the token rotated. New `util.canonical_user_id()` resolver canonicalizes 20 read paths across `projects.py`, `deployments.py`, `builds.py`, `notifications.py`, `envvars.py`, `runtime.py`, and `agent.py`.
+- **Real "Update Now" button.** Banners and the sidebar version line now actually trigger the Electron auto-updater (or the dev-clone `git pull` + rebuild + relaunch) instead of routing to a Settings page that only had a *Check* button.
+- **−27% cold-start bundle.** 14 page components moved out of the main JS bundle behind `React.lazy + Suspense`. Cold-start went from 706 KB → 517 KB raw (204 KB → 164 KB gzipped); each route loads its own ~3–25 KB chunk on first navigation.
+
+### Distribution
+
+- **Per-arch macOS installers.** Switched from a single fat universal `.dmg` to separate **x64** and **arm64** installers — half the per-install download, no `@electron/universal` fragility around bundled per-arch tools.
+- **VS Code extension installs on VS Code 1.80+.** Previously gated to 1.90+ (about a year of releases locked out). Bundled with esbuild so the `.vsix` is now **10 KB across 6 files** (was ~52 KB across 13 files); single-file load = faster activation.
+- **Sidebar deduplicated, color tokens unified.** Removed the redundant icon-only second sidebar that rendered alongside the main one in Electron mode. 27 hand-rolled `hsl(214 …)` color literals across 11 files migrated to two design tokens (`--border-soft`, `--surface-soft`) so palette changes are now a single edit.
+
+### Behind the scenes
+
+- **Backend test count: 99 → 121** (test files: 8 → 14). New coverage for canonical-user-id resolution, builder UUID coercion, port recommendation, and Nixpacks resolution.
+- **Branch protection on `main`.** Build (Linux/macOS/Windows matrix) + Trivy filesystem & container scans must pass before merge.
+- **Stale `chore/release-*` branches and unused workflows pruned.** Repository is back to a single canonical branch (`main`) with a clean release pipeline.
+
+> See `git log v1.5.10..v1.5.12 --oneline` for the full commit list, or browse [the Releases page](https://github.com/sinhaankur/WatchTower/releases) for installer downloads.
 
 ---
 
@@ -125,7 +165,7 @@ WatchTower is **fully functional** and suitable for:
 
 ### Available for Download
 
-**Current Version: 1.2.2**
+**Current Version: 1.5.12**
 
 | Channel | How to Get | Use Case |
 |---------|-----------|----------|
@@ -282,6 +322,9 @@ flowchart LR
 
 ### Platform and Distribution Features
 
+- **Desktop app**: Electron build with native system tray, **OS-level notifications** (deploy completion / build failure), **native folder picker** for local-source projects, sticky sign-out, and in-app **Update Now** wired to `electron-updater`. Per-arch installers for Linux (x86_64, arm64, armv7l), macOS (x64, arm64), and Windows (x64, arm64).
+- **VS Code extension**: WatchTower sidebar inside the editor — projects, deploy actions, deployment logs, and a status bar item. Installs on VS Code **1.80+**, ~10 KB `.vsix`, esbuild-bundled.
+- **Bundled build tooling**: Nixpacks v1.41.0 binaries (Linux x64/arm64, macOS x64/arm64) shipped inside the desktop installer via `extraResources` so users don't need Rust + Cargo + Nix to deploy.
 - Linux App Center installer (`install_app_center.sh`)
 - Windows App Center installer and runner scripts
 - macOS App Center installer and runner scripts
