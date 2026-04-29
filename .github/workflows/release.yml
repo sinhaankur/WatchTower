@@ -83,10 +83,16 @@ jobs:
             extra_apt: "gcc-arm-linux-gnueabihf"
           - os: macos-14
             # macos-14 is the Apple Silicon (M1) runner — required to build
-            # the x64 slice of a universal binary via Rosetta cross-compilation.
-            # electron-builder --universal produces a fat DMG that runs on
-            # both Intel Macs and M1/M2/M3/M4 with a single download.
-            eb_args: --mac --universal
+            # the x64 slice via Rosetta cross-compilation.
+            # We ship separate x64 and arm64 DMGs (configured in
+            # desktop/package.json's mac.target) instead of a single
+            # universal binary because @electron/universal refuses to
+            # merge arch-specific bundled binaries (Nixpacks per-platform
+            # under extraResources/binaries/) without an explicit
+            # x64ArchFiles regex. Two ~150 MB downloads beats two days of
+            # universal-merge config debugging, and matches what
+            # Slack/Discord/Cursor ship.
+            eb_args: --mac --x64 --arm64
             artifact_glob: "desktop/dist/*.dmg desktop/dist/*.zip"
             extra_apt: ""
           - os: windows-latest
