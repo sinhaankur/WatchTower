@@ -24,7 +24,7 @@ async def list_builds(
     """List builds for a deployment"""
     deployment = db.query(Deployment).join(Project).filter(
         Deployment.id == deployment_id,
-        Project.owner_id == UUID(str(current_user["user_id"]))
+        Project.owner_id == util.canonical_user_id(db, current_user)
     ).first()
     
     if not deployment:
@@ -46,7 +46,7 @@ async def get_build(
     """Get build details"""
     build = db.query(Build).join(Deployment).join(Project).filter(
         Build.id == build_id,
-        Project.owner_id == UUID(str(current_user["user_id"]))
+        Project.owner_id == util.canonical_user_id(db, current_user)
     ).first()
     
     if not build:
