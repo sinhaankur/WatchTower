@@ -7,7 +7,7 @@
   "license": "MIT",
   "icon": "assets/icon.png",
   "engines": {
-    "vscode": "^1.90.0"
+    "vscode": "^1.80.0"
   },
   "categories": [
     "Other"
@@ -187,19 +187,24 @@
     }
   },
   "scripts": {
-    "vscode:prepublish": "npm run compile",
-    "compile": "tsc -p ./",
-    "watch": "tsc -watch -p ./",
+    "vscode:prepublish": "npm run package:bundle",
+    "typecheck": "tsc --noEmit -p ./",
+    "bundle": "node esbuild.config.cjs",
+    "bundle:watch": "node esbuild.config.cjs --watch",
+    "compile": "npm run typecheck && npm run bundle",
+    "watch": "npm run bundle:watch",
+    "package:bundle": "npm run typecheck && node esbuild.config.cjs --production",
     "lint": "eslint src --ext ts",
-    "package": "vsce package",
+    "package": "npm run package:bundle && vsce package",
     "publish": "vsce publish"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
-    "@types/vscode": "^1.90.0",
+    "@types/vscode": "^1.80.0",
     "@typescript-eslint/eslint-plugin": "^8.59.0",
     "@typescript-eslint/parser": "^8.59.0",
     "@vscode/vsce": "^3.0.0",
+    "esbuild": "^0.24.0",
     "eslint": "^9.0.0",
     "typescript": "^5.4.0"
   }
