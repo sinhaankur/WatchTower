@@ -162,3 +162,8 @@ watchtower_test.db
 MoonTracker UI /
 node_modules/
 desktop/node_modules/
+
+# Pre-packaged Nixpacks binaries — populated at build time by
+# desktop/scripts/download-nixpacks.py and shipped via electron-builder
+# extraResources. ~36 MB of binaries that should not live in git.
+desktop/build/binaries/

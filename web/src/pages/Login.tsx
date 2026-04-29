@@ -98,11 +98,27 @@ const Login = () => {
       return;
     }
 
+    // Respect explicit sign-out: if the user just clicked "Sign out", the
+    // sentinel sits in localStorage and we DO NOT auto-re-authenticate
+    // from VITE_API_TOKEN — that would silently bounce them back to the
+    // dashboard and make sign-out feel broken. Sentinel persists until
+    // a new sign-in succeeds.
+    const explicitlySignedOut = localStorage.getItem('wt:explicitlySignedOut') === '1';
+
     const hydrateExistingSession = async (token: string) => {
       localStorage.setItem('authToken', token);
+      // Hydration counts as a successful sign-in — clear the sign-out
+      // sentinel so the next launch can auto-login again.
+      localStorage.removeItem('wt:explicitlySignedOut');
       const user = await resolveUserFromContext();
       showSuccessAndRedirect(user, 1800, nextPath);
     };
+
+    if (explicitlySignedOut) {
+      // Don't auto-login. The user must click an explicit sign-in button,
+      // which clears the sentinel via hydrateExistingSession.
+      return;
+    }
 
     // Auto-login: Electron injects VITE_API_TOKEN into the Vite process at launch.
     // If present, store it and go straight to the dashboard.
@@ -146,6 +162,7 @@ const Login = () => {
     setError('');
     try {
       localStorage.setItem('authToken', trimmed);
+      localStorage.removeItem('wt:explicitlySignedOut');
       const user = await resolveUserFromContext();
       trackEvent('login', { method: 'api_token' });
       showSuccessAndRedirect(user, 1600, resolveNextPath());
@@ -162,6 +179,7 @@ const Login = () => {
     try {
       const devToken = 'dev-' + Math.random().toString(36).slice(2, 10);
       localStorage.setItem('authToken', devToken);
+      localStorage.removeItem('wt:explicitlySignedOut');
       const user = await resolveUserFromContext();
       trackEvent('login', { method: 'dev_auto' });
       showSuccessAndRedirect(user, 1600, resolveNextPath());
@@ -186,6 +204,7 @@ const Login = () => {
       const token = resp.data?.token;
       if (!token) throw new Error('Guest session token missing');
       localStorage.setItem('authToken', token);
+      localStorage.removeItem('wt:explicitlySignedOut');
       trackEvent('login', { method: 'guest' });
       showSuccessAndRedirect(
         { name: resp.data.user?.name ?? 'Guest', email: resp.data.user?.email },
@@ -312,6 +331,7 @@ const Login = () => {
         if (cancelled) return;
         if (data.status === 'success' && data.token) {
           localStorage.setItem('authToken', data.token);
+          localStorage.removeItem('wt:explicitlySignedOut');
           setDevicePolling(false);
           setDeviceFlow(null);
           trackEvent('login', { method: 'github_device_flow_success' });
