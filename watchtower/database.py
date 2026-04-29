@@ -191,6 +191,11 @@ class Project(Base):
     repo_url = Column(String)
     repo_branch = Column(String, default="main")
     webhook_secret = Column(String)
+    # Port WatchTower picked (or the user accepted/overrode) at create
+    # time. Used as the deploy-time default for the local-podman runner;
+    # re-validated at bind time, so a port that's free at create time
+    # but taken at deploy time falls through to a fresh pick.
+    recommended_port = Column(Integer, nullable=True)
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
