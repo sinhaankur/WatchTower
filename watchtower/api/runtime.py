@@ -19,9 +19,11 @@ from typing import Any
 import requests
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
+from sqlalchemy.orm import Session
 
 import watchtower
 from watchtower.api import util
+from watchtower.database import get_db
 
 logger = logging.getLogger(__name__)
 
@@ -1639,3 +1641,34 @@ async def local_node_suggest_config(
             "ram_gb": profile["detected_ram_gb"],
         },
     }
+
+
+# ── Active deployment count (sidebar badge) ─────────────────────────────────
+# Powers the live "in flight" count next to Applications in the nav.
+# Lives on /api/runtime/ instead of /api/projects/ to avoid colliding
+# with the existing /{project_id} catch-all path on the projects router.
+
+@router.get("/active-deployments")
+async def active_deployments_count(
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(util.get_current_user),
+):
+    """Count of deployments in non-terminal states across all projects
+    the caller owns. Polled every 8s by the SPA's sidebar badge."""
+    from uuid import UUID
+    from watchtower.database import Deployment, DeploymentStatus, Project
+
+    user_id = UUID(str(current_user["user_id"]))
+    in_flight_states = (
+        DeploymentStatus.PENDING,
+        DeploymentStatus.BUILDING,
+        DeploymentStatus.DEPLOYING,
+    )
+    count = (
+        db.query(Deployment)
+        .join(Project)
+        .filter(Project.owner_id == user_id)
+        .filter(Deployment.status.in_(in_flight_states))
+        .count()
+    )
+    return {"active": count}

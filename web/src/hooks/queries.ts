@@ -26,7 +26,24 @@ export const queryKeys = {
   health: ['health'] as const,
   updateCheck: ['runtime', 'version'] as const,
   me: ['me'] as const,
+  activeDeployments: ['deployments', 'active-count'] as const,
 } as const;
+
+// Polled live so the sidebar badge stays close-to-real-time. 8s is the
+// sweet spot — fast enough that you see a build start, slow enough to
+// not hammer the API on idle tabs. Lives on /api/runtime/ instead of
+// /api/projects/ to avoid colliding with the projects router's
+// /{project_id} catch-all path.
+export function useActiveDeploymentCount() {
+  return useQuery<{ active: number }>({
+    queryKey: queryKeys.activeDeployments,
+    queryFn: async () =>
+      (await apiClient.get<{ active: number }>('/runtime/active-deployments')).data,
+    refetchInterval: 8_000,
+    staleTime: 5_000,
+    retry: false,
+  });
+}
 
 // ── Project queries ──────────────────────────────────────────────────────────
 

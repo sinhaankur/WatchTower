@@ -27,5 +27,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   openOAuth: (url) => ipcRenderer.send('wt:openOAuth', url),
   // Signal main process that OAuth completed — close popup, reload main window.
   oauthDone: () => ipcRenderer.send('wt:oauthDone'),
+  // Trigger an in-app update. Packaged: electron-updater download+install.
+  // Dev clone: git pull + rebuild + relaunch via run.sh update.
+  updateNow: (releaseUrl) => ipcRenderer.invoke('wt:updateNow', releaseUrl),
   platform: process.platform,
 });
