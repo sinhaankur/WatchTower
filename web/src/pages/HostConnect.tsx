@@ -406,7 +406,7 @@ const HostConnect = () => {
       {/* Header */}
       <header
         className="px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between border-b sticky top-0 z-10 bg-white/95 backdrop-blur-sm"
-        style={{ borderColor: 'hsl(214 32% 88%)' }}
+        style={{ borderColor: 'hsl(var(--border-soft))' }}
       >
         <div>
           <h1 className="text-lg font-semibold text-slate-900">Host Connect</h1>
@@ -438,7 +438,7 @@ const HostConnect = () => {
       {/* Tab bar */}
       <div
         className="flex items-center gap-1 px-4 sm:px-6 lg:px-8 border-b overflow-x-auto"
-        style={{ borderColor: 'hsl(214 32% 88%)', background: 'hsl(214 55% 98%)' }}
+        style={{ borderColor: 'hsl(var(--border-soft))', background: 'hsl(var(--sidebar))' }}
       >
         {TABS.map((tab) => (
           <button

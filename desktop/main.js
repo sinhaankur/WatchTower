@@ -1074,6 +1074,22 @@ ipcMain.on('wt:maximize', () => {
 ipcMain.on('wt:close', () => mainWindow?.close());
 ipcMain.handle('wt:isMaximized', () => mainWindow?.isMaximized() ?? false);
 
+// In-app "Update Now" — same code path as the native modal that fires on
+// startup, so the user can trigger an update from a button in the SPA
+// without touching a terminal.
+ipcMain.handle('wt:updateNow', async (_event, releaseUrl) => {
+  if (!mainWindow || mainWindow.isDestroyed()) return { ok: false, error: 'no-window' };
+  const safeUrl = typeof releaseUrl === 'string' && releaseUrl
+    ? releaseUrl
+    : 'https://github.com/sinhaankur/WatchTower/releases';
+  try {
+    await runUpdateNow(mainWindow, safeUrl);
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: err?.message ?? String(err) };
+  }
+});
+
 // ── GitHub OAuth popup ───────────────────────────────────────────────────────
 let oauthPopup = null;
 
