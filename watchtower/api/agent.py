@@ -525,7 +525,7 @@ async def chat(
       - ``{type: "error", error}`` — fatal error during the loop
     """
     client = _get_client()
-    user_id = util.to_uuid(current_user["user_id"])
+    user_id = util.canonical_user_id(db, current_user)
     tools = _build_tools()
     model = (req.model or _default_model()).strip()
     max_iterations = _max_iterations()

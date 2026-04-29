@@ -35,7 +35,7 @@ async def list_projects(
     current_user: dict = Depends(util.get_current_user)
 ):
     """List all projects for the current user"""
-    user_id = UUID(str(current_user["user_id"]))
+    user_id = util.canonical_user_id(db, current_user)
     projects = db.query(Project).filter(Project.owner_id == user_id).all()
     return projects
 
@@ -104,7 +104,7 @@ async def get_project(
     current_user: dict = Depends(util.get_current_user)
 ):
     """Get project details"""
-    user_id = UUID(str(current_user["user_id"]))
+    user_id = util.canonical_user_id(db, current_user)
     project = db.query(Project).filter(
         Project.id == project_id,
         Project.owner_id == user_id
@@ -128,7 +128,7 @@ async def update_project(
     current_user: dict = Depends(util.get_current_user)
 ):
     """Update project settings"""
-    user_id = UUID(str(current_user["user_id"]))
+    user_id = util.canonical_user_id(db, current_user)
     project = db.query(Project).filter(
         Project.id == project_id,
         Project.owner_id == user_id
@@ -175,7 +175,7 @@ async def delete_project(
     current_user: dict = Depends(util.get_current_user)
 ):
     """Delete project"""
-    user_id = UUID(str(current_user["user_id"]))
+    user_id = util.canonical_user_id(db, current_user)
     project = db.query(Project).filter(
         Project.id == project_id,
         Project.owner_id == user_id
@@ -209,7 +209,7 @@ def _load_owned_project(db: Session, project_id: UUID, current_user: dict) -> Pr
     fall back to org membership so users whose user_id changed across token
     rotations can still reach their projects.
     """
-    user_id = util.to_uuid(current_user["user_id"])
+    user_id = util.canonical_user_id(db, current_user)
     project = db.query(Project).filter(
         Project.id == project_id,
         Project.owner_id == user_id,
@@ -484,7 +484,7 @@ async def rotate_webhook_secret(
     will fail signature verification — the replay cache becomes irrelevant
     for that secret because the HMAC won't match.
     """
-    user_id = UUID(str(current_user["user_id"]))
+    user_id = util.canonical_user_id(db, current_user)
     project = db.query(Project).filter(
         Project.id == project_id,
         Project.owner_id == user_id,
