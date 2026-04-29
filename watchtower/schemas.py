@@ -101,6 +101,9 @@ class ProjectBase(BaseModel):
     launch_url: Optional[str] = None
     repo_url: str
     repo_branch: str = "main"
+    # Set by the wizard from /api/runtime/recommend-port. Optional so the
+    # legacy SSH/rsync flow that doesn't need a port can omit it.
+    recommended_port: Optional[int] = None
 
 
 class ProjectCreate(ProjectBase):
@@ -111,6 +114,7 @@ class ProjectUpdate(BaseModel):
     name: Optional[str] = None
     repo_branch: Optional[str] = None
     is_active: Optional[bool] = None
+    recommended_port: Optional[int] = None
 
 
 class ProjectResponse(ProjectBase):
@@ -355,11 +359,15 @@ class SetupWizardComplete(BaseModel):
     framework: Optional[str] = None  # Vercel-like
     enable_preview_deployments: Optional[bool] = True  # Vercel-like
     dockerfile_path: Optional[str] = "./Dockerfile"  # Docker
-    exposed_port: Optional[int] = 3000  # Docker
+    exposed_port: Optional[int] = 3000  # Docker (legacy — per-use-case)
     docker_compose_path: Optional[str] = None  # Docker
     target_nodes: Optional[str] = None  # Docker
     custom_domain: Optional[str] = None
     environment_variables: Optional[List[EnvironmentVariableCreate]] = None
+    # Universal port suggestion fed by /api/runtime/recommend-port — applies
+    # regardless of use_case, persisted on Project itself rather than on the
+    # per-use-case config tables.
+    recommended_port: Optional[int] = None
 
 
 # GitHub Webhook Schemas

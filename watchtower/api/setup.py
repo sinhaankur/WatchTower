@@ -48,6 +48,7 @@ async def complete_setup_wizard(
             repo_url=setup_data.repo_url,
             repo_branch=setup_data.repo_branch,
             webhook_secret=webhook_secret,
+            recommended_port=setup_data.recommended_port,
             org_id=org.id,
             owner_id=user_id
         )
