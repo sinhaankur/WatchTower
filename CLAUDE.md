@@ -100,7 +100,8 @@ python3 scripts/sync_versions.py   # fan version from watchtower/__init__.py to 
 
 `watchtower.api:app` is the FastAPI app exposed at port 8000. It:
 
-- Calls `init_db()` (creates SQLite tables in `./watchtower.db` by default; switch with `DATABASE_URL`) and `_ensure_secret_key()` (auto-generates a Fernet key at `~/.watchtower/secret.key` with `0600` perms if `WATCHTOWER_SECRET_KEY` is unset) in `lifespan`.
+- Runs `init_db()` and `_ensure_dev_api_token()` at **module import time** (NOT in lifespan — Alembic 1.13's `command.upgrade()` deadlocks uvicorn 0.29's lifespan, the call returns but `lifespan.startup.complete` is never sent → backend hangs forever, splash sits, smoke test times out at 90s). `_ensure_secret_key()` stays in lifespan (auto-generates a Fernet key at `~/.watchtower/secret.key` with `0600` perms if `WATCHTOWER_SECRET_KEY` is unset).
+- Default DB path falls through `DATABASE_URL` env → `$WATCHTOWER_DATA_DIR/watchtower.db` → `~/.watchtower/watchtower.db`, and only uses `./watchtower.db` if the file already exists in cwd (preserves dev-clone behaviour). The fallback is what makes the packaged AppImage work — its cwd is a read-only FUSE mount.
 - Mounts routers from `watchtower/api/{projects,deployments,builds,webhooks,setup,enterprise,runtime,envvars,notifications}.py`. All routers prefix `/api/...` and depend on `util.get_current_user`.
 - Mounts `web/dist/assets` as static, and serves the React SPA via a `spa_fallback` route that path-traversal-guards every request (resolves the candidate and requires it to live inside `web/dist`).
 - Conditionally enables `/docs` only when `WATCHTOWER_ENABLE_DOCS=true`.
@@ -117,9 +118,9 @@ python3 scripts/sync_versions.py   # fan version from watchtower/__init__.py to 
 - **Web OAuth** — needs `GITHUB_OAUTH_CLIENT_ID` *and* `GITHUB_OAUTH_CLIENT_SECRET`. Standard redirect-callback flow. Used when the user runs the API behind a known callback URL.
 - **Device Flow** — needs only the *public* `WATCHTOWER_GITHUB_DEVICE_CLIENT_ID`. No client secret, no callback URL. This is the path baked into shipped/desktop builds (the client ID is safe to embed). Same model as the `gh` CLI.
 
-**Dev mode is `WATCHTOWER_ALLOW_INSECURE_DEV_AUTH=true`.** It does NOT mean "any token works" — that bypass was removed in commit 3f645d0 (security). Dev mode only relaxes the "must be set" check on `WATCHTOWER_AUTH_SECRET` (generates an ephemeral one) and surfaces a 503 telling you to set `WATCHTOWER_API_TOKEN` if you forgot. Don't reintroduce the old "any-bearer-accepted" path.
+**Dev mode is `WATCHTOWER_ALLOW_INSECURE_DEV_AUTH=true`.** It does NOT mean "any token works" — that bypass was removed in commit 3f645d0 (security). What dev mode *does* now: at module import time `_ensure_dev_api_token()` (in `api/__init__.py`) auto-sets `WATCHTOWER_API_TOKEN=dev-watchtower-token` if it's missing, with a clear `logger.warning`. The matching token is also the SPA's `DEV_FALLBACK_TOKEN` in `web/src/lib/api.ts`, so both sides agree. The 503 from older builds (`"WATCHTOWER_API_TOKEN must be set even in dev mode"`) is gone — instead the auth flow just works on first launch. `_auth_signing_secret()` falls back to `WATCHTOWER_API_TOKEN` so signed sessions remain stable across restarts. Don't reintroduce the old "any-bearer-accepted" path.
 
-`run.sh` sets `WATCHTOWER_ALLOW_INSECURE_DEV_AUTH=true` when launching the backend in browser mode, and the frontend (`web/src/lib/api.ts`) sends a `dev-token` Bearer automatically in dev builds. The `.env` ships `WATCHTOWER_API_TOKEN=dev-watchtower-token` so the dev token is actually accepted.
+`run.sh` sets `WATCHTOWER_ALLOW_INSECURE_DEV_AUTH=true` when launching the backend in browser mode. The `.env` ships `WATCHTOWER_API_TOKEN=dev-watchtower-token` (matching the auto-set value above) so manually-sourced runs also work.
 
 ### SSRF / path-traversal guards (don't bypass)
 
