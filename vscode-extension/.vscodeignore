@@ -4,7 +4,14 @@ node_modules/**
 src/**
 .gitignore
 .eslintrc*
+eslint.config.cjs
+esbuild.config.cjs
 tsconfig.json
 **/*.map
 **/*.ts
+# Stale .vsix files from prior local packaging — don't ship a .vsix
+# inside another .vsix. (vsce already excludes the file it's about to
+# create, but old leftovers from `npm run package` runs would be
+# included otherwise.)
+*.vsix
 !out/**
