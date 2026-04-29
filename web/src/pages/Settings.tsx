@@ -171,6 +171,7 @@ function VSCodeCard() {
 
 function UpdateCheckCard() {
   const [autoCheck, setAutoCheckState] = useState<boolean>(() => isAutoUpdateCheckEnabled());
+  const [updating, setUpdating] = useState(false);
   const qc = useQueryClient();
   const { data, isFetching, refetch, error } = useUpdateCheck({ autoCheck });
 
@@ -187,6 +188,24 @@ function UpdateCheckCard() {
     const fresh = (await apiClient.get(`/runtime/version?force=true`)).data;
     qc.setQueryData(queryKeys.updateCheck, fresh);
   };
+
+  const handleUpdateNow = async () => {
+    if (!data?.has_update) return;
+    const electron = (window as any).electronAPI;
+    if (electron?.updateNow) {
+      setUpdating(true);
+      try {
+        await electron.updateNow(data.release_url);
+      } finally {
+        setUpdating(false);
+      }
+      return;
+    }
+    // Browser / non-Electron: send the user to the release page.
+    if (data.release_url) window.open(data.release_url, '_blank', 'noopener,noreferrer');
+  };
+
+  const isElectron = typeof window !== 'undefined' && Boolean((window as any).electronAPI);
 
   const current = data?.current ?? '—';
   const latest = data?.latest;
@@ -221,24 +240,36 @@ function UpdateCheckCard() {
         ) : null}
       </div>
 
-      {data?.has_update && data.release_url && (
+      {data?.has_update && (
         <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 mb-3 flex items-start gap-3">
           <div className="flex-1">
             <p className="text-xs text-amber-900">
               <strong>{data.release_name ?? `v${data.latest}`}</strong> is available.
             </p>
             <p className="text-[11px] text-amber-800 mt-0.5">
-              Review the release notes before updating.
+              {isElectron
+                ? 'Click Update Now to download and install in the background — the app will restart when ready.'
+                : 'Open the release page to download the new build.'}
             </p>
           </div>
-          <a
-            href={data.release_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-xs px-3 py-1.5 rounded-lg border border-amber-700 bg-white text-amber-800 hover:bg-amber-100 font-medium"
+          {data.release_url && (
+            <a
+              href={data.release_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs px-3 py-1.5 rounded-lg border border-amber-700 bg-white text-amber-800 hover:bg-amber-100 font-medium shrink-0"
+            >
+              Release notes →
+            </a>
+          )}
+          <button
+            type="button"
+            onClick={() => void handleUpdateNow()}
+            disabled={updating}
+            className="text-xs px-3 py-1.5 rounded-lg border border-amber-800 bg-amber-700 hover:bg-amber-800 text-white font-semibold shadow-[1px_1px_0_0_#92400e] disabled:opacity-60 disabled:cursor-wait shrink-0"
           >
-            Release notes →
-          </a>
+            {updating ? 'Updating…' : isElectron ? 'Update Now' : 'Open release →'}
+          </button>
         </div>
       )}
 
@@ -287,7 +318,7 @@ const Settings = () => {
     <div className="flex-1 overflow-auto bg-slate-50">
       <header
         className="px-4 sm:px-6 lg:px-8 py-4 border-b flex items-center justify-between"
-        style={{ borderColor: 'hsl(214 32% 88%)' }}
+        style={{ borderColor: 'hsl(var(--border-soft))' }}
       >
         <div>
           <h1 className="text-lg font-semibold text-slate-900">Settings</h1>

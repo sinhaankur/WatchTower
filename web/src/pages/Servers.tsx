@@ -176,7 +176,7 @@ const Servers = () => {
     <div className="flex-1 overflow-auto bg-slate-50">
       <header
         className="px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between border-b sticky top-0 z-10 backdrop-blur-sm"
-        style={{ borderColor: 'hsl(214 32% 88%)', background: 'rgba(248, 251, 255, 0.9)' }}
+        style={{ borderColor: 'hsl(var(--border-soft))', background: 'hsl(var(--surface-soft) / 0.9)' }}
       >
         <div>
           <h1 className="text-lg font-semibold text-slate-900">Servers</h1>
