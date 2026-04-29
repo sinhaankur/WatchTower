@@ -926,6 +926,13 @@ async function startBackend() {
         // shell instead of the React SPA (the wheel doesn't ship web/dist).
         WATCHTOWER_DATA_DIR: writableDataDir(),
         WATCHTOWER_WEB_DIST: process.env.WATCHTOWER_WEB_DIST || resolveWebDist(),
+        // Lets the Python backend find bundled binaries (Nixpacks etc.)
+        // shipped via electron-builder's extraResources. In packaged
+        // builds, process.resourcesPath is the resources/ dir inside the
+        // app bundle. In dev (npm start), it's the Electron node_modules
+        // path which doesn't have our binaries — find_nixpacks() falls
+        // back to system PATH automatically.
+        WATCHTOWER_RESOURCES_DIR: process.env.WATCHTOWER_RESOURCES_DIR || process.resourcesPath || '',
       },
       stdio: ['ignore', backendLogFd, backendLogFd],
     }

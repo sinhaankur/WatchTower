@@ -14,7 +14,7 @@ import threading
 import time
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 import requests
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -949,6 +949,49 @@ async def recommend_port(
             "this whole range to other projects."
         ),
     )
+
+
+@router.get("/nixpacks-status")
+async def nixpacks_status(_current_user: dict = Depends(util.get_current_user)):
+    """Report whether a usable Nixpacks binary is available to the build
+    pipeline.
+
+    The SPA polls this when a deploy starts; if ``available`` is False
+    we show an actionable banner ("Local-podman deploys require Nixpacks
+    — install via …") rather than letting the build silently fail later.
+
+    ``source`` is one of:
+      * ``env`` — picked up via ``WATCHTOWER_NIXPACKS_BIN`` override
+      * ``bundled`` — the binary shipped inside the desktop installer
+      * ``system`` — found on PATH (dev clone, or user-installed)
+      * ``missing`` — none of the above worked
+
+    ``platform_supported`` is False on platforms upstream doesn't build
+    binaries for (Windows). Distinguishing "missing on a supported
+    platform" from "platform doesn't have it" lets the UI show different
+    copy ("Install Nixpacks" vs "Use WSL on Windows").
+    """
+    from watchtower import build_tools
+
+    resolution = build_tools.find_nixpacks()
+    version: Optional[str] = None
+    if resolution.path is not None:
+        version = build_tools.get_nixpacks_version(resolution.path)
+
+    drift = (
+        version is not None
+        and version != build_tools.NIXPACKS_EXPECTED_VERSION
+    )
+
+    return {
+        "available": resolution.path is not None,
+        "source": resolution.source,
+        "path": str(resolution.path) if resolution.path else None,
+        "version": version,
+        "expected_version": build_tools.NIXPACKS_EXPECTED_VERSION,
+        "version_drift": drift,
+        "platform_supported": resolution.platform_supported,
+    }
 
 
 @router.get("/status")

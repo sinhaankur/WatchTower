@@ -426,6 +426,10 @@ def _upsert_user_from_github_profile(db: Session, profile: dict):
     login = profile.get("login") or "github-user"
     email = profile.get("email") or f"{login}@users.noreply.github.com"
     name = profile.get("name") or login
+    # Capture the avatar so the SPA's identity badge can render it instead
+    # of the initial-letter placeholder. Refresh on every login so a user
+    # who changes their GitHub avatar sees the new one within one session.
+    avatar_url = profile.get("avatar_url") or None
 
     user = db.query(User).filter(User.github_id == github_id).first()
     if not user:
@@ -435,6 +439,7 @@ def _upsert_user_from_github_profile(db: Session, profile: dict):
         user.github_id = github_id
         user.email = email
         user.name = name
+        user.avatar_url = avatar_url
         user.is_active = True
         db.flush()
         return user
@@ -443,6 +448,7 @@ def _upsert_user_from_github_profile(db: Session, profile: dict):
         email=email,
         github_id=github_id,
         name=name,
+        avatar_url=avatar_url,
         is_active=True,
     )
     db.add(user)
@@ -744,6 +750,7 @@ async def github_login_oauth_callback(
         email=user.email,
         name=user.name,
         github_id=user.github_id,
+        avatar_url=user.avatar_url,
     )
 
     return {
@@ -753,6 +760,7 @@ async def github_login_oauth_callback(
             "id": str(user.id),
             "email": user.email,
             "name": user.name,
+            "avatar_url": user.avatar_url,
         },
         "organization": {
             "id": str(org.id),
@@ -924,6 +932,7 @@ async def poll_github_device_flow(
         email=user.email,
         name=user.name,
         github_id=user.github_id,
+        avatar_url=user.avatar_url,
     )
 
     return {
