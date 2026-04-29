@@ -1,6 +1,9 @@
-@import 'tailwindcss/base';
-@import 'tailwindcss/components';
-@import 'tailwindcss/utilities';
+/*
+ * Legacy/component-class styles. The Tailwind base/components/utilities
+ * layers and the canonical CSS variable system live in globals.css —
+ * this file only carries the .electron-* / .wt-logo helpers and the
+ * legacy --wt-* tokens those helpers consume.
+ */
 
 * {
   @apply box-border;
@@ -14,22 +17,6 @@
   --wt-text-dim: #505a69;
   --wt-accent: #b91c1c;
   --wt-accent-strong: #7f1d1d;
-}
-
-body {
-  @apply antialiased;
-  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
-  background: #fbf6ea;
-  color: var(--wt-text);
-}
-
-[data-theme='dark'] body {
-  color: var(--wt-text);
-}
-
-[data-theme='light'] body {
-  background: #fbf6ea;
-  color: #0f172a;
 }
 
 .electron-shell {

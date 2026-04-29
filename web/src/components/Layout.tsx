@@ -2,12 +2,27 @@ import { ReactNode, useState, useEffect, type ReactElement } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import BrandLogo from './BrandLogo';
 import TitleBar from './TitleBar';
-import ActivityBar from './ActivityBar';
 import { PageTransition } from './PageTransition';
 import { useUpdateCheck, useMe, useActiveDeploymentCount } from '@/hooks/queries';
 import { CommandPalette, openCommandPalette } from './CommandPalette';
 
 const UPDATE_BANNER_DISMISSED_KEY = 'watchtower:updateBannerDismissed';
+
+// Detect if running inside Electron
+const isElectron = typeof window !== 'undefined' && Boolean((window as any).electronAPI);
+
+// Trigger the in-app update flow. In Electron this calls the IPC handler
+// which runs electron-updater (packaged) or `run.sh update` (dev clone).
+// In a plain browser there is nothing to install in-place, so we fall back
+// to opening the release page in a new tab.
+async function triggerUpdate(releaseUrl?: string | null): Promise<void> {
+  const electron = (window as any).electronAPI;
+  if (electron?.updateNow) {
+    await electron.updateNow(releaseUrl ?? '');
+    return;
+  }
+  if (releaseUrl) window.open(releaseUrl, '_blank', 'noopener,noreferrer');
+}
 
 function UpdateBanner() {
   // Banner appears once per (current,latest) pair — dismissing it stores
@@ -17,6 +32,7 @@ function UpdateBanner() {
   const [dismissedFor, setDismissedFor] = useState<string | null>(() => {
     try { return localStorage.getItem(UPDATE_BANNER_DISMISSED_KEY); } catch { return null; }
   });
+  const [updating, setUpdating] = useState(false);
 
   useEffect(() => {
     if (!data?.has_update) return;
@@ -30,6 +46,12 @@ function UpdateBanner() {
     if (!data.latest) return;
     try { localStorage.setItem(UPDATE_BANNER_DISMISSED_KEY, data.latest); } catch { /* ignore */ }
     setDismissedFor(data.latest);
+  };
+
+  const onUpdate = async () => {
+    setUpdating(true);
+    try { await triggerUpdate(data.release_url); }
+    finally { setUpdating(false); }
   };
 
   return (
@@ -49,12 +71,14 @@ function UpdateBanner() {
           Release notes
         </a>
       )}
-      <Link
-        to="/settings"
-        className="px-2 py-0.5 rounded border border-amber-700 bg-white text-amber-800 hover:bg-amber-100 font-medium"
+      <button
+        type="button"
+        onClick={() => void onUpdate()}
+        disabled={updating}
+        className="px-2 py-0.5 rounded border border-amber-800 bg-amber-700 hover:bg-amber-800 text-white font-semibold disabled:opacity-60 disabled:cursor-wait"
       >
-        Update
-      </Link>
+        {updating ? 'Updating…' : isElectron ? 'Update now' : 'Get update'}
+      </button>
       <button
         onClick={dismiss}
         title="Dismiss until next release"
@@ -68,9 +92,6 @@ function UpdateBanner() {
     </div>
   );
 }
-
-// Detect if running inside Electron
-const isElectron = typeof window !== 'undefined' && Boolean((window as any).electronAPI);
 
 // ── SVG icon helpers ──────────────────────────────────────────────────────────
 function IconDashboard() {
@@ -322,12 +343,12 @@ export default function Layout({ children }: { children: ReactNode }) {
   const SidebarInner = ({ onNavClick, rail }: { onNavClick?: () => void; rail?: boolean }) => (
     <>
       {!isElectron && !rail && (
-        <div className="px-4 py-5 border-b" style={{ borderColor: 'hsl(214 32% 88%)' }}>
+        <div className="px-4 py-5 border-b" style={{ borderColor: 'hsl(var(--border-soft))' }}>
           <BrandLogo withLabel size="md" />
         </div>
       )}
       {!isElectron && rail && (
-        <div className="px-3 py-4 flex items-center justify-center border-b" style={{ borderColor: 'hsl(214 32% 88%)' }}>
+        <div className="px-3 py-4 flex items-center justify-center border-b" style={{ borderColor: 'hsl(var(--border-soft))' }}>
           <BrandLogo size="sm" />
         </div>
       )}
@@ -397,7 +418,7 @@ export default function Layout({ children }: { children: ReactNode }) {
       {/* Rail-mode footer: just the avatar + version dot. Full identity
           card and version line render in 'full' mode below. */}
       {rail && (
-        <div className="px-2 py-3 border-t flex flex-col items-center gap-2" style={{ borderColor: 'hsl(214 32% 88%)' }}>
+        <div className="px-2 py-3 border-t flex flex-col items-center gap-2" style={{ borderColor: 'hsl(var(--border-soft))' }}>
           {hasSessionToken && me?.avatar_url ? (
             <img
               src={me.avatar_url}
@@ -414,16 +435,18 @@ export default function Layout({ children }: { children: ReactNode }) {
             </div>
           ) : null}
           {updateData?.has_update && (
-            <Link
-              to="/settings"
-              title={`Update v${updateData.latest} available`}
-              className="w-2 h-2 rounded-full bg-amber-500 ring-2 ring-white"
+            <button
+              type="button"
+              onClick={() => void triggerUpdate(updateData.release_url)}
+              title={`Update v${updateData.latest} available — click to install`}
+              aria-label={`Install update ${updateData.latest}`}
+              className="w-2 h-2 rounded-full bg-amber-500 ring-2 ring-white hover:ring-amber-200 transition"
             />
           )}
         </div>
       )}
 
-      <div className={`px-3 py-3 border-t ${rail ? 'hidden' : ''}`} style={{ borderColor: 'hsl(214 32% 88%)' }}>
+      <div className={`px-3 py-3 border-t ${rail ? 'hidden' : ''}`} style={{ borderColor: 'hsl(var(--border-soft))' }}>
         {hasSessionToken ? (
           <>
             {/* Identity badge — who am I, in which org */}
@@ -506,14 +529,15 @@ export default function Layout({ children }: { children: ReactNode }) {
             WatchTower{versionLabel ? ` ${versionLabel}` : ''}
           </span>
           {updateData?.has_update && (
-            <Link
-              to="/settings"
+            <button
+              type="button"
+              onClick={() => void triggerUpdate(updateData.release_url)}
               className="text-[10px] text-amber-700 hover:text-amber-900 font-medium inline-flex items-center gap-1"
-              title={`Update to ${updateData.latest} available`}
+              title={`Update to ${updateData.latest} — click to install`}
             >
               <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
               Update
-            </Link>
+            </button>
           )}
         </div>
       </div>
@@ -530,9 +554,9 @@ export default function Layout({ children }: { children: ReactNode }) {
           <div className="fixed inset-0 bg-black/40" onClick={() => setMobileSidebarOpen(false)} />
           <aside
             className="relative flex flex-col w-64 max-w-[85vw] border-r shadow-xl z-50"
-            style={{ background: 'hsl(214 55% 98%)', borderColor: 'hsl(214 32% 88%)' }}
+            style={{ background: 'hsl(var(--sidebar))', borderColor: 'hsl(var(--border-soft))' }}
           >
-            <div className="flex items-center justify-between px-4 py-3 border-b" style={{ borderColor: 'hsl(214 32% 88%)' }}>
+            <div className="flex items-center justify-between px-4 py-3 border-b" style={{ borderColor: 'hsl(var(--border-soft))' }}>
               <BrandLogo withLabel size="md" />
               <button
                 onClick={() => setMobileSidebarOpen(false)}
@@ -550,8 +574,6 @@ export default function Layout({ children }: { children: ReactNode }) {
 
       {/* Body row */}
       <div className="flex flex-1 min-h-0 overflow-hidden">
-        {isElectron && <ActivityBar />}
-
         {/* Desktop sidebar — three modes: full (224px), rail (56px,
             icons only), or hidden. Width animates via Tailwind class
             so the transition feels designed instead of janky. */}
@@ -560,7 +582,7 @@ export default function Layout({ children }: { children: ReactNode }) {
             className={`hidden lg:flex shrink-0 flex-col border-r backdrop-blur-sm transition-[width] duration-200 ${
               sidebarMode === 'rail' ? 'w-14' : 'w-56'
             }`}
-            style={{ background: 'hsl(214 55% 98%)', borderColor: 'hsl(214 32% 88%)' }}
+            style={{ background: 'hsl(var(--sidebar))', borderColor: 'hsl(var(--border-soft))' }}
           >
             <SidebarInner rail={sidebarMode === 'rail'} />
           </aside>
@@ -578,9 +600,7 @@ export default function Layout({ children }: { children: ReactNode }) {
           onClick={cycleSidebar}
           className="hidden lg:flex absolute z-10 items-center justify-center w-4 h-10 bg-slate-100 border border-slate-200 hover:bg-slate-200 transition-colors text-slate-500"
           style={{
-            left: isElectron
-              ? (sidebarMode === 'full' ? 48 + 224 : sidebarMode === 'rail' ? 48 + 56 : 48)
-              : (sidebarMode === 'full' ? 224 : sidebarMode === 'rail' ? 56 : 0),
+            left: sidebarMode === 'full' ? 224 : sidebarMode === 'rail' ? 56 : 0,
             top: '50%',
             transform: 'translateY(-50%)',
             borderRadius: '0 4px 4px 0',
@@ -600,7 +620,7 @@ export default function Layout({ children }: { children: ReactNode }) {
           {/* Mobile top bar */}
           <div
             className="lg:hidden flex items-center gap-3 px-4 py-3 border-b shrink-0"
-            style={{ background: 'rgba(248, 251, 255, 0.95)', borderColor: 'hsl(214 32% 88%)' }}
+            style={{ background: 'hsl(var(--surface-soft) / 0.95)', borderColor: 'hsl(var(--border-soft))' }}
           >
             <button
               onClick={() => setMobileSidebarOpen(true)}

@@ -26,6 +26,17 @@
     --secondary-foreground: 0 0% 10%;
     --sidebar: 45 18% 93%;
     --sidebar-border: 0 0% 16%;
+    /*
+     * Soft border / soft surface for places where the hard slate-800
+     * `--border` is too loud — sidebar dividers, page-header bands,
+     * inline pills. Warm-cream tone so the app reads as one palette.
+     * If you want the cool blue-gray that the sidebar polish branch
+     * shipped with, swap these two lines back to:
+     *   --border-soft:  214 32% 88%;
+     *   --surface-soft: 210 60% 99%;
+     */
+    --border-soft:  45 14% 84%;
+    --surface-soft: 45 30% 98%;
     /* Archetype-level motion + shadow tokens */
     --shadow: 4px 4px 0 0 hsl(0 0% 0% / 1);
     --shadow-hover: 6px 6px 0 0 hsl(0 0% 0% / 1);

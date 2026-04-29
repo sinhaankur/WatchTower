@@ -105,7 +105,7 @@ export default function AuditLog() {
     <div className="flex-1 overflow-auto bg-slate-50">
       <header
         className="px-4 sm:px-6 lg:px-8 py-4 border-b flex items-center justify-between gap-4"
-        style={{ borderColor: 'hsl(214 32% 88%)' }}
+        style={{ borderColor: 'hsl(var(--border-soft))' }}
       >
         <div>
           <h1 className="text-lg font-semibold text-slate-900">Audit Log</h1>
