@@ -23,7 +23,8 @@ from sqlalchemy.orm import Session
 
 import watchtower
 from watchtower.api import util
-from watchtower.database import get_db
+from watchtower.database import Project, get_db
+import socket as _socket
 
 logger = logging.getLogger(__name__)
 
@@ -855,6 +856,99 @@ def _background_status() -> dict[str, Any]:
         "log_file": str(LOG_FILE),
         "log_tail": log_tail,
     }
+
+
+_PORT_RANGE_START = 3000
+_PORT_RANGE_END = 4000  # exclusive
+
+
+def _is_port_free(port: int) -> bool:
+    """Race-free port-availability check.
+
+    Bind to 127.0.0.1:port, close immediately. If bind fails (EADDRINUSE
+    or similar) the port is taken; if it succeeds it's free at this
+    instant. Don't set SO_REUSEADDR — that would make the bind succeed
+    against TIME_WAIT sockets and we'd recommend a port that's still
+    closing down.
+    """
+    s = _socket.socket(_socket.AF_INET, _socket.SOCK_STREAM)
+    try:
+        s.bind(("127.0.0.1", port))
+        return True
+    except OSError:
+        return False
+    finally:
+        s.close()
+
+
+@router.get("/recommend-port")
+async def recommend_port(
+    exclude: str = "",
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(util.get_current_user),
+):
+    """Pick a free TCP port from 3000-3999 for the wizard's "we'll use
+    port X" affordance.
+
+    Selection rules, in order:
+      1. Skip ports the caller passes in ``?exclude=3000,3001`` (lets the
+         wizard refresh the suggestion when the user dismisses the first).
+      2. Skip ports already assigned to one of the caller's projects so two
+         projects in the same workspace don't collide on the recommended
+         port even before either is deployed.
+      3. Skip ports whose ``bind("127.0.0.1", p)`` fails right now.
+
+    The first port that survives all three is returned. The caller (the
+    wizard) treats this as a *suggestion* — the source of truth at deploy
+    time is whatever ``Project.recommended_port`` was persisted as plus a
+    fresh validation, since a port free at create time can be taken at
+    deploy time.
+
+    Returns 503 if every port in the range is unavailable.
+    """
+    excluded: set[int] = set()
+    for raw in exclude.split(","):
+        raw = raw.strip()
+        if not raw:
+            continue
+        try:
+            p = int(raw)
+        except ValueError:
+            continue
+        if 1 <= p <= 65535:
+            excluded.add(p)
+
+    user_id = util.canonical_user_id(db, current_user)
+    rows = (
+        db.query(Project.recommended_port)
+        .filter(
+            Project.owner_id == user_id,
+            Project.recommended_port.isnot(None),
+        )
+        .all()
+    )
+    for (p,) in rows:
+        if p:
+            excluded.add(int(p))
+
+    for port in range(_PORT_RANGE_START, _PORT_RANGE_END):
+        if port in excluded:
+            continue
+        if _is_port_free(port):
+            return {
+                "port": port,
+                "range_start": _PORT_RANGE_START,
+                "range_end": _PORT_RANGE_END - 1,
+            }
+
+    raise HTTPException(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        detail=(
+            f"No free port available in {_PORT_RANGE_START}-{_PORT_RANGE_END - 1}. "
+            "Either too many local services are running or the user has assigned "
+            "this whole range to other projects."
+        ),
+    )
 
 
 @router.get("/status")

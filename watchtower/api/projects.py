@@ -68,6 +68,7 @@ async def create_project(
             repo_url=project_data.repo_url,
             repo_branch=project_data.repo_branch,
             webhook_secret=webhook_secret,
+            recommended_port=project_data.recommended_port,
             org_id=org.id,
             owner_id=user_id
         )
