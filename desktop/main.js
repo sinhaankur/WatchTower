@@ -8,43 +8,64 @@ const net = require('net');
 const os = require('os');
 const path = require('path');
 
-// ── Global safety net: never let an unhandled error show Electron's
-//    raw "A JavaScript error occurred in the main process" dialog ──────────
+// ── Global safety net: silent diagnostic capture ─────────────────────────
 //
-// macOS in particular surfaces spawn-side errors (the /usr/bin/python3 stub
-// triggering Xcode CLT installer; missing PATH entries; permission denied)
-// AFTER our local try/catch blocks complete, as a top-level uncaught
-// exception. The default Electron handler then renders a useless
-// "Uncaught Exception: spawn /Applications/Xcode.app" dialog that scares
-// users into thinking the app is malware.
+// Goal: the app should NEVER show a "JavaScript error in the main process"
+// dialog under normal operation. Stack traces go to a diagnostic log file
+// where the Send Error Report flow can pick them up; the user sees nothing.
 //
-// Catching here lets us show a friendly errorBox + write the trace to the
-// backend log, while still exiting non-zero so launchers know things went
-// wrong. Mirrors the pattern recommended by the Electron security docs.
-process.on('uncaughtException', (err) => {
-  const msg = err && err.message ? err.message : String(err);
-  // Only show a dialog if Electron is far enough along that dialog is safe
-  // to call (after app 'ready'). Before that, just stderr + exit.
+// This is deliberately more permissive than the previous "show dialog +
+// process.exit(1)" handler. Most errors that reach this point are either:
+//   1. Recoverable (a failed HTTP probe, a thrown error inside a single
+//      IPC handler) — the app can keep running.
+//   2. Already handled with a specific friendly dialog at the source
+//      (missing Python, port conflict, backend startup timeout) — by the
+//      time uncaughtException fires we'd just be showing a redundant
+//      generic dialog over the specific one.
+//
+// Truly fatal failures (Electron itself crashed, ENOMEM, etc) will still
+// bring the process down; we just don't add a scary dialog on top of them.
+
+function diagnosticLogPath() {
+  // Resolve once per call so we don't depend on writableDataDir being
+  // available at module-load time.
   try {
-    if (app && app.isReady && app.isReady()) {
-      dialog.showErrorBox(
-        'WatchTower hit an unexpected error',
-        `${msg}\n\n` +
-        'This is usually a missing or stub system tool. ' +
-        'See the diagnostic log for details. The app will exit.'
-      );
-    }
-  } catch { /* dialog itself failed — fall through to stderr */ }
-  console.error('[WatchTower] uncaughtException:', err && err.stack ? err.stack : msg);
-  // Don't throw further — exit cleanly. Code 1 so any wrapper (.desktop
-  // launcher, AppImage, npm script) registers the failure.
-  process.exit(1);
+    const dir = path.join(
+      process.env.WATCHTOWER_DATA_DIR || path.join(os.homedir(), '.watchtower'),
+      'logs'
+    );
+    fs.mkdirSync(dir, { recursive: true });
+    return path.join(dir, 'desktop-electron.log');
+  } catch {
+    return null;
+  }
+}
+
+function appendDiagnostic(label, payload) {
+  const line = `[${new Date().toISOString()}] ${label}: ${payload}\n`;
+  // Always log to stderr — surfaces in journald, .desktop launcher, dev
+  // terminal, or `npm start` output.
+  console.error('[WatchTower]', label + ':', payload);
+  // Best-effort file write so the Send Error Report flow can attach it.
+  const logPath = diagnosticLogPath();
+  if (!logPath) return;
+  try { fs.appendFileSync(logPath, line); } catch { /* disk full / permission */ }
+}
+
+process.on('uncaughtException', (err) => {
+  const trace = err && err.stack ? err.stack : (err && err.message ? err.message : String(err));
+  appendDiagnostic('uncaughtException', trace);
+  // Deliberately do NOT show a dialog and do NOT exit. The error has been
+  // captured; if it broke something the user will see *that* (a button
+  // doesn't work, a panel doesn't load) and can send a report which
+  // includes this log. Most uncaughtExceptions we've seen in practice are
+  // benign: a renderer disconnected mid-IPC, a stale promise rejecting
+  // after the window closed, a probe hitting EACCES on a sandbox path.
 });
 
 process.on('unhandledRejection', (reason) => {
-  console.error('[WatchTower] unhandledRejection:', reason);
-  // Don't exit — async failures are usually recoverable (a single failed
-  // HTTP request etc). Logging is the meaningful action here.
+  const trace = reason && reason.stack ? reason.stack : String(reason);
+  appendDiagnostic('unhandledRejection', trace);
 });
 
 // ── Resolve npm binary ───────────────────────────────────────────────────────
@@ -433,7 +454,13 @@ if (process.platform === 'linux') {
 
 const HOST = '127.0.0.1';
 const FRONTEND_PORT = 5222;
-const BACKEND_PORT = 8000;
+// Mutable so launch() can shift to a fallback when 8000 is taken (Docker
+// Desktop, jupyter, etc). All references in the file read the current
+// value, so the CSP, OAuth allowlist, main-window URL, and uvicorn
+// --port argument all follow automatically.
+let BACKEND_PORT = 8000;
+const BACKEND_PORT_DEFAULT = 8000;
+const BACKEND_PORT_FALLBACK_RANGE = 10; // try 8000..8009
 
 /**
  * Find all PIDs listening on `port`, kill them (SIGTERM then SIGKILL),
@@ -1264,6 +1291,54 @@ function stopProcesses() {
   if (staticServer) { try { staticServer.close(); } catch {} staticServer = null; }
 }
 
+/**
+ * Push a real status update into the splash window. The splash's own
+ * scripted progress animation stops the moment the first real update
+ * lands, so the bar reflects actual launch state instead of fake ticks.
+ *
+ * Safe to call before/after splash exists — silently no-ops if the
+ * window has been closed (cancel + early-failure paths use this).
+ */
+function setSplashStatus(msg, pct) {
+  if (!splashWindow || splashWindow.isDestroyed()) return;
+  const safeMsg = String(msg || '').replace(/[\\'"<>]/g, (c) =>
+    ({ '\\': '\\\\', "'": "\\'", '"': '\\"', '<': '\\u003c', '>': '\\u003e' }[c])
+  );
+  const pctArg = typeof pct === 'number' ? `, ${Math.max(0, Math.min(100, pct))}` : '';
+  splashWindow.webContents
+    .executeJavaScript(`window.__setStatus && window.__setStatus('${safeMsg}'${pctArg})`)
+    .catch(() => { /* splash closed mid-update — fine */ });
+}
+
+/**
+ * Probe whether a TCP port is currently bound on loopback. Returns the
+ * accepting-process PID-style string ("in use") or null ("free").
+ *
+ * Implementation: try to bind a server to the port. If the bind fails
+ * with EADDRINUSE, something else owns it. We don't need the PID —
+ * the friendly dialog tells the user how to find it themselves.
+ */
+function isPortInUse(port) {
+  return new Promise((resolve) => {
+    const server = net.createServer();
+    server.unref(); // don't keep the event loop alive on this probe
+    server.once('error', (err) => {
+      resolve(err && err.code === 'EADDRINUSE');
+    });
+    server.once('listening', () => {
+      server.close(() => resolve(false));
+    });
+    server.listen(port, '127.0.0.1');
+  });
+}
+
+// Tracks whether launch() has reached the point of showing the main
+// window. The splash's 'closed' event uses this to decide: if the user
+// closed the splash before the main window appeared, treat it as a
+// "Cancel and quit" — kill the backend, exit. If after, just normal
+// fade-out (no action needed).
+let mainWindowShown = false;
+
 // ── Splash window ────────────────────────────────────────────────────────────
 function createSplash() {
   splashWindow = new BrowserWindow({
@@ -1297,6 +1372,18 @@ function createSplash() {
         `(()=>{const e=document.getElementById('version');if(e)e.textContent='v${escaped}';})()`
       )
       .catch(() => { /* dom-ready handler raced with close — fine */ });
+  });
+
+  // User clicked "Cancel and quit" on the splash. mainWindowShown tells
+  // us whether this is an actual cancellation (main window never made
+  // it) or a normal post-launch fade-out (main is already up; splash
+  // close is just cleanup).
+  splashWindow.on('closed', () => {
+    if (!mainWindowShown) {
+      appendDiagnostic('launch.cancelled', 'user clicked Cancel on splash');
+      stopProcesses();
+      app.quit();
+    }
   });
 }
 
@@ -1470,7 +1557,21 @@ ipcMain.handle('wt:openErrorReport', async (_event, payload = {}) => {
       logTail = lines.slice(Math.max(0, lines.length - 200)).join('\n');
     }
   } catch (err) {
-    logTail = `(could not read log: ${err.message})`;
+    logTail = `(could not read backend log: ${err.message})`;
+  }
+
+  // Also include the Electron-side diagnostic log if it has anything.
+  // Many "main-process" errors land there but never the backend log.
+  let electronTail = '';
+  try {
+    const elPath = diagnosticLogPath();
+    if (elPath && fs.existsSync(elPath)) {
+      const raw = fs.readFileSync(elPath, 'utf8');
+      const lines = raw.split('\n');
+      electronTail = lines.slice(Math.max(0, lines.length - 100)).join('\n');
+    }
+  } catch (err) {
+    electronTail = `(could not read electron log: ${err.message})`;
   }
 
   // Re-probe inline so this handler is self-contained — works even if
@@ -1494,7 +1595,8 @@ ipcMain.handle('wt:openErrorReport', async (_event, payload = {}) => {
   const body =
     (userMessage ? `${userMessage}\n\n` : '') +
     `--- Diagnostics ---\n${depBlock}\n\n` +
-    `--- Backend log (last 200 lines) ---\n${logTail || '(empty)'}\n`;
+    `--- Backend log (last 200 lines) ---\n${logTail || '(empty)'}\n\n` +
+    (electronTail ? `--- Electron diagnostic log (last 100 lines) ---\n${electronTail}\n` : '');
 
   // mailto: bodies have a per-mail-client length cap (~2 KB on macOS,
   // ~32 KB on Linux/Windows). Trim conservatively so the link doesn't
@@ -1611,22 +1713,116 @@ ipcMain.on('wt:oauthDone', () => {
   mainWindow?.webContents.reload();
 });
 
+/**
+ * Translate raw launch errors into user-facing copy. Strips internal
+ * URLs (127.0.0.1, ports) and replaces them with terms a non-developer
+ * understands. Keeps the original message available for the diagnostic
+ * log and the Send Error Report flow.
+ */
+function friendlyLaunchError(error) {
+  const raw = error?.message ?? String(error);
+
+  // Port conflict — already a friendly message constructed in launch().
+  // Pass it through as-is (it includes the diagnosis + the lsof/netstat
+  // commands the user can run). Covers both shapes:
+  //   "Port N is already in use by another application..." (single port)
+  //   "Ports A–B are all in use..."                       (whole range)
+  if (raw.startsWith('Port ') || raw.startsWith('Ports ')) {
+    return raw;
+  }
+
+  if (raw.includes('Timed out waiting for')) {
+    return (
+      "WatchTower's backend service didn't start in time.\n\n" +
+      "Common causes:\n" +
+      "  • Another app is using port 8000 (firewall, Docker desktop, jupyter, etc).\n" +
+      "  • First-launch database setup is slow on this disk.\n" +
+      "  • Python is missing or its install is incomplete.\n\n" +
+      "Open Settings → System after launch to see exactly which dependency is missing, " +
+      "or send an error report so we can diagnose."
+    );
+  }
+
+  if (raw.includes('Backend exited before responding')) {
+    return (
+      "WatchTower's backend crashed during startup.\n\n" +
+      "This is almost always a Python install issue (missing dependency, " +
+      "wrong version, broken venv). The diagnostic log captured the exact error.\n\n" +
+      "Try: open the log shown below, look for an ImportError or ModuleNotFoundError, " +
+      "and run `pip install watchtower-podman` to repair the install."
+    );
+  }
+
+  if (raw.includes('Service check failed') || raw.includes('status 5')) {
+    return (
+      "WatchTower's backend is running but returned an error.\n\n" +
+      "This usually means the database is corrupted or migrations failed. " +
+      "Try moving ~/.watchtower/watchtower.db aside and relaunching to start fresh."
+    );
+  }
+
+  // Unknown error — return the raw message but don't pretend to know what it means.
+  return `WatchTower hit an unexpected error during startup:\n\n${raw}`;
+}
+
 async function launch() {
   createSplash();
+  setSplashStatus('Checking environment', 5);
 
   const backendHealthUrl = `http://${HOST}:${BACKEND_PORT}/health`;
 
   // Start backend if not already running. Use a 120s post-spawn wait —
   // the FastAPI lifespan runs init_db() which can take 30-90s on first-
   // run when Alembic migrations stamp/upgrade an empty database on a
-  // slow disk. The default 45s in waitForUrl was too tight: users on
-  // SD-card-backed Pis or HDD-backed laptops would hit "Timed out
-  // waiting for http://127.0.0.1:8000/health" on first launch only.
+  // slow disk. The default 45s was too tight: users on SD-card-backed
+  // Pis or HDD-backed laptops would hit a timeout on first launch only.
   try {
+    setSplashStatus('Looking for an existing backend', 10);
     await waitForUrl(backendHealthUrl, 1200);
+    setSplashStatus('Backend already running', 70);
   } catch {
+    // Port-in-use auto-fallback: if 8000 is taken (Docker Desktop,
+    // jupyter, leftover WatchTower from a crashed prior run), probe
+    // 8001..8009 and pick the first free one. Mutates BACKEND_PORT so
+    // every downstream reference (uvicorn --port, OAuth allowlist,
+    // CSP, main window URL) follows automatically.
+    //
+    // Only throws if the entire range is occupied — that's a real
+    // "system is in trouble" situation and a manual dialog is right.
+    let chosenPort = null;
+    for (let i = 0; i < BACKEND_PORT_FALLBACK_RANGE; i++) {
+      const candidate = BACKEND_PORT_DEFAULT + i;
+      if (!(await isPortInUse(candidate))) {
+        chosenPort = candidate;
+        break;
+      }
+    }
+    if (chosenPort === null) {
+      throw new Error(
+        `Ports ${BACKEND_PORT_DEFAULT}–${BACKEND_PORT_DEFAULT + BACKEND_PORT_FALLBACK_RANGE - 1} ` +
+        `are all in use. WatchTower couldn't find a free port to start its backend on. ` +
+        `Quit some of the apps using these ports and try again. ` +
+        `Find them with: lsof -i :${BACKEND_PORT_DEFAULT}-${BACKEND_PORT_DEFAULT + BACKEND_PORT_FALLBACK_RANGE - 1}  (macOS/Linux)  or  ` +
+        `netstat -ano  (Windows).`
+      );
+    }
+    if (chosenPort !== BACKEND_PORT_DEFAULT) {
+      // Persist for diagnostics so the user can see in the report which
+      // port the launch actually used. Also worth a setSplashStatus so
+      // the user notices "we're using 8001" before the main window opens.
+      appendDiagnostic(
+        'launch.port-fallback',
+        `port ${BACKEND_PORT_DEFAULT} was in use, falling back to ${chosenPort}`
+      );
+      BACKEND_PORT = chosenPort;
+      setSplashStatus(`Port ${BACKEND_PORT_DEFAULT} was busy — using port ${chosenPort} instead`, 20);
+    }
+    setSplashStatus('Starting WatchTower backend', 25);
     await startBackend();
-    await waitForUrl(backendHealthUrl, 120000);
+    setSplashStatus('Loading database (this can take up to 90s on first launch)', 50);
+    // Re-derive the URL since BACKEND_PORT may have just changed.
+    await waitForUrl(`http://${HOST}:${BACKEND_PORT}/health`, 120000);
+    setSplashStatus('Backend ready', 80);
   }
 
   // The FastAPI backend already serves the React SPA from web/dist
@@ -1655,6 +1851,7 @@ async function launch() {
     }
   }
 
+  setSplashStatus('Loading interface', 90);
   const win = createMainWindow();
 
   // Helper: close splash and show the main window (idempotent).
@@ -1662,6 +1859,8 @@ async function launch() {
   function showMain() {
     if (shown) return;
     shown = true;
+    setSplashStatus('Ready', 100);
+    mainWindowShown = true;
     if (splashWindow && !splashWindow.isDestroyed()) splashWindow.close();
     splashWindow = null;
     if (!win.isDestroyed()) { win.show(); win.focus(); }
@@ -1797,7 +1996,7 @@ app.whenReady().then(async () => {
 
     const distIndex = path.join(webRoot, 'dist', 'index.html');
     const distExists = fs.existsSync(distIndex);
-    const parts = [error.message];
+    const parts = [friendlyLaunchError(error)];
     if (!distExists) {
       parts.push(
         `\nFrontend bundle not found at:\n  ${distIndex}\n` +
@@ -1805,8 +2004,12 @@ app.whenReady().then(async () => {
       );
     }
     if (backendLogPath) {
-      parts.push(`\nBackend log:\n  ${backendLogPath}`);
+      parts.push(`\nFor support, attach this log:\n  ${backendLogPath}`);
     }
+    // Persist the raw error to the diagnostic log so the Send Error Report
+    // flow includes the original (URL-bearing) message even though we
+    // don't show it to the user.
+    appendDiagnostic('launch.failure', error?.stack ?? error?.message ?? String(error));
     dialog.showErrorBox('WatchTower failed to start', parts.join('\n'));
     stopProcesses();
     app.quit();
