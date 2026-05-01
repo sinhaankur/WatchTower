@@ -1,8 +1,8 @@
 {
   "name": "watchtower-podman",
   "displayName": "WatchTower Ops",
-  "description": "Deploy, monitor, and manage your WatchTower projects from VS Code",
-  "version": "1.5.14",
+  "description": "Deploy, monitor, and manage WatchTower projects from VS Code — sidebar tree, one-click deploy, live build logs, and rollback. Talks to any WatchTower API server (local desktop app, PyPI install, Docker, or self-hosted).",
+  "version": "1.5.15",
   "publisher": "sinhaankur",
   "license": "MIT",
   "icon": "assets/icon.png",
