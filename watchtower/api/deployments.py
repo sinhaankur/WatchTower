@@ -284,6 +284,25 @@ async def diagnose_deployment(
     payload["deployment_id"] = str(deployment.id)
     payload["deployment_status"] = deployment.status.value if deployment.status else None
     payload["build_id"] = str(latest_build.id) if latest_build else None
+
+    # LLM fallback escape hatch for UNKNOWN diagnoses. The regex
+    # library doesn't cover everything; when it misses, the SPA can
+    # launch the agent with this pre-filled prompt to get a
+    # free-form analysis. We don't invoke the agent here — keeping
+    # the diagnose endpoint synchronous + cheap is the point. Just
+    # hand the SPA enough context to wire the handoff.
+    if diagnosis.kind == failure_analyzer.FailureKind.UNKNOWN and log_excerpt:
+        payload["agent_prompt"] = (
+            "I'm investigating a failed WatchTower deployment that doesn't "
+            "match any known failure pattern. Read the build log below and "
+            "tell me the most likely root cause + a concrete fix.\n\n"
+            f"Build log (last {len(log_excerpt)} chars):\n```\n{log_excerpt}\n```"
+        )
+        # Path the SPA can deep-link to so "Ask the agent" lands the
+        # user on the agent panel with the prompt already in the
+        # input. Keeps the client free of backend-shape assumptions.
+        payload["agent_route"] = "/agent"
+
     return payload
 
 
@@ -379,11 +398,118 @@ async def auto_fix_deployment(
             ),
         )
 
+    # ── Idempotency + thrash guardrails ────────────────────────────────────
+    # Without these, a user who double-clicks Apply Fix queues two
+    # retry deploys, and a misbehaving tool (or a project that flaps
+    # back to the same failure) could spin up dozens of retries
+    # without anyone noticing. Both windows are derived from the
+    # audit log so we don't need new schema or a separate table.
+    #
+    # 60s idempotency window — protects against double-clicks /
+    # network retries inside the SPA. Refuse with a clear message.
+    # 10-min, 3-attempt thrash guardrail — protects against a true
+    # auto-fix loop where the suggested fix doesn't actually fix the
+    # underlying problem. After 3 attempts in 10 minutes we make the
+    # human take over.
+    from datetime import timedelta
+
+    project_id_str = str(project.id)
+    now = datetime.utcnow()
+    recent_audit_rows = (
+        db.query(audit_log.AuditEvent)
+        .filter(
+            audit_log.AuditEvent.action == "deployment.auto_fix",
+            audit_log.AuditEvent.org_id == project.org_id,
+            audit_log.AuditEvent.created_at >= now - timedelta(minutes=10),
+        )
+        .all()
+    )
+    # Match by project_id embedded in extra_json — cheap string check
+    # since project IDs are UUID4 (no false-positive collision risk).
+    project_recent = [
+        row for row in recent_audit_rows
+        if row.extra_json and project_id_str in row.extra_json
+    ]
+    very_recent = [
+        row for row in project_recent
+        if row.created_at >= now - timedelta(seconds=60)
+    ]
+    if very_recent:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "An auto-fix retry was already queued for this project in "
+                "the last 60 seconds. Wait for it to finish before applying "
+                "another fix."
+            ),
+        )
+    if len(project_recent) >= 3:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=(
+                f"This project has already been auto-fixed {len(project_recent)} "
+                f"times in the last 10 minutes. The suggested fix isn't "
+                f"sticking — investigate manually before retrying."
+            ),
+        )
+
+    # ── REGISTRY_TRANSIENT branch: just re-deploy as-is ────────────────────
+    # Registry flakes (npm 5xx, pip read-timeout, etc) almost always
+    # clear on retry with no changes. We use the same redeploy path
+    # as PORT_IN_USE but skip the port-change step.
+    if diagnosis.kind == failure_analyzer.FailureKind.REGISTRY_TRANSIENT:
+        new_deployment = Deployment(
+            project_id=project.id,
+            commit_sha=deployment.commit_sha,
+            branch=deployment.branch or "main",
+            status=DeploymentStatus.PENDING,
+            trigger=DeploymentTrigger.MANUAL,
+        )
+        db.add(new_deployment)
+        db.flush()
+
+        target_nodes = _select_org_nodes_for_deploy(db, project, [])
+        for node in target_nodes:
+            db.add(
+                DeploymentNode(
+                    deployment_id=new_deployment.id,
+                    node_id=node.id,
+                    status=DeploymentStatus.PENDING,
+                )
+            )
+
+        audit_log.record_for_user(
+            db, current_user,
+            action="deployment.auto_fix",
+            entity_type="deployment",
+            entity_id=new_deployment.id,
+            org_id=project.org_id,
+            request=request,
+            extra={
+                "project_id": str(project.id),
+                "fix_kind": diagnosis.kind.value,
+                "failed_deployment_id": str(deployment.id),
+            },
+        )
+        db.commit()
+        db.refresh(new_deployment)
+        enqueue_build(str(new_deployment.id), background_tasks)
+
+        return {
+            "applied": True,
+            "fix_kind": diagnosis.kind.value,
+            "new_deployment_id": str(new_deployment.id),
+            "new_deployment_status": new_deployment.status.value,
+            "details": {
+                "retry_strategy": "registry_transient — re-running build with no changes",
+            },
+        }
+
     if diagnosis.kind != failure_analyzer.FailureKind.PORT_IN_USE:
-        # Defensive: the only auto_applicable=True kind right now is
-        # PORT_IN_USE. If a future pattern flips the flag, we want
-        # explicit dispatch here rather than a generic "retry as-is"
-        # that might do the wrong thing.
+        # Defensive: PORT_IN_USE and REGISTRY_TRANSIENT are the only
+        # auto_applicable=True kinds wired. If a future pattern flips
+        # the flag, we want explicit dispatch here rather than a
+        # generic "retry as-is" that might do the wrong thing.
         raise HTTPException(
             status_code=status.HTTP_501_NOT_IMPLEMENTED,
             detail=f"Auto-fix for {diagnosis.kind.value} isn't wired yet.",
