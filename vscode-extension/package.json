@@ -2,7 +2,7 @@
   "name": "watchtower",
   "displayName": "WatchTower",
   "description": "Deploy, monitor, and manage your WatchTower projects from VS Code",
-  "version": "1.5.12",
+  "version": "1.5.13",
   "publisher": "sinhaankur",
   "license": "MIT",
   "icon": "assets/icon.png",
