@@ -122,7 +122,16 @@
 <body>
   <div class="shell">
     <div class="logo-wrap">
-      <img class="logo-mark" src="../assets/wt-logo.svg" alt="WatchTower logo" />
+      <!-- Inlined wt-logo.svg. The previous `<img src="../assets/wt-logo.svg">`
+           worked in the dev clone but 404'd in packaged builds because
+           desktop/package.json's `files` array only includes main.js,
+           preload.js, and splash.html — `../assets/` isn't shipped into
+           the .app bundle. Inlining keeps the splash logo visible without
+           changing what gets packaged. -->
+      <svg class="logo-mark" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="WatchTower logo">
+        <rect x="2" y="2" width="60" height="60" rx="11" fill="#fde68a" stroke="#0f172a" stroke-width="4"/>
+        <text x="32" y="39" text-anchor="middle" font-family="DM Sans, Arial, sans-serif" font-size="22" font-weight="800" fill="#b91c1c">Wt</text>
+      </svg>
     </div>
 
     <div class="app-name">WatchTower</div>
@@ -136,7 +145,12 @@
     </div>
   </div>
 
-  <div class="version" id="version">v1.2.2</div>
+  <!-- Version label is populated by main.js's createSplash() via
+       webContents.executeJavaScript after dom-ready. Empty default so a
+       stale build doesn't render a wrong version while the JS hasn't
+       run yet. (The previous hardcoded "v1.2.2" stayed wrong across
+       every release between 1.2.2 and 1.5.12.) -->
+  <div class="version" id="version"></div>
 
   <script>
     const statusEl = document.getElementById('status');

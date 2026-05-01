@@ -1,4 +1,4 @@
-const { app, BrowserWindow, dialog, ipcMain, Menu, Notification, shell, Tray, nativeImage } = require('electron');
+const { app, BrowserWindow, clipboard, dialog, ipcMain, Menu, Notification, shell, Tray, nativeImage } = require('electron');
 const { spawn, execSync, execFileSync } = require('child_process');
 const crypto = require('crypto');
 const fs = require('fs');
@@ -7,6 +7,45 @@ const https = require('https');
 const net = require('net');
 const os = require('os');
 const path = require('path');
+
+// ── Global safety net: never let an unhandled error show Electron's
+//    raw "A JavaScript error occurred in the main process" dialog ──────────
+//
+// macOS in particular surfaces spawn-side errors (the /usr/bin/python3 stub
+// triggering Xcode CLT installer; missing PATH entries; permission denied)
+// AFTER our local try/catch blocks complete, as a top-level uncaught
+// exception. The default Electron handler then renders a useless
+// "Uncaught Exception: spawn /Applications/Xcode.app" dialog that scares
+// users into thinking the app is malware.
+//
+// Catching here lets us show a friendly errorBox + write the trace to the
+// backend log, while still exiting non-zero so launchers know things went
+// wrong. Mirrors the pattern recommended by the Electron security docs.
+process.on('uncaughtException', (err) => {
+  const msg = err && err.message ? err.message : String(err);
+  // Only show a dialog if Electron is far enough along that dialog is safe
+  // to call (after app 'ready'). Before that, just stderr + exit.
+  try {
+    if (app && app.isReady && app.isReady()) {
+      dialog.showErrorBox(
+        'WatchTower hit an unexpected error',
+        `${msg}\n\n` +
+        'This is usually a missing or stub system tool. ' +
+        'See the diagnostic log for details. The app will exit.'
+      );
+    }
+  } catch { /* dialog itself failed — fall through to stderr */ }
+  console.error('[WatchTower] uncaughtException:', err && err.stack ? err.stack : msg);
+  // Don't throw further — exit cleanly. Code 1 so any wrapper (.desktop
+  // launcher, AppImage, npm script) registers the failure.
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason) => {
+  console.error('[WatchTower] unhandledRejection:', reason);
+  // Don't exit — async failures are usually recoverable (a single failed
+  // HTTP request etc). Logging is the meaningful action here.
+});
 
 // ── Resolve npm binary ───────────────────────────────────────────────────────
 // Electron does not inherit the shell PATH on Linux/macOS, so plain 'npm'
@@ -766,25 +805,90 @@ function startStaticServer(distDir) {
  *   4. Return null — signals "no python found" to startBackend(), which
  *      raises a clean dialog telling the user how to install the deps.
  */
+/**
+ * On macOS, `/usr/bin/python3` is a stub that pops up the Xcode Command
+ * Line Tools installer dialog when invoked from a GUI app *that doesn't
+ * have CLT installed*. The dialog spawn surfaces in our caller as
+ * `Error: spawn /Applications/Xcode.app ENOENT` (or similar), with the
+ * error originating BEFORE execSync's own try/catch can absorb it —
+ * crashing the Electron main process with the dreaded "A JavaScript
+ * error occurred" dialog.
+ *
+ * This helper detects the stub and refuses to probe it. We can tell
+ * because:
+ *   - The path is /usr/bin/python3 (not /usr/local/bin/, /opt/homebrew/,
+ *     pyenv, asdf, or anywhere a real Python lives).
+ *   - `xcode-select -p` returns exit code 2 (no developer tools chosen)
+ *     OR the path it returns is the CLT placeholder.
+ *
+ * Cheaper approximation: if we see /usr/bin/python3 AND `xcode-select
+ * --print-path` exits non-zero, treat it as the stub. Skipping it means
+ * the candidate loop falls through and `startBackend()` shows a friendly
+ * "install Python" dialog — much better UX than a crash.
+ */
+function isMacOSPythonStub(absolutePath) {
+  if (process.platform !== 'darwin') return false;
+  if (absolutePath !== '/usr/bin/python3') return false;
+  try {
+    // -p exits 0 with the path on success, non-zero (or stderr) when no
+    // CLT/Xcode is selected. Either way, if we get a clean exit we trust
+    // /usr/bin/python3 to work; if we don't, treat it as the stub.
+    execSync('xcode-select --print-path', { stdio: 'ignore', timeout: 2000 });
+    return false;
+  } catch {
+    return true; // CLT not installed → /usr/bin/python3 is the stub
+  }
+}
+
+/**
+ * Run a probe command but treat any spawn-level error (ENOENT, EACCES,
+ * the macOS stub crash, Windows "App not found" dialog) as a soft miss.
+ * Without this wrapper, those errors escape as unhandled exceptions and
+ * crash the Electron main process before the candidate loop can move on.
+ */
+function probePythonCandidate(cmd) {
+  try {
+    execSync(`${cmd} -c "import watchtower"`, {
+      stdio: 'ignore',
+      timeout: 5000,
+      // shell:false keeps the spawn synchronous and bounded — `cmd` is
+      // an inline arg list, never user-provided, so there's no
+      // injection risk to worry about.
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function resolvePython() {
+  // Bundled venv next to the desktop app (dev clone path).
   if (fs.existsSync(pythonUnix)) return pythonUnix;
   if (fs.existsSync(pythonWin)) return pythonWin;
 
+  // Explicit user override beats every probe.
   const explicit = process.env.WATCHTOWER_PYTHON;
   if (explicit && fs.existsSync(explicit)) return explicit;
 
+  // System candidates. On macOS we filter out the /usr/bin/python3 stub
+  // so the GUI doesn't pop the CLT installer mid-launch.
   const candidates = process.platform === 'win32'
     ? ['python3.exe', 'python.exe', 'python']
     : ['python3', 'python'];
+
   for (const cmd of candidates) {
-    try {
-      // Probe for both the binary AND the watchtower package — a system
-      // python without `pip install watchtower-podman` is useless to us.
-      execSync(`${cmd} -c "import watchtower"`, { stdio: 'ignore', timeout: 5000 });
-      return cmd;
-    } catch { /* not this one */ }
+    // Only the bare-name macOS form `python3` resolves through PATH to
+    // /usr/bin/python3 — short-circuit with the stub check.
+    if (process.platform === 'darwin' && cmd === 'python3') {
+      if (isMacOSPythonStub('/usr/bin/python3')) {
+        // Stub detected — skip without probing. Continue to other
+        // candidates (`python`) which usually isn't the stub on macOS.
+        continue;
+      }
+    }
+    if (probePythonCandidate(cmd)) return cmd;
   }
-  return null; // surfaced as a clear error in startBackend()
+  return null; // surfaced as a clear dialog in startBackend()
 }
 
 // Tracks whether the backend process has died — wired up by startBackend().
@@ -829,28 +933,139 @@ function waitForUrl(url, timeoutMs = 45000) {
   });
 }
 
+/**
+ * Per-platform install instructions for Python + the watchtower-podman
+ * package. Returned as a structured object so the dialog can render
+ * `commands` separately (with a "Copy" button) from `description` text.
+ *
+ * The previous "pip install watchtower-podman" suggestion was useless to
+ * users who didn't have Python installed yet. Naming the actual platform
+ * package manager (homebrew / python.org / apt) closes that gap.
+ */
+function pythonInstallGuide() {
+  if (process.platform === 'darwin') {
+    return {
+      description:
+        "WatchTower needs Python 3.8+ with the watchtower-podman " +
+        "package installed.\n\n" +
+        "Run these two commands in Terminal, then reopen WatchTower.",
+      commands: [
+        'brew install python@3.11',
+        'python3 -m pip install watchtower-podman',
+      ],
+      docsUrl: 'https://github.com/sinhaankur/WatchTower#macos-installation-app-center',
+      // Note: we deliberately do NOT auto-launch xcode-select --install
+      // here. That popup is the same one the system /usr/bin/python3
+      // stub would have triggered on its own — letting the user drive
+      // the install via brew avoids it entirely.
+    };
+  }
+  if (process.platform === 'win32') {
+    return {
+      description:
+        "WatchTower needs Python 3.8+ with the watchtower-podman " +
+        "package installed.\n\n" +
+        "Install Python from python.org (check 'Add Python to PATH' " +
+        "during install), then run this in PowerShell and reopen " +
+        "WatchTower.",
+      commands: [
+        'py -3 -m pip install watchtower-podman',
+      ],
+      docsUrl: 'https://www.python.org/downloads/',
+    };
+  }
+  return {
+    description:
+      "WatchTower needs Python 3.8+ with the watchtower-podman " +
+      "package installed.\n\n" +
+      "Run these in a terminal, then reopen WatchTower.",
+    commands: [
+      'sudo apt install -y python3 python3-pip',
+      'pip3 install --user watchtower-podman',
+    ],
+    docsUrl: 'https://github.com/sinhaankur/WatchTower#installation',
+  };
+}
+
+/**
+ * Show an actionable dialog for missing Python:
+ *   - Description of why it's blocked
+ *   - Copyable install command (one click → clipboard)
+ *   - "Open install docs" button (one click → browser)
+ *   - Quit
+ *
+ * Returns true if the user wants the app to proceed in degraded mode
+ * (currently we exit either way — backend is required — but reserving
+ * the slot for the in-app onboarding flow that lands in a follow-up PR).
+ */
+async function showPythonMissingDialog() {
+  const guide = pythonInstallGuide();
+  const fullCommand = guide.commands.join(' && ');
+  const detail =
+    `${guide.description}\n\n` +
+    `Commands:\n  ${guide.commands.join('\n  ')}\n\n` +
+    `Override (advanced): set WATCHTOWER_PYTHON to a python ` +
+    `you already have installed.`;
+
+  const buttons = ['Copy install command', 'Open install docs', 'Quit'];
+  const result = await dialog.showMessageBox({
+    type: 'warning',
+    title: 'Python not found',
+    message: 'WatchTower can\'t start without Python',
+    detail,
+    buttons,
+    defaultId: 0,
+    cancelId: 2,
+    noLink: true,
+  });
+
+  if (result.response === 0) {
+    try { clipboard.writeText(fullCommand); } catch { /* clipboard unavailable */ }
+    // Re-show the dialog with a confirmation line so the user has a
+    // visible "got it, now restart me" cue.
+    await dialog.showMessageBox({
+      type: 'info',
+      title: 'Copied to clipboard',
+      message: 'Install command copied',
+      detail:
+        'Paste it into your terminal, run the install, then reopen ' +
+        'WatchTower. The app will pick up the new Python automatically.',
+      buttons: ['OK'],
+    });
+  } else if (result.response === 1) {
+    try { shell.openExternal(guide.docsUrl); } catch { /* offline / no browser */ }
+  }
+  // Always exit — backend can't run without Python. The "skip and run
+  // in degraded mode" pathway lands in the follow-up onboarding PR
+  // (which also surfaces dependency status from the SPA itself).
+  return false;
+}
+
 async function startBackend() {
   // Kill any process already holding the backend port (stale uvicorn, container, etc.)
   await killPortProcesses(BACKEND_PORT);
 
   const python = resolvePython();
   if (!python) {
-    // No usable Python interpreter found. Three paths the user can take:
-    //   * pip install watchtower-podman   (recommended for end users)
-    //   * Set WATCHTOWER_PYTHON to an existing python with watchtower
-    //   * Set WATCHTOWER_APP_DIR to a source clone with .venv built
+    // Show a real interactive dialog (copy command / open docs / quit)
+    // instead of a passive errorBox. Then exit cleanly — backend can't
+    // run without Python.
+    if (app && app.isReady && app.isReady()) {
+      await showPythonMissingDialog();
+      // showPythonMissingDialog never returns true today; quit here so
+      // the splash window closes and we don't sit in zombie state.
+      stopProcesses();
+      app.exit(1);
+      // Throw something the app.whenReady() catch can log even though
+      // we've already exited — keeps the diagnostic path consistent.
+      throw new Error('Python not found — user dismissed install dialog');
+    }
+    // app not ready yet (very early failure) — fall back to throwing so
+    // the catch block in app.whenReady() shows the dialog at the right
+    // time.
+    const guide = pythonInstallGuide();
     throw new Error(
-      "Python backend not found. WatchTower needs Python with the\n" +
-      "'watchtower' package installed. Pick one:\n\n" +
-      "  1. Install system-wide:\n" +
-      "       pip install watchtower-podman\n\n" +
-      "  2. Use a source clone:\n" +
-      "       git clone https://github.com/sinhaankur/WatchTower\n" +
-      "       cd WatchTower && ./run.sh   (creates .venv)\n" +
-      "       Then set WATCHTOWER_APP_DIR=/path/to/WatchTower\n\n" +
-      "  3. Point at a custom Python:\n" +
-      "       export WATCHTOWER_PYTHON=/path/to/python\n\n" +
-      "Searched: " + pythonUnix
+      `${guide.description}\n\nRun:\n  ${guide.commands.join('\n  ')}`
     );
   }
 
@@ -1041,6 +1256,24 @@ function createSplash() {
     webPreferences: { contextIsolation: true, nodeIntegration: false },
   });
   splashWindow.loadFile(path.join(__dirname, 'splash.html'));
+
+  // Inject the real version into splash.html's <#version> div once the
+  // page is parsed. The HTML used to hardcode "v1.2.2" which stayed
+  // stale through every release; reading it from app.getVersion() makes
+  // this self-updating.
+  splashWindow.webContents.once('dom-ready', () => {
+    if (!splashWindow || splashWindow.isDestroyed()) return;
+    const v = (app.getVersion() || '').trim();
+    if (!v) return;
+    const escaped = v.replace(/[\\'"<>]/g, (c) =>
+      ({ '\\': '\\\\', "'": "\\'", '"': '\\"', '<': '\\u003c', '>': '\\u003e' }[c])
+    );
+    splashWindow.webContents
+      .executeJavaScript(
+        `(()=>{const e=document.getElementById('version');if(e)e.textContent='v${escaped}';})()`
+      )
+      .catch(() => { /* dom-ready handler raced with close — fine */ });
+  });
 }
 
 // ── Main window ──────────────────────────────────────────────────────────────
