@@ -500,3 +500,127 @@ async def rotate_webhook_secret(
     db.commit()
     logger.info("Webhook secret rotated for project %s", project_id)
     return {"webhook_secret": new_secret}
+
+
+@router.get("/{project_id}/health-check")
+async def health_check_project(
+    project_id: UUID,
+    path: str = "/health",
+    timeout_seconds: int = 5,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(util.get_current_user),
+):
+    """Synchronous health probe of a deployed project.
+
+    Foundation for gap #2 (health checks + auto-rollback). v1 ships
+    on-demand probes only — the user clicks "Check health" in the
+    UI and we make ONE HTTP request to ``project.launch_url + path``,
+    return the status. Continuous polling + auto-rollback layer on
+    top of this in v2/v3:
+      * v2 adds Project.health_check_enabled + interval columns
+        plus a background poller worker.
+      * v3 adds auto-rollback that fires when N consecutive probes
+        fail.
+
+    Both are out of scope for v1 because:
+      * Continuous polling needs careful lifespan management (one
+        poller per process; coordination with the build queue worker).
+      * Auto-rollback modifies production deploy state; shipping it
+        without observed v1 baseline data is reckless.
+
+    Response shape:
+        {
+          "status": "healthy" | "unhealthy" | "unreachable" | "no_url",
+          "response_code": int | null,
+          "latency_ms": int | null,
+          "url": str | null,
+          "error": str | null,
+        }
+
+    Status semantics:
+      * ``healthy``     — HTTP < 500
+      * ``unhealthy``   — HTTP 5xx
+      * ``unreachable`` — connection refused, DNS fail, timeout
+      * ``no_url``      — project has no launch_url yet (no deploy)
+    """
+    import time
+    import requests as _requests
+
+    project = db.query(Project).filter(
+        Project.id == project_id,
+        Project.owner_id == util.canonical_user_id(db, current_user),
+    ).first()
+    if not project:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Project not found",
+        )
+
+    if not project.launch_url:
+        return {
+            "status": "no_url",
+            "response_code": None,
+            "latency_ms": None,
+            "url": None,
+            "error": (
+                "This project has no launch_url yet. Deploy it once and the "
+                "URL will be set automatically; then the health probe will "
+                "have something to check."
+            ),
+        }
+
+    # Validate caller-supplied path. Restrict to a path that starts
+    # with '/' and contains only safe characters; without this, a
+    # path like "http://attacker.com/" would override the host.
+    # Conservative but covers /health, /api/v1/health, /healthz, /up.
+    if not path.startswith("/") or len(path) > 200 or " " in path or "\n" in path:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="path must start with / and contain no spaces or newlines",
+        )
+
+    # Cap timeout — a malicious or buggy upstream that holds the
+    # connection open for 60 seconds would tie up a worker thread.
+    bounded_timeout = max(1, min(int(timeout_seconds or 5), 15))
+
+    target = project.launch_url.rstrip("/") + path
+    started = time.monotonic()
+
+    try:
+        # Don't follow redirects — a 301 to /login or /whoami would
+        # report "healthy" while the original endpoint is broken.
+        # stream=True so we don't load the body into memory; we only
+        # care about the status code, not the content.
+        response = _requests.get(
+            target,
+            timeout=bounded_timeout,
+            allow_redirects=False,
+            stream=True,
+        )
+        try:
+            # Read at most 1 KB to confirm the connection completed;
+            # discard.
+            response.raw.read(1024, decode_content=False)
+        except Exception:
+            pass
+        finally:
+            response.close()
+
+        latency_ms = int((time.monotonic() - started) * 1000)
+        status_label = "healthy" if response.status_code < 500 else "unhealthy"
+        return {
+            "status": status_label,
+            "response_code": response.status_code,
+            "latency_ms": latency_ms,
+            "url": target,
+            "error": None,
+        }
+    except _requests.RequestException as err:
+        latency_ms = int((time.monotonic() - started) * 1000)
+        return {
+            "status": "unreachable",
+            "response_code": None,
+            "latency_ms": latency_ms,
+            "url": target,
+            "error": str(err)[:200],
+        }
