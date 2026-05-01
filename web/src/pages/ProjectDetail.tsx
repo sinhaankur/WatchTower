@@ -208,6 +208,109 @@ function TriggerDeployButton({ projectId, branch }: { projectId: string; branch:
   );
 }
 
+// ── HealthCheckCard ───────────────────────────────────────────────────────────
+//
+// Foundation for gap #2 (health checks + auto-rollback). v1 ships an
+// on-demand probe; v2 adds continuous polling, v3 adds auto-rollback.
+// User clicks "Check health" → backend hits the project's launch_url
+// + /health (configurable path) → result rendered inline. No
+// continuous polling here.
+
+type HealthResult = {
+  status: 'healthy' | 'unhealthy' | 'unreachable' | 'no_url';
+  response_code: number | null;
+  latency_ms: number | null;
+  url: string | null;
+  error: string | null;
+};
+
+function HealthCheckCard({ projectId }: { projectId: string }) {
+  const [result, setResult] = useState<HealthResult | null>(null);
+  const [checking, setChecking] = useState(false);
+  const [path, setPath] = useState('/health');
+
+  const runProbe = async () => {
+    setChecking(true);
+    try {
+      const r = await apiClient.get(`/projects/${projectId}/health-check`, {
+        params: { path },
+      });
+      setResult(r.data);
+    } catch (e) {
+      setResult({
+        status: 'unreachable',
+        response_code: null,
+        latency_ms: null,
+        url: null,
+        error: extractDetail(e, 'Probe failed'),
+      });
+    } finally {
+      setChecking(false);
+    }
+  };
+
+  const statusColor =
+    result?.status === 'healthy'
+      ? 'border-emerald-300 bg-emerald-50 text-emerald-700'
+      : result?.status === 'unhealthy'
+        ? 'border-amber-300 bg-amber-50 text-amber-800'
+        : result?.status === 'unreachable'
+          ? 'border-red-300 bg-red-50 text-red-700'
+          : 'border-slate-300 bg-slate-50 text-slate-600';
+
+  return (
+    <div className="rounded-xl border border-border bg-card overflow-hidden">
+      <div className="px-5 py-4 border-b border-border bg-muted/30 flex items-center gap-3">
+        <h2 className="text-sm font-semibold flex-1">Health Check</h2>
+        <span className="text-[10px] text-muted-foreground">on-demand probe</span>
+      </div>
+      <div className="px-5 py-4 space-y-3">
+        <p className="text-xs text-slate-600">
+          Probe the deployed app's health endpoint synchronously. Continuous
+          monitoring + auto-rollback ship in v2 — this is the foundation.
+        </p>
+        <div className="flex items-center gap-2">
+          <label className="text-[11px] text-slate-600 w-20 shrink-0">Path</label>
+          <input
+            type="text"
+            value={path}
+            onChange={(e) => setPath(e.target.value)}
+            placeholder="/health"
+            className="flex-1 text-xs px-2 py-1.5 rounded border border-slate-300 focus:border-slate-800 focus:outline-none font-mono"
+          />
+          <button
+            onClick={() => void runProbe()}
+            disabled={checking}
+            className="text-xs px-3 py-1.5 rounded-lg border border-slate-800 bg-amber-400 hover:bg-amber-500 text-slate-900 font-semibold shadow-[1px_1px_0_0_#1f2937] disabled:opacity-50 disabled:cursor-wait"
+          >
+            {checking ? 'Probing…' : 'Check health'}
+          </button>
+        </div>
+
+        {result && (
+          <div className={`rounded border p-3 space-y-1 ${statusColor}`}>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] uppercase font-bold tracking-wide">{result.status.replace('_', ' ')}</span>
+              {result.response_code !== null && (
+                <span className="text-[10px] font-mono">HTTP {result.response_code}</span>
+              )}
+              {result.latency_ms !== null && result.latency_ms > 0 && (
+                <span className="text-[10px] font-mono">{result.latency_ms} ms</span>
+              )}
+            </div>
+            {result.url && (
+              <p className="text-[11px] font-mono break-all opacity-80">{result.url}</p>
+            )}
+            {result.error && (
+              <p className="text-[11px] opacity-80">{result.error}</p>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── OverviewTab ───────────────────────────────────────────────────────────────
 
 function OverviewTab({ project }: { project: Project }) {
@@ -237,6 +340,8 @@ function OverviewTab({ project }: { project: Project }) {
           ))}
         </dl>
       </div>
+
+      <HealthCheckCard projectId={project.id} />
 
       <div className="rounded-xl border border-border bg-card overflow-hidden">
         <div className="px-5 py-4 border-b border-border bg-muted/30">
