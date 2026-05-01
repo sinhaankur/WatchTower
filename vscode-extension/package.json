@@ -1,5 +1,5 @@
 {
-  "name": "watchtower",
+  "name": "watchtower-podman",
   "displayName": "WatchTower",
   "description": "Deploy, monitor, and manage your WatchTower projects from VS Code",
   "version": "1.5.14",
