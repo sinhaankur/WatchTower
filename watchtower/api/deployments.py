@@ -20,11 +20,13 @@ from watchtower.database import (
     TeamMember,
     DeploymentNode,
     NodeStatus,
+    Build,
 )
 from watchtower import schemas
 from watchtower.api import util
 from watchtower import builder as build_runner
 from watchtower.api import audit as audit_log
+from watchtower import failure_analyzer
 from watchtower.queue import enqueue_build
 
 router = APIRouter(prefix="/api/projects", tags=["Deployments"])
@@ -221,6 +223,68 @@ async def get_deployment(
         )
     
     return deployment
+
+
+@router.get("/deployments/{deployment_id}/diagnose")
+async def diagnose_deployment(
+    deployment_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(util.get_current_user),
+):
+    """Classify a failed deployment's build/deploy log into a structured
+    diagnosis with a suggested fix.
+
+    The autonomous-ops loop's "diagnose" step. Pulls the most recent
+    Build for the deployment, runs the log through
+    :func:`watchtower.failure_analyzer.classify_failure`, and returns
+    ``{kind, cause, fix, extracted}``. Cheap and synchronous — no LLM
+    cost on the common patterns.
+
+    Returns ``kind == "unknown"`` for failures that didn't match a known
+    pattern. The SPA can then offer the LLM agent as a fallback for
+    free-form analysis.
+
+    Doesn't block on deployment status: even a successful (LIVE)
+    deployment will get diagnosed if a caller asks, returning
+    ``unknown`` if nothing in the log looks like a failure. That keeps
+    the endpoint simple — no enum-state guard logic — and harmless on
+    accidental calls.
+    """
+    deployment = db.query(Deployment).join(Project).filter(
+        Deployment.id == deployment_id,
+        Project.owner_id == util.canonical_user_id(db, current_user),
+    ).first()
+
+    if not deployment:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Deployment not found",
+        )
+
+    # Last build for this deployment — that's where the actionable
+    # error usually lives. Multiple builds can exist if a deployment
+    # was retried; we only diagnose the most recent attempt.
+    latest_build = (
+        db.query(Build)
+        .filter(Build.deployment_id == deployment.id)
+        .order_by(Build.started_at.desc().nullslast())
+        .first()
+    )
+    log_excerpt = (latest_build.build_output if latest_build else "") or ""
+
+    # Cap to last 8 KB of log — patterns appear near the end (the failing
+    # exception, the OOM kill notice). Cheaper regex pass than scanning
+    # multi-megabyte logs verbatim, and matches what we'd send to the
+    # LLM agent on fallback anyway.
+    if len(log_excerpt) > 8 * 1024:
+        log_excerpt = log_excerpt[-8 * 1024:]
+
+    diagnosis = failure_analyzer.classify_failure(log_excerpt)
+    payload = diagnosis.to_dict()
+    payload["deployment_id"] = str(deployment.id)
+    payload["deployment_status"] = deployment.status.value if deployment.status else None
+    payload["build_id"] = str(latest_build.id) if latest_build else None
+    return payload
 
 
 @router.post("/deployments/{deployment_id}/rollback", response_model=schemas.DeploymentResponse)
