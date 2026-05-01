@@ -259,7 +259,12 @@ function OverviewTab({ project }: { project: Project }) {
 // ── DeploymentsTab ────────────────────────────────────────────────────────────
 
 type Diagnosis = {
-  kind: 'port_in_use' | 'missing_env_var' | 'package_not_found' | 'build_oom' | 'permission_denied' | 'disk_full' | 'unknown';
+  kind:
+    | 'port_in_use' | 'missing_env_var' | 'package_not_found'
+    | 'build_oom' | 'permission_denied' | 'disk_full'
+    | 'git_auth_failed' | 'network_failure' | 'build_timeout'
+    | 'tls_failure' | 'registry_transient' | 'runtime_oom'
+    | 'unknown';
   cause: string;
   fix: { description: string; command: string | null; auto_applicable: boolean };
   matched_text: string | null;
@@ -267,6 +272,11 @@ type Diagnosis = {
   deployment_id: string;
   deployment_status: string | null;
   build_id: string | null;
+  // Set only when kind=unknown AND a log exists to analyze. Lets the
+  // SPA show "Ask the agent" with a pre-filled prompt without an
+  // extra round-trip.
+  agent_prompt?: string;
+  agent_route?: string;
 };
 
 function DeploymentsTab({ projectId }: { projectId: string }) {
@@ -395,6 +405,12 @@ const KIND_LABEL: Record<Diagnosis['kind'], string> = {
   build_oom: 'Out of memory during build',
   permission_denied: 'Permission denied',
   disk_full: 'Disk full',
+  git_auth_failed: 'Git authentication failed',
+  network_failure: 'Network / DNS failure',
+  build_timeout: 'Build timed out',
+  tls_failure: 'TLS / SSL failure',
+  registry_transient: 'Registry transient error',
+  runtime_oom: 'Out of memory at runtime',
   unknown: 'Unrecognized failure pattern',
 };
 
@@ -500,9 +516,35 @@ function DiagnosisPanel({ state, deploymentId, onApplied }: DiagnosisPanelProps)
       )}
 
       {isUnknown && (
-        <p className="text-[11px] text-slate-500">
-          No automatic pattern matched this failure. Open the Build Logs tab to investigate manually.
-        </p>
+        <div className="space-y-2">
+          <p className="text-[11px] text-slate-500">
+            No automatic pattern matched this failure.
+            {d.agent_prompt && ' The WatchTower agent can read the log and suggest a fix in plain English.'}
+          </p>
+          {d.agent_prompt && (
+            <button
+              onClick={async () => {
+                // Two-step handoff: copy the prompt to clipboard so
+                // the user can paste it into the agent's input,
+                // then navigate to the agent route. Avoids touching
+                // the agent component's internal state from here.
+                try { await navigator.clipboard.writeText(d.agent_prompt!); }
+                catch { /* clipboard blocked — user can re-copy from log */ }
+                const route = d.agent_route ?? '/agent';
+                window.location.assign(route);
+              }}
+              className="text-[11px] px-3 py-1 rounded border border-slate-800 bg-white hover:bg-slate-50 text-slate-800 font-semibold shadow-[1px_1px_0_0_#1f2937]"
+              title="Copy the diagnosis prompt to clipboard and open the WatchTower agent"
+            >
+              Ask the agent (prompt copied) →
+            </button>
+          )}
+          {!d.agent_prompt && (
+            <p className="text-[11px] text-slate-500">
+              Open the Build Logs tab to investigate manually.
+            </p>
+          )}
+        </div>
       )}
     </div>
   );

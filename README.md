@@ -117,6 +117,38 @@ The project is intentionally lightweight. It is not trying to replace a full Paa
 
 ---
 
+## What's New in 1.5.20
+
+### Autonomous-ops loop hardening
+
+- **End-to-end loop test pinned.** A single pytest now walks detect → diagnose → fix → verify in one call and asserts every state transition (regex classification → /diagnose response → /auto-fix queues a fresh deploy → `Project.recommended_port` actually persisted → audit-log row with the right metadata → new pending deploy doesn't inherit the failed deploy's diagnosis). Future autonomy work that breaks the loop fails this test loudly.
+- **Auto-fix idempotency + thrash guardrails.** A second auto-fix for the same project within 60 seconds returns 409 (catches double-clicks / network retries). After 3 auto-fixes in 10 minutes the 4th returns 429 — a fix that doesn't stick won't quietly thrash; the human takes over.
+- **`REGISTRY_TRANSIENT` auto-apply now wired.** v1.5.19 added the regex but the auto-fix endpoint only handled `PORT_IN_USE`; npm/pip/cargo/go registry flakes silently failed at 501. Fixed: `REGISTRY_TRANSIENT` now triggers a re-deploy as-is (no port change) — the second autonomous-ops loop closed end-to-end.
+- **LLM agent handoff for `UNKNOWN` failures.** `/diagnose` now returns `agent_prompt` + `agent_route` for unrecognized failures with logs. The SPA's diagnose panel exposes an "Ask the agent" button that copies the pre-filled prompt to clipboard and navigates to the agent — the regex library's miss-rate becomes a one-click investigation, not a dead end.
+
+## What's New in 1.5.19
+
+- **Seamless VS Code dashboard.** New `WatchTower: Open Dashboard (in editor)` command opens the entire WatchTower SPA inside a VS Code WebviewPanel — diagnose, auto-fix, env vars, audit log, settings, all signed in via the user's stored API token. No browser switch, no second login.
+- **6 new failure-analyzer patterns** (12 total kinds): `GIT_AUTH_FAILED`, `NETWORK_FAILURE`, `BUILD_TIMEOUT`, `TLS_FAILURE`, `REGISTRY_TRANSIENT`, `RUNTIME_OOM`. Real-shaped excerpts from uvicorn, npm, pip, cargo, go, podman, openssl. Diagnose hit rate roughly doubled.
+- **`REGISTRY_TRANSIENT` is the second auto-applicable kind** alongside `PORT_IN_USE` — npm/pip/cargo/go flakes auto-retry. Pattern ordering pinned by tests: RUNTIME_OOM before BUILD_OOM, TLS_FAILURE before NETWORK_FAILURE, REGISTRY_TRANSIENT before NETWORK_FAILURE.
+- **SPA query-param token bootstrap** (`?wt_token=...`). The VS Code webview hands the SPA an auth token via the iframe URL; `web/src/main.tsx` bootstrap pops the param off, persists to localStorage, and `history.replaceState`s the URL clean so the token doesn't leak into history/referrer/screenshots. Same pattern Slack/GitHub use for magic-link bootstraps.
+
+## What's New in 1.5.18
+
+- **Backup export for `~/.watchtower/`** (closes gap #10 from the gap-analysis snapshot). One-click download from Settings → System produces a tar.gz with `secret.key` (Fernet master key) + `watchtower.db` (the SQLite database with all encrypted secrets). Loud `⚠ Contains credentials` warning panel before the button — the tarball IS the credential set, store it as securely as a password manager. Manual restore documented (`tar -xzf` over `~/.watchtower/`). Auth-gated to `can_manage_team=true`.
+
+## What's New in 1.5.17
+
+- **Auto-apply for port-in-use** — closes the **detect → diagnose → fix → verify** loop end-to-end for the most common deployment failure. When a deploy fails with `EADDRINUSE`, the user clicks Apply Fix and WatchTower picks a free port from the project range (excluding the failed one), persists it as `Project.recommended_port`, and queues a fresh deployment with the same branch/commit. The first **fully closed autonomous remediation loop** in the product. `deployment.auto_fix` audit-log records the failed/new ports for traceability.
+
+## What's New in 1.5.16
+
+- **Failure analyzer (diagnose half).** When a deployment fails, the user gets a Diagnose button on every failed row in the deployments tab. Backend pattern-matches the build log against 6 known failure modes — `PORT_IN_USE`, `MISSING_ENV_VAR`, `PACKAGE_NOT_FOUND`, `BUILD_OOM`, `PERMISSION_DENIED`, `DISK_FULL` — and returns structured cause + suggested fix. Pattern ordering pinned (disk-full beats permission-denied — root cause wins). LLM agent fallback queued for the next release.
+
+## What's New in 1.5.15
+
+- **Seamless startup.** Removed Electron's "JavaScript error in the main process" dialog (the `uncaughtException` handler now silently logs to `~/.watchtower/logs/desktop-electron.log` and the app keeps running). Splash now shows real backend-startup progress instead of fake animation; auto-fallback to ports 8001-8009 when 8000 is taken (Docker Desktop, jupyter, leftover WatchTower processes); "Cancel and quit" button on the splash after 30 seconds; user-facing `127.0.0.1` URLs replaced with friendly copy.
+
 ## What's New in 1.5.14
 
 ### Diagnostics surface that detects + fixes its own problems
