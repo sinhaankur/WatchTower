@@ -454,7 +454,13 @@ if (process.platform === 'linux') {
 
 const HOST = '127.0.0.1';
 const FRONTEND_PORT = 5222;
-const BACKEND_PORT = 8000;
+// Mutable so launch() can shift to a fallback when 8000 is taken (Docker
+// Desktop, jupyter, etc). All references in the file read the current
+// value, so the CSP, OAuth allowlist, main-window URL, and uvicorn
+// --port argument all follow automatically.
+let BACKEND_PORT = 8000;
+const BACKEND_PORT_DEFAULT = 8000;
+const BACKEND_PORT_FALLBACK_RANGE = 10; // try 8000..8009
 
 /**
  * Find all PIDs listening on `port`, kill them (SIGTERM then SIGKILL),
@@ -1718,8 +1724,10 @@ function friendlyLaunchError(error) {
 
   // Port conflict — already a friendly message constructed in launch().
   // Pass it through as-is (it includes the diagnosis + the lsof/netstat
-  // commands the user can run).
-  if (raw.startsWith('Port ') && raw.includes('in use by another application')) {
+  // commands the user can run). Covers both shapes:
+  //   "Port N is already in use by another application..." (single port)
+  //   "Ports A–B are all in use..."                       (whole range)
+  if (raw.startsWith('Port ') || raw.startsWith('Ports ')) {
     return raw;
   }
 
@@ -1773,24 +1781,47 @@ async function launch() {
     await waitForUrl(backendHealthUrl, 1200);
     setSplashStatus('Backend already running', 70);
   } catch {
-    // Port-in-use early detection: if something else owns 8000, the
-    // backend will fail to bind and we'd burn 120 seconds before showing
-    // a confusing timeout. Catching it here lets us show a specific
-    // dialog with actionable copy.
-    if (await isPortInUse(BACKEND_PORT)) {
+    // Port-in-use auto-fallback: if 8000 is taken (Docker Desktop,
+    // jupyter, leftover WatchTower from a crashed prior run), probe
+    // 8001..8009 and pick the first free one. Mutates BACKEND_PORT so
+    // every downstream reference (uvicorn --port, OAuth allowlist,
+    // CSP, main window URL) follows automatically.
+    //
+    // Only throws if the entire range is occupied — that's a real
+    // "system is in trouble" situation and a manual dialog is right.
+    let chosenPort = null;
+    for (let i = 0; i < BACKEND_PORT_FALLBACK_RANGE; i++) {
+      const candidate = BACKEND_PORT_DEFAULT + i;
+      if (!(await isPortInUse(candidate))) {
+        chosenPort = candidate;
+        break;
+      }
+    }
+    if (chosenPort === null) {
       throw new Error(
-        `Port ${BACKEND_PORT} is already in use by another application. ` +
-        `WatchTower needs that port for its local backend service. ` +
-        `Common culprits: another Electron dev server, Docker Desktop, ` +
-        `jupyter, or a leftover WatchTower process. ` +
-        `Find it with: lsof -i :${BACKEND_PORT}  (macOS/Linux)  or  ` +
-        `netstat -ano | findstr :${BACKEND_PORT}  (Windows), then quit it and reopen WatchTower.`
+        `Ports ${BACKEND_PORT_DEFAULT}–${BACKEND_PORT_DEFAULT + BACKEND_PORT_FALLBACK_RANGE - 1} ` +
+        `are all in use. WatchTower couldn't find a free port to start its backend on. ` +
+        `Quit some of the apps using these ports and try again. ` +
+        `Find them with: lsof -i :${BACKEND_PORT_DEFAULT}-${BACKEND_PORT_DEFAULT + BACKEND_PORT_FALLBACK_RANGE - 1}  (macOS/Linux)  or  ` +
+        `netstat -ano  (Windows).`
       );
+    }
+    if (chosenPort !== BACKEND_PORT_DEFAULT) {
+      // Persist for diagnostics so the user can see in the report which
+      // port the launch actually used. Also worth a setSplashStatus so
+      // the user notices "we're using 8001" before the main window opens.
+      appendDiagnostic(
+        'launch.port-fallback',
+        `port ${BACKEND_PORT_DEFAULT} was in use, falling back to ${chosenPort}`
+      );
+      BACKEND_PORT = chosenPort;
+      setSplashStatus(`Port ${BACKEND_PORT_DEFAULT} was busy — using port ${chosenPort} instead`, 20);
     }
     setSplashStatus('Starting WatchTower backend', 25);
     await startBackend();
     setSplashStatus('Loading database (this can take up to 90s on first launch)', 50);
-    await waitForUrl(backendHealthUrl, 120000);
+    // Re-derive the URL since BACKEND_PORT may have just changed.
+    await waitForUrl(`http://${HOST}:${BACKEND_PORT}/health`, 120000);
     setSplashStatus('Backend ready', 80);
   }
 
