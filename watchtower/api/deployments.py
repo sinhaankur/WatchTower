@@ -287,6 +287,187 @@ async def diagnose_deployment(
     return payload
 
 
+@router.post("/deployments/{deployment_id}/auto-fix")
+async def auto_fix_deployment(
+    request: Request,
+    deployment_id: UUID,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(util.get_current_user),
+):
+    """Apply the suggested fix for a failed deployment, when safe.
+
+    Closes the autonomous-ops loop's "fix" half: detect → diagnose →
+    **fix** → verify. Re-classifies the latest build's log; if the
+    failure kind is one of the safely-auto-applicable patterns
+    (currently just PORT_IN_USE), it applies the fix and triggers a
+    fresh deployment with the same branch/commit. The new deployment
+    runs the verify step naturally.
+
+    For PORT_IN_USE specifically: picks a free port from the project
+    range (excluding the port that just failed), persists it as
+    ``Project.recommended_port``, and queues a fresh deployment. The
+    builder reads ``recommended_port`` at deploy time, so the new
+    attempt binds to the new port without further user action.
+
+    For other failure kinds the response is 400 with a clear message
+    that this fix needs human intent (env var values, package install,
+    free disk space) — the SPA shows the suggestion but doesn't
+    pretend it can apply on its own.
+
+    Returns the new deployment's id + status so the SPA can navigate
+    the user to it ("we restarted with port 3001 — watching it now").
+    """
+    # Auth + project lookup match the diagnose endpoint, plus the same
+    # canonical-org fallback used by trigger_deployment so deploys
+    # created under a prior token still resolve. If the project's
+    # missing or the user can't manage deploys on it, 404/403.
+    from watchtower.api.enterprise import _ensure_user_org_member
+    from watchtower.api.runtime import pick_free_port_for_user
+
+    deployment = db.query(Deployment).filter(Deployment.id == deployment_id).first()
+    if not deployment:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Deployment not found",
+        )
+
+    _user, canonical_org, canonical_member = _ensure_user_org_member(db, current_user)
+    project = db.query(Project).filter(Project.id == deployment.project_id).first()
+    if not project or (
+        project.owner_id != _user.id and project.org_id != canonical_org.id
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Deployment not found",
+        )
+
+    member = (
+        canonical_member
+        if project.org_id == canonical_org.id
+        else db.query(TeamMember).filter(
+            TeamMember.org_id == project.org_id,
+            TeamMember.user_id == _user.id,
+            TeamMember.is_active == True,  # noqa: E712
+        ).first()
+    )
+    if not member or not member.can_manage_deployments:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Permission denied",
+        )
+
+    # Re-classify so the auto-fix path doesn't trust a stale diagnosis
+    # from the SPA. Same 8 KB cap as the diagnose endpoint.
+    latest_build = (
+        db.query(Build)
+        .filter(Build.deployment_id == deployment.id)
+        .order_by(Build.started_at.desc().nullslast())
+        .first()
+    )
+    log_excerpt = (latest_build.build_output if latest_build else "") or ""
+    if len(log_excerpt) > 8 * 1024:
+        log_excerpt = log_excerpt[-8 * 1024:]
+    diagnosis = failure_analyzer.classify_failure(log_excerpt)
+
+    if not diagnosis.fix.auto_applicable:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"This failure ({diagnosis.kind.value}) needs human input "
+                f"to fix — open the diagnose panel for the suggested next step."
+            ),
+        )
+
+    if diagnosis.kind != failure_analyzer.FailureKind.PORT_IN_USE:
+        # Defensive: the only auto_applicable=True kind right now is
+        # PORT_IN_USE. If a future pattern flips the flag, we want
+        # explicit dispatch here rather than a generic "retry as-is"
+        # that might do the wrong thing.
+        raise HTTPException(
+            status_code=status.HTTP_501_NOT_IMPLEMENTED,
+            detail=f"Auto-fix for {diagnosis.kind.value} isn't wired yet.",
+        )
+
+    # PORT_IN_USE branch: bump the project's port and redeploy.
+    failed_port = None
+    extracted_port = diagnosis.extracted.get("port") if diagnosis.extracted else None
+    if extracted_port:
+        try:
+            failed_port = int(extracted_port)
+        except (TypeError, ValueError):
+            failed_port = None
+
+    excluded_ports = {failed_port} if failed_port else set()
+    new_port = pick_free_port_for_user(db, _user.id, excluded=excluded_ports)
+    if new_port is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=(
+                "No free port available in the project range. Free up some "
+                "ports on the deploy target and try again."
+            ),
+        )
+
+    project.recommended_port = new_port
+
+    # Queue a fresh deployment using the same branch/commit as the
+    # failed one. Re-uses trigger_deployment's data shape so the
+    # builder pipeline can't tell the difference between a manual
+    # retry and an auto-fix retry. Audit log distinguishes them via
+    # the action and extra metadata.
+    new_deployment = Deployment(
+        project_id=project.id,
+        commit_sha=deployment.commit_sha,
+        branch=deployment.branch or "main",
+        status=DeploymentStatus.PENDING,
+        trigger=DeploymentTrigger.MANUAL,
+    )
+    db.add(new_deployment)
+    db.flush()
+
+    # Mirror the per-node DeploymentNode fan-out from trigger_deployment
+    # so the new deploy targets the same set of nodes (or none, for
+    # local-only).
+    target_nodes = _select_org_nodes_for_deploy(db, project, [])
+    for node in target_nodes:
+        db.add(
+            DeploymentNode(
+                deployment_id=new_deployment.id,
+                node_id=node.id,
+                status=DeploymentStatus.PENDING,
+            )
+        )
+
+    audit_log.record_for_user(
+        db, current_user,
+        action="deployment.auto_fix",
+        entity_type="deployment",
+        entity_id=new_deployment.id,
+        org_id=project.org_id,
+        request=request,
+        extra={
+            "project_id": str(project.id),
+            "fix_kind": diagnosis.kind.value,
+            "failed_deployment_id": str(deployment.id),
+            "failed_port": failed_port,
+            "new_port": new_port,
+        },
+    )
+    db.commit()
+    db.refresh(new_deployment)
+
+    enqueue_build(str(new_deployment.id), background_tasks)
+
+    return {
+        "applied": True,
+        "fix_kind": diagnosis.kind.value,
+        "new_deployment_id": str(new_deployment.id),
+        "new_deployment_status": new_deployment.status.value,
+        "details": {"failed_port": failed_port, "new_port": new_port},
+    }
+
+
 @router.post("/deployments/{deployment_id}/rollback", response_model=schemas.DeploymentResponse)
 async def rollback_deployment(
     request: Request,

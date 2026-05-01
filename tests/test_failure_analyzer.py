@@ -231,3 +231,74 @@ def test_diagnose_endpoint_requires_auth(anon_client: TestClient):
     bogus = "00000000-0000-0000-0000-000000000000"
     r = anon_client.get(f"/api/projects/deployments/{bogus}/diagnose")
     assert r.status_code == 401
+
+
+# ── /auto-fix endpoint ───────────────────────────────────────────────────────
+#
+# Coverage for the auto-apply path (PORT_IN_USE only in v1). Asserts:
+#   - port-in-use failure → fix applies, new deployment queued, project's
+#     recommended_port advanced to a free port
+#   - non-auto-applicable failures (missing env var, package not found)
+#     return 400 with a clear message — no silent retry
+#   - auth gate, 404 on bogus id
+#
+# enqueue_build is hit through the normal trigger path; the test's DB
+# isolation prevents the enqueued task from doing anything outside the
+# transaction. We assert on DB state, not on side effects of the build.
+
+def _insert_failed_deployment_for_project(db: Session, project_id: str, log: str) -> str:
+    """Like _insert_failed_deployment but returns just the deployment id."""
+    deployment_id, _ = _insert_failed_deployment(db, project_id, log)
+    return deployment_id
+
+
+def test_auto_fix_port_in_use_picks_new_port_and_redeploys(client: TestClient, db_session: Session):
+    project = _create_project_via_api(client, name="auto-fix-port")
+    log = "Error: listen EADDRINUSE: address already in use :::3000"
+    deployment_id = _insert_failed_deployment_for_project(db_session, project["id"], log)
+
+    r = client.post(f"/api/projects/deployments/{deployment_id}/auto-fix")
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["applied"] is True
+    assert body["fix_kind"] == "port_in_use"
+    assert body["new_deployment_id"]
+    assert body["new_deployment_status"] == "pending"
+    # The picked port must NOT be the one that just failed.
+    assert body["details"]["new_port"] != 3000
+    # And it should be in the project port range.
+    assert 3000 <= body["details"]["new_port"] < 4000
+
+
+def test_auto_fix_non_applicable_returns_400(client: TestClient, db_session: Session):
+    project = _create_project_via_api(client, name="auto-fix-blocked")
+    # Missing env var is auto_applicable=False — fix needs a human value.
+    log = "KeyError: 'STRIPE_SECRET_KEY'"
+    deployment_id = _insert_failed_deployment_for_project(db_session, project["id"], log)
+
+    r = client.post(f"/api/projects/deployments/{deployment_id}/auto-fix")
+    assert r.status_code == 400, r.text
+    assert "needs human input" in r.json()["detail"].lower()
+
+
+def test_auto_fix_unknown_failure_returns_400(client: TestClient, db_session: Session):
+    project = _create_project_via_api(client, name="auto-fix-unknown")
+    deployment_id = _insert_failed_deployment_for_project(
+        db_session, project["id"],
+        "Some log content that doesn't match any known pattern.",
+    )
+
+    r = client.post(f"/api/projects/deployments/{deployment_id}/auto-fix")
+    assert r.status_code == 400, r.text
+
+
+def test_auto_fix_returns_404_for_unknown_deployment(client: TestClient):
+    bogus = "00000000-0000-0000-0000-000000000000"
+    r = client.post(f"/api/projects/deployments/{bogus}/auto-fix")
+    assert r.status_code == 404
+
+
+def test_auto_fix_requires_auth(anon_client: TestClient):
+    bogus = "00000000-0000-0000-0000-000000000000"
+    r = anon_client.post(f"/api/projects/deployments/{bogus}/auto-fix")
+    assert r.status_code == 401

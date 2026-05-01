@@ -357,7 +357,25 @@ function DeploymentsTab({ projectId }: { projectId: string }) {
                 {diag && (
                   <tr>
                     <td colSpan={7} className="px-4 py-3 bg-slate-50">
-                      <DiagnosisPanel state={diag} />
+                      <DiagnosisPanel
+                        state={diag}
+                        deploymentId={d.id}
+                        onApplied={(newId) => {
+                          // Remove the diagnosis panel for the failed
+                          // deploy and force-refresh the list so the
+                          // newly-queued deploy shows up at the top.
+                          setDiagnoses(prev => {
+                            const next = { ...prev };
+                            delete next[d.id];
+                            return next;
+                          });
+                          void load();
+                          // Audit-friendly client log so a tab pinned
+                          // open across multiple auto-fixes still
+                          // produces a visible trail.
+                          console.log('[WatchTower] auto-fix applied; new deployment', newId);
+                        }}
+                      />
                     </td>
                   </tr>
                 )}
@@ -380,7 +398,16 @@ const KIND_LABEL: Record<Diagnosis['kind'], string> = {
   unknown: 'Unrecognized failure pattern',
 };
 
-function DiagnosisPanel({ state }: { state: { state: 'loading' | 'ready' | 'error'; data?: Diagnosis; error?: string } }) {
+type DiagnosisPanelProps = {
+  state: { state: 'loading' | 'ready' | 'error'; data?: Diagnosis; error?: string };
+  deploymentId: string;
+  onApplied?: (newDeploymentId: string) => void;
+};
+
+function DiagnosisPanel({ state, deploymentId, onApplied }: DiagnosisPanelProps) {
+  const [applying, setApplying] = useState(false);
+  const [applyResult, setApplyResult] = useState<{ ok: boolean; msg: string } | null>(null);
+
   if (state.state === 'loading') {
     return <p className="text-xs text-slate-600">Diagnosing failed deployment…</p>;
   }
@@ -389,13 +416,36 @@ function DiagnosisPanel({ state }: { state: { state: 'loading' | 'ready' | 'erro
   }
   const d = state.data!;
   const isUnknown = d.kind === 'unknown';
+
+  const applyFix = async () => {
+    setApplying(true);
+    setApplyResult(null);
+    try {
+      const r = await apiClient.post(`/projects/deployments/${deploymentId}/auto-fix`);
+      const newId = r.data?.new_deployment_id as string | undefined;
+      const newPort = r.data?.details?.new_port;
+      setApplyResult({
+        ok: true,
+        msg: newPort
+          ? `Queued new deployment on port ${newPort}.`
+          : 'Queued new deployment.',
+      });
+      if (newId && onApplied) {
+        // Brief delay so the user sees the success message before the
+        // panel disappears on refresh.
+        setTimeout(() => onApplied(newId), 1200);
+      }
+    } catch (e) {
+      const msg = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail
+        ?? 'Could not apply the fix.';
+      setApplyResult({ ok: false, msg });
+    } finally {
+      setApplying(false);
+    }
+  };
+
   return (
     <div className="space-y-2">
-      {/* The "Auto-fixable" badge intentionally isn't rendered yet — the
-          /auto-fix endpoint that would back an "Apply fix" button is
-          v2 work. Showing the badge without the action is a UX lie.
-          When the action lands, render it next to KIND_LABEL gated on
-          d.fix.auto_applicable. */}
       <div className="flex items-center gap-2">
         <span className={`text-[10px] px-2 py-0.5 rounded-full border font-medium ${
           isUnknown
@@ -404,17 +454,39 @@ function DiagnosisPanel({ state }: { state: { state: 'loading' | 'ready' | 'erro
         }`}>
           {KIND_LABEL[d.kind]}
         </span>
+        {d.fix.auto_applicable && (
+          <span className="text-[10px] px-2 py-0.5 rounded-full border font-medium border-emerald-300 bg-emerald-50 text-emerald-700">
+            Auto-fixable
+          </span>
+        )}
       </div>
 
       <p className="text-xs text-slate-800">{d.cause}</p>
 
-      <div className="rounded border border-border bg-white p-3 space-y-1">
+      <div className="rounded border border-border bg-white p-3 space-y-2">
         <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Suggested fix</p>
         <p className="text-xs text-slate-800">{d.fix.description}</p>
         {d.fix.command && (
-          <code className="block text-[11px] font-mono bg-slate-100 rounded px-2 py-1 text-slate-700 mt-1">
+          <code className="block text-[11px] font-mono bg-slate-100 rounded px-2 py-1 text-slate-700">
             {d.fix.command}
           </code>
+        )}
+        {d.fix.auto_applicable && (
+          <div className="flex items-center gap-2 pt-1">
+            <button
+              onClick={() => void applyFix()}
+              disabled={applying}
+              className="text-[11px] px-3 py-1 rounded border border-slate-800 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-[1px_1px_0_0_#1f2937] disabled:opacity-60"
+              title="Apply the suggested fix and trigger a fresh deployment"
+            >
+              {applying ? 'Applying…' : 'Apply fix'}
+            </button>
+            {applyResult && (
+              <span className={`text-[11px] ${applyResult.ok ? 'text-emerald-700' : 'text-red-600'}`}>
+                {applyResult.msg}
+              </span>
+            )}
+          </div>
         )}
       </div>
 
