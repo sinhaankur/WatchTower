@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import { createClient } from "./api";
 import { ProjectsProvider, ServicesProvider, ProjectItem } from "./treeView";
 import { streamDeploymentLogs, showProjectLogs } from "./logs";
+import { openDashboard } from "./webview";
 
 let statusBarItem: vscode.StatusBarItem;
 let pollingTimer: ReturnType<typeof setInterval> | undefined;
@@ -77,6 +78,16 @@ export function activate(context: vscode.ExtensionContext): void {
       const apiUrl = vscode.workspace.getConfiguration("watchtower").get<string>("apiUrl") ?? "http://localhost:8000";
       const webUrl = apiUrl.replace(/\/api$/, "");
       vscode.env.openExternal(vscode.Uri.parse(webUrl));
+    })
+  );
+
+  // ── Command: Open Dashboard (in-VS-Code webview) ──────────────────────────
+  // The seamless-VSCode entry point: opens the entire WatchTower SPA
+  // inside a side-tab, signed in via the user's stored API token.
+  // No browser switch, no second login.
+  context.subscriptions.push(
+    vscode.commands.registerCommand("watchtower.openDashboard", async () => {
+      await openDashboard(context, secrets);
     })
   );
 

@@ -98,6 +98,96 @@ def test_disk_full():
     assert d.kind == FailureKind.DISK_FULL
 
 
+def test_git_auth_failed_https():
+    log = "fatal: Authentication failed for 'https://github.com/sinhaankur/private-repo.git/'"
+    d = classify_failure(log)
+    assert d.kind == FailureKind.GIT_AUTH_FAILED
+    assert d.fix.auto_applicable is False
+
+
+def test_git_auth_failed_ssh_publickey():
+    log = "Permission denied (publickey).\nfatal: Could not read from remote repository."
+    d = classify_failure(log)
+    assert d.kind == FailureKind.GIT_AUTH_FAILED
+
+
+def test_network_failure_dns():
+    log = "fatal: unable to access 'https://github.com/x/y.git/': Could not resolve host: github.com"
+    d = classify_failure(log)
+    assert d.kind == FailureKind.NETWORK_FAILURE
+
+
+def test_network_failure_node_enotfound():
+    log = "Error: getaddrinfo ENOTFOUND registry.npmjs.org"
+    d = classify_failure(log)
+    assert d.kind == FailureKind.NETWORK_FAILURE
+
+
+def test_build_timeout():
+    log = "[builder] context deadline exceeded\nBuild cancelled — timeout after 600s"
+    d = classify_failure(log)
+    assert d.kind == FailureKind.BUILD_TIMEOUT
+
+
+def test_tls_failure_x509():
+    log = "tls: failed to verify certificate: x509: certificate signed by unknown authority"
+    d = classify_failure(log)
+    assert d.kind == FailureKind.TLS_FAILURE
+
+
+def test_tls_failure_curl_ssl():
+    log = "curl: (60) SSL certificate problem: self signed certificate"
+    d = classify_failure(log)
+    assert d.kind == FailureKind.TLS_FAILURE
+
+
+def test_registry_transient_npm_503():
+    log = "npm ERR! 503 Service Unavailable - GET https://registry.npmjs.org/express"
+    d = classify_failure(log)
+    assert d.kind == FailureKind.REGISTRY_TRANSIENT
+    # Auto-applicable because retrying with no changes usually works.
+    assert d.fix.auto_applicable is True
+
+
+def test_registry_transient_pip_timeout():
+    log = (
+        "pip._vendor.urllib3.exceptions.ReadTimeoutError: "
+        "HTTPSConnectionPool(host='pypi.org', port=443): Read timed out."
+    )
+    d = classify_failure(log)
+    assert d.kind == FailureKind.REGISTRY_TRANSIENT
+
+
+def test_runtime_oom_oomkilled():
+    log = "OOMKilled: true\ncontainer abc123 killed by OOM (memory cgroup out of memory)"
+    d = classify_failure(log)
+    assert d.kind == FailureKind.RUNTIME_OOM
+
+
+def test_runtime_oom_classified_before_build_oom():
+    # Both can match 'exit code 137'. Runtime-OOM markers must win so
+    # the diagnosis points at runtime config, not build parallelism.
+    log = "Memory cgroup out of memory: Killed process 4321 (node)\nexit code 137"
+    d = classify_failure(log)
+    assert d.kind == FailureKind.RUNTIME_OOM
+
+
+def test_registry_transient_beats_network_failure():
+    # An npm 503 also matches ECONNRESET-style network signals. The
+    # registry-transient pattern MUST win because the right fix is
+    # "retry" not "check DNS".
+    log = "npm ERR! ECONNRESET\nnpm ERR! request to https://registry.npmjs.org/express failed: 503"
+    d = classify_failure(log)
+    assert d.kind == FailureKind.REGISTRY_TRANSIENT
+    assert d.fix.auto_applicable is True
+
+
+def test_tls_failure_beats_network_failure():
+    log = "x509: certificate signed by unknown authority\nconnection reset by peer"
+    d = classify_failure(log)
+    assert d.kind == FailureKind.TLS_FAILURE
+
+
 def test_disk_full_beats_permission_denied_when_both_present():
     # Real-world: disk fills up → file writes fail → some of those failures
     # surface as 'permission denied'-adjacent messages, but the root cause
