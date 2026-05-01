@@ -117,6 +117,29 @@ The project is intentionally lightweight. It is not trying to replace a full Paa
 
 ---
 
+## What's New in 1.5.14
+
+### Diagnostics surface that detects + fixes its own problems
+
+- **Settings → System tab.** Probes Python, Podman/Docker, and the bundled Nixpacks binary at runtime; shows status badges (Found / Missing) and **per-platform copy-paste install commands** for anything missing — `brew install python@3.11`, `winget install RedHat.Podman`, `sudo apt install -y podman`, etc. **Recheck** restarts the app so PATH refreshes after a terminal install. The first step toward an autonomous-ops control plane: detect → diagnose → fix → verify, in one screen.
+- **Send Error Report (mailto with diagnostics auto-attached).** One click in Settings → System or in the header opens the user's mail client pre-filled with platform, app version, dependency status, and the last 200 lines of the desktop-backend log — addressed to the maintainer. The user reviews the email body before clicking send; the app never sends anything itself.
+- **Silent auto-update.** Removed the *"Update Available"* and *"Restart Now / Later"* dialogs from the packaged path. Updates download in the background and apply on next quit (`autoInstallOnAppQuit=true`); a single non-blocking OS notification fires when the download finishes. No more mid-task interruption.
+
+### Distribution
+
+- **VS Code Marketplace published as `sinhaankur.watchtower-podman`** ("WatchTower Ops"). Install with:
+  ```bash
+  code --install-extension sinhaankur.watchtower-podman
+  ```
+  Slug matches the PyPI package (`pip install watchtower-podman`) so users have one mnemonic across both channels.
+
+## What's New in 1.5.13
+
+- **macOS launch crash fixed.** `spawn /Applications/Xcode.app` errors caused by the `/usr/bin/python3` Command Line Tools stub triggering the Xcode CLT installer mid-launch. Detection now skips the stub and surfaces an actionable "install Python" dialog instead of crashing.
+- **Splash logo restored.** Inlined `wt-logo.svg` directly into `splash.html` — the previous external `<img src="../assets/wt-logo.svg">` 404'd in packaged builds because `assets/` wasn't listed in `desktop/package.json`'s `files` array.
+- **Top-level `uncaughtException` + `unhandledRejection` safety net** in the Electron main process. Spawn-side errors (missing PATH, permission denied, the macOS stub) no longer surface Electron's raw "A JavaScript error occurred" dialog — users see a friendly errorBox with a hint that exits cleanly.
+- **Splash version label is now real.** Was hardcoded `v1.2.2` and stayed wrong through every release between 1.2.2 and 1.5.12; now injected from `app.getVersion()` via `webContents.executeJavaScript` on `dom-ready`.
+
 ## What's New in 1.5.12
 
 The 1.5.x series — and especially the 1.5.10 → 1.5.12 cluster — moved WatchTower decisively in the *desktop-first, integrate-don't-rebuild* direction. Highlights:
@@ -323,7 +346,7 @@ flowchart LR
 ### Platform and Distribution Features
 
 - **Desktop app**: Electron build with native system tray, **OS-level notifications** (deploy completion / build failure), **native folder picker** for local-source projects, sticky sign-out, and in-app **Update Now** wired to `electron-updater`. Per-arch installers for Linux (x86_64, arm64, armv7l), macOS (x64, arm64), and Windows (x64, arm64).
-- **VS Code extension**: WatchTower sidebar inside the editor — projects, deploy actions, deployment logs, and a status bar item. Installs on VS Code **1.80+**, ~10 KB `.vsix`, esbuild-bundled.
+- **VS Code extension** (`sinhaankur.watchtower-podman`, "WatchTower Ops" on the marketplace): WatchTower sidebar inside the editor — projects, deploy actions, deployment logs, and a status bar item. Install: `code --install-extension sinhaankur.watchtower-podman`. Runs on VS Code **1.80+**, ~10 KB `.vsix`, esbuild-bundled.
 - **Bundled build tooling**: Nixpacks v1.41.0 binaries (Linux x64/arm64, macOS x64/arm64) shipped inside the desktop installer via `extraResources` so users don't need Rust + Cargo + Nix to deploy.
 - Linux App Center installer (`install_app_center.sh`)
 - Windows App Center installer and runner scripts
