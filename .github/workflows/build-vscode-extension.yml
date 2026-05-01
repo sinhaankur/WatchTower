@@ -70,7 +70,7 @@ jobs:
         id: published-version
         run: |
           CURRENT_VERSION=$(node -p "require('./package.json').version")
-          PUBLISHED_VERSION=$(npx @vscode/vsce show sinhaankur.watchtower --json | node -e "let input=''; process.stdin.on('data', (chunk) => input += chunk); process.stdin.on('end', () => { try { const parsed = JSON.parse(input); const versions = Array.isArray(parsed.versions) ? parsed.versions : []; process.stdout.write(versions[0]?.version || ''); } catch { process.stdout.write(''); } });")
+          PUBLISHED_VERSION=$(npx @vscode/vsce show sinhaankur.watchtower-podman --json | node -e "let input=''; process.stdin.on('data', (chunk) => input += chunk); process.stdin.on('end', () => { try { const parsed = JSON.parse(input); const versions = Array.isArray(parsed.versions) ? parsed.versions : []; process.stdout.write(versions[0]?.version || ''); } catch { process.stdout.write(''); } });")
           echo "current=$CURRENT_VERSION" >> "$GITHUB_OUTPUT"
           echo "published=$PUBLISHED_VERSION" >> "$GITHUB_OUTPUT"
           if [ "$CURRENT_VERSION" = "$PUBLISHED_VERSION" ]; then
