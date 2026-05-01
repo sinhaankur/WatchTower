@@ -94,6 +94,11 @@
         "icon": "$(globe)"
       },
       {
+        "command": "watchtower.openDashboard",
+        "title": "WatchTower: Open Dashboard (in editor)",
+        "icon": "$(window)"
+      },
+      {
         "command": "watchtower.deployProject",
         "title": "WatchTower: Deploy Project",
         "icon": "$(cloud-upload)"
@@ -128,6 +133,11 @@
         {
           "command": "watchtower.refresh",
           "when": "view == watchtower.projectsView || view == watchtower.servicesView",
+          "group": "navigation"
+        },
+        {
+          "command": "watchtower.openDashboard",
+          "when": "view == watchtower.projectsView",
           "group": "navigation"
         },
         {

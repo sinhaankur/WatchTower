@@ -6,6 +6,7 @@ WatchTower itself is a desktop-first deployment control plane for projects backe
 
 ## Features
 
+- **Full WatchTower dashboard inside VS Code.** `WatchTower: Open Dashboard (in editor)` opens the entire WatchTower SPA — projects, deployments, diagnose, auto-fix, backup, settings, audit log — as a side-tab inside VS Code. Signed in automatically with your stored API token; no browser switch, no second login. **The seamless deploy-without-leaving-the-editor flow.**
 - **Sidebar tree of your projects.** Every project in your WatchTower org appears in a dedicated sidebar with its current deployment status, last build time, and last commit.
 - **One-click deploy.** Right-click a project → **Deploy** → tail the build log inside an Output channel as it streams.
 - **Live deployment logs.** `WatchTower: Show Deployment Logs` opens the most recent build's output in an OS-native log view that auto-refreshes.
@@ -49,9 +50,10 @@ All commands are available via the command palette:
 
 | Command | What it does |
 |---|---|
+| `WatchTower: Open Dashboard (in editor)` | Open the full WatchTower SPA inside VS Code as a side-tab — diagnose failures, apply fixes, manage env vars, all without switching apps |
 | `WatchTower: Refresh` | Re-fetch projects, deployments, and status from the API |
 | `WatchTower: Set API Token` | Store the API token in the system keychain |
-| `WatchTower: Open Web UI` | Open the WatchTower web dashboard in your browser |
+| `WatchTower: Open Web UI` | Open the WatchTower web dashboard in your default browser |
 | `WatchTower: Deploy Project` | Trigger a fresh deployment of the selected project |
 | `WatchTower: Show Deployment Logs` | Stream the most recent build's logs in an Output channel |
 | `WatchTower: Rollback Last Deployment` | Roll the project back to the previous successful deployment |
