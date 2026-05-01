@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
 import { useParams, Link /*, useNavigate*/ } from 'react-router-dom';
 import apiClient from '@/lib/api';
 import {
@@ -258,9 +258,23 @@ function OverviewTab({ project }: { project: Project }) {
 
 // ── DeploymentsTab ────────────────────────────────────────────────────────────
 
+type Diagnosis = {
+  kind: 'port_in_use' | 'missing_env_var' | 'package_not_found' | 'build_oom' | 'permission_denied' | 'disk_full' | 'unknown';
+  cause: string;
+  fix: { description: string; command: string | null; auto_applicable: boolean };
+  matched_text: string | null;
+  extracted: Record<string, string>;
+  deployment_id: string;
+  deployment_status: string | null;
+  build_id: string | null;
+};
+
 function DeploymentsTab({ projectId }: { projectId: string }) {
   const [deployments, setDeployments] = useState<Deployment[]>([]);
   const [loading, setLoading] = useState(true);
+  // Map of deployment_id → diagnosis state. Cached per row so re-running
+  // diagnose doesn't re-fetch unless the user closes and reopens.
+  const [diagnoses, setDiagnoses] = useState<Record<string, { state: 'loading' | 'ready' | 'error'; data?: Diagnosis; error?: string }>>({});
 
   async function load() {
     try {
@@ -279,6 +293,26 @@ function DeploymentsTab({ projectId }: { projectId: string }) {
     return () => clearInterval(t);
   }, [projectId]);
 
+  async function runDiagnose(deploymentId: string) {
+    // Toggle off if already open.
+    if (diagnoses[deploymentId]) {
+      setDiagnoses(prev => {
+        const next = { ...prev };
+        delete next[deploymentId];
+        return next;
+      });
+      return;
+    }
+    setDiagnoses(prev => ({ ...prev, [deploymentId]: { state: 'loading' } }));
+    try {
+      const r = await apiClient.get(`/projects/deployments/${deploymentId}/diagnose`);
+      setDiagnoses(prev => ({ ...prev, [deploymentId]: { state: 'ready', data: r.data } }));
+    } catch (e) {
+      const msg = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? 'Could not diagnose this deployment.';
+      setDiagnoses(prev => ({ ...prev, [deploymentId]: { state: 'error', error: msg } }));
+    }
+  }
+
   if (loading) return <p className="text-sm text-muted-foreground">Loading…</p>;
   if (!deployments.length) return <p className="text-sm text-muted-foreground">No deployments yet.</p>;
 
@@ -293,21 +327,111 @@ function DeploymentsTab({ projectId }: { projectId: string }) {
             <th className="px-4 py-3 text-left">Trigger</th>
             <th className="px-4 py-3 text-left">Started</th>
             <th className="px-4 py-3 text-left">Finished</th>
+            <th className="px-4 py-3 text-left"></th>
           </tr>
         </thead>
         <tbody className="divide-y divide-border">
-          {deployments.map(d => (
-            <tr key={d.id} className="hover:bg-muted/30 transition-colors">
-              <td className="px-4 py-3 font-mono">{(d.commit_sha || '—').slice(0, 8)}</td>
-              <td className="px-4 py-3 font-mono text-xs">{d.branch}</td>
-              <td className="px-4 py-3"><Badge status={d.status} /></td>
-              <td className="px-4 py-3 text-xs capitalize">{d.trigger}</td>
-              <td className="px-4 py-3 text-xs text-muted-foreground">{fmtDate(d.created_at)}</td>
-              <td className="px-4 py-3 text-xs text-muted-foreground">{fmtDate(d.completed_at)}</td>
-            </tr>
-          ))}
+          {deployments.map(d => {
+            const isFailed = d.status?.toLowerCase() === 'failed';
+            const diag = diagnoses[d.id];
+            return (
+              <Fragment key={d.id}>
+                <tr className="hover:bg-muted/30 transition-colors">
+                  <td className="px-4 py-3 font-mono">{(d.commit_sha || '—').slice(0, 8)}</td>
+                  <td className="px-4 py-3 font-mono text-xs">{d.branch}</td>
+                  <td className="px-4 py-3"><Badge status={d.status} /></td>
+                  <td className="px-4 py-3 text-xs capitalize">{d.trigger}</td>
+                  <td className="px-4 py-3 text-xs text-muted-foreground">{fmtDate(d.created_at)}</td>
+                  <td className="px-4 py-3 text-xs text-muted-foreground">{fmtDate(d.completed_at)}</td>
+                  <td className="px-4 py-3 text-right">
+                    {isFailed && (
+                      <button
+                        onClick={() => void runDiagnose(d.id)}
+                        className="text-[11px] px-2 py-1 rounded border border-slate-300 hover:border-slate-500 text-slate-600 hover:text-slate-900 transition-colors"
+                      >
+                        {diag ? 'Hide' : 'Diagnose'}
+                      </button>
+                    )}
+                  </td>
+                </tr>
+                {diag && (
+                  <tr>
+                    <td colSpan={7} className="px-4 py-3 bg-slate-50">
+                      <DiagnosisPanel state={diag} />
+                    </td>
+                  </tr>
+                )}
+              </Fragment>
+            );
+          })}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+const KIND_LABEL: Record<Diagnosis['kind'], string> = {
+  port_in_use: 'Port in use',
+  missing_env_var: 'Missing environment variable',
+  package_not_found: 'Package not found',
+  build_oom: 'Out of memory during build',
+  permission_denied: 'Permission denied',
+  disk_full: 'Disk full',
+  unknown: 'Unrecognized failure pattern',
+};
+
+function DiagnosisPanel({ state }: { state: { state: 'loading' | 'ready' | 'error'; data?: Diagnosis; error?: string } }) {
+  if (state.state === 'loading') {
+    return <p className="text-xs text-slate-600">Diagnosing failed deployment…</p>;
+  }
+  if (state.state === 'error') {
+    return <p className="text-xs text-red-600">{state.error}</p>;
+  }
+  const d = state.data!;
+  const isUnknown = d.kind === 'unknown';
+  return (
+    <div className="space-y-2">
+      {/* The "Auto-fixable" badge intentionally isn't rendered yet — the
+          /auto-fix endpoint that would back an "Apply fix" button is
+          v2 work. Showing the badge without the action is a UX lie.
+          When the action lands, render it next to KIND_LABEL gated on
+          d.fix.auto_applicable. */}
+      <div className="flex items-center gap-2">
+        <span className={`text-[10px] px-2 py-0.5 rounded-full border font-medium ${
+          isUnknown
+            ? 'border-slate-300 bg-slate-100 text-slate-700'
+            : 'border-amber-300 bg-amber-50 text-amber-800'
+        }`}>
+          {KIND_LABEL[d.kind]}
+        </span>
+      </div>
+
+      <p className="text-xs text-slate-800">{d.cause}</p>
+
+      <div className="rounded border border-border bg-white p-3 space-y-1">
+        <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Suggested fix</p>
+        <p className="text-xs text-slate-800">{d.fix.description}</p>
+        {d.fix.command && (
+          <code className="block text-[11px] font-mono bg-slate-100 rounded px-2 py-1 text-slate-700 mt-1">
+            {d.fix.command}
+          </code>
+        )}
+      </div>
+
+      {d.matched_text && (
+        <details className="text-[11px] text-slate-500">
+          <summary className="cursor-pointer">Matched log line</summary>
+          <pre className="mt-1 px-2 py-1 bg-slate-100 rounded font-mono text-[10px] text-slate-700 whitespace-pre-wrap">
+            {d.matched_text}
+          </pre>
+        </details>
+      )}
+
+      {isUnknown && (
+        <p className="text-[11px] text-slate-500">
+          No automatic pattern matched this failure. Open the Build Logs tab to investigate manually.
+        </p>
+      )}
     </div>
   );
 }

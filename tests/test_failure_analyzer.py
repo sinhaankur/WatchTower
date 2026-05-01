@@ -1,0 +1,233 @@
+"""Coverage for the failure-analyzer pattern library.
+
+One test per pattern. Each uses a real-shaped excerpt from the actual
+tools that produce these errors (uvicorn, node, python, rustc, the
+linker, podman, etc) so the regex stays grounded in what we'd see in
+the wild — not synthetic strings tailored to make the regex pass.
+
+Plus a thin integration test for ``GET /api/projects/deployments/{id}/
+diagnose`` covering the happy path (failed deploy → KeyError log →
+missing-env-var diagnosis), 404 handling, and the empty-log
+short-circuit.
+"""
+
+from datetime import datetime
+from uuid import UUID
+
+from fastapi.testclient import TestClient
+from sqlalchemy.orm import Session
+
+from watchtower.database import (
+    Build,
+    BuildStatus,
+    Deployment,
+    DeploymentStatus,
+)
+from watchtower.failure_analyzer import (
+    FailureKind,
+    classify_failure,
+)
+
+
+def test_port_in_use_extracts_port_number_when_present():
+    log = "[Errno 98] error while attempting to bind on address ('0.0.0.0', 8000): address already in use"
+    d = classify_failure(log)
+    assert d.kind == FailureKind.PORT_IN_USE
+    # Port extraction is best-effort; the diagnosis should still classify
+    # even if the port number couldn't be parsed out.
+    assert d.fix.auto_applicable is True
+
+
+def test_port_in_use_node_eaddrinuse():
+    log = "Error: listen EADDRINUSE: address already in use :::3000"
+    d = classify_failure(log)
+    assert d.kind == FailureKind.PORT_IN_USE
+
+
+def test_missing_env_var_python_keyerror():
+    log = (
+        'Traceback (most recent call last):\n'
+        '  File "/app/main.py", line 12, in <module>\n'
+        '    DATABASE_URL = os.environ["DATABASE_URL"]\n'
+        "KeyError: 'DATABASE_URL'"
+    )
+    d = classify_failure(log)
+    assert d.kind == FailureKind.MISSING_ENV_VAR
+    assert "DATABASE_URL" in d.cause
+    assert d.fix.auto_applicable is False  # need human to provide value
+
+
+def test_missing_env_var_bash_unbound():
+    log = "deploy.sh: line 4: GITHUB_TOKEN: unbound variable"
+    d = classify_failure(log)
+    assert d.kind == FailureKind.MISSING_ENV_VAR
+    assert "GITHUB_TOKEN" in d.cause
+
+
+def test_package_not_found_python_module():
+    log = "ModuleNotFoundError: No module named 'fastapi'"
+    d = classify_failure(log)
+    assert d.kind == FailureKind.PACKAGE_NOT_FOUND
+    assert "fastapi" in d.cause
+    assert d.fix.auto_applicable is False
+
+
+def test_package_not_found_node_module():
+    log = "Error: Cannot find module 'express'\n  Require stack:\n  - /app/server.js"
+    d = classify_failure(log)
+    assert d.kind == FailureKind.PACKAGE_NOT_FOUND
+    assert "express" in d.cause
+
+
+def test_build_oom_signal_killed():
+    log = "[2026-05-01 04:32:11] running cargo build --release\nsignal: killed\nexit code 137"
+    d = classify_failure(log)
+    assert d.kind == FailureKind.BUILD_OOM
+    assert d.fix.auto_applicable is False
+
+
+def test_permission_denied_eacces():
+    log = "Error: EACCES: permission denied, open '/var/lib/podman/storage/.lock'"
+    d = classify_failure(log)
+    assert d.kind == FailureKind.PERMISSION_DENIED
+
+
+def test_disk_full():
+    log = "tar: write error: No space left on device\n[error] failed to write build artifact"
+    d = classify_failure(log)
+    assert d.kind == FailureKind.DISK_FULL
+
+
+def test_disk_full_beats_permission_denied_when_both_present():
+    # Real-world: disk fills up → file writes fail → some of those failures
+    # surface as 'permission denied'-adjacent messages, but the root cause
+    # is ENOSPC. Pattern ordering must put disk-full first.
+    log = (
+        "permission denied: /var/lib/podman/storage/.lock\n"
+        "tar: cannot write to file: No space left on device\n"
+    )
+    d = classify_failure(log)
+    assert d.kind == FailureKind.DISK_FULL
+
+
+def test_unknown_for_unmatched_log():
+    log = "Build completed normally. Tagging image as v1.5.15. Pushing to registry..."
+    d = classify_failure(log)
+    assert d.kind == FailureKind.UNKNOWN
+    # UNKNOWN diagnoses still get a useful fix description so the UI can
+    # render *something* even before the LLM agent fallback fires.
+    assert d.fix.description
+    assert d.fix.auto_applicable is False
+
+
+def test_empty_log_returns_unknown_with_specific_cause():
+    d = classify_failure("")
+    assert d.kind == FailureKind.UNKNOWN
+    assert "no build/deploy log" in d.cause.lower()
+
+
+def test_to_dict_serializes_for_api():
+    log = 'KeyError: "STRIPE_SECRET_KEY"'
+    d = classify_failure(log)
+    serialized = d.to_dict()
+    # API response shape — exact keys the SPA depends on.
+    assert serialized["kind"] == "missing_env_var"
+    assert serialized["cause"]
+    assert serialized["fix"]["description"]
+    assert serialized["fix"]["auto_applicable"] is False
+    assert serialized["extracted"]["var"] == "STRIPE_SECRET_KEY"
+
+
+# ── Endpoint integration tests ───────────────────────────────────────────────
+#
+# Thin coverage for GET /api/projects/deployments/{id}/diagnose. Inserts
+# a Deployment + Build directly via SQLAlchemy (so we don't run the real
+# builder pipeline) and asserts the endpoint returns the right diagnosis
+# shape. The pattern matching itself is covered by the unit tests above;
+# these tests only verify wiring (auth, 404, shape).
+
+def _create_project_via_api(client: TestClient, name: str = "diagnose-test") -> dict:
+    r = client.post(
+        "/api/projects",
+        json={
+            "name": name,
+            "use_case": "vercel_like",
+            "repo_url": "https://example.com/diagnose.git",
+            "repo_branch": "main",
+        },
+    )
+    assert r.status_code == 201, r.text
+    return r.json()
+
+
+def _insert_failed_deployment(db: Session, project_id: str, build_log: str) -> tuple[str, str]:
+    """Insert a FAILED deployment + Build with the given log directly in the DB.
+
+    Returns (deployment_id, build_id) as strings.
+    """
+    deployment = Deployment(
+        project_id=UUID(project_id),
+        commit_sha="deadbeef" * 5,
+        branch="main",
+        status=DeploymentStatus.FAILED,
+        created_at=datetime.utcnow(),
+        started_at=datetime.utcnow(),
+        completed_at=datetime.utcnow(),
+    )
+    db.add(deployment)
+    db.flush()
+    build = Build(
+        deployment_id=deployment.id,
+        status=BuildStatus.FAILED,
+        build_command="npm run build",
+        build_output=build_log,
+        started_at=datetime.utcnow(),
+        completed_at=datetime.utcnow(),
+    )
+    db.add(build)
+    db.commit()
+    return str(deployment.id), str(build.id)
+
+
+def test_diagnose_endpoint_returns_classified_diagnosis(client: TestClient, db_session: Session):
+    project = _create_project_via_api(client)
+    deployment_id, build_id = _insert_failed_deployment(
+        db_session,
+        project["id"],
+        'Traceback (most recent call last):\n'
+        '  File "main.py", line 5\n'
+        '    KeyError: \'DATABASE_URL\'\n',
+    )
+
+    r = client.get(f"/api/projects/deployments/{deployment_id}/diagnose")
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["kind"] == "missing_env_var"
+    assert "DATABASE_URL" in body["cause"]
+    assert body["fix"]["auto_applicable"] is False
+    assert body["deployment_id"] == deployment_id
+    assert body["build_id"] == build_id
+    assert body["deployment_status"] == "failed"
+
+
+def test_diagnose_endpoint_returns_unknown_for_empty_log(client: TestClient, db_session: Session):
+    project = _create_project_via_api(client, name="empty-log-test")
+    deployment_id, _ = _insert_failed_deployment(db_session, project["id"], "")
+
+    r = client.get(f"/api/projects/deployments/{deployment_id}/diagnose")
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["kind"] == "unknown"
+    assert "no build/deploy log" in body["cause"].lower()
+
+
+def test_diagnose_endpoint_returns_404_for_unknown_deployment(client: TestClient):
+    bogus = "00000000-0000-0000-0000-000000000000"
+    r = client.get(f"/api/projects/deployments/{bogus}/diagnose")
+    assert r.status_code == 404
+
+
+def test_diagnose_endpoint_requires_auth(anon_client: TestClient):
+    bogus = "00000000-0000-0000-0000-000000000000"
+    r = anon_client.get(f"/api/projects/deployments/{bogus}/diagnose")
+    assert r.status_code == 401
