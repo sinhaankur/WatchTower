@@ -36,6 +36,12 @@ class FailureKind(str, enum.Enum):
     BUILD_OOM = "build_oom"
     PERMISSION_DENIED = "permission_denied"
     DISK_FULL = "disk_full"
+    GIT_AUTH_FAILED = "git_auth_failed"
+    NETWORK_FAILURE = "network_failure"
+    BUILD_TIMEOUT = "build_timeout"
+    TLS_FAILURE = "tls_failure"
+    REGISTRY_TRANSIENT = "registry_transient"
+    RUNTIME_OOM = "runtime_oom"
     UNKNOWN = "unknown"
 
 
@@ -209,6 +215,126 @@ def _fix_disk_full(match: re.Match) -> FailureDiagnosis:
     )
 
 
+def _fix_git_auth_failed(match: re.Match) -> FailureDiagnosis:
+    return FailureDiagnosis(
+        kind=FailureKind.GIT_AUTH_FAILED,
+        cause="Git couldn't authenticate to the source repository.",
+        fix=FailureFix(
+            description=(
+                "Either the GitHub PAT for this project is missing/expired, "
+                "or the repo's SSH key isn't authorised. For HTTPS repos: "
+                "regenerate the PAT in GitHub (Settings → Developer settings "
+                "→ Personal access tokens) with `repo` scope and re-add it "
+                "under this project's Integrations tab. For SSH repos: "
+                "add the deploy key shown there to the repo's deploy keys."
+            ),
+            auto_applicable=False,
+        ),
+        matched_text=match.group(0),
+    )
+
+
+def _fix_network_failure(match: re.Match) -> FailureDiagnosis:
+    return FailureDiagnosis(
+        kind=FailureKind.NETWORK_FAILURE,
+        cause="DNS resolution or network connection failed during build.",
+        fix=FailureFix(
+            description=(
+                "The build couldn't reach a hostname (registry, package "
+                "index, GitHub). If this is the first occurrence, just "
+                "retry — most network failures are transient. If it "
+                "repeats, check the deploy node's DNS resolver "
+                "(`/etc/resolv.conf`) and outbound firewall rules."
+            ),
+            auto_applicable=False,
+        ),
+        matched_text=match.group(0),
+    )
+
+
+def _fix_build_timeout(match: re.Match) -> FailureDiagnosis:
+    return FailureDiagnosis(
+        kind=FailureKind.BUILD_TIMEOUT,
+        cause="The build exceeded its time budget and was killed.",
+        fix=FailureFix(
+            description=(
+                "Either the build is genuinely slow (large dependency "
+                "tree, heavy test suite, single-thread compile) or it's "
+                "stuck waiting on a network/lock. Try: pin specific "
+                "package versions to skip dependency resolution; "
+                "parallelise the build; or scale the deploy node's CPU."
+            ),
+            auto_applicable=False,
+        ),
+        matched_text=match.group(0),
+    )
+
+
+def _fix_tls_failure(match: re.Match) -> FailureDiagnosis:
+    return FailureDiagnosis(
+        kind=FailureKind.TLS_FAILURE,
+        cause="A TLS / SSL handshake failed during build.",
+        fix=FailureFix(
+            description=(
+                "Common causes: expired certificate on a self-hosted "
+                "registry, missing CA bundle in the build container, or "
+                "an outbound proxy intercepting traffic. Don't blanket-"
+                "disable verification — fix the trust chain instead. "
+                "For self-hosted GHES: ensure the GHES host's CA is in "
+                "the deploy node's trust store."
+            ),
+            auto_applicable=False,
+        ),
+        matched_text=match.group(0),
+    )
+
+
+def _fix_registry_transient(match: re.Match) -> FailureDiagnosis:
+    return FailureDiagnosis(
+        kind=FailureKind.REGISTRY_TRANSIENT,
+        cause=(
+            "The package registry returned a transient error (5xx / "
+            "connection reset). This is almost always a flake."
+        ),
+        fix=FailureFix(
+            description=(
+                "Click Apply fix to retry the build. Registry flakes "
+                "usually clear in seconds — the same build will succeed "
+                "on the next attempt with no code or config changes."
+            ),
+            # Auto-applicable because the fix is "just retry" — no state
+            # change, no risk of corrupting anything. If the registry is
+            # genuinely down, the retry fails again and the user picks
+            # it up.
+            auto_applicable=True,
+        ),
+        matched_text=match.group(0),
+    )
+
+
+def _fix_runtime_oom(match: re.Match) -> FailureDiagnosis:
+    return FailureDiagnosis(
+        kind=FailureKind.RUNTIME_OOM,
+        cause=(
+            "The deployed container was killed at runtime because it "
+            "exceeded its memory limit (OOMKilled, exit code 137 from "
+            "the runtime, not from the build)."
+        ),
+        fix=FailureFix(
+            description=(
+                "Either: increase the container's memory limit (in the "
+                "project's runtime config), tune your app's allocator "
+                "(NODE_OPTIONS=--max-old-space-size, GOGC, "
+                "PYTHON_GC_THRESHOLD), or scale up the deploy node. "
+                "If memory usage was fine before this deploy, look for "
+                "a leak introduced in the last commit."
+            ),
+            auto_applicable=False,
+        ),
+        matched_text=match.group(0),
+    )
+
+
 # ── Pattern library ──────────────────────────────────────────────────────────
 #
 # Order matters: more specific first. The first regex to match wins, so
@@ -225,6 +351,22 @@ PATTERNS: list[tuple[FailureKind, re.Pattern, Callable[[re.Match], FailureDiagno
         _fix_disk_full,
     ),
     (
+        # Runtime OOM is detected before build OOM because both share
+        # exit-code 137 / SIGKILL signatures, but runtime OOM has the
+        # extra "OOMKilled" / "Memory cgroup out of memory" markers from
+        # podman/Docker that distinguish it from a compiler getting
+        # SIGKILL'd at build time. If we see those, classify as runtime.
+        FailureKind.RUNTIME_OOM,
+        re.compile(
+            r"OOMKilled"
+            r"|Memory cgroup out of memory"
+            r"|Process exited with status 137.*(?:runtime|after start)"
+            r"|container .* killed by OOM",
+            re.IGNORECASE,
+        ),
+        _fix_runtime_oom,
+    ),
+    (
         FailureKind.BUILD_OOM,
         re.compile(
             r"killed.{0,40}out of memory"
@@ -234,6 +376,77 @@ PATTERNS: list[tuple[FailureKind, re.Pattern, Callable[[re.Match], FailureDiagno
             re.IGNORECASE,
         ),
         _fix_build_oom,
+    ),
+    (
+        FailureKind.GIT_AUTH_FAILED,
+        re.compile(
+            r"fatal: Authentication failed for"
+            r"|fatal: could not read Username for"
+            r"|Permission denied \(publickey"
+            r"|fatal: repository .* not found"
+            r"|remote: Repository not found"
+            r"|remote: Invalid username or password",
+            re.IGNORECASE,
+        ),
+        _fix_git_auth_failed,
+    ),
+    (
+        # TLS errors before NETWORK_FAILURE because some TLS errors
+        # surface as connection errors at the syscall layer, but the
+        # specific TLS markers ("certificate", "x509") tell us the
+        # diagnosis precisely.
+        FailureKind.TLS_FAILURE,
+        re.compile(
+            r"x509: certificate signed by unknown authority"
+            r"|SSL certificate problem"
+            r"|certificate verify failed"
+            r"|tls:?\s+(?:bad certificate|handshake failure)"
+            r"|unable to get local issuer certificate",
+            re.IGNORECASE,
+        ),
+        _fix_tls_failure,
+    ),
+    (
+        # Registry-transient before NETWORK_FAILURE: a 503 from npm /
+        # PyPI is technically a network error but the right fix is
+        # "retry" rather than "check DNS". Catching it specifically
+        # makes the retry safe + auto-applicable.
+        FailureKind.REGISTRY_TRANSIENT,
+        re.compile(
+            r"npm ERR!.*?(?:503|ECONNRESET|ETIMEDOUT|EAI_AGAIN)"
+            r"|registry.*?return(?:ed)?\s+(?:5\d{2}|503)"
+            r"|pip.*?HTTPSConnectionPool.*?(?:Read timed out|Max retries exceeded)"
+            r"|cargo:.*?failed to download.*?(?:50\d|connection reset)"
+            r"|go: .*?(?:Get|GET) .*?: (?:50\d|tls handshake timeout|connection reset by peer)",
+            re.IGNORECASE,
+        ),
+        _fix_registry_transient,
+    ),
+    (
+        FailureKind.NETWORK_FAILURE,
+        re.compile(
+            r"getaddrinfo (?:ENOTFOUND|EAI_NODATA|failed)"
+            r"|name or service not known"
+            r"|temporary failure in name resolution"
+            r"|could not resolve host"
+            r"|dial tcp:?\s+lookup .* no such host"
+            r"|dns resolution failed",
+            re.IGNORECASE,
+        ),
+        _fix_network_failure,
+    ),
+    (
+        FailureKind.BUILD_TIMEOUT,
+        re.compile(
+            r"build (?:exceeded|reached) (?:maximum|max) (?:time|duration|timeout)"
+            r"|deadline exceeded"
+            r"|context deadline exceeded"
+            r"|operation timed out"
+            r"|build cancelled.*?timeout"
+            r"|killed by timeout",
+            re.IGNORECASE,
+        ),
+        _fix_build_timeout,
     ),
     (
         FailureKind.PORT_IN_USE,
