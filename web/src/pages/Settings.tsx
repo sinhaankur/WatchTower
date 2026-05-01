@@ -574,6 +574,157 @@ function SystemCard() {
   );
 }
 
+type BackupStatus = {
+  supported: boolean;
+  reason_unsupported: string | null;
+  has_secret_key: boolean;
+  has_database_file: boolean;
+  ready_for_backup: boolean;
+  can_export: boolean;
+};
+
+function BackupCard() {
+  const [status, setStatus] = useState<BackupStatus | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [downloading, setDownloading] = useState(false);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void apiClient
+      .get('/runtime/backup/status')
+      .then(r => { if (!cancelled) setStatus(r.data); })
+      .catch(() => { if (!cancelled) setStatus(null); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, []);
+
+  const handleDownload = async () => {
+    setDownloading(true);
+    setDownloadError(null);
+    try {
+      // Need responseType: blob so axios doesn't try to JSON-parse the
+      // gzip stream. Filename comes from the Content-Disposition header
+      // the backend sets.
+      const r = await apiClient.get('/runtime/backup/export', { responseType: 'blob' });
+      const disposition = r.headers['content-disposition'] as string | undefined;
+      const match = disposition?.match(/filename="?([^"]+)"?/);
+      const filename = match?.[1] ?? 'watchtower-backup.tar.gz';
+      const blob = new Blob([r.data], { type: 'application/gzip' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      const msg = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail
+        ?? 'Could not download backup. Check the System log.';
+      setDownloadError(msg);
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  return (
+    <div className="rounded-xl border border-slate-800 bg-card p-5 shadow-[2px_2px_0_0_#1f2937]">
+      <div className="flex items-center gap-3 mb-4">
+        <div className="w-9 h-9 rounded-lg border border-slate-800 bg-slate-900 flex items-center justify-center shadow-[1px_1px_0_0_#1f2937]">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <polyline points="7 10 12 15 17 10" />
+            <line x1="12" y1="15" x2="12" y2="3" />
+          </svg>
+        </div>
+        <div className="flex-1 min-w-0">
+          <h2 className="text-sm font-semibold text-slate-900">Backup & Restore</h2>
+          <p className="text-xs text-slate-500">
+            Export the encryption key + database so you can recover from disk loss.
+          </p>
+        </div>
+      </div>
+
+      {loading && <p className="text-xs text-slate-500">Checking backup status…</p>}
+
+      {!loading && status && !status.supported && (
+        <div className="rounded-lg border border-amber-300 bg-amber-50 p-3">
+          <p className="text-xs text-amber-800">
+            This install uses a non-SQLite database. Use your database's native backup tool
+            (e.g. <code className="font-mono bg-white px-1 rounded">pg_dump</code>) and back up
+            <code className="font-mono bg-white px-1 rounded">~/.watchtower/secret.key</code> separately.
+            In-app backup is SQLite-only in v1.
+          </p>
+        </div>
+      )}
+
+      {!loading && status && status.supported && (
+        <>
+          <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 mb-3">
+            <p className="text-xs text-amber-900 font-medium">⚠ Contains credentials</p>
+            <p className="text-[11px] text-amber-800 mt-0.5">
+              The backup file contains your Fernet encryption key plus the SQLite database
+              with all encrypted secrets (GitHub PATs, SSH keys, env var values). Store it
+              somewhere as secure as your password manager — anyone with this file can
+              decrypt every secret on this install.
+            </p>
+          </div>
+
+          <div className="grid sm:grid-cols-2 gap-3">
+            <div className="rounded-lg border border-border bg-muted/20 p-3 space-y-2">
+              <p className="text-xs font-semibold text-slate-800 uppercase tracking-wide">Backup contents</p>
+              <ul className="text-[11px] text-slate-700 space-y-1">
+                <li>{status.has_secret_key ? '✓' : '○'} <code className="font-mono">secret.key</code> (Fernet master key)</li>
+                <li>{status.has_database_file ? '✓' : '○'} <code className="font-mono">watchtower.db</code> (SQLite database)</li>
+              </ul>
+              {!status.ready_for_backup && (
+                <p className="text-[11px] text-slate-500 italic">
+                  Fresh install — nothing to back up yet. Create a project or sign in to populate state.
+                </p>
+              )}
+            </div>
+
+            <div className="rounded-lg border border-border bg-muted/20 p-3 space-y-2">
+              <p className="text-xs font-semibold text-slate-800 uppercase tracking-wide">Restore (manual)</p>
+              <p className="text-[11px] text-slate-700">
+                Restore is manual in v1. Stop WatchTower, extract the tarball over your{' '}
+                <code className="font-mono">~/.watchtower/</code> directory, restart.
+              </p>
+              <code className="block text-[10px] font-mono bg-slate-100 rounded px-2 py-1 text-slate-700">
+                tar -xzf watchtower-backup-*.tar.gz -C ~/.watchtower/
+              </code>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-200 mt-3">
+            {downloadError && <p className="text-xs text-red-600 flex-1">{downloadError}</p>}
+            {!downloadError && (
+              <p className="text-xs text-slate-500 flex-1">
+                Suggested cadence: once a week, or after every major project change.
+              </p>
+            )}
+            <button
+              onClick={() => void handleDownload()}
+              disabled={downloading || !status.ready_for_backup || !status.can_export}
+              className="text-xs px-3 py-1.5 rounded-lg border border-slate-800 bg-amber-400 hover:bg-amber-500 text-slate-900 font-semibold shadow-[1px_1px_0_0_#1f2937] disabled:opacity-50 disabled:cursor-not-allowed"
+              title={
+                !status.can_export
+                  ? "Requires can_manage_team permission on this org"
+                  : !status.ready_for_backup
+                    ? "No state to back up yet — create a project first"
+                    : "Download a tarball with secret.key + watchtower.db"
+              }
+            >
+              {downloading ? 'Preparing…' : 'Download backup'}
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 const Settings = () => {
   const [showReportModal, setShowReportModal] = useState(false);
   const [reportNote, setReportNote] = useState('');
@@ -626,6 +777,9 @@ const Settings = () => {
 
         {/* System dependencies + diagnostics */}
         <SystemCard />
+
+        {/* Backup & restore for ~/.watchtower/ */}
+        <BackupCard />
 
         {/* VS Code Integration — prominent card */}
         <VSCodeCard />
