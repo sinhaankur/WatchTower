@@ -1,6 +1,6 @@
 {
   "name": "watchtower-podman",
-  "displayName": "WatchTower",
+  "displayName": "WatchTower Ops",
   "description": "Deploy, monitor, and manage your WatchTower projects from VS Code",
   "version": "1.5.14",
   "publisher": "sinhaankur",
