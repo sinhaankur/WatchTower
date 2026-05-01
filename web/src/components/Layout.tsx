@@ -198,6 +198,7 @@ function IconPuzzle() {
 const PRIMARY_NAV: NavItem[] = [
   { path: '/',              label: 'Dashboard',     Icon: IconDashboard },
   { path: '/applications',  label: 'Applications',  Icon: IconBox },
+  { path: '/templates',     label: 'Templates',     Icon: IconLayers },
   { path: '/servers',       label: 'Servers',       Icon: IconServer },
   { path: '/services',      label: 'Services',      Icon: IconLayers },
 ];
