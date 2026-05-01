@@ -881,6 +881,38 @@ def _is_port_free(port: int) -> bool:
         s.close()
 
 
+def pick_free_port_for_user(db: Session, user_id, excluded: Optional[set] = None) -> Optional[int]:
+    """Internal port picker shared by /recommend-port and /auto-fix.
+
+    Walks the project port range, skipping ports that are (a) explicitly
+    excluded by the caller, (b) already assigned to one of this user's
+    projects, or (c) currently held by some other process. Returns the
+    first surviving port, or None if the whole range is occupied.
+
+    Factored out so the autonomous-ops auto-fix path can call it
+    directly without re-doing the API request inside the same process.
+    """
+    excluded_set: set[int] = set(excluded or ())
+    rows = (
+        db.query(Project.recommended_port)
+        .filter(
+            Project.owner_id == user_id,
+            Project.recommended_port.isnot(None),
+        )
+        .all()
+    )
+    for (p,) in rows:
+        if p:
+            excluded_set.add(int(p))
+
+    for port in range(_PORT_RANGE_START, _PORT_RANGE_END):
+        if port in excluded_set:
+            continue
+        if _is_port_free(port):
+            return port
+    return None
+
+
 @router.get("/recommend-port")
 async def recommend_port(
     exclude: str = "",
@@ -919,27 +951,13 @@ async def recommend_port(
             excluded.add(p)
 
     user_id = util.canonical_user_id(db, current_user)
-    rows = (
-        db.query(Project.recommended_port)
-        .filter(
-            Project.owner_id == user_id,
-            Project.recommended_port.isnot(None),
-        )
-        .all()
-    )
-    for (p,) in rows:
-        if p:
-            excluded.add(int(p))
-
-    for port in range(_PORT_RANGE_START, _PORT_RANGE_END):
-        if port in excluded:
-            continue
-        if _is_port_free(port):
-            return {
-                "port": port,
-                "range_start": _PORT_RANGE_START,
-                "range_end": _PORT_RANGE_END - 1,
-            }
+    chosen = pick_free_port_for_user(db, user_id, excluded=excluded)
+    if chosen is not None:
+        return {
+            "port": chosen,
+            "range_start": _PORT_RANGE_START,
+            "range_end": _PORT_RANGE_END - 1,
+        }
 
     raise HTTPException(
         status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
