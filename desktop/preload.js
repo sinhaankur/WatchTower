@@ -37,5 +37,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Fire an OS-level notification (visible even if WatchTower is
   // minimized / in another workspace). Pass {title, body, silent?}.
   showNotification: (payload) => ipcRenderer.send('wt:showNotification', payload ?? {}),
+  // Probe Python + container runtime + return platform/version/log path.
+  // Used by the System tab in Settings to show what's installed and
+  // give the user copy-paste install commands for anything missing.
+  getDependencyStatus: () => ipcRenderer.invoke('wt:getDependencyStatus'),
+  // Relaunch the app — used by the "Recheck" button after a user
+  // installs a missing dependency. PATH staleness makes in-place
+  // re-probing unreliable, so we restart cleanly.
+  relaunchApp: () => ipcRenderer.invoke('wt:relaunchApp'),
+  // Open the user's mail client with a pre-filled bug report addressed
+  // to the maintainer (system info + log tail). User reviews and sends.
+  openErrorReport: (payload) => ipcRenderer.invoke('wt:openErrorReport', payload ?? {}),
   platform: process.platform,
 });
