@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import apiClient from '@/lib/api';
 import {
@@ -8,6 +8,26 @@ import {
   setAutoUpdateCheckEnabled,
   queryKeys,
 } from '@/hooks/queries';
+
+type DependencyStatus = {
+  platform: string;
+  arch: string;
+  appVersion: string;
+  python: { found: boolean; command: string | null; version: string | null; isStub: boolean };
+  podman: { found: boolean; version: string | null; source: string | null };
+  dataDir: string;
+  backendLogPath: string | null;
+};
+
+type NixpacksStatus = {
+  available: boolean;
+  source: string;
+  path: string | null;
+  version: string | null;
+  expected_version: string;
+  version_drift: boolean;
+  platform_supported: boolean;
+};
 
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
@@ -311,8 +331,274 @@ function UpdateCheckCard() {
   );
 }
 
+function pythonInstallCommand(platform: string): string {
+  if (platform === 'darwin') return 'brew install python@3.11 && python3 -m pip install watchtower-podman';
+  if (platform === 'win32') return 'py -3 -m pip install watchtower-podman';
+  return 'sudo apt install -y python3 python3-pip && pip3 install --user watchtower-podman';
+}
+
+function podmanInstallCommand(platform: string): string {
+  if (platform === 'darwin') return 'brew install podman && podman machine init && podman machine start';
+  if (platform === 'win32') return 'winget install -e --id RedHat.Podman';
+  return 'sudo apt install -y podman';
+}
+
+function nixpacksInstallCommand(platform: string): string {
+  if (platform === 'darwin') return 'brew install nixpacks';
+  if (platform === 'win32') return '# Nixpacks does not ship a Windows binary — use WSL2 or run from a Linux/macOS host.';
+  return 'curl -sSL https://nixpacks.com/install.sh | bash';
+}
+
+type DepRowProps = {
+  label: string;
+  found: boolean;
+  detail?: string | null;
+  installCmd?: string;
+  hint?: string;
+  required: boolean;
+};
+
+function DepRow({ label, found, detail, installCmd, hint, required }: DepRowProps) {
+  const okBadge = (
+    <span className="text-[10px] px-2 py-0.5 rounded-full border font-medium border-emerald-300 bg-emerald-50 text-emerald-700">
+      Found
+    </span>
+  );
+  const missingBadge = (
+    <span className={`text-[10px] px-2 py-0.5 rounded-full border font-medium ${
+      required
+        ? 'border-red-300 bg-red-50 text-red-700'
+        : 'border-amber-300 bg-amber-50 text-amber-700'
+    }`}>
+      {required ? 'Missing (required)' : 'Missing (optional)'}
+    </span>
+  );
+
+  return (
+    <div className="rounded-lg border border-border bg-muted/20 p-4 space-y-2">
+      <div className="flex items-center gap-2">
+        <p className="text-xs font-semibold text-slate-800 uppercase tracking-wide flex-1">{label}</p>
+        {found ? okBadge : missingBadge}
+      </div>
+      {detail && <p className="text-[11px] font-mono text-slate-700 truncate" title={detail}>{detail}</p>}
+      {hint && <p className="text-[11px] text-slate-600">{hint}</p>}
+      {!found && installCmd && (
+        <div className="flex items-center gap-2 p-2 rounded bg-slate-50 border border-border">
+          <code className="text-[11px] font-mono text-slate-700 flex-1 truncate" title={installCmd}>
+            {installCmd}
+          </code>
+          <CopyButton text={installCmd} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SystemCard() {
+  const electron = (typeof window !== 'undefined' ? (window as unknown as { electronAPI?: {
+    getDependencyStatus?: () => Promise<DependencyStatus>;
+    relaunchApp?: () => Promise<unknown>;
+    openErrorReport?: (payload: { message?: string }) => Promise<{ ok: boolean; error?: string }>;
+  } }).electronAPI : undefined);
+
+  const [dep, setDep] = useState<DependencyStatus | null>(null);
+  const [nixpacks, setNixpacks] = useState<NixpacksStatus | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [reportSending, setReportSending] = useState(false);
+  const [reportResult, setReportResult] = useState<{ ok: boolean; msg: string } | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const [d, n] = await Promise.all([
+          electron?.getDependencyStatus?.() ?? Promise.resolve(null),
+          apiClient.get('/runtime/nixpacks-status').then(r => r.data as NixpacksStatus).catch(() => null),
+        ]);
+        if (cancelled) return;
+        setDep(d ?? null);
+        setNixpacks(n);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [electron]);
+
+  const handleRecheck = async () => {
+    if (electron?.relaunchApp) {
+      await electron.relaunchApp();
+      // App will quit; nothing else to do.
+      return;
+    }
+    // Browser fallback: just reload, it's the closest thing to a relaunch we have.
+    window.location.reload();
+  };
+
+  const handleSendReport = async () => {
+    setReportSending(true);
+    setReportResult(null);
+    try {
+      if (electron?.openErrorReport) {
+        const res = await electron.openErrorReport({});
+        setReportResult(res.ok
+          ? { ok: true, msg: 'Mail client opened with diagnostics — review and send.' }
+          : { ok: false, msg: res.error ?? 'Could not open mail client.' });
+      } else {
+        // Browser fallback: plain mailto without diagnostics.
+        window.open('mailto:sinhaankur@ymail.com?subject=WatchTower%20bug%20report', '_blank');
+        setReportResult({ ok: true, msg: 'Mail client opened.' });
+      }
+    } finally {
+      setReportSending(false);
+    }
+  };
+
+  const platform = dep?.platform ?? (
+    typeof navigator !== 'undefined'
+      ? (navigator.userAgent.includes('Mac') ? 'darwin' : navigator.userAgent.includes('Win') ? 'win32' : 'linux')
+      : 'linux'
+  );
+
+  return (
+    <div className="rounded-xl border border-slate-800 bg-card p-5 shadow-[2px_2px_0_0_#1f2937]">
+      <div className="flex items-center gap-3 mb-4">
+        <div className="w-9 h-9 rounded-lg border border-slate-800 bg-slate-900 flex items-center justify-center shadow-[1px_1px_0_0_#1f2937]">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="3" width="18" height="18" rx="2" />
+            <path d="M9 9h6v6H9z" />
+          </svg>
+        </div>
+        <div className="flex-1 min-w-0">
+          <h2 className="text-sm font-semibold text-slate-900">System</h2>
+          <p className="text-xs text-slate-500">
+            {dep
+              ? <>WatchTower {dep.appVersion} · {dep.platform} ({dep.arch})</>
+              : 'Dependencies and diagnostics'}
+          </p>
+        </div>
+        {!electron && (
+          <span className="text-[10px] px-2 py-0.5 rounded-full border font-medium border-slate-300 bg-slate-50 text-slate-600">
+            Browser mode
+          </span>
+        )}
+      </div>
+
+      {loading && <p className="text-xs text-slate-500">Probing system…</p>}
+
+      {!loading && (
+        <>
+          <div className="grid md:grid-cols-2 gap-3 mb-4">
+            <DepRow
+              label="Python 3.8+"
+              required
+              found={dep?.python.found ?? false}
+              detail={dep?.python.command ? `${dep.python.command}${dep.python.version ? ` · ${dep.python.version}` : ''}` : null}
+              hint={dep?.python.isStub
+                ? 'macOS Command Line Tools placeholder detected — install a real Python below.'
+                : !dep?.python.found ? 'Required to run the WatchTower backend.' : undefined}
+              installCmd={pythonInstallCommand(platform)}
+            />
+
+            <DepRow
+              label="Container runtime"
+              required={false}
+              found={dep?.podman.found ?? false}
+              detail={dep?.podman.found ? `${dep.podman.source} · ${dep.podman.version}` : null}
+              hint={!dep?.podman.found ? 'Optional. Needed for local container builds and the App Center deploy flow.' : undefined}
+              installCmd={podmanInstallCommand(platform)}
+            />
+
+            <DepRow
+              label="Nixpacks"
+              required={false}
+              found={nixpacks?.available ?? false}
+              detail={nixpacks?.available
+                ? `${nixpacks.source}${nixpacks.version ? ` · ${nixpacks.version}` : ''}${nixpacks.version_drift ? ` (expected ${nixpacks.expected_version})` : ''}`
+                : null}
+              hint={!nixpacks?.platform_supported
+                ? 'Nixpacks does not publish a Windows binary — use WSL2 or run from Linux/macOS.'
+                : !nixpacks?.available
+                  ? 'Optional. Auto-detects buildpacks for projects without a Dockerfile.'
+                  : undefined}
+              installCmd={nixpacks?.platform_supported === false ? undefined : nixpacksInstallCommand(platform)}
+            />
+
+            {dep?.backendLogPath && (
+              <div className="rounded-lg border border-border bg-muted/20 p-4 space-y-2">
+                <p className="text-xs font-semibold text-slate-800 uppercase tracking-wide">Backend log</p>
+                <div className="flex items-center gap-2 p-2 rounded bg-slate-50 border border-border">
+                  <code className="text-[11px] font-mono text-slate-700 flex-1 truncate" title={dep.backendLogPath}>
+                    {dep.backendLogPath}
+                  </code>
+                  <CopyButton text={dep.backendLogPath} />
+                </div>
+                <p className="text-[11px] text-slate-600">
+                  Attached automatically when you send an error report.
+                </p>
+              </div>
+            )}
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-200">
+            <div className="flex flex-col">
+              <p className="text-xs text-slate-700">
+                Installed something just now? Recheck restarts the app so PATH refreshes.
+              </p>
+              {reportResult && (
+                <p className={`text-[11px] mt-1 ${reportResult.ok ? 'text-emerald-700' : 'text-red-600'}`}>
+                  {reportResult.msg}
+                </p>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => void handleSendReport()}
+                disabled={reportSending}
+                className="text-xs px-3 py-1.5 rounded-lg border border-slate-800 bg-white hover:bg-slate-50 text-slate-800 font-medium shadow-[1px_1px_0_0_#1f2937] disabled:opacity-50"
+                title="Open mail client with diagnostics pre-filled — sent to the maintainer for fixing."
+              >
+                {reportSending ? 'Opening…' : 'Send Error Report'}
+              </button>
+              <button
+                onClick={() => void handleRecheck()}
+                className="text-xs px-3 py-1.5 rounded-lg border border-slate-800 bg-amber-400 hover:bg-amber-500 text-slate-900 font-semibold shadow-[1px_1px_0_0_#1f2937]"
+              >
+                Recheck (restarts app)
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 const Settings = () => {
   const [showReportModal, setShowReportModal] = useState(false);
+  const [reportNote, setReportNote] = useState('');
+  const [reportSending, setReportSending] = useState(false);
+
+  const electron = (typeof window !== 'undefined' ? (window as unknown as { electronAPI?: {
+    openErrorReport?: (payload: { message?: string }) => Promise<{ ok: boolean; error?: string }>;
+  } }).electronAPI : undefined);
+
+  const handleSendReport = async () => {
+    setReportSending(true);
+    try {
+      if (electron?.openErrorReport) {
+        await electron.openErrorReport({ message: reportNote });
+      } else {
+        const subject = encodeURIComponent('WatchTower bug report');
+        const body = encodeURIComponent(reportNote || '');
+        window.open(`mailto:sinhaankur@ymail.com?subject=${subject}&body=${body}`, '_blank');
+      }
+      setShowReportModal(false);
+      setReportNote('');
+    } finally {
+      setReportSending(false);
+    }
+  };
 
   return (
     <div className="flex-1 overflow-auto bg-slate-50">
@@ -327,9 +613,9 @@ const Settings = () => {
         <button
           onClick={() => setShowReportModal(true)}
           className="text-xs px-3 py-1.5 rounded border border-slate-300 text-slate-600 hover:text-slate-900 hover:border-slate-400 transition-colors"
-          title="Report a problem or send feedback"
+          title="Send a bug report with diagnostics attached"
         >
-          Report Problem
+          Send Error Report
         </button>
       </header>
 
@@ -338,12 +624,18 @@ const Settings = () => {
         {/* WatchTower version + update check */}
         <UpdateCheckCard />
 
+        {/* System dependencies + diagnostics */}
+        <SystemCard />
+
         {/* VS Code Integration — prominent card */}
         <VSCodeCard />
 
       </main>
 
-      {/* Report Problem Modal */}
+      {/* Report Problem Modal — opens user's mail client with diagnostics
+          pre-filled (Electron) or a plain mailto (browser). Sends to
+          sinhaankur@ymail.com so the maintainer gets the bug + system
+          info in one go. */}
       {showReportModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg shadow-lg max-w-md w-full p-6 space-y-4">
@@ -354,42 +646,45 @@ const Settings = () => {
                 </svg>
               </div>
               <div>
-                <h3 className="font-semibold text-slate-900">Report Problem</h3>
-                <p className="text-xs text-slate-500 mt-0.5">Help us improve WatchTower</p>
+                <h3 className="font-semibold text-slate-900">Send Error Report</h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  {electron
+                    ? 'System info + recent backend log are attached automatically.'
+                    : 'Opens your mail client with a pre-filled report.'}
+                </p>
               </div>
             </div>
 
-            <p className="text-sm text-slate-700">
-              Found an issue or have feedback? We'd love to hear from you.
-            </p>
+            <label className="block">
+              <span className="text-xs font-medium text-slate-700">What happened? (optional)</span>
+              <textarea
+                value={reportNote}
+                onChange={(e) => setReportNote(e.target.value)}
+                rows={4}
+                placeholder="A short description helps me reproduce and fix the issue."
+                className="mt-1 w-full text-sm px-3 py-2 rounded-lg border border-slate-300 focus:border-slate-800 focus:outline-none resize-none"
+              />
+            </label>
 
-            <div className="bg-slate-50 rounded-lg p-3 space-y-2">
-              <p className="text-xs font-medium text-slate-900">Contact Support:</p>
-              <a
-                href="mailto:sinhaankur827@gmail.com?subject=WatchTower%20Problem%20Report"
-                className="flex items-center gap-2 text-sm text-red-700 hover:text-red-800 font-medium"
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
-                  <polyline points="22,6 12,13 2,6" />
-                </svg>
-                sinhaankur827@gmail.com
-              </a>
-            </div>
+            <p className="text-[11px] text-slate-500">
+              Goes to <span className="font-mono">sinhaankur@ymail.com</span>. You'll see the
+              email before it sends — review and click send in your mail client.
+            </p>
 
             <div className="flex gap-2 pt-2">
               <button
                 onClick={() => setShowReportModal(false)}
                 className="flex-1 py-2 px-3 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50 text-sm font-medium transition-colors"
               >
-                Close
+                Cancel
               </button>
-              <a
-                href="mailto:sinhaankur827@gmail.com?subject=WatchTower%20Problem%20Report"
-                className="flex-1 py-2 px-3 rounded-lg bg-red-700 text-white hover:bg-red-800 text-sm font-medium transition-colors text-center"
+              <button
+                onClick={() => void handleSendReport()}
+                disabled={reportSending}
+                className="flex-1 py-2 px-3 rounded-lg bg-red-700 text-white hover:bg-red-800 text-sm font-medium transition-colors disabled:opacity-60"
               >
-                Send Report
-              </a>
+                {reportSending ? 'Opening…' : 'Open in mail client'}
+              </button>
             </div>
           </div>
         </div>

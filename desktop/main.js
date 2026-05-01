@@ -88,31 +88,34 @@ function checkForAppUpdates(win) {
   if (!win || win.isDestroyed()) return;
 
   // ── Packaged path: electron-updater handles download + install ─────────────
+  // Silent by design: download in the background, surface a single
+  // non-blocking OS notification when ready, then auto-apply on next
+  // quit (autoInstallOnAppQuit=true). No modal dialogs, no
+  // "Restart Now / Later" prompt — interrupting the user mid-task to
+  // ask about an update is exactly what we want to avoid.
   if (autoUpdater && app.isPackaged) {
     autoUpdater.on('update-available', (info) => {
-      if (win.isDestroyed()) return;
-      dialog.showMessageBox(win, {
-        type: 'info',
-        title: 'Update Available',
-        message: `WatchTower ${info.version} is available`,
-        detail: "Downloading in the background. You'll be prompted to restart when it's ready.",
-        buttons: ['OK'],
-      });
+      console.log(`[WatchTower] Update ${info.version} available — downloading in background`);
     });
 
     autoUpdater.on('update-downloaded', (info) => {
-      if (win.isDestroyed()) return;
-      dialog.showMessageBox(win, {
-        type: 'info',
-        title: 'Update Ready',
-        message: `WatchTower ${info.version} is ready to install`,
-        detail: 'Restart WatchTower now to apply the update, or do it later from the tray menu.',
-        buttons: ['Restart Now', 'Later'],
-        defaultId: 0,
-        cancelId: 1,
-      }).then(({ response }) => {
-        if (response === 0) autoUpdater.quitAndInstall(false, true);
-      });
+      console.log(`[WatchTower] Update ${info.version} downloaded — will apply on next quit`);
+      try {
+        if (Notification.isSupported()) {
+          const n = new Notification({
+            title: 'WatchTower update ready',
+            body: `Version ${info.version} will be applied next time you quit.`,
+            silent: true,
+            ...(APP_ICON ? { icon: APP_ICON } : {}),
+          });
+          n.on('click', () => {
+            if (mainWindow && !mainWindow.isDestroyed()) mainWindow.focus();
+          });
+          n.show();
+        }
+      } catch (err) {
+        console.warn('[WatchTower] Update notification failed:', err.message);
+      }
     });
 
     autoUpdater.on('error', (err) => {
@@ -891,6 +894,26 @@ function resolvePython() {
   return null; // surfaced as a clear dialog in startBackend()
 }
 
+// Probe a container runtime CLI (podman/docker). Returns the resolved
+// version string on success, null on miss. Bounded so a hung CLI can't
+// stall the dependency-status IPC.
+function probeContainerRuntime(cmd) {
+  try {
+    const out = execSync(`${cmd} --version`, {
+      stdio: ['ignore', 'pipe', 'ignore'],
+      timeout: 3000,
+    }).toString().trim();
+    return out || cmd;
+  } catch {
+    return null;
+  }
+}
+
+// Most recent backend log path — populated by startBackend() so the
+// "Send error report" feature can attach the tail without re-deriving
+// the path. Null until the first launch attempt.
+let lastBackendLogPath = null;
+
 // Tracks whether the backend process has died — wired up by startBackend().
 // waitForUrl checks this and rejects immediately so we don't sit on the
 // splash for 120 s waiting for a process that's already gone.
@@ -1095,6 +1118,7 @@ async function startBackend() {
     backendLogPath = path.join(fallbackDir, 'desktop-backend.log');
     backendLogFd = fs.openSync(backendLogPath, 'a');
   }
+  lastBackendLogPath = backendLogPath;
   try {
     fs.writeSync(backendLogFd, `\n--- desktop launch ${new Date().toISOString()} ---\n`);
   } catch {}
@@ -1362,6 +1386,133 @@ ipcMain.on('wt:showNotification', (_event, payload = {}) => {
     n.show();
   } catch (err) {
     console.warn('[WatchTower] Notification failed:', err.message);
+  }
+});
+
+// Dependency probe surfaced in Settings → System. Renderer can't shell
+// out, so Electron main is the only place these can be answered. Each
+// probe is independently bounded; a hung CLI won't stall the others.
+//
+// Shape:
+//   { platform, arch, appVersion, python: {found, command, version, isStub},
+//     podman: {found, version, source}, dataDir, backendLogPath }
+ipcMain.handle('wt:getDependencyStatus', async () => {
+  const status = {
+    platform: process.platform,
+    arch: process.arch,
+    appVersion: app.getVersion(),
+    python: { found: false, command: null, version: null, isStub: false },
+    podman: { found: false, version: null, source: null },
+    dataDir: writableDataDir(),
+    backendLogPath: lastBackendLogPath,
+  };
+
+  try {
+    const py = resolvePython();
+    if (py) {
+      status.python.found = true;
+      status.python.command = py;
+      try {
+        const ver = execSync(`${py} --version`, {
+          stdio: ['ignore', 'pipe', 'pipe'],
+          timeout: 3000,
+        }).toString().trim();
+        status.python.version = ver;
+      } catch { /* version probe failed but command exists */ }
+    } else if (process.platform === 'darwin' && isMacOSPythonStub('/usr/bin/python3')) {
+      status.python.isStub = true;
+    }
+  } catch (err) {
+    console.warn('[WatchTower] python probe failed:', err.message);
+  }
+
+  for (const [cmd, source] of [['podman', 'podman'], ['docker', 'docker']]) {
+    const ver = probeContainerRuntime(cmd);
+    if (ver) {
+      status.podman.found = true;
+      status.podman.version = ver;
+      status.podman.source = source;
+      break;
+    }
+  }
+
+  return status;
+});
+
+// Recheck = relaunch. PATH staleness after the user installs Python or
+// Podman in their terminal is the main reason a probe-in-place would
+// lie. Restarting the app picks up the new PATH for free, and is the
+// cleanest UX for the user too — no "wait, did it actually find it?"
+// guesswork.
+ipcMain.handle('wt:relaunchApp', () => {
+  app.relaunch();
+  app.exit(0);
+  return { ok: true };
+});
+
+// Compose a pre-filled error report email so the user can send a crash
+// or bug straight to the maintainer without copy-pasting versions.
+// Body includes platform, app version, dependency status, and the last
+// few hundred lines of the backend log if it exists. The user's mail
+// client opens with the subject + body — they review and click send.
+//
+// We never send anything ourselves: a mailto: link puts the user in
+// control of what leaves their machine.
+ipcMain.handle('wt:openErrorReport', async (_event, payload = {}) => {
+  const TO = 'sinhaankur@ymail.com';
+  const userMessage = typeof payload.message === 'string' ? payload.message : '';
+
+  let logTail = '';
+  try {
+    if (lastBackendLogPath && fs.existsSync(lastBackendLogPath)) {
+      const raw = fs.readFileSync(lastBackendLogPath, 'utf8');
+      const lines = raw.split('\n');
+      logTail = lines.slice(Math.max(0, lines.length - 200)).join('\n');
+    }
+  } catch (err) {
+    logTail = `(could not read log: ${err.message})`;
+  }
+
+  // Re-probe inline so this handler is self-contained — works even if
+  // the renderer never called getDependencyStatus first.
+  let depBlock = '';
+  try {
+    const py = resolvePython();
+    const podman = probeContainerRuntime('podman') || probeContainerRuntime('docker') || 'not found';
+    depBlock =
+      `Platform: ${process.platform} (${process.arch})\n` +
+      `App version: ${app.getVersion()}\n` +
+      `Python: ${py || 'not found'}\n` +
+      `Container runtime: ${podman}\n` +
+      `Data dir: ${writableDataDir()}\n` +
+      `Log: ${lastBackendLogPath || 'n/a'}`;
+  } catch (err) {
+    depBlock = `(diagnostic probe failed: ${err.message})`;
+  }
+
+  const subject = `WatchTower ${app.getVersion()} bug report (${process.platform})`;
+  const body =
+    (userMessage ? `${userMessage}\n\n` : '') +
+    `--- Diagnostics ---\n${depBlock}\n\n` +
+    `--- Backend log (last 200 lines) ---\n${logTail || '(empty)'}\n`;
+
+  // mailto: bodies have a per-mail-client length cap (~2 KB on macOS,
+  // ~32 KB on Linux/Windows). Trim conservatively so the link doesn't
+  // get truncated mid-encode.
+  const trimmedBody = body.length > 6000
+    ? body.slice(0, 6000) + '\n\n[truncated — full log: ' + (lastBackendLogPath || 'n/a') + ']'
+    : body;
+
+  const url =
+    `mailto:${TO}` +
+    `?subject=${encodeURIComponent(subject)}` +
+    `&body=${encodeURIComponent(trimmedBody)}`;
+
+  try {
+    await shell.openExternal(url);
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: err?.message ?? String(err) };
   }
 });
 
