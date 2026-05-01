@@ -29,6 +29,7 @@ from . import (
     projects,
     runtime,
     setup,
+    templates,
     webhooks,
 )
 from .rate_limit import limiter, rate_limit_exceeded_handler
@@ -330,6 +331,7 @@ app.include_router(notifications.router)
 app.include_router(agent.router)
 app.include_router(audit.router)
 app.include_router(me.router)
+app.include_router(templates.router)
 
 # ── Serve React SPA from web/dist (same-origin, no proxy needed) ──────────────
 # Resolution order:
