@@ -117,6 +117,43 @@
       font-weight: 700;
       color: #94a3b8;
     }
+
+    /* Slow-launch hint + cancel button — hidden by default, JS shows
+       them only after 30 s of waiting so a normal-speed launch never
+       sees them. */
+    .hint {
+      margin-top: 16px;
+      font-size: 11px;
+      color: #64748b;
+      text-align: center;
+      max-width: 280px;
+      opacity: 0;
+      transition: opacity 0.3s;
+      -webkit-app-region: no-drag;
+    }
+    .hint.visible { opacity: 1; }
+
+    .cancel-btn {
+      margin-top: 10px;
+      padding: 6px 14px;
+      font-family: inherit;
+      font-size: 11px;
+      font-weight: 600;
+      color: #b91c1c;
+      background: white;
+      border: 1.5px solid #b91c1c;
+      border-radius: 6px;
+      cursor: pointer;
+      opacity: 0;
+      transition: opacity 0.3s, background 0.15s;
+      -webkit-app-region: no-drag;
+      pointer-events: none;
+    }
+    .cancel-btn.visible {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .cancel-btn:hover { background: #fee2e2; }
   </style>
 </head>
 <body>
@@ -143,6 +180,11 @@
     <div class="bar-track">
       <div class="bar-fill" id="bar"></div>
     </div>
+
+    <div class="hint" id="hint">
+      Taking longer than usual — first-launch database setup can be slow on some disks. The app will be ready shortly.
+    </div>
+    <button class="cancel-btn" id="cancel" type="button">Cancel and quit</button>
   </div>
 
   <!-- Version label is populated by main.js's createSplash() via
@@ -164,9 +206,13 @@
       [90, 'ALMOST READY'],
     ];
 
+    // The scripted tick() runs only until main.js sends its first real
+    // status update. After that, real progress takes over and the fake
+    // animation stops — so the bar reflects what's *actually* happening.
+    let realStatusReceived = false;
     let idx = 0;
     const tick = () => {
-      if (idx >= steps.length) return;
+      if (realStatusReceived || idx >= steps.length) return;
       const [pct, msg] = steps[idx++];
       bar.style.width = pct + '%';
       statusEl.innerHTML = msg + ' <span class="dots"><span>.</span><span>.</span><span>.</span></span>';
@@ -174,13 +220,32 @@
     };
     tick();
 
-    // IPC from main — update status dynamically
-    if (typeof window.__setStatus === 'undefined') {
-      window.__setStatus = (msg, pct) => {
-        statusEl.innerHTML = msg + ' <span class="dots"><span>.</span><span>.</span><span>.</span></span>';
-        if (pct !== undefined) bar.style.width = pct + '%';
-      };
-    }
+    // Real progress from main.js. Called via webContents.executeJavaScript;
+    // this is the only place the bar/status should get authoritative state.
+    window.__setStatus = (msg, pct) => {
+      realStatusReceived = true;
+      statusEl.innerHTML = msg + ' <span class="dots"><span>.</span><span>.</span><span>.</span></span>';
+      if (typeof pct === 'number') bar.style.width = pct + '%';
+    };
+
+    // After 30s of waiting, surface the slow-launch hint and the
+    // Cancel button. Most launches finish in under 10s; a 30s hold is
+    // a clear signal that something's off and the user deserves an
+    // escape hatch.
+    setTimeout(() => {
+      const hint = document.getElementById('hint');
+      const cancel = document.getElementById('cancel');
+      if (hint) hint.classList.add('visible');
+      if (cancel) cancel.classList.add('visible');
+    }, 30000);
+
+    // Cancel just closes the splash window. main.js listens for the
+    // splash 'closed' event and treats it as a launch cancellation
+    // when the main window hasn't appeared yet — backend gets killed
+    // and the app quits cleanly.
+    document.getElementById('cancel').addEventListener('click', () => {
+      window.close();
+    });
   </script>
 </body>
 </html>
