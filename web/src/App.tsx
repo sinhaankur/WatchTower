@@ -18,6 +18,7 @@ import './App.css';
 // switches don't flash a giant spinner mid-layout.
 const SetupWizard          = lazy(() => import('./pages/SetupWizard'));
 const ProjectDetail        = lazy(() => import('./pages/ProjectDetail'));
+const Templates            = lazy(() => import('./pages/Templates'));
 const TeamManagement       = lazy(() => import('./pages/TeamManagement'));
 const Servers              = lazy(() => import('./pages/Servers'));
 const Applications         = lazy(() => import('./pages/Applications'));
@@ -117,6 +118,7 @@ function App() {
             <Route path="/servers" element={<RequireAuth><Layout><Servers /></Layout></RequireAuth>} />
             <Route path="/servers/local" element={<RequireAuth><Layout><LocalNode /></Layout></RequireAuth>} />
             <Route path="/applications" element={<RequireAuth><Layout><Applications /></Layout></RequireAuth>} />
+            <Route path="/templates" element={<RequireAuth><Layout><Templates /></Layout></RequireAuth>} />
             <Route path="/databases" element={<RequireAuth><Layout><Databases /></Layout></RequireAuth>} />
             <Route path="/services" element={<RequireAuth><Layout><Services /></Layout></RequireAuth>} />
             <Route path="/integrations" element={<RequireAuth><Layout><Integrations /></Layout></RequireAuth>} />
