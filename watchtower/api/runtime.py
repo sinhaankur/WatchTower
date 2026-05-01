@@ -16,8 +16,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
 
+import io
+import tarfile
+
 import requests
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -2067,3 +2071,181 @@ async def active_deployments_count(
         .count()
     )
     return {"active": count}
+
+
+# ── Backup / restore ─────────────────────────────────────────────────────────
+# Closes gap #10 from the gap-analysis snapshot. Without this, losing
+# ~/.watchtower/secret.key — through a backup-tape restore that misses
+# the dotfile, an accidental rm, a fresh OS install — silently destroys
+# every encrypted credential on the system (GitHub PATs, SSH keys,
+# environment variable values). The DB still works but those columns
+# are unrecoverable ciphertext.
+#
+# v1: export only. Restore is documented as a manual recovery flow in
+# the README — do it while WatchTower is stopped, replace the files in
+# place, restart. Live restore would need a coordinated process exit
+# and atomic file swap; the safety/UX tradeoff isn't worth shipping in
+# v1 given how rare restore is vs how disaster-prone botched restore
+# can be.
+
+def _resolve_data_dir() -> Path:
+    """Same data-dir resolution used by _ensure_secret_key. Centralised
+    here so backup export looks at exactly the path the rest of the app
+    persists secrets to."""
+    return Path(
+        os.getenv("WATCHTOWER_DATA_DIR")
+        or os.path.join(os.path.expanduser("~"), ".watchtower")
+    )
+
+
+def _resolve_sqlite_db_path() -> Optional[Path]:
+    """If the active DATABASE_URL points at a SQLite file, return its
+    Path. None otherwise (Postgres install — backup needs a different
+    flow we don't ship in v1)."""
+    from watchtower.database import DATABASE_URL
+
+    if not DATABASE_URL.startswith("sqlite:"):
+        return None
+    # sqlite:///absolute/path or sqlite:///relative/path
+    raw = DATABASE_URL.split("sqlite:///", 1)[-1]
+    return Path(raw) if raw else None
+
+
+def _user_can_manage_org_secrets(db: Session, current_user: dict) -> bool:
+    """Authorisation gate for backup export. The tarball contains every
+    encrypted secret on the system — only an org admin
+    (can_manage_team=True) should be allowed to download it.
+
+    Single-user / first-user installs satisfy this naturally: the
+    bootstrap path in enterprise._ensure_user_org_member promotes the
+    first member to TeamRole.OWNER with can_manage_team=True. So this
+    gate is invisible for solo desktop users and meaningful for
+    multi-user teams.
+    """
+    from watchtower.database import TeamMember
+
+    user_id = util.canonical_user_id(db, current_user)
+    if user_id is None:
+        return False
+    privileged = (
+        db.query(TeamMember)
+        .filter(
+            TeamMember.user_id == user_id,
+            TeamMember.is_active == True,  # noqa: E712
+            TeamMember.can_manage_team == True,  # noqa: E712
+        )
+        .first()
+    )
+    return privileged is not None
+
+
+@router.get("/backup/export")
+async def backup_export(
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(util.get_current_user),
+):
+    """Stream a tar.gz of the WatchTower credential set.
+
+    Contents:
+      - secret.key (Fernet encryption key — the master key for every
+        encrypted column in the DB)
+      - watchtower.db (SQLite database with all projects, deployments,
+        encrypted env vars, encrypted GitHub PATs, encrypted SSH keys)
+
+    The tarball is built in memory (the credential set is small —
+    typically under 5 MB even for established installs) and streamed
+    to the client with Content-Disposition: attachment.
+
+    503 if the install uses Postgres (backup needs pg_dump, not in
+    v1 scope). 404 if neither file exists yet (fresh install with no
+    state to back up).
+
+    The file IS the credential set. Tell the user explicitly to store
+    it securely — we surface a "contains credentials" warning in the
+    UI before the download starts.
+    """
+    if not _user_can_manage_org_secrets(db, current_user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Backup export requires can_manage_team permission.",
+        )
+
+    data_dir = _resolve_data_dir()
+    secret_key_path = data_dir / "secret.key"
+    db_path = _resolve_sqlite_db_path()
+
+    if db_path is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=(
+                "This install uses a non-SQLite database. Use your "
+                "database's native backup tool (e.g. pg_dump) and back "
+                "up secret.key separately. In-app backup is SQLite-only "
+                "in v1."
+            ),
+        )
+
+    files_to_include: list[tuple[str, Path]] = []
+    if secret_key_path.is_file():
+        files_to_include.append(("secret.key", secret_key_path))
+    if db_path.is_file():
+        files_to_include.append(("watchtower.db", db_path))
+
+    if not files_to_include:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=(
+                "No backup-able state found. This is a fresh install — "
+                "there's nothing to back up yet. Once you create a "
+                "project or sign in via GitHub, the backup endpoint "
+                "will return your credential set."
+            ),
+        )
+
+    buffer = io.BytesIO()
+    with tarfile.open(fileobj=buffer, mode="w:gz") as tar:
+        for arcname, path in files_to_include:
+            tar.add(str(path), arcname=arcname)
+    buffer.seek(0)
+
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    filename = f"watchtower-backup-{timestamp}.tar.gz"
+
+    return StreamingResponse(
+        buffer,
+        media_type="application/gzip",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            # Cache-Control: no-store keeps the tarball out of any
+            # intermediary caches (corporate proxies, browser HTTP
+            # cache). The credential set should NEVER be cached.
+            "Cache-Control": "no-store",
+        },
+    )
+
+
+@router.get("/backup/status")
+async def backup_status(
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(util.get_current_user),
+):
+    """Surface whether the backup endpoint is usable for this install.
+    Lets the SPA decide whether to show the Download Backup button or
+    a "Postgres install — use pg_dump" hint instead. Doesn't expose the
+    actual data dir path (that's available via /api/runtime/diagnostic
+    if needed)."""
+    db_path = _resolve_sqlite_db_path()
+    data_dir = _resolve_data_dir()
+    secret_key_exists = (data_dir / "secret.key").is_file()
+    db_file_exists = bool(db_path and db_path.is_file())
+
+    return {
+        "supported": db_path is not None,
+        "reason_unsupported": (
+            None if db_path is not None else "non_sqlite_database"
+        ),
+        "has_secret_key": secret_key_exists,
+        "has_database_file": db_file_exists,
+        "ready_for_backup": secret_key_exists or db_file_exists,
+        "can_export": _user_can_manage_org_secrets(db, current_user),
+    }
