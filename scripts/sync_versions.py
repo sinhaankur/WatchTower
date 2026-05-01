@@ -27,7 +27,16 @@ def update_package_json(path: Path, version: str) -> None:
     data = json.loads(path.read_text(encoding="utf-8"))
     old = data.get("version")
     data["version"] = version
-    path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    # ensure_ascii=False so non-ASCII characters (em-dashes, smart quotes,
+    # emoji etc) round-trip as-is. The default ensure_ascii=True converts
+    # them to \uXXXX escape sequences which makes diffs noisy and renders
+    # awkwardly when reading the file directly. The marketplace listing
+    # description in vscode-extension/package.json uses an em-dash; this
+    # was getting flipped on every sync until we set this.
+    path.write_text(
+        json.dumps(data, indent=2, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
     print(f"Updated {path.relative_to(ROOT)}: {old} -> {version}")
 
 
