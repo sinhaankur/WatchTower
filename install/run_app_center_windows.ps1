@@ -19,7 +19,14 @@ Get-Content $envPath | ForEach-Object {
     if ($_ -match "^\s*#" -or $_ -match "^\s*$") { return }
     $parts = $_ -split "=", 2
     if ($parts.Length -eq 2) {
-        [System.Environment]::SetEnvironmentVariable($parts[0], $parts[1])
+        $key = $parts[0].Trim()
+        $value = $parts[1].Trim()
+        # Strip optional surrounding quotes to support KEY="value with spaces".
+        if (($value.StartsWith('"') -and $value.EndsWith('"')) -or
+            ($value.StartsWith("'") -and $value.EndsWith("'"))) {
+            $value = $value.Substring(1, $value.Length - 2)
+        }
+        [System.Environment]::SetEnvironmentVariable($key, $value, [System.EnvironmentVariableTarget]::Process)
     }
 }
 

@@ -42,6 +42,27 @@ const STATUS_COLOR: Record<string, string> = {
   rolled_back: 'bg-slate-100 text-slate-500 border-slate-200',
 };
 
+/**
+ * Defensive deduplication: remove duplicate projects by (org_id, name).
+ * Keeps the most recently created one if duplicates are found.
+ * (Backend now prevents duplicates, but this guards against any edge cases)
+ */
+function deduplicateProjects<T extends Project>(projects: T[]): T[] {
+  const seen = new Map<string, { item: T; createdAt: number }>();
+  
+  projects.forEach((p) => {
+    const key = `${p.name}`;  // Use name as key (org_id handled server-side now)
+    const createdAt = new Date(p.created_at).getTime();
+    const existing = seen.get(key);
+    
+    if (!existing || createdAt > existing.createdAt) {
+      seen.set(key, { item: p, createdAt });
+    }
+  });
+  
+  return Array.from(seen.values()).map((v) => v.item);
+}
+
 function Badge({ status }: { status: string }) {
   const cls = STATUS_COLOR[status.toLowerCase()] ?? 'bg-slate-100 text-slate-600 border-slate-200';
   return (
@@ -106,7 +127,7 @@ const Applications = () => {
           };
         })
       );
-      setProjects(enriched);
+      setProjects(deduplicateProjects(enriched));
     } catch (err) {
       if (axios.isAxiosError(err)) {
         const s = err.response?.status;

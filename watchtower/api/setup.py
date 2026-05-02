@@ -5,6 +5,7 @@ Setup Wizard API endpoints
 import logging
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 
 from watchtower.database import (
     get_db, Project,
@@ -100,6 +101,15 @@ async def complete_setup_wizard(
         
         return project
     
+    except HTTPException:
+        db.rollback()
+        raise
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"A project named '{setup_data.project_name}' already exists in this organization",
+        )
     except Exception:
         db.rollback()
         logger.exception("Setup wizard completion failed")

@@ -11,6 +11,7 @@ import hashlib
 import hmac
 import json
 import uuid
+from unittest.mock import Mock, patch
 
 from fastapi.testclient import TestClient
 
@@ -105,6 +106,116 @@ def test_delete_project(client: TestClient):
     r = client.delete(f"/api/projects/{p['id']}")
     assert r.status_code == 204
     assert client.get(f"/api/projects/{p['id']}").status_code == 404
+
+
+def test_create_duplicate_project_returns_409(client: TestClient):
+    _create_project(client, "dup-name", "https://example.com/dup-a.git")
+    r = client.post(
+        "/api/projects",
+        json={
+            "name": "dup-name",
+            "use_case": "vercel_like",
+            "repo_url": "https://example.com/dup-b.git",
+            "repo_branch": "main",
+        },
+    )
+    assert r.status_code == 409
+    assert "already exists" in r.json()["detail"].lower()
+
+
+def test_custom_domain_crud(client: TestClient):
+    p = _create_project(client, "dom-proj", "https://example.com/dom.git")
+
+    create = client.post(
+        f"/api/projects/{p['id']}/domains",
+        json={"domain": "app.example.com", "is_primary": True, "tls_enabled": True},
+    )
+    assert create.status_code == 201, create.text
+    domain = create.json()
+
+    listing = client.get(f"/api/projects/{p['id']}/domains")
+    assert listing.status_code == 200
+    assert len(listing.json()) == 1
+    assert listing.json()[0]["domain"] == "app.example.com"
+
+    update = client.put(
+        f"/api/projects/{p['id']}/domains/{domain['id']}",
+        json={"tls_enabled": False},
+    )
+    assert update.status_code == 200
+    assert update.json()["tls_enabled"] is False
+
+    delete = client.delete(f"/api/projects/{p['id']}/domains/{domain['id']}")
+    assert delete.status_code == 204
+
+    listing_after = client.get(f"/api/projects/{p['id']}/domains")
+    assert listing_after.status_code == 200
+    assert listing_after.json() == []
+
+
+def test_github_device_connect_flow_persists_connection(client: TestClient, monkeypatch):
+    monkeypatch.setenv("WATCHTOWER_GITHUB_DEVICE_CLIENT_ID", "test-device-client-id")
+
+    # Resolve org_id from current authenticated context.
+    ctx = client.get("/api/context")
+    assert ctx.status_code == 200
+    org_id = ctx.json()["organization"]["id"]
+
+    def _fake_post(url, headers=None, data=None, timeout=None):
+        if "device/code" in url:
+            resp = Mock()
+            resp.status_code = 200
+            resp.json.return_value = {
+                "device_code": "device-code-123",
+                "user_code": "ABCD-EFGH",
+                "verification_uri": "https://github.com/login/device",
+                "verification_uri_complete": "https://github.com/login/device?user_code=ABCD-EFGH",
+                "expires_in": 900,
+                "interval": 1,
+            }
+            return resp
+        if "oauth/access_token" in url:
+            resp = Mock()
+            resp.status_code = 200
+            resp.headers = {"content-type": "application/json"}
+            resp.json.return_value = {"access_token": "gho_test_token"}
+            return resp
+        raise AssertionError(f"Unexpected POST url: {url}")
+
+    def _fake_get(url, headers=None, timeout=None, params=None):
+        if url.endswith("/user"):
+            resp = Mock()
+            resp.status_code = 200
+            resp.ok = True
+            resp.json.return_value = {"login": "octocat", "email": "octocat@example.com"}
+            return resp
+        if url.endswith("/user/orgs"):
+            resp = Mock()
+            resp.status_code = 200
+            resp.ok = True
+            resp.json.return_value = []
+            return resp
+        if url.endswith("/user/repos"):
+            resp = Mock()
+            resp.status_code = 200
+            resp.ok = True
+            resp.json.return_value = []
+            return resp
+        raise AssertionError(f"Unexpected GET url: {url}")
+
+    with patch("watchtower.api.enterprise.requests.post", side_effect=_fake_post), \
+         patch("watchtower.api.enterprise.requests.get", side_effect=_fake_get):
+        start = client.post("/api/github/device/connect/start", json={"org_id": org_id})
+        assert start.status_code == 200, start.text
+        assert start.json()["device_code"] == "device-code-123"
+
+        poll = client.post("/api/github/device/connect/poll", json={"device_code": "device-code-123"})
+        assert poll.status_code == 200, poll.text
+        assert poll.json()["status"] == "success"
+
+        # Connection should now be usable by GitHub org listing endpoint.
+        orgs = client.get("/api/github/user/orgs")
+        assert orgs.status_code == 200, orgs.text
 
 
 # ── Related-app endpoints ────────────────────────────────────────────────────

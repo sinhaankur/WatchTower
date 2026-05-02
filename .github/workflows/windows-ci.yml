@@ -1,0 +1,160 @@
+name: Windows CI
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'install/**/*.ps1'
+      - 'install/**/*.cmd'
+      - 'requirements.txt'
+      - 'pyproject.toml'
+      - '.github/workflows/windows-ci.yml'
+  workflow_dispatch:
+
+jobs:
+  validate-windows-scripts:
+    runs-on: windows-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Validate PowerShell syntax
+        shell: pwsh
+        run: |
+          $ErrorCount = 0
+          $ScriptsToCheck = @(
+            'install/install_windows.ps1',
+            'install/run_app_center_windows.ps1'
+          )
+          
+          foreach ($Script in $ScriptsToCheck) {
+            Write-Host "Validating $Script..."
+            $ParseErrors = @()
+            [void][System.Management.Automation.Language.Parser]::ParseFile(
+              (Resolve-Path $Script),
+              [ref]$ParseErrors,
+              [ref]$null
+            )
+            
+            if ($ParseErrors.Count -gt 0) {
+              Write-Host "ERROR: Syntax errors in $Script" -ForegroundColor Red
+              foreach ($Error in $ParseErrors) {
+                Write-Host "  Line $($Error.Extent.StartLineNumber): $($Error.Message)"
+              }
+              $ErrorCount += $ParseErrors.Count
+            } else {
+              Write-Host "✓ $Script syntax OK" -ForegroundColor Green
+            }
+          }
+          
+          if ($ErrorCount -gt 0) {
+            Write-Host "Failed: $ErrorCount syntax errors found" -ForegroundColor Red
+            exit 1
+          }
+
+      - name: Install Python dependencies
+        shell: powershell
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run Windows installer script
+        shell: powershell
+        run: |
+          $InstallDir = Join-Path $env:RUNNER_TEMP "WatchTowerAppCenter"
+          $ConfigDir = Join-Path $env:RUNNER_TEMP "WatchTowerConfig"
+          
+          Write-Host "InstallDir: $InstallDir"
+          Write-Host "ConfigDir: $ConfigDir"
+          
+          powershell -ExecutionPolicy Bypass -File "install/install_windows.ps1" `
+            -InstallDir "$InstallDir" `
+            -ConfigDir "$ConfigDir" `
+            -Port 8000
+
+      - name: Start App Center runner script (background)
+        shell: powershell
+        run: |
+          $InstallDir = Join-Path $env:RUNNER_TEMP "WatchTowerAppCenter"
+          $ConfigDir = Join-Path $env:RUNNER_TEMP "WatchTowerConfig"
+          
+          Start-Process -FilePath powershell `
+            -ArgumentList "-ExecutionPolicy Bypass -File '$InstallDir\install\run_app_center_windows.ps1' -InstallDir '$InstallDir' -ConfigDir '$ConfigDir'" `
+            -NoNewWindow -PassThru `
+            -RedirectStandardOutput "api.log" `
+            -RedirectStandardError "api-error.log" `
+            | Out-Null
+          
+          Write-Host "Backend started, waiting for health check..."
+          Start-Sleep -Seconds 3
+
+      - name: Health check
+        shell: powershell
+        run: |
+          $MaxRetries = 10
+          $RetryCount = 0
+          
+          while ($RetryCount -lt $MaxRetries) {
+            try {
+              $Response = Invoke-WebRequest -Uri "http://127.0.0.1:8000/health" -UseBasicParsing
+              
+              if ($Response.StatusCode -eq 200) {
+                Write-Host "✓ Health check passed" -ForegroundColor Green
+                $HealthData = $Response.Content | ConvertFrom-Json
+                Write-Host "Status: $($HealthData.status)"
+                exit 0
+              }
+            } catch {
+              $RetryCount++
+              if ($RetryCount -lt $MaxRetries) {
+                Write-Host "Retry $RetryCount/$MaxRetries..."
+                Start-Sleep -Seconds 2
+              }
+            }
+          }
+          
+          Write-Host "✗ Health check failed after $MaxRetries retries" -ForegroundColor Red
+          Write-Host "API log:" -ForegroundColor Red
+          Get-Content -Path "api.log" -ErrorAction SilentlyContinue | Write-Host
+          Write-Host "API error log:" -ForegroundColor Red
+          Get-Content -Path "api-error.log" -ErrorAction SilentlyContinue | Write-Host
+          exit 1
+
+      - name: Stop API
+        shell: powershell
+        if: always()
+        run: |
+          Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object {
+            ($_.Name -match '^python(\.exe)?$|^powershell(\.exe)?$') -and (
+              $_.CommandLine -like "*watchtower.deploy_server*" -or
+              $_.CommandLine -like "*run_app_center_windows.ps1*" -or
+              $_.CommandLine -like "*uvicorn*watchtower.api:app*"
+            )
+          } | ForEach-Object {
+            Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue
+          }
+          Start-Sleep -Seconds 1
+
+      - name: Upload logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-ci-logs
+          path: |
+            api.log
+            api-error.log
+          retention-days: 7
+
