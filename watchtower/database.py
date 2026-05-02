@@ -182,6 +182,14 @@ class Organization(Base):
 
 class Project(Base):
     __tablename__ = "projects"
+    # Unique constraint on (org_id, name) prevents duplicate projects per organization
+    __table_args__ = (
+        UniqueConstraint(
+            "org_id",
+            "name",
+            name="uq_projects_org_id_name",
+        ),
+    )
 
     id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
     org_id = Column(Uuid(as_uuid=True), ForeignKey("organizations.id"))
@@ -344,6 +352,25 @@ class GitHubConnection(Base):
 
     user = relationship("User", backref="github_connections")
     organization = relationship("Organization", backref="github_connections")
+
+
+class GitHubDeviceConnectSession(Base):
+    """Persistent state for GitHub Device Flow used by repo-connect UX.
+
+    This replaces process-local memory so polling survives API restarts and
+    multi-worker deployments.
+    """
+    __tablename__ = "github_device_connect_sessions"
+
+    id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    device_code = Column(String, unique=True, index=True)
+    user_id = Column(Uuid(as_uuid=True), ForeignKey("users.id"), index=True)
+    org_id = Column(Uuid(as_uuid=True), ForeignKey("organizations.id"), index=True)
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+    expires_at = Column(DateTime, index=True)
+
+    user = relationship("User", backref="github_device_connect_sessions")
+    organization = relationship("Organization", backref="github_device_connect_sessions")
 
 
 class TeamMember(Base):

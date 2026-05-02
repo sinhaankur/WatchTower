@@ -297,10 +297,14 @@ def get_current_user(
     request: Request,
     authorization: str = Header(None),
 ):
-    """
-    Get current user from API key or token.
-    In self-hosted mode, this can be simplified.
-    TODO: Implement proper authentication
+    """Authenticate the caller via Bearer token.
+
+    Accepts two token shapes:
+      1. Signed user-session token — issued by the GitHub OAuth/Device flow
+         (``create_user_session_token``). Carries user identity and expires.
+      2. Static ``WATCHTOWER_API_TOKEN`` — for CI, curl, and the Electron
+         desktop app. Compared in constant time; synthesises a stable UUID5
+         user_id from the token.
     """
     expected_token = os.getenv("WATCHTOWER_API_TOKEN")
     allow_insecure_dev = os.getenv(

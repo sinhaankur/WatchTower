@@ -265,6 +265,11 @@ class CustomDomainCreate(CustomDomainBase):
     pass
 
 
+class CustomDomainUpdate(BaseModel):
+    is_primary: Optional[bool] = None
+    tls_enabled: Optional[bool] = None
+
+
 class CustomDomainResponse(CustomDomainBase):
     id: UUID
     project_id: UUID
