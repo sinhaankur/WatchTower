@@ -47,35 +47,37 @@ jobs:
       - name: Validate PowerShell syntax
         shell: pwsh
         run: |
+          # Do NOT set StrictMode here: the foreach loop needs to shadow the
+          # automatic $Error variable with $ParseError, which strict mode blocks.
           $ErrorActionPreference = 'Stop'
-          Set-StrictMode -Version Latest
 
           $ErrorCount = 0
           $ScriptsToCheck = @(
             'install/install_windows.ps1',
             'install/run_app_center_windows.ps1'
           )
-          
+
           foreach ($Script in $ScriptsToCheck) {
             Write-Host "Validating $Script..."
-            $ParseErrors = @()
+            # ParseFile signature: ParseFile(path, [ref]tokens, [ref]errors)
+            # We only care about errors, so pass $null for tokens.
+            $ScriptErrors = $null
             [void][System.Management.Automation.Language.Parser]::ParseFile(
-              (Resolve-Path $Script),
-              [ref]$ParseErrors,
-              [ref]$null
+              (Resolve-Path $Script).Path,
+              [ref]$null,
+              [ref]$ScriptErrors
             )
-            
-            if ($ParseErrors.Count -gt 0) {
+            if ($ScriptErrors -and $ScriptErrors.Count -gt 0) {
               Write-Host "ERROR: Syntax errors in $Script" -ForegroundColor Red
-              foreach ($Error in $ParseErrors) {
-                Write-Host "  Line $($Error.Extent.StartLineNumber): $($Error.Message)"
+              foreach ($PE in $ScriptErrors) {
+                Write-Host "  Line $($PE.Extent.StartLineNumber): $($PE.Message)"
               }
-              $ErrorCount += $ParseErrors.Count
+              $ErrorCount += $ScriptErrors.Count
             } else {
               Write-Host "✓ $Script syntax OK" -ForegroundColor Green
             }
           }
-          
+
           if ($ErrorCount -gt 0) {
             Write-Host "Failed: $ErrorCount syntax errors found" -ForegroundColor Red
             exit 1
@@ -164,8 +166,8 @@ jobs:
         shell: pwsh
         if: always()
         run: |
-          $ErrorActionPreference = 'Stop'
-          Set-StrictMode -Version Latest
+          # SilentlyContinue here — CIM queries may return $null on some runners.
+          $ErrorActionPreference = 'SilentlyContinue'
 
           Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object {
             ($_.Name -match '^python(\.exe)?$|^powershell(\.exe)?$|^pwsh(\.exe)?$') -and (
