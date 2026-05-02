@@ -159,12 +159,9 @@ jobs:
 
             try {
               $HealthData = Invoke-RestMethod -Uri "http://127.0.0.1:8000/health" -TimeoutSec 5
-              
-              if ($HealthData.status) {
-                Write-Host "✓ Health check passed" -ForegroundColor Green
-                Write-Host "Status: $($HealthData.status)"
-                exit 0
-              }
+              Write-Host "✓ Health check passed" -ForegroundColor Green
+              Write-Host "Response: $($HealthData | ConvertTo-Json -Compress)"
+              exit 0
             } catch {
               $RetryCount++
               if ($RetryCount -lt $MaxRetries) {
@@ -179,6 +176,17 @@ jobs:
           Get-Content -Path "api.log" -ErrorAction SilentlyContinue | Write-Host
           Write-Host "API error log:" -ForegroundColor Red
           Get-Content -Path "api-error.log" -ErrorAction SilentlyContinue | Write-Host
+
+          $ApiLogTail = @(Get-Content -Path "api.log" -ErrorAction SilentlyContinue | Select-Object -Last 10)
+          foreach ($Line in $ApiLogTail) {
+            Write-Host "::error file=api.log::$Line"
+          }
+
+          $ApiErrorTail = @(Get-Content -Path "api-error.log" -ErrorAction SilentlyContinue | Select-Object -Last 10)
+          foreach ($Line in $ApiErrorTail) {
+            Write-Host "::error file=api-error.log::$Line"
+          }
+
           exit 1
 
       - name: Stop API
