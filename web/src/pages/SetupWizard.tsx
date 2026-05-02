@@ -43,6 +43,9 @@ type LocalProject = {
   name: string;
   use_case: 'netlify_like' | 'vercel_like' | 'docker_platform';
   deployment_model: 'self_hosted' | 'saas';
+  // Persisted so the dashboard can render "Deploys to: this machine"
+  // alongside the project, and the CTA after creation can be specific.
+  deployment_target?: DeploymentTarget;
   source_type?: 'github' | 'local_folder';
   local_folder_path?: string;
   launch_url?: string;
@@ -351,6 +354,7 @@ const SetupWizard = () => {
       name: data.project_name,
       use_case: data.use_case,
       deployment_model: data.deployment_model,
+      deployment_target: data.deployment_target,
       source_type: data.source_type,
       local_folder_path: data.local_folder_path || undefined,
       launch_url: data.launch_url || undefined,
@@ -400,7 +404,25 @@ const SetupWizard = () => {
       // Local-first mode keeps setup usable while backend is unavailable.
     }
     setSubmitting(false);
-    navigate('/');
+
+    // Target-aware landing: pick the page the user is most likely to need
+    // next, instead of dropping them on the dashboard for everyone.
+    //   this_machine → dashboard with a "click Deploy" hint (no extra
+    //                   setup; they're ready to deploy right now)
+    //   remote_ssh   → dashboard (the existing flow — they may have
+    //                   already added a node, or they'll add one next)
+    //   cloud_setup  → /servers (they need to register the box they're
+    //                   about to provision; sending them there directly
+    //                   skips a "where do I add the server?" hunt)
+    if (data.deployment_target === 'cloud_setup') {
+      navigate('/servers');
+    } else {
+      // Pass the target through router state so Dashboard can render a
+      // one-time "Project created — click Deploy" hint specific to it.
+      navigate('/', {
+        state: { just_created: data.project_name, target: data.deployment_target },
+      });
+    }
   };
 
   return (
