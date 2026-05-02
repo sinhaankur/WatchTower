@@ -1497,15 +1497,17 @@ async def add_org_node(
     _user, canonical_org, member = _ensure_user_org_member(db, current_user)
 
     # Guest sessions can browse + manage local resources but cannot register
-    # remote SSH nodes — that's a privileged operation that needs a real
-    # GitHub identity on the audit trail. Enforce server-side too so direct
-    # API calls don't bypass the UI gate.
-    if not current_user.get("github_id"):
+    # remote SSH nodes. Detect guest by the guest email sentinel rather than
+    # by "lacks github_id" — the latter also blocks legitimate API-token
+    # operators (who never go through GitHub but ARE the server's owner).
+    # Enforce server-side too so direct API calls don't bypass the UI gate.
+    if current_user.get("email") == _GUEST_EMAIL:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=(
-                "Adding remote deployment nodes requires a GitHub-"
-                "authenticated session. Sign in with GitHub to continue."
+                "Guest mode can't add remote deployment servers. "
+                "Sign in with GitHub OAuth, GitHub Device Flow, or your "
+                "server's API token to continue."
             ),
         )
 
