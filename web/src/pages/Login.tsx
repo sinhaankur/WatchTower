@@ -36,7 +36,39 @@ type LoggedInUser = {
   name?: string;
   email?: string;
   isTest?: boolean;
+  // Distinguishes which auth method actually completed. Was previously
+  // hardcoded as "GitHub" in the success screen, which lied for users
+  // who signed in via API token, dev mode, or device flow.
+  method?: 'github_oauth' | 'github_device_flow' | 'api_token' | 'guest' | 'dev';
 };
+
+// Debug-only affordances (e.g. "Test logged-in success screen") only
+// appear in dev builds. Production bundles strip them.
+const IS_DEV: boolean = Boolean((import.meta as unknown as { env?: { DEV?: boolean } }).env?.DEV);
+
+/**
+ * Live countdown for the GitHub Device Flow code.
+ * GitHub gives a 15-minute window; without a visible timer, users
+ * walk away and discover the expiration only at the moment the
+ * polling silently fails.
+ */
+function DeviceFlowCountdown({ started, expiresIn }: { started: number; expiresIn: number }) {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
+  const remaining = Math.max(0, Math.floor(expiresIn - (now - started) / 1000));
+  const m = Math.floor(remaining / 60);
+  const s = String(remaining % 60).padStart(2, '0');
+  // Last 60 seconds gets a red highlight so the user knows time's running out.
+  const tone = remaining <= 60 ? 'text-red-600 font-semibold' : 'text-slate-500';
+  return (
+    <span className={`tabular-nums ${tone}`}>
+      {remaining > 0 ? `expires in ${m}:${s}` : 'expired'}
+    </span>
+  );
+}
 
 const Login = () => {
   const navigate = useNavigate();
@@ -165,10 +197,18 @@ const Login = () => {
       localStorage.removeItem('wt:explicitlySignedOut');
       const user = await resolveUserFromContext();
       trackEvent('login', { method: 'api_token' });
-      showSuccessAndRedirect(user, 1600, resolveNextPath());
+      showSuccessAndRedirect({ ...user, method: 'api_token' }, 1600, resolveNextPath());
     } catch {
       localStorage.removeItem('authToken');
-      setError('Authentication failed. If installation ownership is enabled, your account must be invited by an owner/admin before access is granted.');
+      // Specific error guidance — the most common cause is users
+      // pasting a GitHub PAT (because the field used to be labeled
+      // that way). Tell them what shape the token should take.
+      setError(
+        'Token did not authenticate. This field accepts the server\'s ' +
+        '`WATCHTOWER_API_TOKEN` (set when WatchTower was installed) — ' +
+        'NOT a GitHub Personal Access Token. If you need GitHub auth, ' +
+        'use the "Sign in with GitHub" button above instead.'
+      );
       setLoading(false);
     }
   };
@@ -182,7 +222,7 @@ const Login = () => {
       localStorage.removeItem('wt:explicitlySignedOut');
       const user = await resolveUserFromContext();
       trackEvent('login', { method: 'dev_auto' });
-      showSuccessAndRedirect(user, 1600, resolveNextPath());
+      showSuccessAndRedirect({ ...user, method: 'dev' }, 1600, resolveNextPath());
     } catch {
       localStorage.removeItem('authToken');
       setError('Dev auto-login failed. Check that WATCHTOWER_ALLOW_INSECURE_DEV_AUTH=true on the server.');
@@ -207,7 +247,7 @@ const Login = () => {
       localStorage.removeItem('wt:explicitlySignedOut');
       trackEvent('login', { method: 'guest' });
       showSuccessAndRedirect(
-        { name: resp.data.user?.name ?? 'Guest', email: resp.data.user?.email },
+        { name: resp.data.user?.name ?? 'Guest', email: resp.data.user?.email, method: 'guest' },
         1200,
         resolveNextPath(),
       );
@@ -253,7 +293,7 @@ const Login = () => {
         window.location.assign(oauthUrl);
       }
     } catch {
-      setError('Unable to start GitHub login. Ensure GITHUB_OAUTH_CLIENT_ID/GITHUB_CLIENT_ID and GITHUB_OAUTH_CLIENT_SECRET/GITHUB_CLIENT_SECRET are configured on the API server.');
+      setError('Unable to start GitHub login. Ask your administrator to configure GitHub OAuth on the server, or use Device Flow / API token sign-in below.');
       setLoading(false);
     }
   };
@@ -336,7 +376,7 @@ const Login = () => {
           setDeviceFlow(null);
           trackEvent('login', { method: 'github_device_flow_success' });
           showSuccessAndRedirect(
-            { name: data.user?.name, email: data.user?.email },
+            { name: data.user?.name, email: data.user?.email, method: 'github_device_flow' },
             1400,
             resolveNextPath()
           );
@@ -369,19 +409,11 @@ const Login = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [deviceFlow?.device_code]);
 
-  const openGitHubTokenGenerator = () => {
-    trackEvent('login', { method: 'token_generator_opened', type: 'fine_grained' });
-    window.open('https://github.com/settings/personal-access-tokens/new', '_blank', 'noopener,noreferrer');
-  };
-
-  const openClassicPATGenerator = () => {
-    trackEvent('login', { method: 'token_generator_opened', type: 'classic' });
-    window.open(
-      'https://github.com/settings/tokens/new?scopes=repo,read%3Apackages&description=WatchTower+API+Token',
-      '_blank',
-      'noopener,noreferrer'
-    );
-  };
+  // Note: GitHub PAT generation buttons used to live above the API
+  // token input. They were misleading (the API token field is for
+  // WATCHTOWER_API_TOKEN, NOT for a GitHub PAT) and have been removed.
+  // Users who need a GitHub PAT for private-repo access link it from
+  // Settings → Integrations after signing in via OAuth/Device Flow.
 
   // Determine if the server has anything configured at all
   const apiTokenConfigured = Boolean(authStatus?.api_token?.configured);
@@ -402,7 +434,26 @@ const Login = () => {
             <div>
               <h2 className="text-2xl font-bold text-slate-900 mb-2">✓ Logged In</h2>
               <p className="text-sm text-slate-600">
-                {loggedInUser.name ? `Welcome, ${loggedInUser.name}!` : 'Successfully authenticated with GitHub'}
+                {loggedInUser.name
+                  ? `Welcome, ${loggedInUser.name}!`
+                  : (() => {
+                      // Truthful default: reflect the actual auth method
+                      // instead of hardcoding "GitHub" for paths that
+                      // weren't (api_token, dev, guest).
+                      switch (loggedInUser.method) {
+                        case 'github_oauth':
+                        case 'github_device_flow':
+                          return 'Successfully authenticated with GitHub';
+                        case 'api_token':
+                          return 'Signed in with API token';
+                        case 'guest':
+                          return 'Signed in as Guest';
+                        case 'dev':
+                          return 'Signed in via dev-mode auto-login';
+                        default:
+                          return 'Authenticated';
+                      }
+                    })()}
               </p>
               {loggedInUser.email && (
                 <p className="text-xs text-slate-500 mt-1">{loggedInUser.email}</p>
@@ -441,9 +492,20 @@ const Login = () => {
               <BrandLogo size="lg" withLabel subtitle="Secure Team Access" />
             </div>
             <h1 className="text-2xl font-semibold mb-2 text-slate-900">Sign in to WatchTower</h1>
-            <p className="text-sm text-slate-600 mb-6">
-              Use GitHub to authenticate, or enter an API token below.
+            <p className="text-sm text-slate-600 mb-3">
+              Use GitHub to authenticate, or enter the server's API token below.
             </p>
+            <details className="mb-5 text-left text-xs text-slate-500">
+              <summary className="cursor-pointer hover:text-slate-700 text-center">Why does WatchTower need a sign-in?</summary>
+              <div className="mt-2 px-2 space-y-1.5 text-slate-600">
+                <p>WatchTower deploys your projects across machines you own. To do that safely it needs to know <strong>who</strong> triggered each action.</p>
+                <p><strong>If you sign in with GitHub:</strong> WatchTower can clone your repos (including private ones if you authorize it later), attribute audit-log entries to your real identity, and deploy under team-scoped permissions.</p>
+                <p><strong>If you use the API token:</strong> WatchTower runs locally as the operator who installed the server. Most single-user desktop installs work this way.</p>
+                <p>WatchTower never reads or stores your GitHub password. OAuth and Device Flow both happen on github.com, not here.</p>
+              </div>
+            </details>
+            {/* Debug-only affordance — vite strips this in production builds. */}
+            {IS_DEV && (
             <div className="mb-4">
               <button
                 type="button"
@@ -453,14 +515,16 @@ const Login = () => {
                 Test logged-in success screen
               </button>
             </div>
+            )}
 
         {/* Dev mode: one-click login */}
         {!statusLoading && authStatus?.dev_auth?.allow_insecure && (
-          <div className="mb-5 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-left">
-            <p className="text-sm font-semibold text-amber-800 mb-1">🛠 Dev mode active</p>
-            <p className="text-xs text-amber-700 mb-3">
-              Server is running with <code className="font-mono bg-amber-100 px-1 rounded">WATCHTOWER_ALLOW_INSECURE_DEV_AUTH=true</code>.
-              Any token is accepted — click below to log in instantly.
+          <div className="mb-5 rounded-lg border border-red-400 bg-red-50 px-4 py-3 text-left">
+            <p className="text-sm font-semibold text-red-800 mb-1">⚠ Insecure dev mode enabled</p>
+            <p className="text-xs text-red-700 mb-3">
+              <code className="font-mono bg-red-100 px-1 rounded">WATCHTOWER_ALLOW_INSECURE_DEV_AUTH=true</code> is set on the server.
+              <strong> Any token is accepted</strong> — anyone reaching this page can sign in instantly.
+              Set the env var to <code className="font-mono bg-red-100 px-1 rounded">false</code> in production.
             </p>
             <Button
               onClick={() => void devAutoLogin()}
@@ -508,8 +572,21 @@ const Login = () => {
             <div className="space-y-3 mb-4">
               {!oauthReady && !deviceFlowReady && (
                   <div className="text-left text-xs rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-blue-700 mb-3">
-                  <p className="font-medium text-blue-800 mb-1">GitHub not configured yet</p>
-                  <p>Set <code className="font-mono bg-blue-100 px-1 rounded text-xs">WATCHTOWER_GITHUB_DEVICE_CLIENT_ID</code> (Device Flow, no secret) or <code className="font-mono bg-blue-100 px-1 rounded text-xs">GITHUB_OAUTH_CLIENT_ID</code> + <code className="font-mono bg-blue-100 px-1 rounded text-xs">GITHUB_OAUTH_CLIENT_SECRET</code> on the server.</p>
+                  <p className="font-medium text-blue-800 mb-1">GitHub sign-in not set up yet</p>
+                  <p>
+                    Ask your administrator to configure GitHub login on the server.
+                    {' '}You can still sign in with the server's API token below in the meantime.
+                  </p>
+                  <p className="mt-1 text-blue-600">
+                    <a
+                      href="https://github.com/sinhaankur/WatchTower#github-authentication"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="hover:underline"
+                    >
+                      Setup guide →
+                    </a>
+                  </p>
                   </div>
               )}
 
@@ -536,7 +613,8 @@ const Login = () => {
                   </div>
                   <div className="flex items-center gap-2 text-xs text-slate-500">
                     <span className="inline-block w-3 h-3 border-2 border-slate-300 border-t-slate-700 rounded-full animate-spin" />
-                    {devicePolling ? 'Waiting for GitHub authorization…' : 'Starting…'}
+                    <span className="flex-1">{devicePolling ? 'Waiting for GitHub authorization…' : 'Starting…'}</span>
+                    <DeviceFlowCountdown started={deviceFlow.started} expiresIn={deviceFlow.expires_in} />
                   </div>
                   <div className="flex gap-2">
                     <a
@@ -588,11 +666,17 @@ const Login = () => {
                     )}
                   </Button>
                   {(oauthReady || deviceFlowReady) && (
-                      <p className="text-xs text-slate-600 text-center">
-                      {deviceFlowReady
-                        ? '✓ No setup needed — GitHub will give you a short code to enter'
-                        : '✓ Browser opens GitHub → authenticate → returns here automatically'}
+                    <div className="text-xs text-slate-600 text-center space-y-1">
+                      <p>
+                        {deviceFlowReady
+                          ? '✓ Click → GitHub gives you a short code to enter'
+                          : '✓ Click → browser opens GitHub → returns here automatically'}
                       </p>
+                      <p className="text-[11px] text-slate-500">
+                        Method: <span className="font-medium">{deviceFlowReady ? 'Device Flow' : 'OAuth redirect'}</span>
+                        {deviceFlowReady && oauthReady && ' (Device Flow preferred — no callback URL needed)'}
+                      </p>
+                    </div>
                   )}
                 </>
               )}
@@ -618,9 +702,24 @@ const Login = () => {
                 </svg>
                 <span>Continue as Guest</span>
               </Button>
-              <p className="mt-1.5 text-[11px] text-slate-500 text-center">
-                Browse and run local builds without an account. Adding remote deployment servers requires a GitHub sign-in.
-              </p>
+              <details className="mt-1.5 text-[11px] text-slate-500">
+                <summary className="cursor-pointer text-center hover:text-slate-700">What can guest mode do?</summary>
+                <div className="mt-2 px-3 text-left space-y-1">
+                  <p className="text-slate-700"><strong>Guest mode CAN:</strong></p>
+                  <ul className="list-disc list-inside space-y-0.5 pl-1">
+                    <li>Browse projects and deployments</li>
+                    <li>Run local builds (Nixpacks / Containerfile)</li>
+                    <li>Deploy to <code className="font-mono bg-slate-100 px-0.5 rounded">localhost</code> (containers running on this machine)</li>
+                    <li>Use the failure analyzer + auto-fix loop on local deploys</li>
+                  </ul>
+                  <p className="text-slate-700 pt-1"><strong>Guest mode CAN'T:</strong></p>
+                  <ul className="list-disc list-inside space-y-0.5 pl-1">
+                    <li>Add remote SSH deployment servers</li>
+                    <li>Manage team members</li>
+                    <li>Access private GitHub repos</li>
+                  </ul>
+                </div>
+              </details>
             </div>
 
             <div className="my-5 flex items-center gap-3">
@@ -629,71 +728,30 @@ const Login = () => {
               <div className="h-px flex-1 bg-slate-200" />
             </div>
 
-            {/* API token — SECONDARY auth method */}
+            {/* API token — SECONDARY auth method.
+                Critically: this field accepts the SERVER's WATCHTOWER_API_TOKEN
+                (a deployment-scoped token set when the operator installed
+                WatchTower). It does NOT accept a GitHub Personal Access
+                Token — the previous label + PAT-creation links here led
+                users to create a GitHub PAT, paste it, and get rejected.
+                The post-login flow (Settings → Integrations → GitHub)
+                is where users actually link a GitHub PAT for repo access. */}
             <div className="text-left">
               <label htmlFor="api-token" className="block text-xs font-medium text-slate-700 mb-1.5">
-                Sign in with a GitHub Personal Access Token
+                Sign in with the server's API token
               </label>
 
-              {/* PAT generation links */}
               <div className="mb-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 space-y-2">
-                <p className="text-xs font-medium text-slate-700 flex items-center gap-1.5">
-                  <svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor" className="shrink-0 text-slate-500" aria-hidden="true">
-                    <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/>
-                  </svg>
-                  Create a GitHub token, paste it below
+                <p className="text-xs text-slate-700">
+                  This is the <code className="font-mono bg-white border border-slate-200 px-1 rounded">WATCHTOWER_API_TOKEN</code> set on the server when WatchTower was installed. <strong>It is not a GitHub Personal Access Token.</strong>
                 </p>
-                <div className="flex flex-col gap-1.5">
-                  <a
-                    href="https://github.com/settings/personal-access-tokens/new"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center justify-between rounded-md border border-slate-300 bg-white hover:bg-slate-100 px-3 py-2 text-xs text-slate-800 transition-colors group"
-                  >
-                    <span className="font-medium">Fine-grained PAT <span className="text-slate-400 font-normal">(recommended)</span></span>
-                    <span className="text-slate-400 group-hover:text-slate-700 text-[10px]">github.com ↗</span>
-                  </a>
-                  <a
-                    href="https://github.com/settings/tokens/new?scopes=repo,read%3Apackages&description=WatchTower+API+Token"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center justify-between rounded-md border border-slate-300 bg-white hover:bg-slate-100 px-3 py-2 text-xs text-slate-800 transition-colors group"
-                  >
-                    <span className="font-medium">Classic PAT</span>
-                    <span className="text-slate-400 group-hover:text-slate-700 text-[10px]">github.com ↗</span>
-                  </a>
-                </div>
-                <p className="text-[11px] text-slate-500">
-                  Required scopes: <code className="font-mono bg-white border border-slate-200 px-1 rounded">Contents: Read</code> · <code className="font-mono bg-white border border-slate-200 px-1 rounded">Packages: Read</code>
-                </p>
+                <ul className="text-[11px] text-slate-600 list-disc list-inside space-y-0.5">
+                  <li>Find it in your server's <code className="font-mono bg-white border border-slate-200 px-0.5 rounded">.env</code> file or systemd unit env</li>
+                  <li>If you installed via <code className="font-mono bg-white border border-slate-200 px-0.5 rounded">./run.sh</code>, the dev token is <code className="font-mono bg-white border border-slate-200 px-0.5 rounded">dev-watchtower-token</code></li>
+                  <li>For private repo access, link your GitHub account from Settings → Integrations <em>after</em> sign-in</li>
+                </ul>
               </div>
 
-              <div className="mb-2">
-                <p className="text-xs text-slate-500 mb-0 text-center hidden">
-                  Paste a <code className="font-mono bg-slate-100 px-1 rounded">WATCHTOWER_API_TOKEN</code> from your server
-                </p>
-              </div>
-              <div className="mb-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 hidden">
-                <p className="text-[11px] text-slate-700 mb-2">
-                  Need a GitHub token? Generate one with <span className="font-semibold">Contents: Read</span> and <span className="font-semibold">Packages: Read</span> (for private GHCR images).
-                </p>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={openGitHubTokenGenerator}
-                    className="flex-1 text-[11px] bg-red-700 hover:bg-red-800 text-white rounded px-2 py-1 transition-colors"
-                  >
-                    Fine-grained <span className="opacity-75">(recommended)</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={openClassicPATGenerator}
-                    className="flex-1 text-[11px] border border-slate-300 hover:border-slate-400 text-slate-600 hover:text-slate-800 rounded px-2 py-1 transition-colors"
-                  >
-                    Classic PAT
-                  </button>
-                </div>
-              </div>
               <input
                 id="api-token"
                 type="password"
@@ -701,7 +759,7 @@ const Login = () => {
                 onChange={(e) => setTokenInput(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && void continueWithToken()}
                 className="w-full rounded-lg border border-slate-300 focus:border-red-700 focus:ring-1 focus:ring-red-700 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition"
-                placeholder="Paste your API token"
+                placeholder="Paste WATCHTOWER_API_TOKEN"
                 autoComplete="current-password"
               />
               <Button
@@ -710,7 +768,7 @@ const Login = () => {
                 variant="outline"
                 className="w-full mt-3 rounded-lg text-slate-700"
               >
-                {loading ? 'Verifying…' : 'Sign in with Token'}
+                {loading ? 'Verifying…' : 'Sign in with API Token'}
               </Button>
             </div>
           </>
