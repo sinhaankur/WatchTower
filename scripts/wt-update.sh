@@ -122,6 +122,38 @@ if [[ "$SKIP_INSTALL" -eq 0 ]]; then
   curl -fL --retry 3 -o "$TMP" "$URL"
   SIZE_MB=$(( $(stat -c%s "$TMP") / 1048576 ))
   echo "  downloaded ${SIZE_MB} MB → $TMP"
+
+  # ── dpkg-lock pre-flight ─────────────────────────────────────────────
+  # aptd (GNOME Software Updater backend) and unattended-upgrades both
+  # hold the dpkg frontend lock during their package operations. If
+  # we just call `sudo dpkg -i` while one of them is running, dpkg
+  # errors out with the unhelpful
+  #   "dpkg frontend lock was locked by another process with pid <X>"
+  # message and the user has no idea what to do.
+  #
+  # Detect the lock holder up-front so the user gets actionable copy
+  # instead of a raw dpkg complaint. Wait up to 60 s for it to clear
+  # on its own — most Software Updater operations finish quickly.
+  if [[ -e /var/lib/dpkg/lock-frontend ]]; then
+    DEADLINE=$(( $(date +%s) + 60 ))
+    while LOCK_PID=$(sudo fuser /var/lib/dpkg/lock-frontend 2>/dev/null | awk '{print $1}'); [[ -n "$LOCK_PID" ]]; do
+      LOCK_CMD=$(ps -p "$LOCK_PID" -o comm= 2>/dev/null || echo "?")
+      NOW=$(date +%s)
+      if [[ "$NOW" -ge "$DEADLINE" ]]; then
+        echo
+        echo "  ❌ dpkg lock held by PID $LOCK_PID ($LOCK_CMD) — gave up after 60s."
+        echo "     Close any open Software Updater / Software Center window,"
+        echo "     wait for unattended-upgrades to finish, or run:"
+        echo "       sudo kill $LOCK_PID"
+        echo "     then re-run this script."
+        exit 1
+      fi
+      printf "\r  ⏳ dpkg lock held by PID %s (%s) — waiting up to %ds..." "$LOCK_PID" "$LOCK_CMD" "$(( DEADLINE - NOW ))"
+      sleep 2
+    done
+    printf "\r  dpkg lock free%-50s\n" ""
+  fi
+
   echo "  installing (sudo will prompt for password)"
   sudo dpkg -i "$TMP"
 else
