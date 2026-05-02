@@ -302,7 +302,12 @@ _PUBLIC_ASSET_HEADERS = {
 @app.get("/", tags=["Health"], include_in_schema=False)
 async def root():
     """Serve the React SPA, or a JSON fallback if web/dist is not built."""
-    index = Path(__file__).resolve().parents[2] / "web" / "dist" / "index.html"
+    # Must honor WATCHTOWER_WEB_DIST: the packaged desktop app sets it to its
+    # bundled SPA, but the watchtower package itself may be loaded from a dev
+    # clone (editable install). Without this, GET / serves the dev tree's
+    # index.html while /assets/* serves from the packaged dir — bundle hashes
+    # diverge, the referenced JS 404s, and the window goes blank.
+    index = _WEB_DIST / "index.html"
     if index.is_file():
         return FileResponse(str(index), headers=_INDEX_NO_CACHE_HEADERS)
     return {"message": "WatchTower API", "version": "2.0.0", "docs": "/docs"}
