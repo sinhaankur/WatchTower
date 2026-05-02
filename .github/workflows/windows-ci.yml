@@ -121,8 +121,18 @@ jobs:
           $InstallDir = Join-Path $env:RUNNER_TEMP "WatchTowerAppCenter"
           $ConfigDir = Join-Path $env:RUNNER_TEMP "WatchTowerConfig"
           
+          $RunnerScript = Join-Path $InstallDir "install\run_app_center_windows.ps1"
+          $PwshArgs = @(
+            '-NoProfile',
+            '-NonInteractive',
+            '-ExecutionPolicy', 'Bypass',
+            '-File', $RunnerScript,
+            '-InstallDir', $InstallDir,
+            '-ConfigDir', $ConfigDir
+          )
+
           $ApiProcess = Start-Process -FilePath pwsh `
-            -ArgumentList "-NoProfile -NonInteractive -ExecutionPolicy Bypass -File '$InstallDir\install\run_app_center_windows.ps1' -InstallDir '$InstallDir' -ConfigDir '$ConfigDir'" `
+            -ArgumentList $PwshArgs `
             -NoNewWindow -PassThru `
             -RedirectStandardOutput "api.log" `
             -RedirectStandardError "api-error.log"
