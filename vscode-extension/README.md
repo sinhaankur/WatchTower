@@ -30,7 +30,7 @@ Or search for **WatchTower Ops** in the Extensions sidebar (`Ctrl+Shift+X` / `âŒ
 The extension talks to a running WatchTower backend. Easiest option â€” install the desktop app from the [GitHub Releases page](https://github.com/sinhaankur/WatchTower/releases) and launch it. The backend starts on `http://127.0.0.1:8000` by default.
 
 Other options:
-- **PyPI**: `pip install watchtower-podman` then `watchtower-deploy serve`
+- **PyPI** (Ubuntu 24.04+ / Debian 12+ / Fedora 38+ / recent Homebrew): `pipx install watchtower-podman` then `watchtower-deploy serve`. Older distros: `pip install watchtower-podman`
 - **Docker**: `docker run -p 8000:8000 ghcr.io/sinhaankur/watchtower:latest`
 - **Source**: `./run.sh browser` from the repo
 
