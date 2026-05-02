@@ -134,8 +134,10 @@ def _owner_mode_enabled() -> bool:
 # register their own OAuth app — they only need to authorize this one via
 # GitHub Device Flow (no client secret required).
 # Override with WATCHTOWER_GITHUB_DEVICE_CLIENT_ID env var if you publish
-# your own fork. The Client ID is intentionally public — it's safe to embed.
-DEFAULT_DEVICE_CLIENT_ID = ""  # set in shipped builds, or via env
+# your own fork. The Client ID is intentionally public — it's safe to embed
+# (same model as the `gh` CLI). The matching OAuth app on github.com must
+# have "Enable Device Flow" ticked.
+DEFAULT_DEVICE_CLIENT_ID = "Ov23lilAUjd9BVg8rNl8"
 
 
 def _device_flow_client_id() -> Optional[str]:

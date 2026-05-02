@@ -353,10 +353,58 @@ def _command_exists(command: str) -> bool:
     return ok
 
 
+# Well-known absolute install paths for tools that GUI installers drop
+# outside the bare ``/usr/bin`` PATH that systemd / Electron-spawned
+# processes inherit. Looked up only when ``which <cmd>`` fails, so a
+# normal Homebrew / apt install (already on PATH) costs nothing extra.
+_FALLBACK_TOOL_PATHS: dict[str, list[str]] = {
+    "tailscale": [
+        "/usr/local/bin/tailscale",
+        "/opt/homebrew/bin/tailscale",
+        "/Applications/Tailscale.app/Contents/MacOS/Tailscale",
+        "/usr/bin/tailscale",
+        "C:\\Program Files\\Tailscale\\tailscale.exe",
+        "C:\\Program Files (x86)\\Tailscale\\tailscale.exe",
+    ],
+    "docker": [
+        "/usr/local/bin/docker",
+        "/opt/homebrew/bin/docker",
+        "/Applications/Docker.app/Contents/Resources/bin/docker",
+    ],
+    "podman": [
+        "/usr/local/bin/podman",
+        "/opt/homebrew/bin/podman",
+    ],
+    "cloudflared": [
+        "/usr/local/bin/cloudflared",
+        "/opt/homebrew/bin/cloudflared",
+    ],
+}
+
+
+def _resolve_tool_path(command: str) -> Optional[str]:
+    """Return an absolute path to ``command`` or None if not installed.
+
+    Tries PATH first (the fast common case), then falls back to a curated
+    list of GUI-installer locations. Result is suitable to pass straight
+    to ``subprocess.run`` — never returns a relative name.
+    """
+    import shutil
+
+    found = shutil.which(command)
+    if found:
+        return found
+    for candidate in _FALLBACK_TOOL_PATHS.get(command, []):
+        if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
+            return candidate
+    return None
+
+
 def _tool_status(command: str, version_args: list[str]) -> dict[str, Any]:
-    if not _command_exists(command):
+    resolved = _resolve_tool_path(command)
+    if not resolved:
         return {"installed": False, "version": None}
-    _, out, err, _ = _run_cmd([command, *version_args], timeout=5)
+    _, out, err, _ = _run_cmd([resolved, *version_args], timeout=5)
     return {
         "installed": True,
         "version": out or err or "unknown",
@@ -439,10 +487,14 @@ def _tailscale_status() -> dict[str, Any]:
             "hostname": None,
         }
 
-    ip_ok, ip_out, _, _ = _run_cmd(["tailscale", "ip", "-4"], timeout=6)
+    # Use the absolute path resolution so GUI-installer locations
+    # (e.g. /Applications/Tailscale.app/...) work even when the spawning
+    # process's PATH is minimal.
+    tailscale_bin = _resolve_tool_path("tailscale") or "tailscale"
+    ip_ok, ip_out, _, _ = _run_cmd([tailscale_bin, "ip", "-4"], timeout=6)
     connected = ip_ok and bool(ip_out.strip())
     status_ok, status_out, _, _ = _run_cmd(
-        ["tailscale", "status", "--json"],
+        [tailscale_bin, "status", "--json"],
         timeout=8,
     )
 
