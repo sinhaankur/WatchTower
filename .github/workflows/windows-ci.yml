@@ -168,7 +168,7 @@ jobs:
               $ApiPid = $null
             }
 
-            $Response = curl.exe -sS --max-time 5 http://127.0.0.1:8000/health 2>&1
+            $Response = curl.exe -sS --noproxy "*" --max-time 5 http://127.0.0.1:8000/health 2>&1
             if ($LASTEXITCODE -eq 0) {
               Write-Host "✓ Health check passed" -ForegroundColor Green
               Write-Host "Response: $Response"
