@@ -47,8 +47,6 @@ jobs:
       - name: Validate PowerShell syntax
         shell: pwsh
         run: |
-          # Do NOT set StrictMode here: the foreach loop needs to shadow the
-          # automatic $Error variable with $ParseError, which strict mode blocks.
           $ErrorActionPreference = 'Stop'
 
           $ErrorCount = 0
@@ -59,22 +57,27 @@ jobs:
 
           foreach ($Script in $ScriptsToCheck) {
             Write-Host "Validating $Script..."
-            # ParseFile signature: ParseFile(path, [ref]tokens, [ref]errors)
-            # We only care about errors, so pass $null for tokens.
+            # Use ParseInput with explicit UTF-8 to avoid any encoding issues
+            $Content = Get-Content -Path $Script -Raw -Encoding UTF8
             $ScriptErrors = $null
-            [void][System.Management.Automation.Language.Parser]::ParseFile(
-              (Resolve-Path $Script).Path,
+            $null = [System.Management.Automation.Language.Parser]::ParseInput(
+              $Content,
               [ref]$null,
               [ref]$ScriptErrors
             )
             if ($ScriptErrors -and $ScriptErrors.Count -gt 0) {
               Write-Host "ERROR: Syntax errors in $Script" -ForegroundColor Red
               foreach ($PE in $ScriptErrors) {
-                Write-Host "  Line $($PE.Extent.StartLineNumber): $($PE.Message)"
+                $Msg = $PE.Message
+                $Line = $PE.Extent.StartLineNumber
+                $Col = $PE.Extent.StartColumnNumber
+                Write-Host "  ${Script}:${Line}:${Col}: $Msg"
+                # Emit as a GitHub Actions annotation so it shows in the PR
+                Write-Host "::error file=${Script},line=${Line},col=${Col}::$Msg"
               }
               $ErrorCount += $ScriptErrors.Count
             } else {
-              Write-Host "✓ $Script syntax OK" -ForegroundColor Green
+              Write-Host "OK: $Script syntax valid"
             }
           }
 
