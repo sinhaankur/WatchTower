@@ -209,6 +209,32 @@ async def _clone_repo(
 ) -> tuple[bool, str]:
     if dest.exists():
         shutil.rmtree(dest)
+
+    # Local-folder source: the wizard stores the path as `local://<abs path>`.
+    # Git would treat `local://` as a remote-helper scheme and fail with
+    # "git: 'remote-local' is not a git command". Copy the directory instead
+    # so deploys work for projects that aren't backed by a git remote.
+    if repo_url.startswith("local://"):
+        src = Path(repo_url.removeprefix("local://"))
+        if not src.is_dir():
+            msg = f"source folder not found: {src}"
+            append(f"[local] {msg}")
+            return False, msg
+        append(f"[local] Copying {src} → build dir…")
+        try:
+            shutil.copytree(
+                src,
+                dest,
+                symlinks=True,
+                ignore=shutil.ignore_patterns(
+                    ".git", "node_modules", "__pycache__", ".venv", "dist", "build",
+                ),
+            )
+        except Exception as exc:
+            append(f"[local] copy failed: {exc}")
+            return False, str(exc)
+        return True, ""
+
     shown = display_url or _redact_url(repo_url)
     append(f"[git] Cloning {shown} @ {branch}…")
     proc = await asyncio.create_subprocess_exec(
