@@ -160,6 +160,7 @@ jobs:
           $MaxRetries = 30
           $RetryDelaySeconds = 3
           $RetryCount = 0
+          $LastProbeError = ""
           
           while ($RetryCount -lt $MaxRetries) {
             if ($ApiPid -and -not (Get-Process -Id $ApiPid -ErrorAction SilentlyContinue)) {
@@ -167,17 +168,18 @@ jobs:
               $ApiPid = $null
             }
 
-            try {
-              $HealthData = Invoke-RestMethod -Uri "http://127.0.0.1:8000/health" -TimeoutSec 5
+            $Response = curl.exe -sS --max-time 5 http://127.0.0.1:8000/health 2>&1
+            if ($LASTEXITCODE -eq 0) {
               Write-Host "✓ Health check passed" -ForegroundColor Green
-              Write-Host "Response: $($HealthData | ConvertTo-Json -Compress)"
+              Write-Host "Response: $Response"
               exit 0
-            } catch {
-              $RetryCount++
-              if ($RetryCount -lt $MaxRetries) {
-                Write-Host "Retry $RetryCount/$MaxRetries failed: $($_.Exception.Message)"
-                Start-Sleep -Seconds $RetryDelaySeconds
-              }
+            }
+
+            $RetryCount++
+            $LastProbeError = "$Response"
+            if ($RetryCount -lt $MaxRetries) {
+              Write-Host "Retry $RetryCount/$MaxRetries failed: $LastProbeError"
+              Start-Sleep -Seconds $RetryDelaySeconds
             }
           }
           
@@ -186,6 +188,10 @@ jobs:
           Get-Content -Path "api.log" -ErrorAction SilentlyContinue | Write-Host
           Write-Host "API error log:" -ForegroundColor Red
           Get-Content -Path "api-error.log" -ErrorAction SilentlyContinue | Write-Host
+
+          if ($LastProbeError) {
+            Write-Host "::error file=.github/workflows/windows-ci.yml::Final health probe error: $LastProbeError"
+          }
 
           $ApiLogTail = @(Get-Content -Path "api.log" -ErrorAction SilentlyContinue | Select-Object -Last 10)
           foreach ($Line in $ApiLogTail) {
