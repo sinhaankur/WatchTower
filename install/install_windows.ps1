@@ -86,16 +86,17 @@ if (-not (Test-Path $appsPath)) {
 }
 if (-not (Test-Path $envPath)) {
     $triggerToken = & $venvPython -c "import secrets; print(secrets.token_urlsafe(32))"
-@"
-WATCHTOWER_REPO_DIR=$InstallDir
-WATCHTOWER_NODES_FILE=$nodesPath
-WATCHTOWER_APPS_FILE=$appsPath
-WATCHTOWER_TRIGGER_TOKEN=$triggerToken
-WATCHTOWER_DEFAULT_BRANCH=main
-WATCHTOWER_LOG_LEVEL=INFO
-WATCHTOWER_PORT=$Port
-WATCHTOWER_BIND_HOST=127.0.0.1
-"@ | Set-Content -Path $envPath -Encoding UTF8
+    $envLines = @(
+        "WATCHTOWER_REPO_DIR=$InstallDir",
+        "WATCHTOWER_NODES_FILE=$nodesPath",
+        "WATCHTOWER_APPS_FILE=$appsPath",
+        "WATCHTOWER_TRIGGER_TOKEN=$triggerToken",
+        "WATCHTOWER_DEFAULT_BRANCH=main",
+        "WATCHTOWER_LOG_LEVEL=INFO",
+        "WATCHTOWER_PORT=$Port",
+        "WATCHTOWER_BIND_HOST=127.0.0.1"
+    )
+    $envLines | Set-Content -Path $envPath -Encoding UTF8
 }
 
 # ── Re-start scheduled task if it existed ─────────────────────────────────────
