@@ -606,6 +606,90 @@ const repoRoot = process.env.WATCHTOWER_APP_DIR || path.resolve(__dirname, '..')
 const webRoot = path.join(repoRoot, 'web');
 const pythonUnix = path.join(repoRoot, '.venv', 'bin', 'python');
 const pythonWin = path.join(repoRoot, '.venv', 'Scripts', 'python.exe');
+
+// ── .env loading + PATH augmentation ────────────────────────────────────────
+// Electron does NOT inherit the shell's PATH on macOS / Linux, and it does
+// NOT auto-load a .env file the way `run.sh` does. The two consequences for
+// users:
+//
+//  1. The integrations probe in watchtower.api.runtime can't find binaries
+//     installed by the OS GUI (e.g. macOS Tailscale.app drops its CLI in
+//     /usr/local/bin or /Applications/Tailscale.app/Contents/MacOS) so the
+//     dashboard reports "Tailscale not connected" even when `tailscale up`
+//     succeeded in a Terminal.
+//
+//  2. Auth env vars set in the repo .env (e.g. WATCHTOWER_GITHUB_DEVICE_CLIENT_ID,
+//     GITHUB_OAUTH_CLIENT_ID/SECRET, WATCHTOWER_GHE_HOST) never reach the
+//     spawned Python backend, so /api/auth/status reports nothing as
+//     configured and the "Sign in with GitHub" button is rendered disabled.
+//
+// We fix both before runtimeApiToken is computed (so .env-supplied
+// WATCHTOWER_API_TOKEN wins over the random fallback).
+
+function loadDotEnvIntoProcess(envPath) {
+  if (!envPath || !fs.existsSync(envPath)) return;
+  let raw;
+  try { raw = fs.readFileSync(envPath, 'utf8'); } catch { return; }
+  // Minimal KEY=VALUE parser. Strips quotes, skips comments / blanks.
+  // Does NOT handle multi-line values or shell expansion — keep it
+  // dependency-free; users with complex .env should set vars in the
+  // shell or systemd unit.
+  for (const lineRaw of raw.split(/\r?\n/)) {
+    const line = lineRaw.trim();
+    if (!line || line.startsWith('#')) continue;
+    const eq = line.indexOf('=');
+    if (eq <= 0) continue;
+    const key = line.slice(0, eq).trim();
+    let val = line.slice(eq + 1).trim();
+    if ((val.startsWith('"') && val.endsWith('"')) ||
+        (val.startsWith("'") && val.endsWith("'"))) {
+      val = val.slice(1, -1);
+    }
+    if (key && process.env[key] === undefined) {
+      process.env[key] = val;
+    }
+  }
+}
+
+loadDotEnvIntoProcess(path.join(repoRoot, '.env'));
+
+function augmentPathForSpawnedTools() {
+  // Common locations where CLI tools end up but which Electron's spawned
+  // children won't see by default. Order matters — first match wins, so
+  // user-installed brew binaries override system /usr/bin equivalents.
+  const extras = process.platform === 'darwin'
+    ? [
+        '/opt/homebrew/bin',
+        '/opt/homebrew/sbin',
+        '/usr/local/bin',
+        '/usr/local/sbin',
+        '/Applications/Tailscale.app/Contents/MacOS',
+        '/Applications/Docker.app/Contents/Resources/bin',
+        '/Applications/Podman Desktop.app/Contents/Resources/bin',
+      ]
+    : process.platform === 'linux'
+      ? [
+          '/usr/local/bin',
+          '/usr/local/sbin',
+          path.join(os.homedir(), '.local', 'bin'),
+          '/snap/bin',
+        ]
+      : [
+          // Windows Tailscale default install dir
+          'C:\\Program Files\\Tailscale',
+          'C:\\Program Files (x86)\\Tailscale',
+        ];
+  const sep = process.platform === 'win32' ? ';' : ':';
+  const current = (process.env.PATH || '').split(sep).filter(Boolean);
+  const merged = [...current];
+  for (const dir of extras) {
+    if (!merged.includes(dir)) merged.push(dir);
+  }
+  process.env.PATH = merged.join(sep);
+}
+
+augmentPathForSpawnedTools();
+
 const runtimeApiToken = process.env.WATCHTOWER_API_TOKEN || `wt-${crypto.randomBytes(24).toString('hex')}`;
 
 function isGithubOauthConfigured() {
