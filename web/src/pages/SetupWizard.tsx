@@ -6,9 +6,20 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
+// Where the user's deployment will run. Step 1 of the wizard asks this
+// directly; the rest of the flow adapts (skipping server registration
+// for `this_machine`, surfacing the existing SSH form for `remote_ssh`,
+// showing cloud-setup commands for `cloud_setup`).
+//
+// Maps onto deployment_model='self_hosted' for all three (the user owns
+// the runtime in every case — there is no managed SaaS path today),
+// but the UX is dramatically different between them.
+type DeploymentTarget = 'this_machine' | 'remote_ssh' | 'cloud_setup';
+
 type WizardData = {
   source_type: 'github' | 'local_folder';
   deployment_model: 'self_hosted' | 'saas';
+  deployment_target: DeploymentTarget;
   use_case: 'netlify_like' | 'vercel_like' | 'docker_platform';
   repo_url: string;
   local_folder_path: string;
@@ -241,6 +252,11 @@ const SetupWizard = () => {
   const [data, setData] = useState<WizardData>({
     source_type: 'github',
     deployment_model: 'self_hosted',
+    // Default to "this machine" — matches what most first-time users
+    // actually have (one Linux laptop, want to try it out), and
+    // doesn't require any additional setup. Users who need a real
+    // production target can pick the other two in Step 1.
+    deployment_target: 'this_machine',
     use_case: 'vercel_like',
     repo_url: '',
     local_folder_path: '',
@@ -288,7 +304,7 @@ const SetupWizard = () => {
       // In quick mode, only need repo URL and project name
       return data.repo_url.trim().length > 0 && data.project_name.trim().length > 0;
     }
-    if (step === 1) return Boolean(data.deployment_model);
+    if (step === 1) return Boolean(data.deployment_target);
     if (step === 2) return Boolean(data.use_case);
     if (step === 3) {
       if (data.source_type === 'github') {
@@ -306,10 +322,12 @@ const SetupWizard = () => {
   const nextSteps = useMemo(() => {
     const steps: string[] = [];
 
-    if (data.deployment_model === 'self_hosted') {
-      steps.push('Add at least one Infrastructure node before your first deployment.');
+    if (data.deployment_target === 'this_machine') {
+      steps.push('Your project deploys to this machine via Podman — no server registration needed. After deploy, the URL is http://127.0.0.1:<port>.');
+    } else if (data.deployment_target === 'remote_ssh') {
+      steps.push('Add at least one server in the Servers tab before your first deployment.');
     } else {
-      steps.push('Confirm your SaaS limits and branch preview retention policy.');
+      steps.push('Spin up a Linux box (Oracle Cloud Free Tier, Hetzner, etc.), then add it as a Remote SSH server.');
     }
 
     if (data.use_case === 'netlify_like') {
@@ -466,42 +484,166 @@ const SetupWizard = () => {
 
           {step === 1 && !quickMode && (
             <div className="electron-card rounded-xl p-6">
-              <h2 className="text-lg font-semibold text-slate-900">Where will you deploy?</h2>
-              <p className="text-sm text-slate-600 mb-4">Select runtime ownership mode.</p>
-
-              {/* No-nodes warning — only shown when self_hosted is selected and we know there are no nodes */}
-              {hasNodes === false && data.deployment_model === 'self_hosted' && (
-                <div className="mb-5 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm">
-                  <p className="font-semibold text-amber-900">⚠ No server nodes added yet</p>
-                  <p className="text-amber-800 mt-1 text-xs">
-                    You need at least one infrastructure node before WatchTower can deploy your app.
-                    You can still create the project now, but deployments will fail until you add a server.
-                  </p>
-                  <Link
-                    to="/servers"
-                    className="inline-block mt-2 text-xs font-medium text-amber-900 underline underline-offset-2 hover:text-amber-700"
-                  >
-                    → Add a server node first
-                  </Link>
-                </div>
-              )}
+              <h2 className="text-lg font-semibold text-slate-900">Where will your app run?</h2>
+              <p className="text-sm text-slate-600 mb-4">
+                Pick the deployment target that fits. You can change this later, and you
+                can mix targets across projects.
+              </p>
 
               <div className="space-y-3">
-                {([
-                  { value: 'self_hosted', title: 'Self-Hosted', desc: 'Run WatchTower on your own servers.' },
-                  { value: 'saas', title: 'SaaS', desc: 'Use managed cloud runtime.' },
-                ] as const).map((opt) => (
-                  <label key={opt.value} className={`flex gap-4 items-start border rounded-md p-4 cursor-pointer ${data.deployment_model === opt.value ? 'border-red-300 bg-red-50' : 'border-border bg-white hover:border-red-300'}`}>
-                    <input type="radio" name="deployment_model" className="mt-1" checked={data.deployment_model === opt.value} onChange={() => setField('deployment_model', opt.value)} />
-                    <div>
-                      <p className="font-medium text-sm">{opt.title}</p>
-                      <p className="text-xs text-slate-600 mt-0.5">{opt.desc}</p>
+                {/* Option 1: This machine — recommended default for trying things out */}
+                <label className={`block border rounded-lg p-4 cursor-pointer transition ${
+                  data.deployment_target === 'this_machine'
+                    ? 'border-emerald-400 bg-emerald-50'
+                    : 'border-slate-200 bg-white hover:border-emerald-300'
+                }`}>
+                  <div className="flex gap-3 items-start">
+                    <input
+                      type="radio"
+                      name="deployment_target"
+                      className="mt-1"
+                      checked={data.deployment_target === 'this_machine'}
+                      onChange={() => setField('deployment_target', 'this_machine')}
+                    />
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <p className="font-semibold text-sm text-slate-900">This machine (Podman)</p>
+                        <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-200 text-emerald-900 font-bold">
+                          Recommended for trying it out
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-700 mt-1">
+                        WatchTower builds your project with Nixpacks and runs it in a container on this Linux machine.
+                        URL is <code className="font-mono bg-white border border-slate-200 px-1 rounded">http://127.0.0.1:&lt;port&gt;</code> — only you can access it.
+                      </p>
+                      <ul className="text-[11px] text-slate-600 mt-2 space-y-0.5">
+                        <li>✅ No external infrastructure, no signup</li>
+                        <li>✅ Closes the autonomous-ops loop locally (build → diagnose → auto-fix)</li>
+                        <li>⚠ Only running while your machine is on (laptop sleep / reboot pauses the deploy)</li>
+                      </ul>
                     </div>
-                  </label>
-                ))}
+                  </div>
+                </label>
+
+                {/* Option 2: Remote SSH server */}
+                <label className={`block border rounded-lg p-4 cursor-pointer transition ${
+                  data.deployment_target === 'remote_ssh'
+                    ? 'border-blue-400 bg-blue-50'
+                    : 'border-slate-200 bg-white hover:border-blue-300'
+                }`}>
+                  <div className="flex gap-3 items-start">
+                    <input
+                      type="radio"
+                      name="deployment_target"
+                      className="mt-1"
+                      checked={data.deployment_target === 'remote_ssh'}
+                      onChange={() => setField('deployment_target', 'remote_ssh')}
+                    />
+                    <div className="flex-1">
+                      <p className="font-semibold text-sm text-slate-900">A remote SSH server I already have</p>
+                      <p className="text-xs text-slate-700 mt-1">
+                        WatchTower deploys via rsync + a remote reload command. Works for any Linux box you can
+                        SSH into — VPS, home Pi over Tailscale, friend's box.
+                      </p>
+                      <ul className="text-[11px] text-slate-600 mt-2 space-y-0.5">
+                        <li>✅ 24/7 deploy if the box is up 24/7</li>
+                        <li>✅ Public URL if the box is publicly addressable</li>
+                        <li>⚙ Needs SSH key + reload command (we'll guide you)</li>
+                      </ul>
+                      {data.deployment_target === 'remote_ssh' && hasNodes === false && (
+                        <div className="mt-3 rounded border border-amber-300 bg-amber-50 px-3 py-2 text-xs">
+                          <p className="text-amber-900">No servers added yet — you'll add one in the Servers tab after creating this project, or click below to do it now.</p>
+                          <Link to="/servers" className="inline-block mt-1 text-amber-900 underline">
+                            → Add a server now
+                          </Link>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </label>
+
+                {/* Option 3: I need a hosting target */}
+                <label className={`block border rounded-lg p-4 cursor-pointer transition ${
+                  data.deployment_target === 'cloud_setup'
+                    ? 'border-violet-400 bg-violet-50'
+                    : 'border-slate-200 bg-white hover:border-violet-300'
+                }`}>
+                  <div className="flex gap-3 items-start">
+                    <input
+                      type="radio"
+                      name="deployment_target"
+                      className="mt-1"
+                      checked={data.deployment_target === 'cloud_setup'}
+                      onChange={() => setField('deployment_target', 'cloud_setup')}
+                    />
+                    <div className="flex-1">
+                      <p className="font-semibold text-sm text-slate-900">I need a server (help me pick one)</p>
+                      <p className="text-xs text-slate-700 mt-1">
+                        WatchTower itself doesn't host servers. Pick a cheap or free cloud Linux box, then come back
+                        and choose <em>"A remote SSH server I already have"</em> with its IP.
+                      </p>
+                      {data.deployment_target === 'cloud_setup' && (
+                        <div className="mt-3 space-y-2">
+                          <p className="text-[11px] font-semibold text-slate-800 uppercase tracking-wide">Cheapest viable options</p>
+                          <div className="grid sm:grid-cols-2 gap-2">
+                            <a
+                              href="https://www.oracle.com/cloud/free/"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="block rounded border border-slate-300 bg-white hover:border-slate-500 p-2.5 text-xs"
+                            >
+                              <p className="font-semibold text-slate-900">Oracle Cloud Always Free</p>
+                              <p className="text-slate-600 mt-0.5">$0 forever · 4 ARM cores · 24 GB RAM · public IP</p>
+                            </a>
+                            <a
+                              href="https://www.hetzner.com/cloud/"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="block rounded border border-slate-300 bg-white hover:border-slate-500 p-2.5 text-xs"
+                            >
+                              <p className="font-semibold text-slate-900">Hetzner CAX11</p>
+                              <p className="text-slate-600 mt-0.5">~$4.59/mo · 2 ARM · 4 GB RAM · billed hourly</p>
+                            </a>
+                            <a
+                              href="https://www.digitalocean.com/pricing/droplets"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="block rounded border border-slate-300 bg-white hover:border-slate-500 p-2.5 text-xs"
+                            >
+                              <p className="font-semibold text-slate-900">DigitalOcean</p>
+                              <p className="text-slate-600 mt-0.5">$4–6/mo · 1 vCPU · 1 GB RAM · public IP</p>
+                            </a>
+                            <a
+                              href="https://tailscale.com/"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="block rounded border border-slate-300 bg-white hover:border-slate-500 p-2.5 text-xs"
+                            >
+                              <p className="font-semibold text-slate-900">Tailscale + this machine</p>
+                              <p className="text-slate-600 mt-0.5">Free · this machine, accessible privately from anywhere</p>
+                            </a>
+                          </div>
+                          <p className="text-[11px] text-slate-600 mt-1">
+                            After you have a Linux box: install Podman, ensure SSH access works,
+                            then come back here and switch to <em>"A remote SSH server I already have."</em>
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </label>
               </div>
-              <div className="mt-6 flex justify-end">
-                <Button onClick={() => setStep(2)} disabled={!canContinue} className="electron-accent-bg rounded-md">Continue</Button>
+              <div className="mt-6 flex justify-end gap-2">
+                {data.deployment_target === 'cloud_setup' && (
+                  <Link to="/" className="text-sm">
+                    <Button variant="outline" className="electron-button rounded-md">
+                      Save and come back later
+                    </Button>
+                  </Link>
+                )}
+                <Button onClick={() => setStep(2)} disabled={!canContinue} className="electron-accent-bg rounded-md">
+                  Continue
+                </Button>
               </div>
             </div>
           )}
