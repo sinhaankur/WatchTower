@@ -75,15 +75,42 @@ def _skip_health(request: StarletteRequest) -> bool:
 
 
 # Single shared limiter — endpoints import this and decorate routes.
+#
+# default_limits is intentionally EMPTY: only routes that explicitly
+# declare a budget via @limiter.limit("N/period") get rate-limited.
+# A global default of 1000/hour (the previous setting) turned out to
+# be hostile to normal app behavior and 429'd:
+#   * /health probed every few seconds by the Electron startup poll
+#   * /api/projects polled every 10s by the SPA's deployment list
+#   * /api/templates / /api/audit / /api/me on every page navigation
+#   * Even unauthenticated /api/* calls returned 429 instead of 401
+#     because the rate-limit middleware ran before auth, masking the
+#     real reason for the rejection
+# Caught via stress test on 1.5.22: 1500 sequential /health hits →
+# every single one 429'd; ~88% error rate under sustained mixed load.
+#
+# The brute-force protection that originally motivated default_limits
+# is preserved because the sensitive endpoints — GitHub OAuth (10/min),
+# device flow (20/min), webhook signature verification (60/min), agent
+# chat (30/min/user) — already have explicit @limiter.limit decorators.
+# Generic API browsing, status polling, and dashboard refresh have no
+# brute-force surface and don't need a global budget.
+#
+# Operators who explicitly want a global cap (multi-tenant SaaS,
+# abusive-traffic mode) can set WATCHTOWER_RATELIMIT_DEFAULT.
+#
 # headers_enabled=False because turning it on requires every rate-limited
 # endpoint to also accept a `response: Response` parameter so slowapi can
-# inject X-RateLimit-* headers into it. That's a lot of churn for marginal
-# value — clients still get a 429 + Retry-After from the exception handler
-# when over budget. If we ever want the headers, we can flip this on AND
-# add `response: Response` everywhere.
+# inject X-RateLimit-* headers. Marginal value vs. churn — clients still
+# get a 429 + Retry-After from the exception handler when over budget.
+def _default_limits_from_env() -> list[str]:
+    raw = os.getenv("WATCHTOWER_RATELIMIT_DEFAULT", "").strip()
+    return [raw] if raw else []
+
+
 limiter = Limiter(
     key_func=_key_remote,
-    default_limits=[os.getenv("WATCHTOWER_RATELIMIT_DEFAULT", "1000/hour")],
+    default_limits=_default_limits_from_env(),
     storage_uri=os.getenv("WATCHTOWER_RATELIMIT_STORAGE_URL", "memory://"),
     headers_enabled=False,
 )
