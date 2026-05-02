@@ -1,6 +1,15 @@
 name: Windows CI
 
 on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'install/**/*.ps1'
+      - 'install/**/*.cmd'
+      - 'requirements.txt'
+      - 'pyproject.toml'
+      - '.github/workflows/windows-ci.yml'
   pull_request:
     branches:
       - main
@@ -11,6 +20,13 @@ on:
       - 'pyproject.toml'
       - '.github/workflows/windows-ci.yml'
   workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   validate-windows-scripts:
@@ -25,15 +41,15 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
+          cache: 'pip'
+          cache-dependency-path: 'requirements.txt'
 
       - name: Validate PowerShell syntax
         shell: pwsh
         run: |
+          $ErrorActionPreference = 'Stop'
+          Set-StrictMode -Version Latest
+
           $ErrorCount = 0
           $ScriptsToCheck = @(
             'install/install_windows.ps1',
@@ -66,33 +82,42 @@ jobs:
           }
 
       - name: Install Python dependencies
-        shell: powershell
+        shell: pwsh
         run: |
+          $ErrorActionPreference = 'Stop'
+          Set-StrictMode -Version Latest
+
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          python -m pip install -r requirements.txt
 
       - name: Run Windows installer script
-        shell: powershell
+        shell: pwsh
         run: |
+          $ErrorActionPreference = 'Stop'
+          Set-StrictMode -Version Latest
+
           $InstallDir = Join-Path $env:RUNNER_TEMP "WatchTowerAppCenter"
           $ConfigDir = Join-Path $env:RUNNER_TEMP "WatchTowerConfig"
           
           Write-Host "InstallDir: $InstallDir"
           Write-Host "ConfigDir: $ConfigDir"
           
-          powershell -ExecutionPolicy Bypass -File "install/install_windows.ps1" `
+          pwsh -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "install/install_windows.ps1" `
             -InstallDir "$InstallDir" `
             -ConfigDir "$ConfigDir" `
             -Port 8000
 
       - name: Start App Center runner script (background)
-        shell: powershell
+        shell: pwsh
         run: |
+          $ErrorActionPreference = 'Stop'
+          Set-StrictMode -Version Latest
+
           $InstallDir = Join-Path $env:RUNNER_TEMP "WatchTowerAppCenter"
           $ConfigDir = Join-Path $env:RUNNER_TEMP "WatchTowerConfig"
           
-          Start-Process -FilePath powershell `
-            -ArgumentList "-ExecutionPolicy Bypass -File '$InstallDir\install\run_app_center_windows.ps1' -InstallDir '$InstallDir' -ConfigDir '$ConfigDir'" `
+          Start-Process -FilePath pwsh `
+            -ArgumentList "-NoProfile -NonInteractive -ExecutionPolicy Bypass -File '$InstallDir\install\run_app_center_windows.ps1' -InstallDir '$InstallDir' -ConfigDir '$ConfigDir'" `
             -NoNewWindow -PassThru `
             -RedirectStandardOutput "api.log" `
             -RedirectStandardError "api-error.log" `
@@ -102,18 +127,20 @@ jobs:
           Start-Sleep -Seconds 3
 
       - name: Health check
-        shell: powershell
+        shell: pwsh
         run: |
+          $ErrorActionPreference = 'Stop'
+          Set-StrictMode -Version Latest
+
           $MaxRetries = 10
           $RetryCount = 0
           
           while ($RetryCount -lt $MaxRetries) {
             try {
-              $Response = Invoke-WebRequest -Uri "http://127.0.0.1:8000/health" -UseBasicParsing
+              $HealthData = Invoke-RestMethod -Uri "http://127.0.0.1:8000/health" -TimeoutSec 5
               
-              if ($Response.StatusCode -eq 200) {
+              if ($HealthData.status) {
                 Write-Host "✓ Health check passed" -ForegroundColor Green
-                $HealthData = $Response.Content | ConvertFrom-Json
                 Write-Host "Status: $($HealthData.status)"
                 exit 0
               }
@@ -134,11 +161,14 @@ jobs:
           exit 1
 
       - name: Stop API
-        shell: powershell
+        shell: pwsh
         if: always()
         run: |
+          $ErrorActionPreference = 'Stop'
+          Set-StrictMode -Version Latest
+
           Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object {
-            ($_.Name -match '^python(\.exe)?$|^powershell(\.exe)?$') -and (
+            ($_.Name -match '^python(\.exe)?$|^powershell(\.exe)?$|^pwsh(\.exe)?$') -and (
               $_.CommandLine -like "*watchtower.deploy_server*" -or
               $_.CommandLine -like "*run_app_center_windows.ps1*" -or
               $_.CommandLine -like "*uvicorn*watchtower.api:app*"
