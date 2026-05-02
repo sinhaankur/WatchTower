@@ -17,7 +17,7 @@ $repoDir = Split-Path -Parent $scriptDir
 $venvDir = Join-Path $InstallDir ".venv"
 $venvPython = Join-Path $venvDir "Scripts\python.exe"
 
-# ── Detect existing installation ───────────────────────────────────────────────
+# -- Detect existing installation -----------------------------------------------
 $existingVersion = $null
 if (Test-Path $venvPython) {
     try {
@@ -33,7 +33,7 @@ if ($existingVersion) {
     $taskName = "WatchTowerAppCenter"
     $task = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
     if ($task -and $task.State -eq "Running") {
-        Write-Host "[install] Stopping scheduled task '$taskName' before update…"
+        Write-Host "[install] Stopping scheduled task '$taskName' before update..."
         Stop-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
     }
 
@@ -45,21 +45,21 @@ if ($existingVersion) {
                 ($_.CommandLine -like "*watchtower*")
              }
     if ($procs) {
-        Write-Host "[install] Stopping running WatchTower process(es)…"
+        Write-Host "[install] Stopping running WatchTower process(es)..."
         $procs | ForEach-Object {
             Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue
         }
         Start-Sleep -Seconds 1
     }
 
-    Write-Host "[install] Updating in-place — config files in $ConfigDir are preserved."
+    Write-Host "[install] Updating in-place - config files in $ConfigDir are preserved."
     Write-Host ""
 } else {
-    Write-Host "[install] No existing installation found — performing fresh install."
+    Write-Host "[install] No existing installation found - performing fresh install."
     Write-Host ""
 }
 
-# ── Install ────────────────────────────────────────────────────────────────────
+# -- Install --------------------------------------------------------------------
 
 New-Item -ItemType Directory -Path $InstallDir -Force | Out-Null
 New-Item -ItemType Directory -Path $ConfigDir -Force | Out-Null
@@ -99,18 +99,18 @@ if (-not (Test-Path $envPath)) {
     $envLines | Set-Content -Path $envPath -Encoding UTF8
 }
 
-# ── Re-start scheduled task if it existed ─────────────────────────────────────
+# -- Re-start scheduled task if it existed -------------------------------------
 $taskName = "WatchTowerAppCenter"
 $task = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
 if ($task) {
-    Write-Host "[install] Restarting scheduled task '$taskName'…"
+    Write-Host "[install] Restarting scheduled task '$taskName'..."
     Start-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
 }
 
 $newVersion = & $venvPython -c "import importlib.metadata; print(importlib.metadata.version('watchtower'))" 2>$null
 
 Write-Host ""
-Write-Host "WatchTower App Center $newVersion — ready."
+Write-Host "WatchTower App Center $newVersion - ready."
 Write-Host "Run the API with:"
 Write-Host "  powershell -ExecutionPolicy Bypass -File '$InstallDir\install\run_app_center_windows.ps1' -ConfigDir '$ConfigDir'"
 Write-Host ""
