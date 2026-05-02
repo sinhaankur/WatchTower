@@ -163,8 +163,8 @@ jobs:
           
           while ($RetryCount -lt $MaxRetries) {
             if ($ApiPid -and -not (Get-Process -Id $ApiPid -ErrorAction SilentlyContinue)) {
-              Write-Host "App Center process PID $ApiPid exited before becoming healthy." -ForegroundColor Red
-              break
+              Write-Host "App Center launcher PID $ApiPid exited; continuing health probes for child server process."
+              $ApiPid = $null
             }
 
             try {
