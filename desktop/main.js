@@ -993,15 +993,22 @@ function waitForUrl(url, timeoutMs = 45000) {
  * package manager (homebrew / python.org / apt) closes that gap.
  */
 function pythonInstallGuide() {
+  // We use pipx on macOS + Linux because raw `pip install --user` fails
+  // on PEP 668 systems (Ubuntu 24.04+, Debian 12+, Fedora 38+, recent
+  // brew Python) with "externally-managed-environment". pipx is the
+  // modern recommended path for installing Python applications without
+  // touching the system Python; same isolation, works everywhere.
+  // Windows still uses py launcher because the python.org installer
+  // doesn't enforce PEP 668.
   if (process.platform === 'darwin') {
     return {
       description:
         "WatchTower needs Python 3.8+ with the watchtower-podman " +
         "package installed.\n\n" +
-        "Run these two commands in Terminal, then reopen WatchTower.",
+        "Run this in Terminal, then reopen WatchTower:",
       commands: [
-        'brew install python@3.11',
-        'python3 -m pip install watchtower-podman',
+        'brew install pipx',
+        'pipx install watchtower-podman',
       ],
       docsUrl: 'https://github.com/sinhaankur/WatchTower#macos-installation-app-center',
       // Note: we deliberately do NOT auto-launch xcode-select --install
@@ -1030,8 +1037,8 @@ function pythonInstallGuide() {
       "package installed.\n\n" +
       "Run these in a terminal, then reopen WatchTower.",
     commands: [
-      'sudo apt install -y python3 python3-pip',
-      'pip3 install --user watchtower-podman',
+      'sudo apt install -y python3 pipx',
+      'pipx install watchtower-podman',
     ],
     docsUrl: 'https://github.com/sinhaankur/WatchTower#installation',
   };
@@ -1749,7 +1756,8 @@ function friendlyLaunchError(error) {
       "This is almost always a Python install issue (missing dependency, " +
       "wrong version, broken venv). The diagnostic log captured the exact error.\n\n" +
       "Try: open the log shown below, look for an ImportError or ModuleNotFoundError, " +
-      "and run `pip install watchtower-podman` to repair the install."
+      "and run `pipx install watchtower-podman` to repair the install (pipx avoids " +
+      "PEP 668 errors on Ubuntu 24+ / Debian 12+ / recent brew Python)."
     );
   }
 

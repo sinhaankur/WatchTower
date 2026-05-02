@@ -331,10 +331,21 @@ function UpdateCheckCard() {
   );
 }
 
+// Install commands surfaced in the System tab when Python is missing
+// or the watchtower-podman package isn't importable.
+//
+// We use pipx on macOS + Linux because raw `pip install --user` fails
+// on PEP 668 systems (Ubuntu 24.04+, Debian 12+, Fedora 38+, brew
+// Python 3.13+) with "externally-managed-environment". pipx is the
+// modern recommended path for installing Python applications without
+// touching the system Python — same isolation, same end result, but
+// works on every distro since 2023.
+//
+// Windows is unchanged; the python.org installer doesn't enforce PEP 668.
 function pythonInstallCommand(platform: string): string {
-  if (platform === 'darwin') return 'brew install python@3.11 && python3 -m pip install watchtower-podman';
+  if (platform === 'darwin') return 'brew install pipx && pipx install watchtower-podman';
   if (platform === 'win32') return 'py -3 -m pip install watchtower-podman';
-  return 'sudo apt install -y python3 python3-pip && pip3 install --user watchtower-podman';
+  return 'sudo apt install -y python3 pipx && pipx install watchtower-podman';
 }
 
 function podmanInstallCommand(platform: string): string {
