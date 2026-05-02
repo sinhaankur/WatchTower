@@ -1,6 +1,6 @@
 {
   "name": "watchtower",
-  "version": "1.5.22",
+  "version": "1.5.23",
   "private": true,
   "scripts": {
     "dev": "npm --prefix web run dev --",
