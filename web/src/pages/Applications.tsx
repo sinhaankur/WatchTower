@@ -255,8 +255,16 @@ const Applications = () => {
                         )}
                       </div>
                       <div className="mt-1.5 flex items-center gap-3 text-xs text-slate-500 flex-wrap">
-                        {p.repo_url && !p.repo_url.startsWith('local://') ? (
-                          <span className="truncate max-w-xs font-mono">{p.repo_url.replace('https://github.com/', '')}</span>
+                        {p.repo_url && /^https?:\/\//i.test(p.repo_url) ? (
+                          <a
+                            href={p.repo_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="truncate max-w-xs font-mono text-slate-600 hover:text-slate-900 hover:underline"
+                            title={`Open repository: ${p.repo_url}`}
+                          >
+                            {p.repo_url.replace('https://github.com/', '')} ↗
+                          </a>
                         ) : (
                           <span className="font-mono">{p.source_type === 'local_folder' ? 'local folder' : p.repo_url}</span>
                         )}
@@ -269,15 +277,23 @@ const Applications = () => {
 
                     {/* Right: actions */}
                     <div className="flex items-center gap-2 shrink-0">
-                      {p.launch_url && /^https?:\/\//i.test(p.launch_url) && (
+                      {p.launch_url && /^https?:\/\//i.test(p.launch_url) ? (
                         <a
                           href={p.launch_url}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="px-3 py-1.5 rounded-lg border border-border text-xs text-slate-700 hover:bg-slate-100 transition-colors"
+                          title={`Open app: ${p.launch_url}`}
                         >
                           Open ↗
                         </a>
+                      ) : (
+                        <span
+                          className="px-3 py-1.5 rounded-lg border border-border text-xs text-slate-400 cursor-not-allowed"
+                          title="No launch URL set. Edit the project to add one, or deploy to populate it."
+                        >
+                          Open ↗
+                        </span>
                       )}
                       <button
                         onClick={() => void triggerDeploy(p.id, p.repo_branch)}
