@@ -225,7 +225,7 @@ WatchTower is **fully functional** and suitable for:
 | Channel | How to Get | Use Case |
 |---------|-----------|----------|
 | **Docker** | `docker pull ghcr.io/sinhaankur/watchtower:latest` | Production & staging |
-| **Python** | `pip install watchtower-podman` | Development & automation |
+| **Python** | `pipx install watchtower-podman` (Ubuntu 24+ / Debian 12+ / Fedora 38+) or `pip install watchtower-podman` in a venv on older distros | Development & automation |
 | **Source** | [GitHub Releases](https://github.com/sinhaankur/WatchTower/releases) | Development, customization |
 | **Git** | `git clone https://github.com/sinhaankur/WatchTower.git` | Contributor setup |
 
