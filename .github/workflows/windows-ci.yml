@@ -112,7 +112,7 @@ jobs:
             -ConfigDir "$ConfigDir" `
             -Port 8000
 
-      - name: Start App Center runner script (background)
+      - name: Start App Center and health check
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -120,8 +120,8 @@ jobs:
 
           $InstallDir = Join-Path $env:RUNNER_TEMP "WatchTowerAppCenter"
           $ConfigDir = Join-Path $env:RUNNER_TEMP "WatchTowerConfig"
-          
           $RunnerScript = Join-Path $InstallDir "install\run_app_center_windows.ps1"
+
           $PwshArgs = @(
             '-NoProfile',
             '-NonInteractive',
@@ -137,25 +137,8 @@ jobs:
             -RedirectStandardOutput "api.log" `
             -RedirectStandardError "api-error.log"
 
-          $PidFile = Join-Path $env:RUNNER_TEMP "watchtower-api.pid"
-          Set-Content -Path $PidFile -Value $ApiProcess.Id
           Write-Host "Started App Center process PID: $($ApiProcess.Id)"
-          
-          Write-Host "Backend started, waiting for health check..."
-          Start-Sleep -Seconds 5
-
-      - name: Health check
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = 'Stop'
-          Set-StrictMode -Version Latest
-
-          $PidFile = Join-Path $env:RUNNER_TEMP "watchtower-api.pid"
-          $ApiPid = $null
-          if (Test-Path $PidFile) {
-            $ApiPid = [int](Get-Content -Path $PidFile -Raw).Trim()
-            Write-Host "Monitoring App Center process PID: $ApiPid"
-          }
+          Start-Sleep -Seconds 2
 
           $MaxRetries = 30
           $RetryDelaySeconds = 3
@@ -163,9 +146,8 @@ jobs:
           $LastProbeError = ""
           
           while ($RetryCount -lt $MaxRetries) {
-            if ($ApiPid -and -not (Get-Process -Id $ApiPid -ErrorAction SilentlyContinue)) {
-              Write-Host "App Center launcher PID $ApiPid exited; continuing health probes for child server process."
-              $ApiPid = $null
+            if (-not (Get-Process -Id $ApiProcess.Id -ErrorAction SilentlyContinue)) {
+              Write-Host "App Center process exited during startup checks."
             }
 
             $Response = curl.exe -sS --noproxy "*" --max-time 5 http://127.0.0.1:8000/health 2>&1
