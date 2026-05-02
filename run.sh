@@ -3,9 +3,9 @@
 # WatchTower — one-command launcher
 #
 # Usage:
-#   ./run.sh              # auto-detect: desktop app if DISPLAY, else browser
-#   ./run.sh desktop      # Electron desktop app
-#   ./run.sh browser      # Browser (http://127.0.0.1:5222)
+#   ./run.sh              # interactive: choose desktop or browser, then browser
+#   ./run.sh desktop      # Electron desktop app (no prompt)
+#   ./run.sh browser      # Browser mode — prompts to pick which browser
 #   ./run.sh stop         # Kill all WatchTower processes
 #   ./run.sh logs         # Tail backend + frontend logs
 #   ./run.sh update       # Pull latest code from GitHub and rebuild
@@ -157,6 +157,55 @@ cmd_logs() {
     error "No logs found yet. Start the app first."; exit 1; }
 }
 
+# ── Browser detection ────────────────────────────────────────────────────────
+# Returns a list of browser names that are available on this system.
+# Each entry is "label:command" e.g. "Chrome:google-chrome"
+detect_browsers() {
+  local found=()
+  # macOS app bundle names
+  if [[ "$(uname)" == "Darwin" ]]; then
+    [[ -d "/Applications/Google Chrome.app" ]]        && found+=("Chrome:open -a 'Google Chrome'")
+    [[ -d "/Applications/Firefox.app" ]]              && found+=("Firefox:open -a Firefox")
+    [[ -d "/Applications/Safari.app" ]]               && found+=("Safari:open -a Safari")
+    [[ -d "/Applications/Brave Browser.app" ]]        && found+=("Brave:open -a 'Brave Browser'")
+    [[ -d "/Applications/Microsoft Edge.app" ]]       && found+=("Edge:open -a 'Microsoft Edge'")
+    [[ -d "/Applications/Arc.app" ]]                  && found+=("Arc:open -a Arc")
+  fi
+  # Linux / PATH-based commands
+  for pair in \
+    "Chrome:google-chrome" \
+    "Chrome:google-chrome-stable" \
+    "Chromium:chromium" \
+    "Chromium:chromium-browser" \
+    "Firefox:firefox" \
+    "Brave:brave-browser" \
+    "Edge:microsoft-edge" \
+    "Vivaldi:vivaldi" \
+    "Opera:opera"
+  do
+    local cmd="${pair#*:}"
+    command -v "$cmd" >/dev/null 2>&1 && found+=("$pair")
+  done
+  # Always offer the system default as a fallback
+  found+=("Default browser:__default__")
+  printf '%s\n' "${found[@]}"
+}
+
+# Open $1 in the browser identified by a detect_browsers entry.
+open_in_browser() {
+  local url="$1" entry="$2"
+  local cmd="${entry#*:}"
+  if [[ "$cmd" == "__default__" ]]; then
+    if command -v xdg-open >/dev/null 2>&1; then
+      xdg-open "$url" 2>/dev/null &
+    elif command -v open >/dev/null 2>&1; then
+      open "$url" &
+    fi
+  else
+    eval "$cmd \"$url\"" 2>/dev/null &
+  fi
+}
+
 # ── Parse args ───────────────────────────────────────────────────────────────
 MODE="${1:-auto}"
 case "$MODE" in
@@ -223,17 +272,72 @@ if [[ ! -f "$DIST_INDEX" ]]; then
 fi
 
 # ── Resolve mode early (before Step 4) so desktop mode can skip backend start ──
+# Global variable: which browser entry the user picked (detect_browsers format)
+SELECTED_BROWSER="Default browser:__default__"
+
 if [[ "$MODE" == "auto" ]]; then
   if [[ "$IS_ARM" == true ]]; then
-    # Raspberry Pi / ARM: default to browser mode.
-    info "ARM detected ($ARCH) — defaulting to browser mode."
-    info "To run the desktop app instead: ./run.sh desktop"
+    # Raspberry Pi / ARM: only browser mode makes sense.
+    info "ARM detected ($ARCH) — browser mode only on this platform."
     MODE=browser
-  elif [[ -n "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ]] && \
-       ( command -v electron >/dev/null 2>&1 || [[ -d "$ROOT/desktop/node_modules" ]] ); then
-    MODE=desktop
   else
-    MODE=browser
+    # Interactive launcher: let the user choose.
+    HAS_ELECTRON=false
+    ( command -v electron >/dev/null 2>&1 || [[ -d "$ROOT/desktop/node_modules" ]] ) && HAS_ELECTRON=true
+
+    echo ""
+    echo -e "  ${CYAN}How would you like to open WatchTower?${NC}"
+    echo ""
+    if [[ "$HAS_ELECTRON" == true ]]; then
+      echo -e "  ${GREEN}[1]${NC} Desktop app  (Electron window)"
+      echo -e "  ${GREEN}[2]${NC} Browser      (opens in your browser)"
+    else
+      echo -e "  ${GREEN}[1]${NC} Browser      (opens in your browser)"
+    fi
+    echo ""
+    if [[ "$HAS_ELECTRON" == true ]]; then
+      read -r -p "  Enter choice [1-2, default 1]: " UI_CHOICE </dev/tty
+      UI_CHOICE="$(echo "${UI_CHOICE:-1}" | tr '[:upper:]' '[:lower:]' | xargs)"
+      # Accept natural answers too: yes/browser/web, no/desktop/app.
+      if [[ "$UI_CHOICE" == "2" || "$UI_CHOICE" == "yes" || "$UI_CHOICE" == "y" || "$UI_CHOICE" == "browser" || "$UI_CHOICE" == "web" ]]; then
+        MODE=browser
+      elif [[ "$UI_CHOICE" == "1" || "$UI_CHOICE" == "no" || "$UI_CHOICE" == "n" || "$UI_CHOICE" == "desktop" || "$UI_CHOICE" == "app" ]]; then
+        MODE=desktop
+      else
+        warn "Unrecognized choice '$UI_CHOICE' — defaulting to Desktop (1)."
+        MODE=desktop
+      fi
+    else
+      read -r -p "  Press Enter to open in browser (or Ctrl-C to cancel): " </dev/tty || true
+      MODE=browser
+    fi
+  fi
+fi
+
+# If browser mode, also ask which browser to use.
+if [[ "$MODE" == "browser" ]]; then
+  BROWSER_ENTRIES=()
+  while IFS= read -r entry; do
+    [[ -n "$entry" ]] && BROWSER_ENTRIES+=("$entry")
+  done < <(detect_browsers)
+  if [[ ${#BROWSER_ENTRIES[@]} -gt 1 ]]; then
+    echo ""
+    echo -e "  ${CYAN}Choose a browser:${NC}"
+    echo ""
+    for i in "${!BROWSER_ENTRIES[@]}"; do
+      label="${BROWSER_ENTRIES[$i]%%:*}"
+      echo -e "  ${GREEN}[$((i+1))]${NC} $label"
+    done
+    echo ""
+    read -r -p "  Enter choice [1-${#BROWSER_ENTRIES[@]}, default 1]: " BROWSER_CHOICE </dev/tty
+    BROWSER_CHOICE="${BROWSER_CHOICE:-1}"
+    # Validate; fall back to 1 on bad input.
+    if ! [[ "$BROWSER_CHOICE" =~ ^[0-9]+$ ]] || \
+       (( BROWSER_CHOICE < 1 || BROWSER_CHOICE > ${#BROWSER_ENTRIES[@]} )); then
+      BROWSER_CHOICE=1
+    fi
+    SELECTED_BROWSER="${BROWSER_ENTRIES[$((BROWSER_CHOICE-1))]}"
+    info "Opening with: ${SELECTED_BROWSER%%:*}"
   fi
 fi
 
@@ -286,12 +390,7 @@ elif [[ "$MODE" == "browser" ]]; then
   echo ""
   echo -e "  ${GREEN}Open in your browser:${NC}  http://127.0.0.1:${API_PORT}"
   echo ""
-  # Open browser
-  if command -v xdg-open >/dev/null 2>&1; then
-    xdg-open "http://127.0.0.1:${API_PORT}" 2>/dev/null &
-  elif command -v open >/dev/null 2>&1; then
-    open "http://127.0.0.1:${API_PORT}" &
-  fi
+  open_in_browser "http://127.0.0.1:${API_PORT}" "$SELECTED_BROWSER"
 fi
 
 echo ""

@@ -13,6 +13,7 @@ from watchtower.database import (
     get_db,
     Project,
     ProjectRelation,
+    CustomDomain,
     Deployment,
     DeploymentStatus,
     DeploymentTrigger,
@@ -34,9 +35,12 @@ async def list_projects(
     db: Session = Depends(get_db),
     current_user: dict = Depends(util.get_current_user)
 ):
-    """List all projects for the current user"""
+    """List all active projects for the current user."""
     user_id = util.canonical_user_id(db, current_user)
-    projects = db.query(Project).filter(Project.owner_id == user_id).all()
+    projects = db.query(Project).filter(
+        Project.owner_id == user_id,
+        Project.is_active == True,  # noqa: E712
+    ).all()
     return projects
 
 
@@ -56,6 +60,18 @@ async def create_project(
 
         # Generate webhook secret
         webhook_secret = util.generate_webhook_secret()
+        
+        # Check for duplicate project name in same org.
+        # This mirrors the DB unique constraint and returns a user-friendly 409.
+        existing = db.query(Project).filter(
+            Project.org_id == org.id,
+            Project.name == project_data.name,
+        ).first()
+        if existing:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"A project named '{project_data.name}' already exists in this organization"
+            )
         
         # Create project
         db_project = Project(
@@ -89,6 +105,15 @@ async def create_project(
 
         return db_project
 
+    except HTTPException:
+        db.rollback()
+        raise
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"A project named '{project_data.name}' already exists in this organization",
+        )
     except Exception:
         db.rollback()
         logger.exception("Project creation failed")
@@ -624,3 +649,194 @@ async def health_check_project(
             "url": target,
             "error": str(err)[:200],
         }
+
+
+# ── Custom Domain Endpoints ───────────────────────────────────────────────────
+
+
+@router.get("/{project_id}/domains", response_model=List[schemas.CustomDomainResponse])
+async def list_domains(
+    project_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(util.get_current_user),
+):
+    """List custom domains for a project."""
+    project = _load_owned_project(db, project_id, current_user)
+    return db.query(CustomDomain).filter(CustomDomain.project_id == project.id).all()
+
+
+@router.post(
+    "/{project_id}/domains",
+    response_model=schemas.CustomDomainResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def add_domain(
+    project_id: UUID,
+    payload: schemas.CustomDomainCreate,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(util.get_current_user),
+):
+    """Add a custom domain to a project."""
+    project = _load_owned_project(db, project_id, current_user)
+
+    existing = db.query(CustomDomain).filter(CustomDomain.domain == payload.domain).first()
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Domain is already registered",
+        )
+
+    # If the new domain is marked primary, clear any existing primary flag.
+    if payload.is_primary:
+        db.query(CustomDomain).filter(
+            CustomDomain.project_id == project.id,
+            CustomDomain.is_primary == True,  # noqa: E712
+        ).update({"is_primary": False})
+
+    domain = CustomDomain(
+        project_id=project.id,
+        domain=payload.domain,
+        is_primary=payload.is_primary,
+        tls_enabled=payload.tls_enabled,
+    )
+    db.add(domain)
+    db.commit()
+    db.refresh(domain)
+    logger.info("Domain %s added to project %s", payload.domain, project_id)
+    return domain
+
+
+@router.put(
+    "/{project_id}/domains/{domain_id}",
+    response_model=schemas.CustomDomainResponse,
+)
+async def update_domain(
+    project_id: UUID,
+    domain_id: UUID,
+    payload: schemas.CustomDomainUpdate,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(util.get_current_user),
+):
+    """Update a custom domain (primary flag, TLS setting)."""
+    project = _load_owned_project(db, project_id, current_user)
+    domain = db.query(CustomDomain).filter(
+        CustomDomain.id == domain_id,
+        CustomDomain.project_id == project.id,
+    ).first()
+    if not domain:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Domain not found")
+
+    if payload.is_primary is not None:
+        if payload.is_primary:
+            db.query(CustomDomain).filter(
+                CustomDomain.project_id == project.id,
+                CustomDomain.is_primary == True,  # noqa: E712
+            ).update({"is_primary": False})
+        domain.is_primary = payload.is_primary
+    if payload.tls_enabled is not None:
+        domain.tls_enabled = payload.tls_enabled
+
+    db.commit()
+    db.refresh(domain)
+    return domain
+
+
+@router.delete(
+    "/{project_id}/domains/{domain_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def delete_domain(
+    project_id: UUID,
+    domain_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(util.get_current_user),
+):
+    """Remove a custom domain from a project."""
+    project = _load_owned_project(db, project_id, current_user)
+    domain = db.query(CustomDomain).filter(
+        CustomDomain.id == domain_id,
+        CustomDomain.project_id == project.id,
+    ).first()
+    if not domain:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Domain not found")
+    db.delete(domain)
+    db.commit()
+    logger.info("Domain %s removed from project %s", domain.domain, project_id)
+    return None
+
+
+@router.post(
+    "/{project_id}/domains/{domain_id}/validate-dns",
+)
+async def validate_domain_dns(
+    project_id: UUID,
+    domain_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(util.get_current_user),
+):
+    """Attempt to validate DNS for a custom domain.
+
+    Resolves the domain and checks whether any of its A/AAAA records match
+    the outbound IP of this server (best-effort). Updates
+    ``letsencrypt_validated`` to ``True`` when the check passes.
+
+    Response shape::
+
+        {
+          "validated": bool,
+          "domain": str,
+          "resolved_ips": [str],
+          "message": str,
+        }
+    """
+    import socket
+
+    project = _load_owned_project(db, project_id, current_user)
+    domain = db.query(CustomDomain).filter(
+        CustomDomain.id == domain_id,
+        CustomDomain.project_id == project.id,
+    ).first()
+    if not domain:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Domain not found")
+
+    try:
+        infos = socket.getaddrinfo(domain.domain, None)
+    except socket.gaierror as exc:
+        return {
+            "validated": False,
+            "domain": domain.domain,
+            "resolved_ips": [],
+            "message": f"DNS lookup failed: {exc}",
+        }
+
+    resolved_ips = list({info[4][0] for info in infos})
+
+    # Determine this server's outbound IP. Fall back gracefully if the
+    # lookup fails (air-gapped / no internet access).
+    server_ip: str | None = None
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+            s.connect(("8.8.8.8", 80))
+            server_ip = s.getsockname()[0]
+    except OSError:
+        pass
+
+    validated = server_ip is not None and server_ip in resolved_ips
+    if validated and not domain.letsencrypt_validated:
+        domain.letsencrypt_validated = True
+        db.commit()
+
+    message = (
+        f"Domain resolves to this server ({server_ip})."
+        if validated
+        else (
+            f"Domain resolved to {resolved_ips} but this server's IP is {server_ip!r}. "
+            "Point the domain's A record to this server and retry."
+        )
+    )
+    return {
+        "validated": validated,
+        "domain": domain.domain,
+        "resolved_ips": resolved_ips,
+        "message": message,
+    }

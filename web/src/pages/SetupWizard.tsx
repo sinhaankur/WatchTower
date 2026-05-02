@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useRef } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import apiClient from '@/lib/api';
 import { Card, CardContent } from '@/components/ui/card';
@@ -76,6 +76,17 @@ const SetupWizard = () => {
   const [ghRepos, setGhRepos] = useState<GHRepo[]>([]);
   const [repoSearch, setRepoSearch] = useState('');
   const [ghConnected, setGhConnected] = useState(false);
+  const [browserPickedFolderName, setBrowserPickedFolderName] = useState('');
+  const [ghAuthReady, setGhAuthReady] = useState({ loaded: false, oauth: false, device: false });
+  const [deviceConnect, setDeviceConnect] = useState({
+    open: false,
+    userCode: '',
+    verificationUri: '',
+    verificationUriComplete: '',
+    deviceCode: '',
+    polling: false,
+    error: '',
+  });
   // Port suggestion from /api/runtime/recommend-port. `null` while loading,
   // a number when fetched, `'error'` if the endpoint failed (we don't want
   // to silently fall back to "3000" the way the legacy code did — better
@@ -83,11 +94,31 @@ const SetupWizard = () => {
   const [recommendedPort, setRecommendedPort] = useState<number | null | 'error'>(null);
   const [portEditOpen, setPortEditOpen] = useState(false);
   const navigate = useNavigate();
+  const folderInputRef = useRef<HTMLInputElement>(null);
+  const hasElectronFolderPicker = Boolean((window as unknown as { electronAPI?: { selectFolder?: unknown } }).electronAPI?.selectFolder);
+
+  const loadAuthStatus = async () => {
+    try {
+      const res = await apiClient.get('/auth/status');
+      const payload = res.data as {
+        oauth?: { github_configured?: boolean };
+        device_flow?: { github_configured?: boolean };
+      };
+      setGhAuthReady({
+        loaded: true,
+        oauth: Boolean(payload?.oauth?.github_configured),
+        device: Boolean(payload?.device_flow?.github_configured),
+      });
+    } catch {
+      setGhAuthReady({ loaded: true, oauth: false, device: false });
+    }
+  };
 
   // Check if any deployment nodes exist so we can warn before wasting the user's time
   useEffect(() => {
     const checkNodes = async () => {
       try {
+        await loadAuthStatus();
         const ctxRes = await apiClient.get('/context');
         const fetchedOrgId = (ctxRes.data as any)?.organization?.id;
         if (!fetchedOrgId) { setHasNodes(false); return; }
@@ -102,6 +133,7 @@ const SetupWizard = () => {
           setGhConnected(false);
         }
       } catch {
+        setGhAuthReady({ loaded: true, oauth: false, device: false });
         setHasNodes(null); // unknown — don't block
       }
     };
@@ -192,6 +224,93 @@ const SetupWizard = () => {
     void fetchRepos();
   }, [selectedGHOrg, ghPickerOpen]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const pollDeviceConnect = async (deviceCode: string, intervalSeconds: number) => {
+    try {
+      const res = await apiClient.post('/github/device/connect/poll', { device_code: deviceCode });
+      const status = (res.data as { status?: string; interval?: number })?.status;
+
+      if (status === 'success') {
+        setGhConnected(true);
+        setDeviceConnect((prev) => ({
+          ...prev,
+          open: false,
+          polling: false,
+          error: '',
+        }));
+        setGhPickerOpen(true);
+        setGhPickerError('');
+        return;
+      }
+
+      if (status === 'authorization_pending' || status === 'slow_down') {
+        const nextInterval = Math.max(
+          Number((res.data as { interval?: number })?.interval ?? intervalSeconds),
+          2,
+        );
+        window.setTimeout(() => {
+          void pollDeviceConnect(deviceCode, nextInterval);
+        }, nextInterval * 1000);
+        return;
+      }
+
+      if (status === 'access_denied') {
+        setDeviceConnect((prev) => ({
+          ...prev,
+          polling: false,
+          error: 'GitHub authorization was cancelled. Try again.',
+        }));
+        return;
+      }
+
+      if (status === 'expired_token') {
+        setDeviceConnect((prev) => ({
+          ...prev,
+          polling: false,
+          error: 'Device code expired. Start connect again.',
+        }));
+      }
+    } catch {
+      setDeviceConnect((prev) => ({
+        ...prev,
+        polling: false,
+        error: 'Could not complete GitHub device authorization.',
+      }));
+    }
+  };
+
+  const startDeviceConnect = async (effectiveOrgId: string) => {
+    try {
+      const res = await apiClient.post('/github/device/connect/start', { org_id: effectiveOrgId });
+      const payload = res.data as {
+        device_code?: string;
+        user_code?: string;
+        verification_uri?: string;
+        verification_uri_complete?: string;
+        interval?: number;
+      };
+      const deviceCode = payload.device_code || '';
+      const interval = Math.max(Number(payload.interval ?? 5), 2);
+      if (!deviceCode) {
+        setGhPickerError('GitHub device connect did not return a device code.');
+        return;
+      }
+
+      setDeviceConnect({
+        open: true,
+        userCode: payload.user_code || '',
+        verificationUri: payload.verification_uri || 'https://github.com/login/device',
+        verificationUriComplete: payload.verification_uri_complete || '',
+        deviceCode,
+        polling: true,
+        error: '',
+      });
+
+      void pollDeviceConnect(deviceCode, interval);
+    } catch {
+      setGhPickerError('Could not start GitHub device authorization.');
+    }
+  };
+
   const openGitHubPicker = async () => {
     const isLoggedIn = Boolean(localStorage.getItem('authToken'));
     if (!isLoggedIn) {
@@ -217,6 +336,9 @@ const SetupWizard = () => {
     }
 
     if (!ghConnected) {
+      if (!ghAuthReady.loaded) {
+        await loadAuthStatus();
+      }
       // Need to connect GitHub with repo scope
       let effectiveOrgId = orgId;
       if (!effectiveOrgId) {
@@ -229,16 +351,26 @@ const SetupWizard = () => {
         }
       }
       if (!effectiveOrgId) { setGhPickerError('Organization context not loaded. Refresh and try again.'); return; }
-      try {
-        const redirectUri = `${window.location.origin}/oauth/github/callback`;
-        const res = await apiClient.get('/github/oauth/start', {
-          params: { org_id: effectiveOrgId, redirect_uri: redirectUri, next_path: '/setup?github_picker=1' },
-        });
-        const url = (res.data as any)?.authorize_url;
-        if (url) { window.location.href = url; }
-      } catch {
-        setGhPickerError('Could not start GitHub authorization. Check OAuth configuration in settings.');
+      if (ghAuthReady.oauth) {
+        try {
+          const redirectUri = `${window.location.origin}/oauth/github/callback`;
+          const res = await apiClient.get('/github/oauth/start', {
+            params: { org_id: effectiveOrgId, redirect_uri: redirectUri, next_path: '/setup?github_picker=1' },
+          });
+          const url = (res.data as any)?.authorize_url;
+          if (url) { window.location.href = url; }
+        } catch {
+          setGhPickerError('Could not start GitHub authorization. Check OAuth configuration in settings.');
+        }
+        return;
       }
+
+      if (ghAuthReady.device) {
+        await startDeviceConnect(effectiveOrgId);
+        return;
+      }
+
+      setGhPickerError('GitHub connection is not configured on this server. Add OAuth credentials in Integrations, or paste a repository URL manually.');
       return;
     }
     setGhPickerOpen(true);
@@ -303,6 +435,9 @@ const SetupWizard = () => {
   };
 
   const canContinue = useMemo(() => {
+    const hasAbsoluteLikePath = (value: string) =>
+      value.startsWith('/') || value.includes('\\') || /^[a-zA-Z]:\\/.test(value);
+
     if (quickMode) {
       // In quick mode, only need repo URL and project name
       return data.repo_url.trim().length > 0 && data.project_name.trim().length > 0;
@@ -313,7 +448,9 @@ const SetupWizard = () => {
       if (data.source_type === 'github') {
         return data.repo_url.trim().length > 0 && data.build_command.trim().length > 0;
       }
-      return data.local_folder_path.trim().length > 0;
+      // Browser folder picker can't return a true absolute local filesystem
+      // path; require a path-looking value before allowing Continue.
+      return data.local_folder_path.trim().length > 0 && hasAbsoluteLikePath(data.local_folder_path.trim());
     }
     return data.project_name.trim().length > 0;
   }, [data, step, quickMode]);
@@ -368,6 +505,7 @@ const SetupWizard = () => {
   const createProject = async () => {
     setSubmitting(true);
     saveLocalProject();
+    let initialDeployQueued = false;
     try {
       const effectiveRepoUrl = data.source_type === 'github'
         ? data.repo_url
@@ -377,7 +515,7 @@ const SetupWizard = () => {
         ? data.build_command
         : (data.build_command || 'npm run dev');
 
-      await apiClient.post('/setup/wizard/complete', {
+      const createdProjectResp = await apiClient.post('/setup/wizard/complete', {
         deployment_model: data.deployment_model,
         use_case: data.use_case,
         source_type: data.source_type,
@@ -400,6 +538,23 @@ const SetupWizard = () => {
         // local-podman runner can read it as the source of truth.
         recommended_port: data.exposed_port,
       });
+
+      // Queue an initial deployment for GitHub projects so the repository
+      // is cloned/downloaded immediately after setup.
+      if (data.source_type === 'github') {
+        try {
+          const createdProject = createdProjectResp.data as { id?: string };
+          if (createdProject?.id) {
+            await apiClient.post(`/projects/${createdProject.id}/deployments`, {
+              branch: effectiveBranch,
+              commit_sha: 'setup-initial-deploy',
+            });
+            initialDeployQueued = true;
+          }
+        } catch {
+          // Non-fatal: project creation succeeded; user can deploy manually.
+        }
+      }
     } catch {
       // Local-first mode keeps setup usable while backend is unavailable.
     }
@@ -420,7 +575,12 @@ const SetupWizard = () => {
       // Pass the target through router state so Dashboard can render a
       // one-time "Project created — click Deploy" hint specific to it.
       navigate('/', {
-        state: { just_created: data.project_name, target: data.deployment_target },
+        state: {
+          just_created: data.project_name,
+          target: data.deployment_target,
+          source_type: data.source_type,
+          initial_deploy_queued: initialDeployQueued,
+        },
       });
     }
   };
@@ -754,10 +914,45 @@ const SetupWizard = () => {
                         onClick={() => void openGitHubPicker()}
                         className="text-xs electron-accent underline hover:opacity-80"
                       >
-                        {ghConnected ? '📂 Browse GitHub Repos' : '🔗 Sign in with GitHub'}
+                        {ghConnected
+                          ? 'Browse GitHub Repositories'
+                          : ghAuthReady.device
+                            ? 'Connect GitHub (Device Code)'
+                            : 'Connect GitHub for Repo Access'}
                       </button>
                     </div>
                     <Input id="repo_url" value={data.repo_url} onChange={(e) => setField('repo_url', e.target.value)} className="mt-1.5 rounded-md border-border bg-white" placeholder="https://github.com/owner/repo" />
+                    <p className="text-[11px] text-slate-600">
+                      Choosing a repo here fills URL and branch. WatchTower clones/downloads the repository when the first deployment is queued.
+                    </p>
+
+                    {deviceConnect.open && (
+                      <div className="mt-3 border border-indigo-200 rounded-lg bg-indigo-50 p-4 space-y-2">
+                        <p className="text-sm font-semibold text-indigo-900">Authorize GitHub Connection</p>
+                        <p className="text-xs text-indigo-800">
+                          Open GitHub, enter this code, then return here. We will continue automatically once authorized.
+                        </p>
+                        <div className="flex items-center gap-2">
+                          <code className="px-2 py-1 rounded bg-white border border-indigo-200 text-indigo-900 font-semibold tracking-wider">
+                            {deviceConnect.userCode || '---'}
+                          </code>
+                          <a
+                            href={deviceConnect.verificationUriComplete || deviceConnect.verificationUri}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-xs underline text-indigo-700 hover:text-indigo-900"
+                          >
+                            Open GitHub Verification
+                          </a>
+                        </div>
+                        {deviceConnect.polling && (
+                          <p className="text-xs text-indigo-700 animate-pulse">Waiting for GitHub authorization…</p>
+                        )}
+                        {deviceConnect.error && (
+                          <p className="text-xs text-red-700 bg-red-50 border border-red-200 rounded px-2 py-1">{deviceConnect.error}</p>
+                        )}
+                      </div>
+                    )}
 
                     {/* GitHub Repo Picker Panel */}
                     {ghPickerOpen && (
@@ -840,29 +1035,57 @@ const SetupWizard = () => {
                         className="flex-1 rounded-md border-border bg-white"
                         placeholder="/home/you/my-app"
                       />
-                      {/* Native folder picker (desktop only) — typing an
-                          absolute path is the kind of friction that makes
-                          a desktop app feel like a wrapped web page.
-                          Falls back to plain text input in browser mode. */}
-                      {Boolean((window as unknown as { electronAPI?: { selectFolder?: unknown } }).electronAPI?.selectFolder) && (
-                        <button
-                          type="button"
-                          onClick={async () => {
-                            const electron = (window as unknown as { electronAPI?: { selectFolder?: (opts: { defaultPath?: string }) => Promise<{ ok: boolean; path?: string }> } }).electronAPI;
-                            if (!electron?.selectFolder) return;
+                      {/* Hidden file input for browser-based folder selection */}
+                      <input
+                        ref={folderInputRef}
+                        type="file"
+                        multiple
+                        style={{ display: 'none' }}
+                        {...({ webkitdirectory: true } as any)}
+                        onChange={(e) => {
+                          // Extract folder path from first file's path (browser mode)
+                          if (e.target.files && e.target.files.length > 0) {
+                            const file = e.target.files[0];
+                            const webkitRelativePath = (file as any).webkitRelativePath;
+                            if (webkitRelativePath) {
+                              // Extract the root folder from the path (first segment)
+                              const folderName = webkitRelativePath.split('/')[0];
+                              // Browser APIs do not expose absolute local paths; this
+                              // is a convenience hint only. User must type full path.
+                              setField('local_folder_path', folderName || 'selected-folder');
+                              setBrowserPickedFolderName(folderName || 'selected-folder');
+                            }
+                          }
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          // Try Electron API first (desktop mode)
+                          const electron = (window as unknown as { electronAPI?: { selectFolder?: (opts: { defaultPath?: string }) => Promise<{ ok: boolean; path?: string }> } }).electronAPI;
+                          if (electron?.selectFolder) {
                             const result = await electron.selectFolder({
                               defaultPath: data.local_folder_path || undefined,
                             });
                             if (result?.ok && result.path) {
                               setField('local_folder_path', result.path);
+                              setBrowserPickedFolderName('');
                             }
-                          }}
-                          className="px-3 py-2 text-sm rounded-md border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 font-medium whitespace-nowrap"
-                        >
-                          Browse…
-                        </button>
-                      )}
+                          } else {
+                            // Fallback to browser file picker (web mode)
+                            folderInputRef.current?.click();
+                          }
+                        }}
+                        className="px-3 py-2 text-sm rounded-md border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 font-medium whitespace-nowrap"
+                      >
+                        Browse…
+                      </button>
                     </div>
+                    {!hasElectronFolderPicker && browserPickedFolderName && (
+                      <p className="text-xs text-amber-700 mt-1">
+                        Browser security only shared the folder name ({browserPickedFolderName}). Please replace it with the full absolute path before continuing.
+                      </p>
+                    )}
                     <p className="text-xs text-slate-600 mt-1">Use an absolute path to your app folder on this machine.</p>
                   </div>
                 )}

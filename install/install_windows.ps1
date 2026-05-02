@@ -12,7 +12,8 @@ if (-not (Get-Command python -ErrorAction SilentlyContinue)) {
     throw "Python is required. Install Python 3.8+ and re-run this script."
 }
 
-$repoDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$repoDir = Split-Path -Parent $scriptDir
 $venvDir = Join-Path $InstallDir ".venv"
 $venvPython = Join-Path $venvDir "Scripts\python.exe"
 
@@ -36,12 +37,18 @@ if ($existingVersion) {
         Stop-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
     }
 
-    # Kill any uvicorn process serving from the old install dir to free file locks.
-    $procs = Get-Process -Name "python" -ErrorAction SilentlyContinue |
-             Where-Object { $_.CommandLine -like "*watchtower*" }
+    # Kill any running WatchTower python process to free file locks.
+    # Get-Process.CommandLine is inconsistent across PS editions; query via CIM.
+    $procs = Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
+             Where-Object {
+                ($_.Name -match '^python(\.exe)?$') -and
+                ($_.CommandLine -like "*watchtower*")
+             }
     if ($procs) {
         Write-Host "[install] Stopping running WatchTower process(es)…"
-        $procs | Stop-Process -Force -ErrorAction SilentlyContinue
+        $procs | ForEach-Object {
+            Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue
+        }
         Start-Sleep -Seconds 1
     }
 
@@ -72,10 +79,10 @@ $appsPath = Join-Path $ConfigDir "apps.json"
 $envPath = Join-Path $ConfigDir "appcenter.env"
 
 if (-not (Test-Path $nodesPath)) {
-    Copy-Item (Join-Path $InstallDir "nodes.json") $nodesPath
+    Copy-Item (Join-Path $InstallDir "config\nodes.json") $nodesPath
 }
 if (-not (Test-Path $appsPath)) {
-    Copy-Item (Join-Path $InstallDir "apps.json") $appsPath
+    Copy-Item (Join-Path $InstallDir "config\apps.json") $appsPath
 }
 if (-not (Test-Path $envPath)) {
     $triggerToken = & $venvPython -c "import secrets; print(secrets.token_urlsafe(32))"
@@ -104,7 +111,7 @@ $newVersion = & $venvPython -c "import importlib.metadata; print(importlib.metad
 Write-Host ""
 Write-Host "WatchTower App Center $newVersion — ready."
 Write-Host "Run the API with:"
-Write-Host "  powershell -ExecutionPolicy Bypass -File run_app_center_windows.ps1 -ConfigDir '$ConfigDir'"
+Write-Host "  powershell -ExecutionPolicy Bypass -File '$InstallDir\install\run_app_center_windows.ps1' -ConfigDir '$ConfigDir'"
 Write-Host ""
 Write-Host "Then test:"
 Write-Host "  curl http://127.0.0.1:$Port/health"

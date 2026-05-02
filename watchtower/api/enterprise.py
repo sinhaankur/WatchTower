@@ -8,7 +8,10 @@ import hmac
 import json
 import base64
 import hashlib
+import smtplib
 import subprocess
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 from urllib.parse import urlencode
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import RedirectResponse
@@ -22,7 +25,8 @@ import requests
 
 from watchtower.database import (
     get_db, Organization, User, GitHubConnection, TeamMember, OrgNode, InstallationClaim,
-    NodeNetwork, NodeNetworkMember, Project, NodeStatus, TeamRole, GitHubProvider
+    NodeNetwork, NodeNetworkMember, Project, NodeStatus, TeamRole, GitHubProvider,
+    GitHubDeviceConnectSession,
 )
 from watchtower import schemas_enterprise as schemas
 from watchtower.api import util
@@ -30,6 +34,95 @@ from watchtower.api.rate_limit import limiter
 
 router = APIRouter(prefix="/api", tags=["Enterprise"])
 logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Email helpers
+# ---------------------------------------------------------------------------
+
+def _send_invitation_email(
+    to_email: str,
+    org_name: str,
+    role: str,
+    inviter_name: str,
+) -> None:
+    """Send a team-invitation email via SMTP.
+
+    Reads configuration from environment variables:
+      WATCHTOWER_SMTP_HOST     — SMTP server hostname (required to send)
+      WATCHTOWER_SMTP_PORT     — port, default 587
+      WATCHTOWER_SMTP_USER     — login username (optional for local relays)
+      WATCHTOWER_SMTP_PASSWORD — login password (optional for local relays)
+      WATCHTOWER_SMTP_FROM     — From address, default noreply@watchtower.local
+      WATCHTOWER_APP_URL       — base URL shown in the invitation link
+
+    If ``WATCHTOWER_SMTP_HOST`` is not set, the function logs a warning and
+    returns without raising — callers should still complete the DB write.
+    """
+    smtp_host = os.getenv("WATCHTOWER_SMTP_HOST")
+    if not smtp_host:
+        logger.warning(
+            "Team invitation email NOT sent to %s — WATCHTOWER_SMTP_HOST is unset. "
+            "Set WATCHTOWER_SMTP_HOST (and optionally WATCHTOWER_SMTP_PORT / "
+            "WATCHTOWER_SMTP_USER / WATCHTOWER_SMTP_PASSWORD) to enable email.",
+            to_email,
+        )
+        return
+
+    smtp_port = int(os.getenv("WATCHTOWER_SMTP_PORT", "587"))
+    smtp_user = os.getenv("WATCHTOWER_SMTP_USER", "")
+    smtp_password = os.getenv("WATCHTOWER_SMTP_PASSWORD", "")
+    from_addr = os.getenv("WATCHTOWER_SMTP_FROM", "noreply@watchtower.local")
+    app_url = os.getenv("WATCHTOWER_APP_URL", "http://localhost:8000").rstrip("/")
+
+    login_link = f"{app_url}/login"
+
+    subject = f"You've been invited to join {org_name} on WatchTower"
+    body_text = (
+        f"Hi,\n\n"
+        f"{inviter_name} has invited you to join the organization \"{org_name}\" "
+        f"on WatchTower as a {role}.\n\n"
+        f"To accept the invitation, sign in here:\n{login_link}\n\n"
+        f"If you did not expect this invitation, you can safely ignore this email.\n\n"
+        f"— The WatchTower Team"
+    )
+    body_html = (
+        f"<p>Hi,</p>"
+        f"<p><strong>{inviter_name}</strong> has invited you to join the organization "
+        f"<strong>{org_name}</strong> on WatchTower as a <em>{role}</em>.</p>"
+        f"<p><a href=\"{login_link}\">Accept invitation &rarr;</a></p>"
+        f"<p>If you did not expect this invitation, you can safely ignore this email.</p>"
+        f"<p>&mdash; The WatchTower Team</p>"
+    )
+
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = subject
+    msg["From"] = from_addr
+    msg["To"] = to_email
+    msg.attach(MIMEText(body_text, "plain"))
+    msg.attach(MIMEText(body_html, "html"))
+
+    try:
+        with smtplib.SMTP(smtp_host, smtp_port, timeout=10) as server:
+            server.ehlo()
+            if smtp_port != 25:
+                server.starttls()
+                server.ehlo()
+            if smtp_user and smtp_password:
+                server.login(smtp_user, smtp_password)
+            server.sendmail(from_addr, [to_email], msg.as_string())
+        logger.info("Invitation email sent to %s for org %s", to_email, org_name)
+    except Exception:
+        # Non-fatal — the DB record was already committed, the user can be
+        # notified out-of-band. Log at ERROR so operators notice.
+        logger.exception(
+            "Failed to send invitation email to %s (SMTP %s:%s)",
+            to_email,
+            smtp_host,
+            smtp_port,
+        )
+
+
 
 
 def _owner_mode_enabled() -> bool:
@@ -776,7 +869,6 @@ async def github_login_oauth_callback(
 # Client ID and every install of WatchTower uses it.
 # ---------------------------------------------------------------------------
 
-
 @router.post("/auth/github/device/start")
 @limiter.limit("20/minute")
 async def start_github_device_flow(request: Request):
@@ -833,6 +925,281 @@ from pydantic import BaseModel as _PydBaseModel  # local import to avoid top-lev
 
 class DevicePollRequest(_PydBaseModel):
     device_code: str
+
+
+class DeviceConnectStartRequest(_PydBaseModel):
+    org_id: UUID
+
+
+class DeviceConnectPollRequest(_PydBaseModel):
+    device_code: str
+
+
+def _fetch_github_profile_with_email(access_token: str) -> dict:
+    profile_resp = requests.get(
+        "https://api.github.com/user",
+        headers={
+            "Accept": "application/json",
+            "Authorization": f"Bearer {access_token}",
+            "X-GitHub-Api-Version": "2022-11-28",
+        },
+        timeout=15,
+    )
+    if profile_resp.status_code >= 400:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Unable to fetch GitHub user profile",
+        )
+
+    profile = profile_resp.json()
+    if profile.get("email"):
+        return profile
+
+    # Backfill primary verified email if hidden in public profile.
+    try:
+        emails_resp = requests.get(
+            "https://api.github.com/user/emails",
+            headers={
+                "Accept": "application/json",
+                "Authorization": f"Bearer {access_token}",
+                "X-GitHub-Api-Version": "2022-11-28",
+            },
+            timeout=10,
+        )
+        if emails_resp.ok:
+            emails = emails_resp.json() or []
+            primary = next(
+                (e for e in emails if e.get("primary") and e.get("verified")),
+                next((e for e in emails if e.get("verified")), None),
+            )
+            if primary and primary.get("email"):
+                profile["email"] = primary["email"]
+    except requests.RequestException:
+        pass
+
+    return profile
+
+
+@router.post("/github/device/connect/start")
+@limiter.limit("20/minute")
+async def start_github_device_connect(
+    request: Request,
+    payload: DeviceConnectStartRequest,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(util.get_current_user),
+):
+    """Begin GitHub Device Flow for repository connection (org-scoped token storage)."""
+    _user, org, _member = _ensure_user_org_member(db, current_user)
+    if org.id != payload.org_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Cannot connect GitHub for a different organization.",
+        )
+
+    client_id = _device_flow_client_id()
+    if not client_id:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=(
+                "GitHub Device Flow client id is not configured. Set "
+                "WATCHTOWER_GITHUB_DEVICE_CLIENT_ID or GITHUB_OAUTH_CLIENT_ID."
+            ),
+        )
+
+    try:
+        resp = requests.post(
+            "https://github.com/login/device/code",
+            headers={"Accept": "application/json"},
+            data={
+                "client_id": client_id,
+                "scope": "read:user user:email repo",
+            },
+            timeout=15,
+        )
+    except requests.RequestException as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Unable to reach GitHub device endpoint",
+        ) from exc
+
+    if resp.status_code >= 400:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"GitHub device endpoint error: {resp.text[:200]}",
+        )
+
+    data = resp.json()
+    device_code = data.get("device_code")
+    if not device_code:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="GitHub did not return a device_code",
+        )
+
+    now = datetime.utcnow()
+    expires_in = int(data.get("expires_in", 900))
+
+    # Clean up expired sessions opportunistically.
+    db.query(GitHubDeviceConnectSession).filter(
+        GitHubDeviceConnectSession.expires_at < now,
+    ).delete(synchronize_session=False)
+
+    # Upsert by device_code so retries are idempotent.
+    existing_session = db.query(GitHubDeviceConnectSession).filter(
+        GitHubDeviceConnectSession.device_code == device_code,
+    ).first()
+    if existing_session:
+        existing_session.user_id = _current_user_uuid(current_user)
+        existing_session.org_id = payload.org_id
+        existing_session.created_at = now
+        existing_session.expires_at = datetime.utcfromtimestamp(now.timestamp() + expires_in)
+    else:
+        db.add(GitHubDeviceConnectSession(
+            device_code=device_code,
+            user_id=_current_user_uuid(current_user),
+            org_id=payload.org_id,
+            created_at=now,
+            expires_at=datetime.utcfromtimestamp(now.timestamp() + expires_in),
+        ))
+    db.commit()
+
+    return {
+        "device_code": device_code,
+        "user_code": data.get("user_code"),
+        "verification_uri": data.get("verification_uri"),
+        "verification_uri_complete": data.get("verification_uri_complete"),
+        "expires_in": expires_in,
+        "interval": max(int(data.get("interval", 5)), 1),
+    }
+
+
+@router.post("/github/device/connect/poll")
+@limiter.limit("120/minute")
+async def poll_github_device_connect(
+    request: Request,
+    payload: DeviceConnectPollRequest,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(util.get_current_user),
+):
+    """Poll GitHub device flow and persist org-scoped GitHub connection on success."""
+    now = datetime.utcnow()
+    # Clean up expired sessions opportunistically.
+    db.query(GitHubDeviceConnectSession).filter(
+        GitHubDeviceConnectSession.expires_at < now,
+    ).delete(synchronize_session=False)
+    db.commit()
+
+    session = db.query(GitHubDeviceConnectSession).filter(
+        GitHubDeviceConnectSession.device_code == payload.device_code,
+    ).first()
+    if not session:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Unknown or expired device flow session.",
+        )
+
+    current_uid = str(_current_user_uuid(current_user))
+    if str(session.user_id) != current_uid:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="This device flow session belongs to a different user.",
+        )
+
+    if session.expires_at < now:
+        db.delete(session)
+        db.commit()
+        return {"status": "expired_token"}
+
+    client_id = _device_flow_client_id()
+    if not client_id:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="GitHub Device Flow client id is not configured.",
+        )
+
+    try:
+        resp = requests.post(
+            "https://github.com/login/oauth/access_token",
+            headers={"Accept": "application/json"},
+            data={
+                "client_id": client_id,
+                "device_code": payload.device_code,
+                "grant_type": "urn:ietf:params:oauth:grant-type:device_code",
+            },
+            timeout=15,
+        )
+    except requests.RequestException as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Unable to reach GitHub token endpoint",
+        ) from exc
+
+    data = resp.json() if resp.headers.get("content-type", "").startswith("application/json") else {}
+    error = data.get("error")
+    if error:
+        return {"status": error, "interval": data.get("interval")}
+
+    access_token = data.get("access_token")
+    if not access_token:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="GitHub did not return an access token",
+        )
+
+    profile = _fetch_github_profile_with_email(access_token)
+    github_username = profile.get("login") or current_user.get("name", "github-user")
+
+    _user, org, _member = _ensure_user_org_member(db, current_user)
+    if str(org.id) != str(session.org_id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Organization context changed during device flow.",
+        )
+
+    existing = db.query(GitHubConnection).filter(
+        GitHubConnection.org_id == org.id,
+        GitHubConnection.user_id == _current_user_uuid(current_user),
+        GitHubConnection.provider == GitHubProvider.GITHUB_COM,
+    ).first()
+
+    if existing:
+        existing.github_username = github_username
+        existing.github_access_token = util.encrypt_secret(access_token)
+        existing.enterprise_url = None
+        existing.enterprise_name = None
+        existing.is_active = True
+        existing.is_primary = True
+        existing.last_synced = datetime.utcnow()
+        db.delete(session)
+        db.commit()
+        db.refresh(existing)
+        return {
+            "status": "success",
+            "github_username": existing.github_username,
+            "org_id": str(org.id),
+        }
+
+    connection = GitHubConnection(
+        user_id=_current_user_uuid(current_user),
+        org_id=org.id,
+        provider=GitHubProvider.GITHUB_COM,
+        github_username=github_username,
+        github_access_token=util.encrypt_secret(access_token),
+        enterprise_url=None,
+        enterprise_name=None,
+        is_primary=True,
+        is_active=True,
+        last_synced=datetime.utcnow(),
+    )
+    db.add(connection)
+    db.delete(session)
+    db.commit()
+    db.refresh(connection)
+    return {
+        "status": "success",
+        "github_username": connection.github_username,
+        "org_id": str(org.id),
+    }
 
 
 @router.post("/auth/github/device/poll")
@@ -1416,9 +1783,18 @@ async def invite_team_member(
         db.add(new_member)
         db.commit()
         db.refresh(new_member)
-        
-        # TODO: Send email invitation
-        
+
+        # Resolve org name and inviter display name for the email.
+        org = db.query(Organization).filter(Organization.id == org_id).first()
+        org_name = org.name if org else str(org_id)
+        inviter_name = current_user.get("name") or current_user.get("email") or "A WatchTower admin"
+        _send_invitation_email(
+            to_email=member_data.email,
+            org_name=org_name,
+            role=member_data.role.value if hasattr(member_data.role, "value") else str(member_data.role),
+            inviter_name=inviter_name,
+        )
+
         return new_member
     except Exception:
         db.rollback()
@@ -1789,3 +2165,140 @@ async def add_node_to_network(
         db.rollback()
         logger.exception("Adding node to network failed")
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unable to add node to network")
+
+
+@router.put("/node-networks/{network_id}", response_model=schemas.NodeNetworkResponse)
+async def update_node_network(
+    network_id: UUID,
+    update_data: schemas.NodeNetworkUpdate,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(util.get_current_user),
+):
+    """Update node network settings."""
+    user_id = _current_user_uuid(current_user)
+    _ensure_user_org_member(db, current_user)
+    network = db.query(NodeNetwork).filter(NodeNetwork.id == network_id).first()
+    if not network:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Network not found")
+
+    member = db.query(TeamMember).filter(
+        TeamMember.org_id == network.org_id,
+        TeamMember.user_id == user_id,
+    ).first()
+    if not member or not member.can_manage_nodes:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied")
+
+    if update_data.name is not None:
+        network.name = update_data.name
+    if update_data.description is not None:
+        network.description = update_data.description
+    if update_data.is_default is not None:
+        network.is_default = update_data.is_default
+    if update_data.load_balance is not None:
+        network.load_balance = update_data.load_balance
+    if update_data.health_check_interval is not None:
+        network.health_check_interval = update_data.health_check_interval
+
+    db.commit()
+    db.refresh(network)
+    return network
+
+
+@router.delete("/node-networks/{network_id}", status_code=204)
+async def delete_node_network(
+    network_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(util.get_current_user),
+):
+    """Delete a node network and all its member associations."""
+    user_id = _current_user_uuid(current_user)
+    _ensure_user_org_member(db, current_user)
+    network = db.query(NodeNetwork).filter(NodeNetwork.id == network_id).first()
+    if not network:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Network not found")
+
+    member = db.query(TeamMember).filter(
+        TeamMember.org_id == network.org_id,
+        TeamMember.user_id == user_id,
+    ).first()
+    if not member or not member.can_manage_nodes:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied")
+
+    db.query(NodeNetworkMember).filter(NodeNetworkMember.network_id == network_id).delete()
+    db.delete(network)
+    db.commit()
+    logger.info("Node network %s deleted", network_id)
+    return None
+
+
+@router.put("/node-networks/{network_id}/nodes/{node_id}", response_model=schemas.NodeNetworkResponse)
+async def update_node_in_network(
+    network_id: UUID,
+    node_id: UUID,
+    update_data: schemas.NodeNetworkMemberUpdate,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(util.get_current_user),
+):
+    """Update a node's priority/weight within a network."""
+    user_id = _current_user_uuid(current_user)
+    _ensure_user_org_member(db, current_user)
+    network = db.query(NodeNetwork).filter(NodeNetwork.id == network_id).first()
+    if not network:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Network not found")
+
+    member = db.query(TeamMember).filter(
+        TeamMember.org_id == network.org_id,
+        TeamMember.user_id == user_id,
+    ).first()
+    if not member or not member.can_manage_nodes:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied")
+
+    net_member = db.query(NodeNetworkMember).filter(
+        NodeNetworkMember.network_id == network_id,
+        NodeNetworkMember.node_id == node_id,
+    ).first()
+    if not net_member:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Node is not in this network")
+
+    if update_data.priority is not None:
+        net_member.priority = update_data.priority
+    if update_data.weight is not None:
+        net_member.weight = update_data.weight
+
+    db.commit()
+    db.refresh(network)
+    return network
+
+
+@router.delete("/node-networks/{network_id}/nodes/{node_id}", status_code=204)
+async def remove_node_from_network(
+    network_id: UUID,
+    node_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(util.get_current_user),
+):
+    """Remove a node from a network."""
+    user_id = _current_user_uuid(current_user)
+    _ensure_user_org_member(db, current_user)
+    network = db.query(NodeNetwork).filter(NodeNetwork.id == network_id).first()
+    if not network:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Network not found")
+
+    member = db.query(TeamMember).filter(
+        TeamMember.org_id == network.org_id,
+        TeamMember.user_id == user_id,
+    ).first()
+    if not member or not member.can_manage_nodes:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied")
+
+    net_member = db.query(NodeNetworkMember).filter(
+        NodeNetworkMember.network_id == network_id,
+        NodeNetworkMember.node_id == node_id,
+    ).first()
+    if not net_member:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Node is not in this network")
+
+    db.delete(net_member)
+    db.commit()
+    logger.info("Node %s removed from network %s", node_id, network_id)
+    return None

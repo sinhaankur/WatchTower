@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import apiClient from '@/lib/api';
@@ -49,6 +49,26 @@ const USE_CASE_META: Record<LocalProject['use_case'], { label: string; color: st
   docker_platform: { label: 'Docker App',         color: 'bg-cyan-100 text-cyan-700 border-cyan-200', dot: 'bg-cyan-500' },
 };
 
+/**
+ * Defensive deduplication: remove duplicate projects by name.
+ * Keeps the most recently created one if duplicates are found.
+ * (Backend now prevents duplicates, but this guards against any edge cases)
+ */
+function deduplicateProjects<T extends LocalProject>(projects: T[]): T[] {
+  const seen = new Map<string, { item: T; createdAt: number }>();
+  
+  projects.forEach((p) => {
+    const createdAt = new Date(p.created_at).getTime();
+    const existing = seen.get(p.name);
+    
+    if (!existing || createdAt > existing.createdAt) {
+      seen.set(p.name, { item: p, createdAt });
+    }
+  });
+  
+  return Array.from(seen.values()).map((v) => v.item);
+}
+
 // ── Small components ──────────────────────────────────────────────────────────
 function StatCard({ label, value, sub, accent }: { label: string; value: string | number; sub?: string; accent?: string }) {
   return (
@@ -81,6 +101,8 @@ function NoticeBanner({ notice }: { notice: Notice }) {
 
 // ── Main Dashboard ────────────────────────────────────────────────────────────
 const Dashboard = () => {
+  const location = useLocation();
+  const navigate = useNavigate();
   const [projects, setProjects]           = useState<LocalProject[]>([]);
   const [loading, setLoading]             = useState(true);
   const [serverStatus, setServerStatus]   = useState<'checking' | 'online' | 'offline'>('checking');
@@ -174,7 +196,7 @@ const Dashboard = () => {
     try {
       const proj = await apiClient.get('/projects');
       const rows = (proj.data as any[]) ?? [];
-      setProjects(rows.map((p) => ({
+      const mapped = rows.map((p) => ({
         id:               String(p.id),
         name:             p.name ?? 'Unnamed Project',
         use_case:         (p.use_case ?? 'docker_platform') as LocalProject['use_case'],
@@ -185,7 +207,8 @@ const Dashboard = () => {
         repo_url:         p.repo_url ?? '',
         repo_branch:      p.repo_branch ?? 'main',
         created_at:       p.created_at ?? new Date().toISOString(),
-      })));
+      }));
+      setProjects(deduplicateProjects(mapped));
       setDataSource('server');
     } catch (err) {
       if (apiReachable) {
@@ -224,6 +247,28 @@ const Dashboard = () => {
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    const navState = (location.state ?? null) as null | {
+      just_created?: string;
+      source_type?: 'github' | 'local_folder';
+      initial_deploy_queued?: boolean;
+    };
+    if (!navState?.just_created) return;
+
+    if (navState.source_type === 'github') {
+      if (navState.initial_deploy_queued) {
+        showNotice('success', `Project ${navState.just_created} created. Initial deployment queued and repository clone has started.`);
+      } else {
+        showNotice('info', `Project ${navState.just_created} created. Click Deploy to start cloning and building from GitHub.`);
+      }
+    } else {
+      showNotice('success', `Project ${navState.just_created} created successfully.`);
+    }
+
+    navigate(location.pathname, { replace: true, state: null });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.state]);
 
   const stats = useMemo(() => ({
     total:  projects.length,
