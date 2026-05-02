@@ -121,15 +121,18 @@ jobs:
           $InstallDir = Join-Path $env:RUNNER_TEMP "WatchTowerAppCenter"
           $ConfigDir = Join-Path $env:RUNNER_TEMP "WatchTowerConfig"
           
-          Start-Process -FilePath pwsh `
+          $ApiProcess = Start-Process -FilePath pwsh `
             -ArgumentList "-NoProfile -NonInteractive -ExecutionPolicy Bypass -File '$InstallDir\install\run_app_center_windows.ps1' -InstallDir '$InstallDir' -ConfigDir '$ConfigDir'" `
             -NoNewWindow -PassThru `
             -RedirectStandardOutput "api.log" `
-            -RedirectStandardError "api-error.log" `
-            | Out-Null
+            -RedirectStandardError "api-error.log"
+
+          $PidFile = Join-Path $env:RUNNER_TEMP "watchtower-api.pid"
+          Set-Content -Path $PidFile -Value $ApiProcess.Id
+          Write-Host "Started App Center process PID: $($ApiProcess.Id)"
           
           Write-Host "Backend started, waiting for health check..."
-          Start-Sleep -Seconds 3
+          Start-Sleep -Seconds 5
 
       - name: Health check
         shell: pwsh
@@ -137,10 +140,23 @@ jobs:
           $ErrorActionPreference = 'Stop'
           Set-StrictMode -Version Latest
 
-          $MaxRetries = 10
+          $PidFile = Join-Path $env:RUNNER_TEMP "watchtower-api.pid"
+          $ApiPid = $null
+          if (Test-Path $PidFile) {
+            $ApiPid = [int](Get-Content -Path $PidFile -Raw).Trim()
+            Write-Host "Monitoring App Center process PID: $ApiPid"
+          }
+
+          $MaxRetries = 30
+          $RetryDelaySeconds = 3
           $RetryCount = 0
           
           while ($RetryCount -lt $MaxRetries) {
+            if ($ApiPid -and -not (Get-Process -Id $ApiPid -ErrorAction SilentlyContinue)) {
+              Write-Host "App Center process PID $ApiPid exited before becoming healthy." -ForegroundColor Red
+              break
+            }
+
             try {
               $HealthData = Invoke-RestMethod -Uri "http://127.0.0.1:8000/health" -TimeoutSec 5
               
@@ -152,8 +168,8 @@ jobs:
             } catch {
               $RetryCount++
               if ($RetryCount -lt $MaxRetries) {
-                Write-Host "Retry $RetryCount/$MaxRetries..."
-                Start-Sleep -Seconds 2
+                Write-Host "Retry $RetryCount/$MaxRetries failed: $($_.Exception.Message)"
+                Start-Sleep -Seconds $RetryDelaySeconds
               }
             }
           }
