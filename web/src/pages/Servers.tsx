@@ -50,7 +50,13 @@ const STEP_LABELS = ['Basic Info', 'SSH Access', 'Deployment'];
 
 const Servers = () => {
   const { data: me } = useMe();
-  const isGuest = me?.is_guest === true || me?.is_github_authenticated === false;
+  // Only ACTUAL guests are restricted from adding remote servers.
+  // API-token users (single-user desktop installs that don't go through
+  // GitHub OAuth) are NOT guests — they're the operator and should keep
+  // full access to node management. The previous version conflated
+  // "lacks GitHub auth" with "is a guest", which broke single-user
+  // desktop installs.
+  const isGuest = me?.is_guest === true;
   const [orgId, setOrgId]           = useState('');
   const [orgName, setOrgName]       = useState('');
   const [nodes, setNodes]           = useState<OrgNode[]>([]);
@@ -223,7 +229,7 @@ const Servers = () => {
             <div className="text-sm">
               <p className="text-slate-800 font-medium">Guest mode — local deployments only.</p>
               <p className="text-xs text-slate-600 mt-0.5">
-                Adding a remote server requires a GitHub-authenticated session so the audit trail attributes the change to a real identity. <Link to="/login" className="text-red-700 hover:text-red-800 font-medium">Sign in with GitHub</Link>.
+                Guest mode can't register remote SSH servers. <Link to="/login" className="text-red-700 hover:text-red-800 font-medium">Sign in with GitHub</Link> or sign in with your server's API token to continue.
               </p>
             </div>
           </div>
