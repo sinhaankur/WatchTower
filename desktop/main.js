@@ -671,9 +671,75 @@ ipcMain.on('wt:getAuthBootstrap', (event) => {
 });
 
 // Prevents a second Electron process from opening a duplicate splash window.
-const gotSingleInstanceLock = app.requestSingleInstanceLock();
+//
+// Stale-lock self-healing: if a previous instance died abnormally (kill -9,
+// OOM, segfault, system crash), the SingletonLock symlink in
+// ~/.config/<app>/ keeps pointing at a dead PID. New launches then fail
+// requestSingleInstanceLock(), schedule app.quit(), and the splash flashes
+// for a few seconds before the app silently dies. That symptom is exactly
+// what users hit when they say "the splash opens then disappears" — the
+// most common cause of "WatchTower won't launch" reports we've seen.
+//
+// The fix: if the lock is held, parse the PID out of the SingletonLock
+// symlink target ("hostname-PID" format), check if that PID is alive, and
+// if it isn't, remove the stale symlinks and try the lock again.
+//
+// We do NOT force-clear if the PID is alive (that would race with a real
+// running instance and the second-instance handler would be the right
+// path anyway).
+function tryAcquireSingletonLock() {
+  if (app.requestSingleInstanceLock()) return true;
+
+  // Lock denied. Inspect the SingletonLock symlink target.
+  const userDataDir = app.getPath('userData');
+  const lockLink = path.join(userDataDir, 'SingletonLock');
+  let staleClearable = false;
+  try {
+    const target = fs.readlinkSync(lockLink);
+    // Format on Linux: "<hostname>-<pid>". Pull the trailing PID.
+    const match = String(target).match(/-(\d+)$/);
+    const pid = match ? Number(match[1]) : null;
+    if (pid && pid > 0) {
+      // process.kill with signal 0 throws if the PID isn't alive (or
+      // if we don't own it). For our purposes, "throws" = "stale".
+      try {
+        process.kill(pid, 0);
+      } catch {
+        staleClearable = true;
+      }
+    } else {
+      // Couldn't parse a PID; treat as stale rather than leaving the
+      // user stuck with a flashing-splash forever.
+      staleClearable = true;
+    }
+  } catch (err) {
+    if (err && err.code === 'EINVAL') {
+      // Not a symlink — we can't introspect, but if a regular file is
+      // here without a corresponding live process, treating it as
+      // stale is the right call. The worst case is a benign retry.
+      staleClearable = true;
+    } else if (err && err.code !== 'ENOENT') {
+      // ENOENT means there's no lock to clear — falling through means
+      // the caller will see the lock denial and quit, which is correct.
+      console.warn('[WatchTower] SingletonLock readlink failed:', err.message);
+    }
+  }
+
+  if (!staleClearable) return false;
+
+  // Remove the stale set and retry. We delete all three Singleton*
+  // entries because Electron treats them as a triple — leaving any one
+  // behind makes the next requestSingleInstanceLock fail again.
+  for (const name of ['SingletonLock', 'SingletonCookie', 'SingletonSocket']) {
+    try { fs.unlinkSync(path.join(userDataDir, name)); } catch { /* ENOENT etc. */ }
+  }
+  console.warn('[WatchTower] cleared stale SingletonLock from a dead prior instance');
+  return app.requestSingleInstanceLock();
+}
+
+const gotSingleInstanceLock = tryAcquireSingletonLock();
 if (!gotSingleInstanceLock) {
-  // Another instance is already running — focus it and exit immediately.
+  // Another instance is genuinely running — focus it and exit immediately.
   app.quit();
 }
 
