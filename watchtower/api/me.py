@@ -89,6 +89,17 @@ async def get_me(
         pass
 
     is_github_authenticated = bool(github_id)
+    # is_guest is keyed off the guest email, NOT off "lacks github_id".
+    # Three identity classes here, only ONE of which is meant to be limited:
+    #   1. GitHub-authenticated user → full access
+    #   2. API-token user (operator who installed the server, no GitHub
+    #      OAuth configured) → full access; they ARE the operator
+    #   3. Guest (clicked "Continue as Guest") → limited, gated below
+    # The previous logic conflated #2 with #3 by checking github_id alone,
+    # which locked single-user desktop installs out of adding deploy nodes
+    # whenever they used the WATCHTOWER_API_TOKEN auth path. Surfaced via
+    # user feedback ("adding remote deployment nodes requires a GitHub-
+    # authenticated session" while signed in via API token).
     is_guest = (not is_github_authenticated) and (email == "guest@watchtower.local")
 
     return MeResponse(
@@ -102,9 +113,10 @@ async def get_me(
         role=role,
         can_manage_team=can_manage_team,
         can_manage_deployments=can_manage_deployments,
-        # Guests can NOT register remote nodes — UI hides the affordance
-        # too, but enforce here as well so direct API calls also fail.
-        can_manage_nodes=can_manage_nodes and is_github_authenticated,
+        # Only guests are blocked from registering remote nodes. API-token
+        # operators and GitHub-authenticated users keep can_manage_nodes
+        # exactly as their TeamMember row says.
+        can_manage_nodes=can_manage_nodes and not is_guest,
         can_create_projects=can_create_projects,
         is_guest=is_guest,
         is_github_authenticated=is_github_authenticated,
