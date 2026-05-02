@@ -1,0 +1,8 @@
+# Default: auto-detect text files and normalize line endings.
+* text=auto
+
+# Windows installer scripts must use CRLF on Windows checkout.
+install/*.ps1  text eol=crlf
+install/*.cmd  text eol=crlf
+scripts/install-powershell-windows.ps1  text eol=crlf
+desktop/scripts/*.ps1  text eol=crlf
