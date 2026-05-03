@@ -26,15 +26,40 @@ classifiers = [
   "Operating System :: Microsoft :: Windows",
   "Operating System :: MacOS"
 ]
+# Keep this list in sync with requirements.txt. requirements.txt holds
+# the pinned versions used by the dev clone / CI / Docker image; the
+# bounds here are looser so PyPI / pipx consumers' resolvers have room
+# to move. Anything imported by the runtime must appear here, otherwise
+# `pipx install watchtower-podman` produces a partial install that
+# crashes at first use (regression that bit 1.6.x — see CHANGELOG 1.6.3).
 dependencies = [
-  "pyyaml>=6.0",
-  "apscheduler>=3.10.0",
-  "podman>=4.0.0",
-  "requests>=2.28.0",
+  # Core API
   "fastapi>=0.110.0",
   "uvicorn>=0.29.0",
+  "pydantic>=2.0.0",
+  "pydantic-settings>=2.1.0",
+  "python-dotenv>=1.0.0",
+  # Database + migrations
+  "sqlalchemy>=2.0.0",
+  "alembic>=1.13.0",
+  "psycopg2-binary>=2.9.0",
+  # Crypto / secret storage
+  "cryptography>=42.0.0",
+  # Misc utilities
+  "pyyaml>=6.0",
+  "apscheduler>=3.10.0",
+  "requests>=2.28.0",
   "fabric>=3.2.0",
-  "pydantic>=2.0.0"
+  "httpx>=0.25.0",
+  # Build queue (RQ + Redis); falls back to in-process when REDIS_URL unset
+  "redis>=5.0.0",
+  "rq>=1.16.0",
+  # LLM agent — talks to any OpenAI-compatible endpoint
+  "openai>=1.50.0",
+  # Rate limiting
+  "slowapi>=0.1.9",
+  # Container update mode (Podman SDK has Linux wheels only)
+  "podman>=4.0.0; sys_platform == 'linux'",
 ]
 
 [project.urls]
