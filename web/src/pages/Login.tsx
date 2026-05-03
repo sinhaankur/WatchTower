@@ -783,7 +783,7 @@ const Login = () => {
                     <p className="text-amber-700">⚠ <strong>Insecure dev mode enabled</strong> — set <code className="font-mono bg-amber-50 px-1 rounded">WATCHTOWER_ALLOW_INSECURE_DEV_AUTH=false</code> in production.</p>
                   )}
                   {authStatus?.installation?.owner_mode_enabled && (
-                    <p className="text-blue-700"><strong>Installation ownership is active.</strong> If this is your machine and you're locked out, ask the owner to invite you, or clear <code className="font-mono bg-blue-50 px-1 rounded">~/.watchtower/watchtower.db</code>'s <code className="font-mono bg-blue-50 px-1 rounded">installation_claims</code> row.</p>
+                    <p className="text-blue-700"><strong>Installation ownership is active.</strong> If this is your machine and you're locked out, ask the owner to invite you — or, if you have shell access, run <code className="font-mono bg-blue-50 px-1 rounded">watchtower-deploy reset-installation-owner</code> and the next sign-in claims it.</p>
                   )}
                 </div>
               </details>
