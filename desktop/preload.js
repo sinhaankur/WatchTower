@@ -48,5 +48,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Open the user's mail client with a pre-filled bug report addressed
   // to the maintainer (system info + log tail). User reviews and sends.
   openErrorReport: (payload) => ipcRenderer.invoke('wt:openErrorReport', payload ?? {}),
+  // Setup-mode helpers used when backend prerequisites are missing.
+  openTerminal: () => ipcRenderer.invoke('wt:openTerminal'),
+  copyText: (text) => ipcRenderer.invoke('wt:copyText', text ?? ''),
+  openExternal: (url) => ipcRenderer.invoke('wt:openExternal', url ?? ''),
   platform: process.platform,
 });

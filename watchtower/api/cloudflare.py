@@ -34,9 +34,10 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
+from watchtower import cloudflare_dns
 from watchtower.api import audit as audit_log
 from watchtower.api import util
-from watchtower.database import CloudflareCredential, get_db
+from watchtower.database import CloudflareCredential, CustomDomain, Project, get_db
 
 router = APIRouter(prefix="/api/integrations/cloudflare", tags=["Integrations"])
 logger = logging.getLogger(__name__)
@@ -243,6 +244,177 @@ async def verify_cloudflare_credential(
     db.commit()
     db.refresh(cred)
     return cred
+
+
+# ── Phase 2: DNS sync for custom domains ──────────────────────────────────────
+
+
+class CloudflareDnsSyncRequest(BaseModel):
+    credential_id: UUID = Field(..., description="Which CloudflareCredential row to use.")
+    target_ip: str = Field(..., min_length=4, description="IPv4 address the A record should point at.")
+    proxied: bool = Field(False, description="Run traffic through Cloudflare proxy. Phase 2 leaves this off — Phase 3 LB integration flips it.")
+
+
+class CloudflareDnsStatus(BaseModel):
+    domain: str
+    cloudflare_credential_id: Optional[UUID] = None
+    cloudflare_zone_id: Optional[str] = None
+    cloudflare_record_id: Optional[str] = None
+    cloudflare_target_ip: Optional[str] = None
+    cloudflare_synced_at: Optional[datetime] = None
+
+
+def _load_owned_domain(db: Session, project_id: UUID, domain_id: UUID, current_user: dict) -> CustomDomain:
+    """Resolve a CustomDomain that belongs to a project the caller owns
+    (or is a member of via canonical org). Mirrors how the rest of
+    /api/projects/* gates access."""
+    user, org = _resolve_org(db, current_user)
+    project = (
+        db.query(Project)
+        .filter(Project.id == project_id)
+        .filter((Project.owner_id == user.id) | (Project.org_id == org.id))
+        .first()
+    )
+    if not project:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found.")
+    domain = (
+        db.query(CustomDomain)
+        .filter(CustomDomain.id == domain_id, CustomDomain.project_id == project.id)
+        .first()
+    )
+    if not domain:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Domain not found on this project.")
+    return domain
+
+
+@router.post("/projects/{project_id}/domains/{domain_id}/sync", response_model=CloudflareDnsStatus)
+async def sync_domain_to_cloudflare(
+    project_id: UUID,
+    domain_id: UUID,
+    payload: CloudflareDnsSyncRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(util.get_current_user),
+):
+    """Create or update the Cloudflare A record for this CustomDomain.
+
+    Idempotent — calling twice with the same target_ip results in one
+    record. Stores the resulting zone_id + record_id back on the domain
+    so subsequent syncs skip the zone-lookup roundtrip.
+    """
+    domain = _load_owned_domain(db, project_id, domain_id, current_user)
+
+    cred = (
+        db.query(CloudflareCredential)
+        .filter(CloudflareCredential.id == payload.credential_id, CloudflareCredential.org_id == domain.project.org_id)
+        .first()
+    )
+    if not cred:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cloudflare credential not found in this org.")
+
+    plaintext = util.decrypt_secret(cred.api_token_encrypted)
+    if not plaintext:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Could not decrypt stored Cloudflare token — WATCHTOWER_SECRET_KEY may have changed.",
+        )
+
+    try:
+        result = cloudflare_dns.sync_a_record(
+            plaintext,
+            domain.domain,
+            payload.target_ip,
+            existing_zone_id=domain.cloudflare_zone_id,
+            existing_record_id=domain.cloudflare_record_id,
+            proxied=payload.proxied,
+        )
+    except cloudflare_dns.CloudflareDnsError as exc:
+        raise HTTPException(status_code=exc.status, detail=exc.detail) from exc
+
+    domain.cloudflare_credential_id = cred.id
+    domain.cloudflare_zone_id = result.zone_id
+    domain.cloudflare_record_id = result.record_id
+    domain.cloudflare_target_ip = result.target_ip
+    domain.cloudflare_synced_at = datetime.now(timezone.utc).replace(tzinfo=None)
+
+    audit_log.record_for_user(
+        db, current_user,
+        action="cloudflare.dns.sync",
+        entity_type="custom_domain",
+        entity_id=domain.id,
+        org_id=domain.project.org_id,
+        request=request,
+        extra={
+            "domain": domain.domain,
+            "target_ip": payload.target_ip,
+            "zone_id": result.zone_id,
+            "credential_id": str(cred.id),
+        },
+    )
+    db.commit()
+    db.refresh(domain)
+    return CloudflareDnsStatus(
+        domain=domain.domain,
+        cloudflare_credential_id=domain.cloudflare_credential_id,
+        cloudflare_zone_id=domain.cloudflare_zone_id,
+        cloudflare_record_id=domain.cloudflare_record_id,
+        cloudflare_target_ip=domain.cloudflare_target_ip,
+        cloudflare_synced_at=domain.cloudflare_synced_at,
+    )
+
+
+@router.post("/projects/{project_id}/domains/{domain_id}/unsync", response_model=CloudflareDnsStatus)
+async def unsync_domain_from_cloudflare(
+    project_id: UUID,
+    domain_id: UUID,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(util.get_current_user),
+):
+    """Delete the A record from Cloudflare and clear the linked
+    columns. Treats a missing-on-Cloudflare record as success (the
+    desired end state is "no record")."""
+    domain = _load_owned_domain(db, project_id, domain_id, current_user)
+    if not domain.cloudflare_credential_id or not domain.cloudflare_record_id or not domain.cloudflare_zone_id:
+        # Nothing to do — return current (empty) status. Idempotent.
+        return CloudflareDnsStatus(domain=domain.domain)
+
+    cred = db.query(CloudflareCredential).filter(CloudflareCredential.id == domain.cloudflare_credential_id).first()
+    if cred:
+        plaintext = util.decrypt_secret(cred.api_token_encrypted)
+        if plaintext:
+            try:
+                cloudflare_dns.delete_a_record(plaintext, domain.cloudflare_zone_id, domain.cloudflare_record_id)
+            except cloudflare_dns.CloudflareDnsError as exc:
+                # Token revoked or zone gone — clear the columns anyway,
+                # since the operator's intent is "stop managing this
+                # record". They can re-sync after fixing the credential.
+                logger.warning(
+                    "Cloudflare unsync for domain %s failed (%s); clearing local link anyway.",
+                    domain.domain, exc.detail,
+                )
+
+    audit_log.record_for_user(
+        db, current_user,
+        action="cloudflare.dns.unsync",
+        entity_type="custom_domain",
+        entity_id=domain.id,
+        org_id=domain.project.org_id,
+        request=request,
+        extra={
+            "domain": domain.domain,
+            "zone_id": domain.cloudflare_zone_id,
+            "record_id": domain.cloudflare_record_id,
+        },
+    )
+    domain.cloudflare_credential_id = None
+    domain.cloudflare_zone_id = None
+    domain.cloudflare_record_id = None
+    domain.cloudflare_target_ip = None
+    domain.cloudflare_synced_at = None
+    db.commit()
+    db.refresh(domain)
+    return CloudflareDnsStatus(domain=domain.domain)
 
 
 @router.delete("/{cred_id}", status_code=status.HTTP_204_NO_CONTENT)
