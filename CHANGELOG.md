@@ -9,6 +9,27 @@ Curated, human-friendly history of WatchTower releases. Auto-generated GitHub Re
 
 ---
 
+## 1.7.0 — Cloudflare integration (Phase 1: foundation)
+
+The first slice of Cloudflare support: **store and verify API tokens** so future phases can use them. Phase 1 ships no user-visible deployment automation on its own — it lays the rails. Roadmap:
+
+- **Phase 1 (this release)** — token storage, verification against Cloudflare API, CRUD UI in Integrations.
+- **Phase 2** — auto-manage DNS A/AAAA records when a project gains a custom domain.
+- **Phase 3** — provision a Cloudflare Load Balancer with primary + standby pool members so traffic fails over automatically when a node goes down.
+- **Phase 4** — Cloudflare Tunnel connectors per node so HA works for nodes behind NAT (home self-hosting).
+
+What's in this release:
+
+- New `CloudflareCredential` model + migration `3603b4e517f3`. Tokens stored encrypted via `WATCHTOWER_SECRET_KEY` (Fernet); plaintext only round-trips through `decrypt_secret` at use time.
+- New `watchtower/api/cloudflare.py` router with four endpoints under `/api/integrations/cloudflare`: list, create (with verification), per-credential re-verify, delete. All audited.
+- Verification calls Cloudflare's `/user/tokens/verify` then `/accounts` to capture the friendly account name. Saving an unverifiable token returns 400 — no silent broken-credential rows.
+- New "Cloudflare" section in **Integrations** page: connect a token, see verified accounts, re-verify, remove.
+- Token plaintext is **never** returned by the API. Read responses carry only account_id, account_name, and last_verified_at.
+
+To use: get a Cloudflare API token at [dash.cloudflare.com → API Tokens](https://dash.cloudflare.com/profile/api-tokens). For Phase 2+ the recommended scopes will be Account Settings:Read + Zone:Read + DNS:Edit; Phase 1 only needs the verify endpoint, which any token can call.
+
+Tests: 226 pass.
+
 ## 1.6.5 — Login UX: GitHub sign-in is the obvious primary path
 
 The earlier login page made every auth method a full-width button stacked one after another, with the "Quick Dev Login" rendered as a giant red CTA at the top and "Continue as Guest" full-width below GitHub sign-in. New users skipped past GitHub, landed in Guest mode, then hit "Guest mode can't deploy to remote nodes" walls. Instead of fixing the walls, fixed the funnel.

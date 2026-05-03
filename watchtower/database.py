@@ -609,6 +609,37 @@ class AuditEvent(Base):
     extra_json = Column(Text, nullable=True)
 
 
+class CloudflareCredential(Base):
+    """A Cloudflare API token scoped to one org.
+
+    Stored encrypted via ``encrypt_secret`` (Fernet, key in
+    ``WATCHTOWER_SECRET_KEY``); the plaintext token only round-trips
+    through ``decrypt_secret`` at use time. The ``account_id`` is the
+    Cloudflare account UUID the token is scoped to — surfaced so the
+    UI can show "which Cloudflare account am I connected to" without
+    decrypting the token.
+
+    One row per org. The label is operator-chosen (e.g. "Personal CF",
+    "Work CF") so multi-account flows are possible later, but Phase 1
+    treats the most-recent row per org as the active credential.
+    """
+    __tablename__ = "cloudflare_credentials"
+
+    id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    org_id = Column(Uuid(as_uuid=True), ForeignKey("organizations.id"), nullable=False, index=True)
+    label = Column(String, nullable=True)
+    account_id = Column(String, nullable=True)            # Cloudflare account UUID
+    account_name = Column(String, nullable=True)          # Cloudflare account display name
+    api_token_encrypted = Column(Text, nullable=False)    # encrypt_secret() output
+    last_verified_at = Column(DateTime, nullable=True)    # last successful CF API ping
+    created_by_user_id = Column(Uuid(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    created_at = Column(DateTime, default=_utcnow, nullable=False)
+    updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow, nullable=False)
+
+    organization = relationship("Organization", backref="cloudflare_credentials")
+    created_by = relationship("User")
+
+
 class NotificationWebhook(Base):
     """Discord / Slack webhook for deployment notifications per project."""
     __tablename__ = "notification_webhooks"
