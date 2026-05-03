@@ -120,27 +120,75 @@ function checkForAppUpdates(win) {
     });
 
     autoUpdater.on('update-downloaded', (info) => {
-      console.log(`[WatchTower] Update ${info.version} downloaded — will apply on next quit`);
-      try {
-        if (Notification.isSupported()) {
-          const n = new Notification({
-            title: 'WatchTower update ready',
-            body: `Version ${info.version} will be applied next time you quit.`,
-            silent: true,
-            ...(APP_ICON ? { icon: APP_ICON } : {}),
-          });
-          n.on('click', () => {
-            if (mainWindow && !mainWindow.isDestroyed()) mainWindow.focus();
-          });
-          n.show();
+      console.log(`[WatchTower] Update ${info.version} downloaded — prompting user to restart`);
+      // 1.10 change: stop relying on the silent autoInstallOnAppQuit
+      // path. Two reasons:
+      //   1. On macOS the .app is unsigned (no Apple Developer ID), so
+      //      electron-updater silently fails to atomically replace the
+      //      bundle on quit. The user sees "update ready" and then the
+      //      app comes back as the old version — looks broken.
+      //   2. Even on Linux, the silent-on-quit path is invisible —
+      //      users don't know an update was applied until they read
+      //      the splash version.
+      // Prompt explicitly with a Restart Now / Later choice. On Mac
+      // we also offer "Download Manually" so the user has an escape
+      // hatch when the in-place install fails. The release URL is the
+      // landing page; the bundled DMG link is one click away.
+      const isMac = process.platform === 'darwin';
+      const buttons = isMac
+        ? ['Restart and Install', 'Download Manually', 'Later']
+        : ['Restart and Install', 'Later'];
+      const releaseUrl = `https://github.com/sinhaankur/WatchTower/releases/tag/v${info.version}`;
+      dialog.showMessageBox(mainWindow || win, {
+        type: 'info',
+        title: 'WatchTower update ready',
+        message: `Version ${info.version} is ready to install.`,
+        detail: isMac
+          ? 'Click Restart and Install to apply now. If the restart fails to update (unsigned macOS builds occasionally fail to overwrite the app), use Download Manually to grab the installer from GitHub.'
+          : 'Click Restart and Install to apply the update now.',
+        buttons,
+        defaultId: 0,
+        cancelId: buttons.length - 1,
+      }).then(({ response }) => {
+        if (response === 0) {
+          // Try the in-place install. If electron-updater can't apply
+          // the update (most often on unsigned Mac), the app will
+          // simply come back as the old version — at least the user
+          // saw the prompt and knows to try the manual path.
+          try {
+            autoUpdater.quitAndInstall(false, true);
+          } catch (err) {
+            console.warn('[WatchTower] quitAndInstall threw:', err.message);
+            shell.openExternal(releaseUrl);
+          }
+        } else if (isMac && response === 1) {
+          shell.openExternal(releaseUrl);
         }
-      } catch (err) {
-        console.warn('[WatchTower] Update notification failed:', err.message);
-      }
+      }).catch((err) => {
+        console.warn('[WatchTower] Update prompt failed:', err.message);
+      });
     });
 
     autoUpdater.on('error', (err) => {
       console.warn('[WatchTower] Auto-update check failed:', err.message);
+      // Surface to user so silent-failure isn't the default story. We
+      // intentionally don't show this on every check — only on errors
+      // that happen mid-download (after update-available fired). The
+      // initial "no update" check failures are still silent.
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        const releaseUrl = 'https://github.com/sinhaankur/WatchTower/releases/latest';
+        dialog.showMessageBox(mainWindow, {
+          type: 'warning',
+          title: 'Auto-update failed',
+          message: 'WatchTower could not finish the update.',
+          detail: `${err.message || 'Unknown error.'}\n\nYou can install the latest version manually from GitHub.`,
+          buttons: ['Open Release Page', 'Dismiss'],
+          defaultId: 0,
+          cancelId: 1,
+        }).then(({ response }) => {
+          if (response === 0) shell.openExternal(releaseUrl);
+        }).catch(() => {});
+      }
     });
 
     autoUpdater.checkForUpdates().catch((err) => {

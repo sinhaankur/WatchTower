@@ -9,6 +9,31 @@ Curated, human-friendly history of WatchTower releases. Auto-generated GitHub Re
 
 ---
 
+## 1.10.0 — Cross-platform service controls + visible auto-update
+
+The desktop app was originally written assuming Linux + systemd. On macOS three things were broken at once: the Podman watchdog and WatchTower auto-update daemon cards both showed misleading "unavailable / not installed" badges, the Podman **Start** button on the Integrations page returned `sudo: a password is required` (because there's no systemd on the Mac host), and macOS auto-update silently failed because the `.app` is unsigned and `electron-updater` can't atomically replace an unsigned bundle. All four are fixed.
+
+### Cross-platform service surface
+- New `_host_platform()` helper in `watchtower/api/runtime.py` returns `mac | linux | windows`.
+- `_podman_watchdog_status()` and `_watchtower_service_status()` short-circuit on non-Linux with `supported: false` plus a human-readable `message`. The corresponding enable/disable endpoints return 501 with the same message instead of running `systemctl` and failing with shell garbage.
+- `_SERVICE_MAP['podman']` is now type `podman` (not `systemd`). The new `_control_podman()` runs `podman machine start|stop|restart` on Mac/Windows and falls back to `sudo systemctl <action> podman.socket` on Linux.
+- `_do_service_control()` now returns a structured 500 with `{message, command, needs_terminal, platform}` so the UI can offer Copy / Open in Terminal buttons instead of dumping raw `stderr`.
+
+### Frontend platform awareness
+- `WatchdogStatus` type extended with `supported`, `platform`, `message`. New `PlatformNotApplicable` card renders a clean "Not applicable on macOS / Windows" state for both `WatchdogCard` and `WatchTowerServiceCard` instead of the broken toggle.
+- `ServiceControls.doAction` recognises the structured `ControlErrorDetail`. When `needs_terminal === true` it renders the attempted command in a one-line `$ …` strip with **Copy** and **Open Terminal** buttons (the latter uses the existing `wt:openTerminal` IPC bridge from 1.9.0; copy primes the clipboard so paste-and-run is one keystroke).
+- Podman card no longer advertises `enable / disable` actions — those don't apply to `podman machine` and the Linux equivalent (systemd boot persistence) is the watchdog card's job.
+
+### Auto-update is no longer silent
+- The previous "download in background, apply on quit" path made the most common failure mode (unsigned macOS builds losing the atomic-replace race) **completely invisible** — users would quit, reopen, see the same version, and conclude updates were broken. Replaced with an explicit `dialog.showMessageBox` on `update-downloaded`:
+  - **Restart and Install** (default) → calls `autoUpdater.quitAndInstall(false, true)`.
+  - **Download Manually** (Mac only) → opens the GitHub release page so the user can grab the `.dmg` directly.
+  - **Later** → dismiss; we'll prompt again next launch.
+- `autoUpdater.on('error')` now surfaces a recoverable dialog with an **Open Release Page** button. Previously a mid-download error went only to `console.warn` — invisible to the user.
+
+### What this unblocks
+The Podman **Start** button on Integrations actually starts the engine on Mac (via `podman machine start`) instead of failing with a sudo error. The "Autonomous Operation" section stops cluttering the page with Linux-only daemons that can't work on a laptop. Update prompts arrive with a button to press, not a notification to dismiss and forget. Long-term fix for the unsigned-Mac auto-update is signing + notarization via Apple Developer ID; until then, **Download Manually** is the reliable escape hatch.
+
 ## 1.9.1 — CI: retry npm install on transient 502s
 
 The macOS build of v1.9.0 lost a 502 from Electron's binary-download mirror during `npm install` and shipped without any `.dmg` artifacts, breaking auto-update for every existing macOS install. Wrapped both `npm install` steps (web + desktop) in 3-attempt retry loops with exponential-ish backoff (20s, 40s, 60s). Self-heals the next time the registry blips.
