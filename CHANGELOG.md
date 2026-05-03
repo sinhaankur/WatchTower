@@ -9,6 +9,25 @@ Curated, human-friendly history of WatchTower releases. Auto-generated GitHub Re
 
 ---
 
+## 1.10.1 — Mac/Windows install commands + Docker Desktop launcher
+
+User on macOS hit a wall the moment they followed the Integrations page install steps: the UI returned **Linux apt commands unconditionally** — `sudo apt install`, `sudo dpkg -i`, `sudo usermod -aG`, `sudo systemctl enable` — none of which exist on Mac. Every "Show install steps" expand was a dead end. Same problem the 1.10.0 service-control fix solved at the runtime level, but the install-commands endpoint still hardcoded `os: linux` and returned the apt set regardless of host platform.
+
+### Install commands are now platform-aware
+- New `_mac_install_commands()` returns Homebrew commands (`brew install podman`, `brew install --cask docker`, `brew install cloudflared`, `brew services start nginx`, etc.) plus inline notes where the GUI installer is the easier path (Docker Desktop) or where the integration doesn't apply locally (Coolify is a Linux-server tool — note links the user to the docs instead of pretending the install works).
+- New `_windows_install_commands()` returns winget IDs (`winget install --id RedHat.Podman`, `Docker.DockerDesktop`, `tailscale.tailscale`, `Cloudflare.cloudflared`).
+- `_install_commands_for_host()` dispatches via the existing `_host_platform()` helper.
+- `GET /api/runtime/integrations/install-commands` now returns the correct set + an `os: mac | linux | windows` field. The frontend picks them up automatically — same key-by-service shape as before.
+
+### Docker on Mac actually works now
+- `_SERVICE_MAP['docker']` switched from type `systemd` to `docker_engine`.
+- New `_control_docker_engine()` runs `open -a Docker` on Mac (launches Docker Desktop, no sudo required), `sudo systemctl <action> docker.service` on Linux. Stop/restart on Mac returns a friendly "use the menu bar app" message instead of a sudo error — Docker Desktop has no clean stop CLI and we don't paper over it with `osascript`.
+- `_do_service_control()` short-circuits pure-systemd services (`nginx`, `cloudflared`) on non-Linux with a 501 + structured `"manage via brew services"` hint, instead of running `sudo -n systemctl ...` and dumping a password-required error.
+- Frontend Docker card drops `enable / disable` from advertised actions (no boot-persistence concept on Docker Desktop).
+
+### Podman start is now idempotent
+- `_control_podman()` recognises "already running" / "already stopped" stderr from `podman machine start|stop` and returns 200 success. Repeatedly clicking Start when the engine is already up no longer surfaces a 500 — the UI shows "Podman is already running." and moves on.
+
 ## 1.10.0 — Cross-platform service controls + visible auto-update
 
 The desktop app was originally written assuming Linux + systemd. On macOS three things were broken at once: the Podman watchdog and WatchTower auto-update daemon cards both showed misleading "unavailable / not installed" badges, the Podman **Start** button on the Integrations page returned `sudo: a password is required` (because there's no systemd on the Mac host), and macOS auto-update silently failed because the `.app` is unsigned and `electron-updater` can't atomically replace an unsigned bundle. All four are fixed.
