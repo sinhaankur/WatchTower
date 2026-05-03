@@ -699,6 +699,208 @@ function WatchtowerConfigCard() {
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 
+type CloudflareCredential = {
+  id: string;
+  label: string | null;
+  account_id: string | null;
+  account_name: string | null;
+  last_verified_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+function CloudflareSection() {
+  const [creds, setCreds] = useState<CloudflareCredential[] | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [token, setToken] = useState('');
+  const [label, setLabel] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+  const [showForm, setShowForm] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const resp = await apiClient.get<CloudflareCredential[]>('/integrations/cloudflare');
+      setCreds(resp.data);
+    } catch {
+      setCreds([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { void load(); }, [load]);
+
+  const submit = async () => {
+    setError('');
+    setSubmitting(true);
+    try {
+      await apiClient.post('/integrations/cloudflare', {
+        api_token: token.trim(),
+        label: label.trim() || null,
+      });
+      setToken('');
+      setLabel('');
+      setShowForm(false);
+      void load();
+    } catch (e) {
+      const detail = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      setError(detail || 'Failed to save token');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const remove = async (id: string) => {
+    if (!confirm('Remove this Cloudflare connection? Any features using it will stop working.')) return;
+    try {
+      await apiClient.delete(`/integrations/cloudflare/${id}`);
+      void load();
+    } catch (e) {
+      const detail = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      setError(detail || 'Failed to delete');
+    }
+  };
+
+  const reverify = async (id: string) => {
+    try {
+      await apiClient.post(`/integrations/cloudflare/${id}/verify`);
+      void load();
+    } catch (e) {
+      const detail = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      setError(detail || 'Re-verification failed');
+    }
+  };
+
+  return (
+    <section className="rounded-xl border border-slate-200 bg-white">
+      <header className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+        <div>
+          <h2 className="text-sm font-semibold text-slate-900">Cloudflare</h2>
+          <p className="text-xs text-slate-600 mt-0.5">
+            Connect a Cloudflare API token to manage DNS, deploy to Pages/Workers, or set up failover (HA) across nodes. Phase 1: token storage.
+          </p>
+        </div>
+        {!showForm && (
+          <button
+            type="button"
+            onClick={() => { setShowForm(true); setError(''); }}
+            className="px-3 py-1.5 rounded-lg bg-orange-600 hover:bg-orange-700 text-white text-xs font-medium"
+          >
+            + Connect Cloudflare
+          </button>
+        )}
+      </header>
+
+      <div className="p-5 space-y-4">
+        {error && (
+          <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+            {error}
+          </div>
+        )}
+
+        {showForm && (
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 space-y-3">
+            <div>
+              <label className="block text-xs font-medium text-slate-700 mb-1">API token</label>
+              <input
+                type="password"
+                value={token}
+                onChange={(e) => setToken(e.target.value)}
+                placeholder="cf_…"
+                autoComplete="off"
+                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:border-orange-600 focus:ring-1 focus:ring-orange-600 outline-none"
+              />
+              <p className="text-[11px] text-slate-500 mt-1">
+                Create one at{' '}
+                <a
+                  href="https://dash.cloudflare.com/profile/api-tokens"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-orange-700 hover:underline"
+                >
+                  dash.cloudflare.com → API Tokens
+                </a>
+                . Recommended scopes: Account.Account Settings:Read, Zone.Zone:Read, Zone.DNS:Edit (Phase 2 needs DNS edit).
+              </p>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-700 mb-1">Label (optional)</label>
+              <input
+                type="text"
+                value={label}
+                onChange={(e) => setLabel(e.target.value)}
+                placeholder="Personal CF"
+                maxLength={80}
+                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:border-orange-600 focus:ring-1 focus:ring-orange-600 outline-none"
+              />
+            </div>
+            <div className="flex gap-2 justify-end">
+              <button
+                type="button"
+                onClick={() => { setShowForm(false); setToken(''); setLabel(''); setError(''); }}
+                className="px-3 py-1.5 rounded-md border border-slate-300 text-xs text-slate-700 hover:bg-slate-100"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => void submit()}
+                disabled={submitting || token.trim().length < 20}
+                className="px-3 py-1.5 rounded-md bg-orange-600 hover:bg-orange-700 disabled:opacity-50 text-white text-xs font-medium"
+              >
+                {submitting ? 'Verifying…' : 'Verify & save'}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {loading ? (
+          <p className="text-xs text-slate-500">Loading…</p>
+        ) : creds && creds.length > 0 ? (
+          <ul className="divide-y divide-slate-100 border border-slate-200 rounded-lg overflow-hidden">
+            {creds.map((c) => (
+              <li key={c.id} className="px-4 py-3 flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-slate-900 truncate">
+                    {c.label || c.account_name || 'Cloudflare'}
+                  </p>
+                  <p className="text-[11px] text-slate-500 truncate">
+                    {c.account_name && <>{c.account_name} · </>}
+                    {c.account_id ? <>account <code className="font-mono">{c.account_id.slice(0, 8)}…</code></> : 'no account scope'}
+                    {c.last_verified_at && <> · verified {new Date(c.last_verified_at).toLocaleString()}</>}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => void reverify(c.id)}
+                    className="text-[11px] text-slate-600 hover:text-slate-900 underline underline-offset-2"
+                  >
+                    Re-verify
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void remove(c.id)}
+                    className="text-[11px] text-red-600 hover:text-red-800 underline underline-offset-2"
+                  >
+                    Remove
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        ) : !showForm && (
+          <p className="text-xs text-slate-500">
+            No Cloudflare connections yet. Click <strong>Connect Cloudflare</strong> to add an API token.
+          </p>
+        )}
+      </div>
+    </section>
+  );
+}
+
 const Integrations = () => {
   const [data, setData] = useState<IntegrationsPayload | null>(null);
   const [installCmds, setInstallCmds] = useState<InstallCommands | null>(null);
@@ -991,6 +1193,12 @@ const Integrations = () => {
             />
           </div>
         </section>
+
+        {/* Cloud account connections — separate from local-tool detection
+            since these are credential-based (API tokens), not binary
+            checks. Phase 1 covers Cloudflare; Phase 2/3/4 use these
+            tokens for DNS / Load Balancer / Tunnel automation. */}
+        <CloudflareSection />
 
         {/* How they work together */}
         <section className="rounded-xl border border-blue-200 bg-blue-50 p-5">
