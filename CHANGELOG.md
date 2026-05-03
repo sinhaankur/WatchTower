@@ -9,6 +9,20 @@ Curated, human-friendly history of WatchTower releases. Auto-generated GitHub Re
 
 ---
 
+## 1.6.0 — GitHub Device Flow + desktop tool detection
+
+End users can finally sign in with GitHub directly from the desktop app, and the runtime status panel correctly detects Tailscale / Docker / Podman on macOS without the user having to fix shell PATH.
+
+- **GitHub Device Flow shipped with a baked-in public Client ID.** Same model as the `gh` CLI — no client secret, no callback URL, no per-install OAuth app registration. The desktop "Sign in with GitHub" button is live out-of-the-box.
+- **`Login.tsx` no longer ships a silently-disabled button.** When `/api/auth/status` reports `github_configured: false`, the SPA now opens the setup guide instead of rendering an inert grey button with `cursor-not-allowed`.
+- **Desktop PATH augmentation.** `desktop/main.js` prepends Homebrew, Tailscale.app, Docker.app, and Podman Desktop paths before spawning the backend. Electron does not inherit shell PATH on macOS / Linux, which previously caused `which tailscale` to fail and report "not connected" even on machines with Tailscale running.
+- **Backend tool resolution.** `api/runtime.py` falls back to a curated list of absolute paths (`/usr/local/bin`, `/opt/homebrew/bin`, `/Applications/Tailscale.app/Contents/MacOS`, …) when the binary isn't on PATH.
+- **`.env` auto-load in desktop builds.** `loadDotEnvIntoProcess()` reads the repo `.env` so dev runs pick up `WATCHTOWER_GITHUB_DEVICE_CLIENT_ID` without re-exporting.
+- **`datetime.utcnow()` deprecation cleanup.** Python 3.12 emits warnings for naive `utcnow` / `utcfromtimestamp`; replaced 25 call sites with timezone-aware equivalents that strip tzinfo to keep the existing naive `DateTime` schema. Warning count in test runs: 701 → 79.
+- **Trimmed Windows CI annotation noise.** Failure path no longer emits a red `::error` annotation per uvicorn INFO log line. Logs stay in the run output and the artifact upload; the PR view gets one summary annotation.
+
+Tests: 224 pass.
+
 ## 1.5.20 — Autonomous-ops loop hardening
 
 The autonomous-ops differentiation lane gets a battery of safety + completeness improvements.
