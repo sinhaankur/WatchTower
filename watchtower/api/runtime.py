@@ -799,6 +799,90 @@ def _linux_install_commands() -> dict[str, list[str]]:
     }
 
 
+def _mac_install_commands() -> dict[str, list[str]]:
+    """Homebrew-based install commands for macOS.
+
+    The previous endpoint returned the Linux/apt commands unconditionally,
+    so Mac users following the UI hit a wall of "command not found" errors
+    (`apt`, `dpkg`, `usermod`, `systemctl` — none of those exist on Mac).
+    """
+    return {
+        "podman": [
+            "brew install podman",
+            "podman machine init",
+            "podman machine start",
+            "podman --version",
+        ],
+        "docker": [
+            "# Docker Desktop has a GUI installer — easier than CLI on Mac:",
+            "brew install --cask docker",
+            "open -a Docker  # launches Docker Desktop; daemon needs ~30s to come up",
+            "docker --version",
+        ],
+        "coolify": [
+            "# Coolify is intended for Linux servers, not local Mac use.",
+            "# Install it on a remote node, then add that node to WatchTower.",
+            "# See: https://coolify.io/docs/installation",
+        ],
+        "tailscale": [
+            "brew install --cask tailscale",
+            "open -a Tailscale  # sign in via the menu bar app",
+        ],
+        "cloudflared": [
+            "brew install cloudflared",
+            "cloudflared --version",
+        ],
+        "nginx": [
+            "brew install nginx",
+            "brew services start nginx",
+            "nginx -v",
+        ],
+    }
+
+
+def _windows_install_commands() -> dict[str, list[str]]:
+    """winget-based install commands for Windows. Falls back to chocolatey
+    where winget doesn't have the package."""
+    return {
+        "podman": [
+            "winget install --id RedHat.Podman",
+            "podman machine init",
+            "podman machine start",
+            "podman --version",
+        ],
+        "docker": [
+            "winget install --id Docker.DockerDesktop",
+            "# Launch Docker Desktop from the Start menu; daemon takes ~30s.",
+            "docker --version",
+        ],
+        "coolify": [
+            "# Coolify is Linux-only. Install on a remote node and add that node to WatchTower.",
+            "# See: https://coolify.io/docs/installation",
+        ],
+        "tailscale": [
+            "winget install --id tailscale.tailscale",
+        ],
+        "cloudflared": [
+            "winget install --id Cloudflare.cloudflared",
+            "cloudflared --version",
+        ],
+        "nginx": [
+            "# Easiest: chocolatey (`choco install nginx`)",
+            "# Manual: download from https://nginx.org/en/download.html and run nginx.exe",
+        ],
+    }
+
+
+def _install_commands_for_host() -> tuple[str, dict[str, list[str]]]:
+    """Pick the right install-command set for the host OS."""
+    platform = _host_platform()
+    if platform == "mac":
+        return platform, _mac_install_commands()
+    if platform == "windows":
+        return platform, _windows_install_commands()
+    return platform, _linux_install_commands()
+
+
 def _run_cmd(
     command: list[str], timeout: int = 10
 ) -> tuple[bool, str, str, int]:
@@ -1319,10 +1403,17 @@ async def integrations_status(
 async def integrations_install_commands(
     _current_user: dict = Depends(util.get_current_user),
 ):
-    """Return copy-ready install commands for each supported integration."""
+    """Return copy-ready install commands for each supported integration.
+
+    Platform-aware: returns Homebrew commands on macOS, winget on
+    Windows, apt on Linux. Previously returned the apt set
+    unconditionally, which left Mac/Windows users with `command not
+    found` for every step (apt, dpkg, usermod, systemctl).
+    """
+    platform, commands = _install_commands_for_host()
     return {
-        "os": "linux",
-        "commands": _linux_install_commands(),
+        "os": platform,
+        "commands": commands,
     }
 
 
@@ -1904,9 +1995,13 @@ _SERVICE_MAP: dict[str, dict[str, Any]] = {
         "actions": {"start", "stop", "restart"},
     },
     "docker": {
-        "type": "systemd",
+        # Like Podman, Docker on Mac/Win runs as Docker Desktop (a GUI
+        # app), not a systemd unit. _control_docker() does the right
+        # thing per platform — `open -a Docker` on Mac, `start
+        # com.docker.service` on Windows, `sudo systemctl ...` on Linux.
+        "type": "docker_engine",
         "unit": "docker.service",
-        "actions": {"start", "stop", "restart", "enable", "disable"},
+        "actions": {"start", "stop", "restart"},
     },
     "coolify": {
         "type": "docker_container",
@@ -1941,6 +2036,12 @@ def _control_podman(action: str) -> tuple[bool, str, list[str]]:
     On Linux: `sudo systemctl <action> podman.socket` (rootful daemon).
     On Mac/Windows: `podman machine <action>` (the Linux VM that hosts the
     container engine — there is no systemd on the host).
+
+    Idempotency: ``podman machine start`` exits non-zero with
+    "already running" if the VM is already up, and ``stop`` does the
+    same with "already stopped". For an operations toggle that's the
+    desired end state — treat it as success so the UI doesn't
+    surface a scary 500 for a no-op.
     """
     platform = _host_platform()
     if platform == "linux":
@@ -1953,7 +2054,45 @@ def _control_podman(action: str) -> tuple[bool, str, list[str]]:
     ok, out, err, _ = _run_cmd(cmd, timeout=120)
     if ok:
         return True, (out.strip() or f"podman machine {machine_action} succeeded."), cmd
-    return False, (err.strip() or f"podman machine {machine_action} failed."), cmd
+
+    err_text = (err or "").strip()
+    err_lower = err_text.lower()
+    # Idempotency: requested state already in effect → treat as success.
+    if action == "start" and "already running" in err_lower:
+        return True, "Podman is already running.", cmd
+    if action == "stop" and "already stopped" in err_lower:
+        return True, "Podman is already stopped.", cmd
+
+    return False, (err_text or f"podman machine {machine_action} failed."), cmd
+
+
+def _control_docker_engine(action: str) -> tuple[bool, str, list[str]]:
+    """Start/stop/restart the Docker engine in a platform-aware way.
+
+    On Mac: `open -a Docker` launches Docker Desktop (no sudo). Stop has
+    no clean CLI equivalent in Docker Desktop — we report "use the menu
+    bar app to quit" rather than running a fragile `osascript`.
+    On Linux: `sudo systemctl <action> docker.service`.
+    On Windows: would need `sc.exe` against `com.docker.service`; not
+    implemented yet, returns a friendly message.
+    """
+    platform = _host_platform()
+    if platform == "linux":
+        return _control_systemd("docker.service", action)
+
+    if platform == "mac":
+        if action == "start":
+            cmd = ["open", "-a", "Docker"]
+            ok, _, err, _ = _run_cmd(cmd, timeout=10)
+            if ok:
+                return True, "Launching Docker Desktop. The daemon may take 10–30s to come up.", cmd
+            return False, (err.strip() or "Failed to launch Docker Desktop."), cmd
+        if action in ("stop", "restart"):
+            return False, (
+                "Docker Desktop on macOS doesn't expose a clean stop/restart CLI. "
+                "Use the Docker icon in the menu bar (Quit Docker Desktop / Restart)."
+            ), []
+    return False, f"Docker {action} on {platform} is not supported by WatchTower yet.", []
 
 
 def _do_service_control(service: str, action: str) -> dict[str, Any]:
@@ -1973,10 +2112,32 @@ def _do_service_control(service: str, action: str) -> dict[str, Any]:
     attempted_cmd: list[str] = []
 
     if svc_type == "systemd":
+        # Pure systemd-only services (nginx, cloudflared). On non-Linux
+        # hosts WatchTower has no equivalent control path — short-
+        # circuit with a friendly 501 instead of running systemctl and
+        # producing a sudo-password error.
+        platform = _host_platform()
+        if platform != "linux":
+            raise HTTPException(
+                status_code=status.HTTP_501_NOT_IMPLEMENTED,
+                detail={
+                    "message": (
+                        f"Service control for '{service}' is only available on Linux. "
+                        f"On {platform}, manage it through Homebrew (`brew services …`) or "
+                        f"the service's native installer."
+                    ),
+                    "command": "",
+                    "needs_terminal": False,
+                    "platform": platform,
+                },
+            )
         ok, msg, attempted_cmd = _control_systemd(cfg["unit"], action)
 
     elif svc_type == "podman":
         ok, msg, attempted_cmd = _control_podman(action)
+
+    elif svc_type == "docker_engine":
+        ok, msg, attempted_cmd = _control_docker_engine(action)
 
     elif svc_type == "hybrid":
         # start/stop: use native CLI; enable/disable: use systemd
