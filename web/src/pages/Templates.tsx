@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import apiClient from '@/lib/api';
 
 type EnvVar = {
@@ -36,7 +36,11 @@ const CATEGORY_BADGE: Record<string, string> = {
 export default function Templates() {
   const navigate = useNavigate();
   const [templates, setTemplates] = useState<Template[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  // Track HTTP status alongside the message so we can render different
+  // affordances per error class (auth → sign-in CTA, 5xx → retry hint).
+  // Earlier the page just showed "Could not load templates" for every
+  // failure, which made an expired session look like a backend outage.
+  const [error, setError] = useState<{ status: number; message: string } | null>(null);
   const [creating, setCreating] = useState<string | null>(null);
   const [creatingError, setCreatingError] = useState<string | null>(null);
   const [filter, setFilter] = useState('');
@@ -47,7 +51,15 @@ export default function Templates() {
       .get('/templates')
       .then(r => { if (!cancelled) setTemplates(r.data.templates); })
       .catch(e => {
-        if (!cancelled) setError((e as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? 'Could not load templates');
+        if (cancelled) return;
+        const httpStatus = (e as { response?: { status?: number } })?.response?.status ?? 0;
+        const detail = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+        const message =
+          httpStatus === 401 ? 'Sign in to view the template catalog.'
+          : httpStatus === 403 ? (detail ?? 'Your account does not have access to templates.')
+          : httpStatus >= 500 ? 'Server error — try again in a moment.'
+          : detail ?? 'Could not load templates.';
+        setError({ status: httpStatus, message });
       });
     return () => { cancelled = true; };
   }, []);
@@ -125,8 +137,29 @@ export default function Templates() {
 
       <main className="px-4 sm:px-6 lg:px-8 py-6 max-w-6xl mx-auto w-full">
         {error && (
-          <div className="rounded-lg border border-red-300 bg-red-50 p-3 mb-4 text-xs text-red-800">
-            {error}
+          <div className={`rounded-lg p-3 mb-4 text-xs flex items-center justify-between gap-3 ${
+            error.status === 401
+              ? 'border border-blue-300 bg-blue-50 text-blue-800'
+              : 'border border-red-300 bg-red-50 text-red-800'
+          }`}>
+            <span>{error.message}</span>
+            {error.status === 401 && (
+              <Link
+                to="/login"
+                className="shrink-0 px-2.5 py-1 rounded-md bg-slate-900 text-white text-[11px] font-medium hover:bg-slate-800"
+              >
+                Sign in →
+              </Link>
+            )}
+            {error.status >= 500 && (
+              <button
+                type="button"
+                onClick={() => window.location.reload()}
+                className="shrink-0 px-2.5 py-1 rounded-md border border-red-300 text-red-800 text-[11px] font-medium hover:bg-red-100"
+              >
+                Retry
+              </button>
+            )}
           </div>
         )}
         {creatingError && (
