@@ -1,6 +1,7 @@
 """
 GitHub Enterprise, Teams, and Node Management API endpoints
 """
+from watchtower.api.util import utcnow
 
 import logging
 import os
@@ -20,7 +21,7 @@ from sqlalchemy import func
 from typing import List, Optional
 import uuid as uuid_module
 from uuid import UUID
-from datetime import datetime
+from datetime import datetime, timezone
 import requests
 
 from watchtower.database import (
@@ -381,7 +382,7 @@ def _ensure_user_org_member(db: Session, current_user: dict):
                 if member:
                     member.user_id = user_id
                     member.is_active = True
-                    member.joined_at = member.joined_at or datetime.utcnow()
+                    member.joined_at = member.joined_at or utcnow()
                     db.flush()
 
             if not member or not member.is_active:
@@ -480,7 +481,7 @@ def _parse_oauth_state(state: str) -> dict:
 
     payload = json.loads(raw.decode("utf-8"))
     issued = int(payload.get("iat", 0))
-    if int(datetime.utcnow().timestamp()) - issued > 900:
+    if int(utcnow().timestamp()) - issued > 900:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="OAuth state expired")
     return payload
 
@@ -756,7 +757,7 @@ async def start_github_login_oauth(
             "mode": "login",
             "provider": schemas.GitHubProvider.GITHUB_COM.value,
             "next": effective_next,
-            "iat": int(datetime.utcnow().timestamp()),
+            "iat": int(utcnow().timestamp()),
         }
     )
 
@@ -1038,7 +1039,7 @@ async def start_github_device_connect(
             detail="GitHub did not return a device_code",
         )
 
-    now = datetime.utcnow()
+    now = utcnow()
     expires_in = int(data.get("expires_in", 900))
 
     # Clean up expired sessions opportunistically.
@@ -1061,7 +1062,7 @@ async def start_github_device_connect(
             user_id=_current_user_uuid(current_user),
             org_id=payload.org_id,
             created_at=now,
-            expires_at=datetime.utcfromtimestamp(now.timestamp() + expires_in),
+            expires_at=datetime.fromtimestamp(now.timestamp() + expires_in, tz=timezone.utc).replace(tzinfo=None),
         ))
     db.commit()
 
@@ -1084,7 +1085,7 @@ async def poll_github_device_connect(
     current_user: dict = Depends(util.get_current_user),
 ):
     """Poll GitHub device flow and persist org-scoped GitHub connection on success."""
-    now = datetime.utcnow()
+    now = utcnow()
     # Clean up expired sessions opportunistically.
     db.query(GitHubDeviceConnectSession).filter(
         GitHubDeviceConnectSession.expires_at < now,
@@ -1171,7 +1172,7 @@ async def poll_github_device_connect(
         existing.enterprise_name = None
         existing.is_active = True
         existing.is_primary = True
-        existing.last_synced = datetime.utcnow()
+        existing.last_synced = utcnow()
         db.delete(session)
         db.commit()
         db.refresh(existing)
@@ -1191,7 +1192,7 @@ async def poll_github_device_connect(
         enterprise_name=None,
         is_primary=True,
         is_active=True,
-        last_synced=datetime.utcnow(),
+        last_synced=utcnow(),
     )
     db.add(connection)
     db.delete(session)
@@ -1350,7 +1351,7 @@ async def start_github_oauth(
             "provider": provider.value,
             "enterprise_url": enterprise_url,
             "next": effective_next,
-            "iat": int(datetime.utcnow().timestamp()),
+            "iat": int(utcnow().timestamp()),
         }
     )
 
@@ -1437,13 +1438,13 @@ async def github_oauth_callback(
         existing.enterprise_url = enterprise_url
         existing.enterprise_name = payload.enterprise_name
         existing.is_active = True
-        existing.last_synced = datetime.utcnow()
+        existing.last_synced = utcnow()
         claim = _get_installation_claim(db)
         if claim and claim.owner_user_id == user_id:
             owner_user = db.query(User).filter(User.id == user_id).first()
             claim.owner_github_id = owner_user.github_id if owner_user else None
             claim.owner_login = github_username
-            claim.github_connected_at = datetime.utcnow()
+            claim.github_connected_at = utcnow()
         db.commit()
         db.refresh(existing)
         return {"redirect_to": redirect_to, **schemas.GitHubConnectionResponse.model_validate(existing).model_dump()}
@@ -1462,7 +1463,7 @@ async def github_oauth_callback(
         enterprise_name=payload.enterprise_name,
         is_primary=True,
         is_active=True,
-        last_synced=datetime.utcnow(),
+        last_synced=utcnow(),
     )
     db.add(connection)
     claim = _get_installation_claim(db)
@@ -1470,7 +1471,7 @@ async def github_oauth_callback(
         owner_user = db.query(User).filter(User.id == user_id).first()
         claim.owner_github_id = owner_user.github_id if owner_user else None
         claim.owner_login = github_username
-        claim.github_connected_at = datetime.utcnow()
+        claim.github_connected_at = utcnow()
     db.commit()
     db.refresh(connection)
     return {"redirect_to": redirect_to, **schemas.GitHubConnectionResponse.model_validate(connection).model_dump()}
@@ -1779,7 +1780,7 @@ async def invite_team_member(
             can_manage_deployments=member_data.can_manage_deployments,
             can_manage_nodes=member_data.can_manage_nodes,
             can_manage_team=member_data.can_manage_team,
-            invited_at=datetime.utcnow()
+            invited_at=utcnow()
         )
         
         db.add(new_member)
@@ -2017,7 +2018,7 @@ async def check_node_health(
     if not member:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied")
 
-    now = datetime.utcnow()
+    now = utcnow()
     try:
         health = _perform_ssh_health_check(node)
         node.status = health["status"]

@@ -18,6 +18,7 @@ The read endpoint (``GET /api/audit``) returns events for the caller's
 organization only; cross-org reads are not allowed.
 """
 from __future__ import annotations
+from watchtower.api.util import utcnow
 
 import json
 import logging
@@ -173,7 +174,7 @@ async def list_audit_events(
     from watchtower.api.enterprise import _ensure_user_org_member
     _user, canonical_org, _member = _ensure_user_org_member(db, current_user)
 
-    cutoff = datetime.utcnow() - timedelta(days=days)
+    cutoff = utcnow() - timedelta(days=days)
     q = (
         db.query(AuditEvent)
         .filter(AuditEvent.org_id == canonical_org.id)

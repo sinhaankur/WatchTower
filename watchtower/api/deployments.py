@@ -1,6 +1,7 @@
 """
 Deployments API endpoints
 """
+from watchtower.api.util import utcnow
 
 import logging
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
@@ -414,7 +415,7 @@ async def auto_fix_deployment(
     from datetime import timedelta
 
     project_id_str = str(project.id)
-    now = datetime.utcnow()
+    now = utcnow()
     recent_audit_rows = (
         db.query(audit_log.AuditEvent)
         .filter(
