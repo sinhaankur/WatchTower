@@ -24,6 +24,7 @@ from watchtower import schemas
 from watchtower.api import audit as audit_log
 from watchtower.api import util
 from watchtower import builder as build_runner  # noqa: F401  (kept for sync wrapper imports elsewhere)
+from watchtower import local_runner
 from watchtower.queue import enqueue_build
 
 router = APIRouter(prefix="/api/projects", tags=["Projects"])
@@ -225,6 +226,78 @@ async def delete_project(
     db.delete(project)
     db.commit()
 
+    return None
+
+
+@router.post("/{project_id}/run-locally")
+async def run_project_locally(
+    project_id: UUID,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(util.get_current_user),
+):
+    """Run the most recent build of this project as a Podman container
+    on localhost. Idempotent — re-running stops the prior container
+    cleanly. Returns ``{ url, port, container_id, image, serving_path }``."""
+    project = _load_owned_project(db, project_id, current_user)
+    try:
+        status_obj = local_runner.run_locally(
+            project_id=str(project.id),
+            project_name=project.name,
+            recommended_port=project.recommended_port,
+        )
+    except local_runner.LocalRunError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    audit_log.record_for_user(
+        db, current_user,
+        action="project.run_locally",
+        entity_type="project",
+        entity_id=project.id,
+        org_id=project.org_id,
+        request=request,
+        extra={"port": status_obj.port, "image": status_obj.image},
+    )
+    db.commit()
+    return {
+        "project_id": str(project.id),
+        "url": status_obj.url,
+        "port": status_obj.port,
+        "container_id": status_obj.container_id,
+        "image": status_obj.image,
+        "serving_path": status_obj.serving_path,
+    }
+
+
+@router.get("/{project_id}/run-locally")
+async def get_local_run_status(
+    project_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(util.get_current_user),
+):
+    """Return the cached state of a local run, or ``null`` if not running."""
+    project = _load_owned_project(db, project_id, current_user)
+    state = local_runner.status_locally(str(project.id))
+    if state is None:
+        return None
+    return {
+        "project_id": str(project.id),
+        "url": state.url,
+        "port": state.port,
+        "container_id": state.container_id,
+        "image": state.image,
+        "serving_path": state.serving_path,
+    }
+
+
+@router.delete("/{project_id}/run-locally", status_code=status.HTTP_204_NO_CONTENT)
+async def stop_local_run(
+    project_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(util.get_current_user),
+):
+    """Stop the project's local container if one is running."""
+    project = _load_owned_project(db, project_id, current_user)
+    local_runner.stop_locally(str(project.id))
     return None
 
 

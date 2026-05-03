@@ -285,12 +285,31 @@ def _get_installation_claim(db: Session) -> Optional[InstallationClaim]:
 
 
 def _claim_installation_if_needed(db: Session, user: User) -> Optional[InstallationClaim]:
+    """Claim install ownership for the FIRST user who signs in — but
+    only if they have a real GitHub identity. Anonymous guests and
+    static-token users have ``github_id is None`` and must NOT be able
+    to claim ownership; otherwise the very first request after a fresh
+    install (which goes through the Guest path on the desktop launcher)
+    would lock the install to "Guest" and every subsequent real user
+    would see "ask owner Guest to invite you" — exactly the loop that
+    bit users in 1.7.x.
+
+    Operators who want to run WatchTower entirely without GitHub auth
+    can disable owner mode via ``WATCHTOWER_INSTALL_OWNER_MODE=false``.
+    """
     if not _owner_mode_enabled():
         return None
 
     claim = _get_installation_claim(db)
     if claim:
         return claim
+
+    # No claim yet AND this caller has no real identity to attach to →
+    # treat owner mode as a no-op for them. The guest can still use
+    # local features; the next GitHub-authenticated sign-in becomes
+    # the legitimate owner.
+    if not user.github_id:
+        return None
 
     claim = InstallationClaim(
         owner_user_id=user.id,
@@ -324,8 +343,17 @@ def _ensure_user_org_member(db: Session, current_user: dict):
 
     if _owner_mode_enabled():
         claim = _claim_installation_if_needed(db, user)
-        owner_user_id = claim.owner_user_id
-        owner_user = db.query(User).filter(User.id == owner_user_id).first()
+        # Guest / static-token users hit this branch when no real GitHub
+        # owner has signed in yet. Treat owner mode as a no-op for them
+        # — they get their own implicit org rooted at their user_id and
+        # can use local-only features. The next GitHub-authed sign-in
+        # writes the real claim and takes over ownership.
+        if claim is None:
+            owner_user_id = user.id
+            owner_user = user
+        else:
+            owner_user_id = claim.owner_user_id
+            owner_user = db.query(User).filter(User.id == owner_user_id).first()
 
         org = db.query(Organization).filter(Organization.owner_id == owner_user_id).first()
         if not org:

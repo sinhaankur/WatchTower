@@ -9,6 +9,28 @@ Curated, human-friendly history of WatchTower releases. Auto-generated GitHub Re
 
 ---
 
+## 1.9.0 — Run Locally (Podman) + owner-mode no-claim-for-guests fix
+
+The end-to-end "develop on my Mac, deploy when it's worth paying for a server" loop now actually closes — projects can be **run as a Podman container on localhost** with a single click.
+
+### Run Locally
+- New `watchtower/local_runner.py` service: picks a free port, stops any prior container WatchTower started for this project, then either:
+  - **Containerfile / Dockerfile present** → `podman build` + `podman run`, exposing the project's `recommended_port`.
+  - **Static-site build output** (`dist/`, `build/`, `_site/`, `out/`, `public/`, or root with an `index.html`) → `podman run nginx:alpine` with the output dir mounted read-only.
+- Three new endpoints:
+  - `POST /api/projects/{id}/run-locally` — start (idempotent).
+  - `GET  /api/projects/{id}/run-locally` — fetch current run state.
+  - `DELETE /api/projects/{id}/run-locally` — stop.
+- New **Run Locally** card on each project's Overview tab — Start / Restart / Stop, with the localhost URL clickable.
+- State persists in `$WATCHTOWER_BUILD_DIR/_local_runs/<project_id>.json` so the dashboard renders "running on http://localhost:<port>" across API restarts; a liveness check (`podman container exists`) clears stale rows.
+
+### Owner-mode no longer self-locks via Guest
+The 1.6.x lockout loop turned out to be self-perpetuating: the *Guest* user (no `github_id`) would auto-claim install ownership, then any subsequent real GitHub sign-in failed the owner check. Fixed in `_claim_installation_if_needed` — claims now require a real `github_id`. Guests get their own implicit org and can use local features; the next GitHub-authenticated sign-in becomes the legitimate install owner without conflict.
+
+If you previously got locked out, the recovery is unchanged: `watchtower-deploy reset-installation-owner`.
+
+Tests: 226 pass.
+
 ## 1.8.0 — Cloudflare Phase 2 + environment badge + setup-mode bridges
 
 Three meaningful pieces that together close most of the "feels incomplete" gaps from 1.7.x.

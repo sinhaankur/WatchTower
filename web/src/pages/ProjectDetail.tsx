@@ -344,6 +344,8 @@ function OverviewTab({ project }: { project: Project }) {
 
       <HealthCheckCard projectId={project.id} />
 
+      <RunLocallyCard projectId={project.id} />
+
       <div className="rounded-xl border border-border bg-card overflow-hidden">
         <div className="px-5 py-4 border-b border-border bg-muted/30">
           <h2 className="text-sm font-semibold">GitHub Webhook URL</h2>
@@ -1514,5 +1516,137 @@ function DomainRow({
         </div>
       )}
     </li>
+  );
+}
+
+// ── RunLocallyCard ─────────────────────────────────────────────────────────
+// Spawns a Podman container on this Mac after a build completes. Idempotent
+// — re-running stops the prior container and starts a fresh one. Static-site
+// projects get nginx; Containerfile-based projects build + run their own
+// image. Closes the "develop locally before paying for a server" loop.
+
+type LocalRun = {
+  project_id: string;
+  url: string;
+  port: number;
+  container_id: string;
+  image: string;
+  serving_path: string | null;
+};
+
+function RunLocallyCard({ projectId }: { projectId: string }) {
+  const [run, setRun] = useState<LocalRun | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const refresh = async () => {
+    try {
+      const r = await apiClient.get<LocalRun | null>(`/projects/${projectId}/run-locally`);
+      setRun(r.data);
+    } catch {
+      setRun(null);
+    }
+  };
+
+  useEffect(() => { void refresh(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [projectId]);
+
+  const start = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const r = await apiClient.post<LocalRun>(`/projects/${projectId}/run-locally`, {});
+      setRun(r.data);
+    } catch (e) {
+      setError(extractDetail(e, 'Could not start local container'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const stop = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await apiClient.delete(`/projects/${projectId}/run-locally`);
+      setRun(null);
+    } catch (e) {
+      setError(extractDetail(e, 'Could not stop container'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="rounded-xl border border-border bg-card overflow-hidden">
+      <div className="px-5 py-4 border-b border-border bg-muted/30 flex items-center justify-between">
+        <div>
+          <h2 className="text-sm font-semibold">Run Locally</h2>
+          <p className="text-[11px] text-muted-foreground mt-0.5">
+            Spin up the latest build as a Podman container on this Mac. Free, instant, no server needed.
+          </p>
+        </div>
+        {!run && (
+          <button
+            type="button"
+            onClick={() => void start()}
+            disabled={busy}
+            className="px-3 py-1.5 rounded-md bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-medium"
+          >
+            {busy ? 'Starting…' : 'Run Locally'}
+          </button>
+        )}
+      </div>
+      <div className="px-5 py-4">
+        {error && (
+          <div className="rounded-lg border border-red-300 bg-red-50 p-3 mb-3 text-xs text-red-800">
+            {error}
+          </div>
+        )}
+        {run ? (
+          <div className="space-y-3">
+            <div className="flex items-center gap-3">
+              <span className="inline-flex items-center gap-1.5 text-xs px-2 py-1 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse" />
+                Running
+              </span>
+              <a
+                href={run.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm font-mono text-blue-700 hover:underline"
+              >
+                {run.url} ↗
+              </a>
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              Image: <code className="font-mono">{run.image}</code> · Container: <code className="font-mono">{run.container_id.slice(0, 12)}</code>
+              {run.serving_path && <> · Serving: <code className="font-mono">{run.serving_path}</code></>}
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => void start()}
+                disabled={busy}
+                className="text-xs px-3 py-1.5 rounded-md border border-border hover:bg-muted disabled:opacity-50"
+              >
+                {busy ? '…' : 'Restart'}
+              </button>
+              <button
+                type="button"
+                onClick={() => void stop()}
+                disabled={busy}
+                className="text-xs px-3 py-1.5 rounded-md border border-red-300 text-red-700 hover:bg-red-50 disabled:opacity-50"
+              >
+                Stop
+              </button>
+            </div>
+          </div>
+        ) : (
+          <p className="text-xs text-muted-foreground">
+            Not running. Trigger a deploy first (the <strong>Deploy Now</strong> button up top), then come back here and click <strong>Run Locally</strong>. Static sites get served by nginx; Dockerfile-based projects build + run their own image.
+          </p>
+        )}
+      </div>
+    </div>
   );
 }
