@@ -120,7 +120,21 @@ jobs:
           cache-dependency-path: web/package-lock.json
 
       - name: Install web dependencies
-        run: npm --prefix web install
+        # Wrapped in a 3-attempt retry with backoff because npm/registry
+        # transient failures (mainly 502s during postinstall scripts that
+        # download arch-specific binaries) routinely fail entire release
+        # builds. Caught us on v1.9.0 — the macOS-14 leg lost a 502 from
+        # Electron's binary mirror and the whole release shipped without
+        # any .dmg artifacts. Cheap to retry, never re-runs on the
+        # "command actually broken" case (exit code 1 each time).
+        run: |
+          for attempt in 1 2 3; do
+            if npm --prefix web install; then exit 0; fi
+            echo "::warning::npm install (web) failed on attempt $attempt; retrying after backoff"
+            sleep $((attempt * 20))
+          done
+          exit 1
+        shell: bash
 
       - name: Build frontend (web/dist)
         run: npm --prefix web run build
@@ -140,7 +154,17 @@ jobs:
         run: pip install Pillow
 
       - name: Install desktop dependencies
-        run: npm --prefix desktop install
+        # Same retry pattern as the web step above. Electron's
+        # post-install script downloads a ~150 MB platform-specific
+        # binary; that's the most common 502 source in this workflow.
+        run: |
+          for attempt in 1 2 3; do
+            if npm --prefix desktop install; then exit 0; fi
+            echo "::warning::npm install (desktop) failed on attempt $attempt; retrying after backoff"
+            sleep $((attempt * 20))
+          done
+          exit 1
+        shell: bash
 
       - name: Build & publish installers
         # --publish always: electron-builder uploads each artifact to the

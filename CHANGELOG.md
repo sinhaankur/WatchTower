@@ -9,6 +9,10 @@ Curated, human-friendly history of WatchTower releases. Auto-generated GitHub Re
 
 ---
 
+## 1.9.1 — CI: retry npm install on transient 502s
+
+The macOS build of v1.9.0 lost a 502 from Electron's binary-download mirror during `npm install` and shipped without any `.dmg` artifacts, breaking auto-update for every existing macOS install. Wrapped both `npm install` steps (web + desktop) in 3-attempt retry loops with exponential-ish backoff (20s, 40s, 60s). Self-heals the next time the registry blips.
+
 ## 1.9.0 — Run Locally (Podman) + owner-mode no-claim-for-guests fix
 
 The end-to-end "develop on my Mac, deploy when it's worth paying for a server" loop now actually closes — projects can be **run as a Podman container on localhost** with a single click.
