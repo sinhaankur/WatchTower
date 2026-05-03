@@ -9,6 +9,17 @@ Curated, human-friendly history of WatchTower releases. Auto-generated GitHub Re
 
 ---
 
+## 1.6.5 — Login UX: GitHub sign-in is the obvious primary path
+
+The earlier login page made every auth method a full-width button stacked one after another, with the "Quick Dev Login" rendered as a giant red CTA at the top and "Continue as Guest" full-width below GitHub sign-in. New users skipped past GitHub, landed in Guest mode, then hit "Guest mode can't deploy to remote nodes" walls. Instead of fixing the walls, fixed the funnel.
+
+- **GitHub sign-in is the only big button** at the top of the card now.
+- **Guest mode + Quick Dev Login + API token** are demoted to small links under an "Other ways to sign in" expander. Open by default? No — collapsed, so the GitHub CTA is unmistakable.
+- **Dev mode + ownership warnings** moved into a collapsed "Server status" details at the bottom. Still visible, no longer competing with the primary action.
+- **Wording fix on the ownership lockout** — explicit recovery hint pointing at `installation_claims` for self-host operators who locked themselves out.
+
+No backend / API changes. Pure SPA. Build a 6KB smaller `index.js` chunk than 1.6.4 because the dropped explanation blocks shed some markup.
+
 ## 1.6.4 — Fix login (device-flow start crash)
 
 The `requests` lazy-import optimisation in 1.6.2 was broken: Python's PEP 562 module-level `__getattr__` only fires on *external* attribute access (`enterprise.requests`), NOT on bare-name lookups *inside* the module. So `requests.post(...)` and `except requests.RequestException` both hit `NameError` — every `POST /api/auth/github/device/start` returned 500 "Internal server error", making sign-in impossible. No test covered the success or RequestException paths, so it shipped.
