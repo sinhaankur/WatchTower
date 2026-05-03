@@ -12,6 +12,7 @@ from sqlalchemy import (
     Boolean,
     Enum,
     ForeignKey,
+    Index,
     Text,
     UniqueConstraint,
     Uuid,
@@ -234,7 +235,7 @@ class Deployment(Base):
     __tablename__ = "deployments"
 
     id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    project_id = Column(Uuid(as_uuid=True), ForeignKey("projects.id"))
+    project_id = Column(Uuid(as_uuid=True), ForeignKey("projects.id"), index=True)
     commit_sha = Column(String)
     commit_message = Column(String, nullable=True)
     branch = Column(String)
@@ -248,12 +249,20 @@ class Deployment(Base):
     project = relationship("Project", back_populates="deployments")
     builds = relationship("Build", back_populates="deployment", cascade="all, delete-orphan")
 
+    __table_args__ = (
+        # "Latest deployments for project X" is the canonical hot path
+        # (deployments list, dashboard, rollback target lookup). Composite
+        # lets the planner do a single index range-scan instead of
+        # filter-then-sort.
+        Index("ix_deployments_project_created", "project_id", "created_at"),
+    )
+
 
 class Build(Base):
     __tablename__ = "builds"
 
     id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    deployment_id = Column(Uuid(as_uuid=True), ForeignKey("deployments.id"))
+    deployment_id = Column(Uuid(as_uuid=True), ForeignKey("deployments.id"), index=True)
     status = Column(Enum(BuildStatus), default=BuildStatus.PENDING, index=True)
     container_id = Column(String, nullable=True)  # Podman container ID
     build_command = Column(String)
@@ -262,6 +271,13 @@ class Build(Base):
     completed_at = Column(DateTime, nullable=True)
 
     deployment = relationship("Deployment", back_populates="builds")
+
+    __table_args__ = (
+        # "Latest build for deployment X" — used by diagnose/auto-fix and
+        # build-status panels. Without this the rollback path scans the
+        # entire builds table on every click.
+        Index("ix_builds_deployment_started", "deployment_id", "started_at"),
+    )
 
     @property
     def duration_seconds(self):
@@ -306,7 +322,7 @@ class CustomDomain(Base):
     __tablename__ = "custom_domains"
 
     id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    project_id = Column(Uuid(as_uuid=True), ForeignKey("projects.id"))
+    project_id = Column(Uuid(as_uuid=True), ForeignKey("projects.id"), index=True)
     domain = Column(String, unique=True, index=True)
     is_primary = Column(Boolean, default=False)
     tls_enabled = Column(Boolean, default=True)
@@ -322,7 +338,7 @@ class EnvironmentVariable(Base):
     __tablename__ = "environment_variables"
 
     id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    project_id = Column(Uuid(as_uuid=True), ForeignKey("projects.id"))
+    project_id = Column(Uuid(as_uuid=True), ForeignKey("projects.id"), index=True)
     key = Column(String)
     value = Column(String)  # Should be encrypted in production
     environment = Column(Enum(Environment), default=Environment.PRODUCTION)
@@ -374,11 +390,15 @@ class GitHubDeviceConnectSession(Base):
     __tablename__ = "github_device_connect_sessions"
 
     id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    device_code = Column(String, unique=True, index=True)
-    user_id = Column(Uuid(as_uuid=True), ForeignKey("users.id"), index=True)
-    org_id = Column(Uuid(as_uuid=True), ForeignKey("organizations.id"), index=True)
-    created_at = Column(DateTime, default=_utcnow, index=True)
-    expires_at = Column(DateTime, index=True)
+    # `unique=True` already creates an implicit index in both SQLite (autoindex)
+    # and Postgres, so a separate `index=True` would be redundant — the original
+    # migration mistakenly created both, leaving a duplicate non-unique index
+    # that the follow-up migration drops.
+    device_code = Column(String, nullable=False, unique=True)
+    user_id = Column(Uuid(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
+    org_id = Column(Uuid(as_uuid=True), ForeignKey("organizations.id"), nullable=False, index=True)
+    created_at = Column(DateTime, default=_utcnow, nullable=False, index=True)
+    expires_at = Column(DateTime, nullable=False, index=True)
 
     user = relationship("User", backref="github_device_connect_sessions")
     organization = relationship("Organization", backref="github_device_connect_sessions")
@@ -510,7 +530,7 @@ class DeploymentNode(Base):
     __tablename__ = "deployment_nodes"
 
     id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    deployment_id = Column(Uuid(as_uuid=True), ForeignKey("deployments.id"))
+    deployment_id = Column(Uuid(as_uuid=True), ForeignKey("deployments.id"), index=True)
     node_id = Column(Uuid(as_uuid=True), ForeignKey("org_nodes.id"))
     
     status = Column(Enum(DeploymentStatus), default=DeploymentStatus.PENDING)
@@ -533,7 +553,7 @@ class ProjectRelation(Base):
 
     id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
     project_id = Column(Uuid(as_uuid=True), ForeignKey("projects.id"), index=True)
-    related_project_id = Column(Uuid(as_uuid=True), ForeignKey("projects.id"))
+    related_project_id = Column(Uuid(as_uuid=True), ForeignKey("projects.id"), index=True)
     order_index = Column(Integer, default=0)
     note = Column(String, nullable=True)
     created_at = Column(DateTime, default=_utcnow)
@@ -594,7 +614,7 @@ class NotificationWebhook(Base):
     __tablename__ = "notification_webhooks"
 
     id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    project_id = Column(Uuid(as_uuid=True), ForeignKey("projects.id"), nullable=True)
+    project_id = Column(Uuid(as_uuid=True), ForeignKey("projects.id"), nullable=True, index=True)
     org_id = Column(Uuid(as_uuid=True), ForeignKey("organizations.id"), nullable=True)
     provider = Column(String, default="discord")   # "discord" | "slack"
     url = Column(String)                            # Webhook URL
@@ -629,14 +649,28 @@ def init_db() -> None:
       3. **DB already managed by Alembic** → ``upgrade head`` is a no-op
          when on the latest revision, otherwise applies pending changes.
 
-    Production deployments can bypass this and invoke ``alembic upgrade``
+    Production deployments can bypass this with
+    ``WATCHTOWER_SKIP_DB_INIT=true`` and invoke ``alembic upgrade``
     explicitly during release; ``init_db`` exists so single-process
     desktop / dev / test starts "just work."
     """
+    if os.getenv("WATCHTOWER_SKIP_DB_INIT", "").lower() == "true":
+        return
+
     inspector = inspect(engine)
     existing_tables = set(inspector.get_table_names())
     has_app_tables = bool(existing_tables - {"alembic_version"})
     has_alembic_table = "alembic_version" in existing_tables
+
+    # Fast path: the dominant case is a desktop/dev restart where the DB is
+    # already at head. Loading the Alembic ScriptDirectory + running upgrade
+    # costs ~70 ms even when no migrations apply. Skip it if a cheap file
+    # scan + single-row query proves we're up to date.
+    if has_app_tables and has_alembic_table:
+        head = _head_from_version_files()
+        current = _current_alembic_version()
+        if head and current and head == current:
+            return
 
     cfg = _alembic_config()
     if has_app_tables and not has_alembic_table:
@@ -647,6 +681,51 @@ def init_db() -> None:
     else:
         from alembic import command
         command.upgrade(cfg, "head")
+
+
+def _current_alembic_version() -> str | None:
+    """Read the single ``version_num`` from ``alembic_version`` without
+    loading Alembic. Returns ``None`` if the table is empty / unreadable
+    (caller falls through to the full Alembic path)."""
+    try:
+        with engine.connect() as conn:
+            row = conn.execute(text("SELECT version_num FROM alembic_version")).fetchone()
+            return row[0] if row else None
+    except Exception:
+        return None
+
+
+def _head_from_version_files() -> str | None:
+    """Compute the migration head by parsing ``alembic/versions/*.py``
+    (revision + down_revision strings only — no Alembic import). Returns
+    ``None`` if the directory has zero or multiple heads (branching),
+    forcing the slow path so Alembic can resolve them properly."""
+    import re
+    from pathlib import Path
+
+    versions_dir = Path(__file__).resolve().parents[1] / "alembic" / "versions"
+    if not versions_dir.is_dir():
+        return None
+
+    rev_re = re.compile(r"^revision\s*[:=]\s*['\"]([0-9a-fA-F]+)['\"]", re.MULTILINE)
+    down_re = re.compile(r"^down_revision\s*[:=]\s*['\"]([0-9a-fA-F]+)['\"]", re.MULTILINE)
+
+    revisions: set[str] = set()
+    referenced: set[str] = set()
+    for path in versions_dir.glob("*.py"):
+        try:
+            content = path.read_text(encoding="utf-8")
+        except OSError:
+            return None
+        m_rev = rev_re.search(content)
+        if not m_rev:
+            continue
+        revisions.add(m_rev.group(1))
+        for m_down in down_re.finditer(content):
+            referenced.add(m_down.group(1))
+
+    heads = revisions - referenced
+    return next(iter(heads)) if len(heads) == 1 else None
 
 
 def _alembic_config():
