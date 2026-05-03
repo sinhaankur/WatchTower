@@ -96,6 +96,213 @@ try {
   // Silently skip auto-update rather than crashing.
 }
 
+// ─── Manual self-replace updater for unsigned macOS builds ──────────────────
+// electron-updater's `quitAndInstall()` relies on Squirrel.Mac, which silently
+// fails to atomically replace bundles that lack a Developer ID signature. WatchTower
+// ships unsigned (no $99/yr Apple Developer subscription yet), so users would click
+// "Restart and Install" → app quits → reopens as the OLD version → updates appeared
+// broken from the user's perspective. We bypass that whole path on Mac:
+//
+//   1. Download the .dmg ourselves from GitHub Releases (we know the URL pattern).
+//   2. Write a detached shell script that waits for our PID to die, mounts the DMG,
+//      swaps /Applications/WatchTower.app, strips quarantine, and relaunches.
+//   3. Spawn the script with detached:true + unref() so it survives `app.quit()`.
+//
+// Runs in <30s on average. The shell script logs to ~/Library/Logs/WatchTower-update.log
+// so a failed update is debuggable without re-launching the .app to read its diag log.
+
+function downloadFile(url, destPath, onProgress) {
+  // Recursive redirect handling — GitHub release downloads do a 302 to S3.
+  return new Promise((resolve, reject) => {
+    const fetch = (currentUrl, redirectsRemaining) => {
+      if (redirectsRemaining < 0) {
+        reject(new Error('Too many redirects'));
+        return;
+      }
+      const req = https.get(currentUrl, { headers: { 'User-Agent': `WatchTower-Desktop/${app.getVersion()}` } }, (res) => {
+        if (res.statusCode === 301 || res.statusCode === 302 || res.statusCode === 307 || res.statusCode === 308) {
+          const next = res.headers.location;
+          res.resume();
+          if (!next) { reject(new Error(`Redirect with no Location header (status ${res.statusCode})`)); return; }
+          fetch(next, redirectsRemaining - 1);
+          return;
+        }
+        if (res.statusCode !== 200) {
+          res.resume();
+          reject(new Error(`Download failed: HTTP ${res.statusCode} from ${currentUrl}`));
+          return;
+        }
+        const total = parseInt(res.headers['content-length'] || '0', 10);
+        let received = 0;
+        const out = fs.createWriteStream(destPath);
+        res.on('data', (chunk) => {
+          received += chunk.length;
+          if (onProgress && total > 0) onProgress(received / total, received, total);
+        });
+        res.pipe(out);
+        out.on('finish', () => out.close(() => resolve(destPath)));
+        out.on('error', (err) => { try { fs.unlinkSync(destPath); } catch {} reject(err); });
+      });
+      req.on('error', reject);
+      req.setTimeout(60000, () => { req.destroy(new Error('Download timed out')); });
+    };
+    fetch(url, 5);
+  });
+}
+
+/**
+ * Apply a downloaded DMG to /Applications/WatchTower.app on macOS.
+ * Runs detached so it survives our own app.quit().
+ *
+ * The script asks for admin via osascript ONLY if /Applications/WatchTower.app is
+ * not user-writable. If the user installed via drag-drop (most common, no sudo),
+ * the swap is silent — no auth prompt, no prompt fatigue.
+ */
+function spawnMacUpdaterScript(dmgPath) {
+  const cacheDir = path.join(os.homedir(), 'Library', 'Caches', 'WatchTower');
+  fs.mkdirSync(cacheDir, { recursive: true });
+  const scriptPath = path.join(cacheDir, 'apply-update.sh');
+  const logPath = path.join(os.homedir(), 'Library', 'Logs', 'WatchTower-update.log');
+  fs.mkdirSync(path.dirname(logPath), { recursive: true });
+
+  const appPath = '/Applications/WatchTower.app';
+  const parentPid = process.pid;
+
+  // The script is rewritten on every update — never cached. ${...} substitutions
+  // are baked in at write time so the script has no runtime arguments to misparse.
+  const script = `#!/bin/bash
+set -u
+exec >> "${logPath}" 2>&1
+echo ""
+echo "--- WatchTower update started $(date '+%Y-%m-%dT%H:%M:%S%z') ---"
+echo "parent_pid=${parentPid} dmg=${dmgPath}"
+
+# Wait for the parent app to exit (max 30s). Once it's gone, we own
+# /Applications/WatchTower.app — no file locks holding us back.
+for i in $(seq 1 60); do
+  if ! kill -0 ${parentPid} 2>/dev/null; then
+    echo "Parent exited after $((i * 500))ms"
+    break
+  fi
+  sleep 0.5
+done
+
+if [ ! -f "${dmgPath}" ]; then
+  echo "ERROR: DMG not found at ${dmgPath}"
+  exit 1
+fi
+
+# Mount the DMG (no Finder window, don't auto-open the volume)
+MOUNT_OUTPUT=$(hdiutil attach "${dmgPath}" -nobrowse -noautoopen 2>&1)
+echo "$MOUNT_OUTPUT"
+MOUNT_POINT=$(echo "$MOUNT_OUTPUT" | grep -E "^/dev/" | grep "/Volumes/" | tail -1 | sed 's/^.*\\(\\/Volumes\\/.*\\)$/\\1/')
+if [ -z "$MOUNT_POINT" ] || [ ! -d "$MOUNT_POINT/WatchTower.app" ]; then
+  echo "ERROR: failed to find WatchTower.app in mounted DMG (mount=$MOUNT_POINT)"
+  hdiutil detach "$MOUNT_POINT" 2>/dev/null || true
+  exit 1
+fi
+echo "Mounted at $MOUNT_POINT"
+
+# Replace /Applications/WatchTower.app. If the user installed via drag-drop
+# the .app is user-writable — we can rm/cp directly. If they used sudo cp
+# (root-owned), prompt for admin via osascript.
+if [ -w "${appPath}" ] && [ -w "/Applications" ]; then
+  echo "Direct write — no admin prompt"
+  rm -rf "${appPath}"
+  cp -R "$MOUNT_POINT/WatchTower.app" "/Applications/"
+  COPY_RC=$?
+else
+  echo "Admin required — prompting via osascript"
+  osascript -e "do shell script \\"rm -rf '${appPath}' && cp -R '$MOUNT_POINT/WatchTower.app' '/Applications/' && xattr -cr '${appPath}'\\" with administrator privileges"
+  COPY_RC=$?
+fi
+
+if [ $COPY_RC -ne 0 ]; then
+  echo "ERROR: copy failed (rc=$COPY_RC)"
+  hdiutil detach "$MOUNT_POINT" 2>/dev/null || true
+  exit 1
+fi
+
+# Strip Gatekeeper quarantine so the new build launches cleanly.
+xattr -cr "${appPath}" 2>/dev/null || true
+
+# Detach and clean up the DMG
+hdiutil detach "$MOUNT_POINT" 2>/dev/null || true
+rm -f "${dmgPath}"
+
+# Relaunch
+echo "Relaunching ${appPath}"
+open "${appPath}"
+echo "--- update completed $(date '+%Y-%m-%dT%H:%M:%S%z') ---"
+`;
+
+  fs.writeFileSync(scriptPath, script, { mode: 0o755 });
+
+  const child = spawn('/bin/bash', [scriptPath], {
+    detached: true,
+    stdio: 'ignore',
+  });
+  child.unref();
+}
+
+/**
+ * Detect this Mac's arch slice for choosing the right DMG.
+ * `process.arch` returns 'arm64' for Apple Silicon, 'x64' for Intel.
+ */
+function macDmgArch() {
+  return process.arch === 'arm64' ? 'arm64' : 'x64';
+}
+
+/**
+ * Download the latest-version DMG from the v{version} GitHub release and
+ * trigger the self-replace script. Returns true on a successful kick-off
+ * (the actual install runs after we quit), false on download failure.
+ *
+ * Use this instead of autoUpdater.quitAndInstall() on macOS.
+ */
+async function applyMacUpdate(targetVersion, parentWindow, onProgress) {
+  if (process.platform !== 'darwin') {
+    throw new Error('applyMacUpdate is macOS-only');
+  }
+  const arch = macDmgArch();
+  const dmgFilename = `WatchTower-${targetVersion}-mac-${arch}.dmg`;
+  const url = `https://github.com/sinhaankur/WatchTower/releases/download/v${targetVersion}/${dmgFilename}`;
+  const cacheDir = path.join(os.homedir(), 'Library', 'Caches', 'WatchTower');
+  fs.mkdirSync(cacheDir, { recursive: true });
+  const dmgPath = path.join(cacheDir, dmgFilename);
+
+  // Remove any partial download from a previous failed attempt
+  try { if (fs.existsSync(dmgPath)) fs.unlinkSync(dmgPath); } catch {}
+
+  console.log(`[WatchTower] Downloading ${url} → ${dmgPath}`);
+  try {
+    await downloadFile(url, dmgPath, onProgress);
+  } catch (err) {
+    console.warn('[WatchTower] DMG download failed:', err.message);
+    if (parentWindow && !parentWindow.isDestroyed()) {
+      dialog.showMessageBox(parentWindow, {
+        type: 'error',
+        title: 'Download failed',
+        message: `Could not download the WatchTower ${targetVersion} installer.`,
+        detail: `${err.message}\n\nYou can download it manually from GitHub.`,
+        buttons: ['Open Release Page', 'Cancel'],
+        defaultId: 0,
+        cancelId: 1,
+      }).then(({ response }) => {
+        if (response === 0) shell.openExternal(`https://github.com/sinhaankur/WatchTower/releases/tag/v${targetVersion}`);
+      }).catch(() => {});
+    }
+    return false;
+  }
+
+  console.log('[WatchTower] Spawning updater script — app will quit');
+  spawnMacUpdaterScript(dmgPath);
+  // Give the spawned script a moment to start before we yank the parent
+  await new Promise((r) => setTimeout(r, 250));
+  app.quit();
+  return true;
+}
+
 /**
  * Fire-and-forget update check called once after the main window is shown.
  * Shows a non-blocking notification dialog; never interrupts the user mid-task.
@@ -149,12 +356,21 @@ function checkForAppUpdates(win) {
         buttons,
         defaultId: 0,
         cancelId: buttons.length - 1,
-      }).then(({ response }) => {
+      }).then(async ({ response }) => {
         if (response === 0) {
-          // Try the in-place install. If electron-updater can't apply
-          // the update (most often on unsigned Mac), the app will
-          // simply come back as the old version — at least the user
-          // saw the prompt and knows to try the manual path.
+          // Mac: bypass electron-updater's quitAndInstall (silently broken on
+          // unsigned bundles) and use our own DMG self-replace helper.
+          // Other platforms: trust electron-updater since they're either
+          // signed (Windows NSIS) or use a different install model (Linux).
+          if (isMac) {
+            try {
+              await applyMacUpdate(info.version, mainWindow);
+            } catch (err) {
+              console.warn('[WatchTower] applyMacUpdate failed:', err.message);
+              shell.openExternal(releaseUrl);
+            }
+            return;
+          }
           try {
             autoUpdater.quitAndInstall(false, true);
           } catch (err) {
@@ -2081,17 +2297,67 @@ async function showLaunchFailureDialog(error, backendLogPath) {
 
   const guide = pythonInstallGuide();
   const installCommand = guide.commands.join(' && ');
+  const isMac = process.platform === 'darwin';
+
+  // On Mac we offer "Reinstall Latest Version" as the first button, since
+  // the most common cause of this dialog is "you're running an old .app
+  // with a known startup bug" — the fix is to swap the bundle. Same
+  // self-replace path the in-app update flow uses.
+  const buttons = isMac
+    ? ['Reinstall Latest Version', 'Copy prerequisite install command', 'Open setup guide', 'Quit']
+    : ['Copy prerequisite install command', 'Open setup guide', 'Quit'];
+
   const response = await dialog.showMessageBox({
     type: 'error',
     title: 'WatchTower failed to start',
     message: parts.join('\n'),
-    buttons: ['Copy prerequisite install command', 'Open setup guide', 'Quit'],
+    buttons,
     defaultId: 0,
-    cancelId: 2,
+    cancelId: buttons.length - 1,
     noLink: true,
   });
 
-  if (response.response === 0) {
+  if (isMac && response.response === 0) {
+    // Reinstall — fetch latest release tag from GitHub, then run the
+    // self-replace helper. This works even when the backend is broken
+    // because none of it depends on the backend.
+    try {
+      const latest = await fetchLatestReleaseTag();
+      if (!latest) {
+        await dialog.showMessageBox({
+          type: 'warning',
+          title: 'Reinstall failed',
+          message: 'Could not reach GitHub to find the latest version.',
+          detail: 'Check your internet connection and try again, or download manually from the release page.',
+          buttons: ['Open Release Page', 'Cancel'],
+          defaultId: 0,
+        }).then(({ response: r }) => {
+          if (r === 0) shell.openExternal('https://github.com/sinhaankur/WatchTower/releases/latest');
+        });
+        return;
+      }
+      // Prompt one more time to confirm — this WILL replace /Applications/WatchTower.app.
+      const confirm = await dialog.showMessageBox({
+        type: 'question',
+        title: 'Reinstall WatchTower',
+        message: `Download and install WatchTower ${latest}?`,
+        detail: 'This will replace /Applications/WatchTower.app, strip the Gatekeeper quarantine, and relaunch. The current app will quit during the swap.',
+        buttons: ['Reinstall', 'Cancel'],
+        defaultId: 0,
+        cancelId: 1,
+      });
+      if (confirm.response !== 0) return;
+      await applyMacUpdate(latest, null);
+    } catch (err) {
+      console.warn('[WatchTower] Reinstall failed:', err.message);
+      shell.openExternal('https://github.com/sinhaankur/WatchTower/releases/latest');
+    }
+    return;
+  }
+
+  // Index shifts depending on whether we showed the Reinstall button.
+  const offset = isMac ? 1 : 0;
+  if (response.response === offset) {
     try { clipboard.writeText(installCommand); } catch { /* clipboard unavailable */ }
     await dialog.showMessageBox({
       type: 'info',
@@ -2104,9 +2370,44 @@ async function showLaunchFailureDialog(error, backendLogPath) {
     return;
   }
 
-  if (response.response === 1) {
+  if (response.response === offset + 1) {
     try { shell.openExternal(guide.docsUrl); } catch { /* offline / no browser */ }
   }
+}
+
+/**
+ * Hit the GitHub Releases API for the latest tag. Returns the version
+ * string (e.g. "1.10.1") with the `v` stripped, or null on any failure.
+ * Used by the failure-dialog reinstall path so we don't need a working
+ * backend / autoUpdater to recover from a broken install.
+ */
+function fetchLatestReleaseTag() {
+  return new Promise((resolve) => {
+    const req = https.get(
+      'https://api.github.com/repos/sinhaankur/WatchTower/releases/latest',
+      {
+        headers: {
+          'User-Agent': `WatchTower-Desktop/${app.getVersion()}`,
+          'Accept': 'application/vnd.github+json',
+        },
+        timeout: 8000,
+      },
+      (res) => {
+        let body = '';
+        res.on('data', (chunk) => { body += chunk; });
+        res.on('end', () => {
+          try {
+            if (res.statusCode !== 200) { resolve(null); return; }
+            const data = JSON.parse(body);
+            const tag = (data.tag_name || '').replace(/^v/, '');
+            resolve(tag || null);
+          } catch { resolve(null); }
+        });
+      },
+    );
+    req.on('error', () => resolve(null));
+    req.on('timeout', () => { req.destroy(); resolve(null); });
+  });
 }
 
 async function launch() {
