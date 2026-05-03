@@ -9,6 +9,32 @@ Curated, human-friendly history of WatchTower releases. Auto-generated GitHub Re
 
 ---
 
+## 1.10.2 — Auto-update actually installs on unsigned macOS
+
+Auto-update has been quietly broken on Mac since v1: `electron-updater` calls Squirrel.Mac under the hood, which **silently refuses to atomically replace bundles that lack a Developer ID signature**. Users would click "Restart and Install", the app would quit, reopen as the OLD version — and from the user's perspective updates simply didn't work. The 1.10.0 dialog made the prompt visible but didn't fix the install step itself; the manual "Download Manually" fallback worked but required drag-drop.
+
+This release replaces the broken Squirrel-based path with a self-written DMG self-replace helper that works for unsigned bundles.
+
+### Self-replace helper (Mac)
+- `applyMacUpdate(version, parentWindow)` downloads the version-specific `.dmg` directly from the GitHub Releases URL (handles 302 redirects to S3, content-length progress, 60s socket timeout, partial-download cleanup).
+- `spawnMacUpdaterScript(dmgPath)` writes a bash script to `~/Library/Caches/WatchTower/apply-update.sh` that:
+  1. Waits for the parent app PID to exit (max 30s polling).
+  2. Mounts the DMG with `hdiutil -nobrowse -noautoopen`.
+  3. Replaces `/Applications/WatchTower.app` — direct `rm/cp` if user-writable (drag-drop installs), `osascript ... with administrator privileges` if root-owned (`sudo cp` installs).
+  4. Strips Gatekeeper quarantine (`xattr -cr`) so the new build launches cleanly without "can't be opened" warnings.
+  5. Detaches the DMG, removes the cached file, relaunches the new bundle.
+- Script logs to `~/Library/Logs/WatchTower-update.log` so a failed update is debuggable without re-launching the .app.
+- Spawned with `detached: true` + `unref()` so it survives `app.quit()`.
+- The `update-downloaded` dialog's "Restart and Install" button now calls this on Mac instead of `autoUpdater.quitAndInstall()`. Other platforms (Windows NSIS, Linux) keep using `quitAndInstall` — they're either signed or use installers that handle the swap correctly.
+
+### Failure-dialog escape hatch
+Even when WatchTower can't start (broken backend, missing dependencies), the user can now recover **without ever opening a terminal**. The "WatchTower failed to start" dialog gains a **Reinstall Latest Version** button (Mac only) that:
+- Hits `api.github.com/repos/sinhaankur/WatchTower/releases/latest` for the current tag.
+- Confirms with the user (this WILL replace `/Applications/WatchTower.app`).
+- Runs the same self-replace helper.
+
+This closes the chicken-and-egg gap: the prior auto-update path required the app to start successfully *before* it could check for updates. If startup was broken (the actual case the user kept hitting), there was no in-app way out — only manual `curl + hdiutil + cp` from the terminal. Now the failure dialog itself can repair the install.
+
 ## 1.10.1 — Mac/Windows install commands + Docker Desktop launcher
 
 User on macOS hit a wall the moment they followed the Integrations page install steps: the UI returned **Linux apt commands unconditionally** — `sudo apt install`, `sudo dpkg -i`, `sudo usermod -aG`, `sudo systemctl enable` — none of which exist on Mac. Every "Show install steps" expand was a dead end. Same problem the 1.10.0 service-control fix solved at the runtime level, but the install-commands endpoint still hardcoded `os: linux` and returned the apt set regardless of host platform.
