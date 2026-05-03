@@ -9,6 +9,16 @@ Curated, human-friendly history of WatchTower releases. Auto-generated GitHub Re
 
 ---
 
+## 1.6.4 — Fix login (device-flow start crash)
+
+The `requests` lazy-import optimisation in 1.6.2 was broken: Python's PEP 562 module-level `__getattr__` only fires on *external* attribute access (`enterprise.requests`), NOT on bare-name lookups *inside* the module. So `requests.post(...)` and `except requests.RequestException` both hit `NameError` — every `POST /api/auth/github/device/start` returned 500 "Internal server error", making sign-in impossible. No test covered the success or RequestException paths, so it shipped.
+
+- **Reverted the lazy `__getattr__`**; restored top-level `import requests` in `watchtower/api/enterprise.py`. Cold-start regresses ~140 ms vs 1.6.2 but the app actually works, which trumps the savings.
+- **Added `tests/test_github_device_flow.py`** with two regression tests: success path (200 + user_code) and upstream-failure path (raises `RequestException` → 502, not 500).
+- Net cold-start vs pre-1.6.2: still ~30% faster (init_db fast-path + WATCHTOWER_SKIP_DB_INIT remain).
+
+Tests: 226 pass.
+
 ## 1.6.3 — Fix `pipx install` (and the desktop `.app`)
 
 `pyproject.toml` only declared 8 of the 16 runtime dependencies the app actually imports — `requirements.txt` carried the full list, but pip ignores that file when installing from a wheel. Result: every user who tried `pipx install watchtower-podman` (or used the desktop `.app`, which spawns the pipx-installed backend) hit a `ModuleNotFoundError: No module named 'slowapi'` on first request.
