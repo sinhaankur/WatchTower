@@ -9,6 +9,19 @@ Curated, human-friendly history of WatchTower releases. Auto-generated GitHub Re
 
 ---
 
+## 1.7.2 — Owner-mode lockout recovery (CLI)
+
+If your sign-in maps to a different internal user_id than the existing installation owner (e.g. token rotation, switching from API token to GitHub OAuth, or a buggy claim from an earlier broken release) you'd get stuck on:
+
+> *This WatchTower installation is owned by X. Ask an owner/admin to invite your account before accessing resources.*
+
+…with no in-app recovery. The previous "fix" required hand-editing the SQLite DB.
+
+- New CLI: `watchtower-deploy reset-installation-owner` clears every `InstallationClaim` row. The next sign-in re-claims ownership cleanly. Idempotent.
+- Login page's ownership advisory now points at the CLI instead of "edit the SQLite DB".
+- Recovery is shell-gated on purpose — anyone with shell access on the WatchTower host can already do worse than reset ownership, so no public API surface needed.
+- Documented in CLAUDE.md → Things that bite.
+
 ## 1.7.1 — Templates page: actionable error messaging
 
 Replaced the generic "Could not load templates" with status-aware messaging:
