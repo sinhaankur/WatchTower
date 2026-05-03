@@ -1028,7 +1028,7 @@ function isMacOSPythonStub(absolutePath) {
  */
 function probePythonCandidate(cmd) {
   try {
-    execSync(`${cmd} -c "import watchtower"`, {
+    execSync(`${cmd} -c "import sys; import watchtower; raise SystemExit(0 if sys.version_info >= (3,10) else 1)"`, {
       stdio: 'ignore',
       timeout: 5000,
       // shell:false keeps the spawn synchronous and bounded — `cmd` is
@@ -1046,6 +1046,12 @@ function resolvePython() {
   if (fs.existsSync(pythonUnix)) return pythonUnix;
   if (fs.existsSync(pythonWin)) return pythonWin;
 
+  // pipx-managed WatchTower install (common on macOS/Linux). Prefer this
+  // ahead of generic PATH python so we avoid stale Xcode/python3.9 picks.
+  const home = process.env.HOME || process.env.USERPROFILE || '';
+  const pipxPython = path.join(home, '.local', 'pipx', 'venvs', 'watchtower-podman', 'bin', 'python');
+  if (fs.existsSync(pipxPython) && probePythonCandidate(pipxPython)) return pipxPython;
+
   // Explicit user override beats every probe.
   const explicit = process.env.WATCHTOWER_PYTHON;
   if (explicit && fs.existsSync(explicit)) return explicit;
@@ -1054,7 +1060,14 @@ function resolvePython() {
   // so the GUI doesn't pop the CLT installer mid-launch.
   const candidates = process.platform === 'win32'
     ? ['python3.exe', 'python.exe', 'python']
-    : ['python3', 'python'];
+    : [
+        '/opt/homebrew/bin/python3.12',
+        '/opt/homebrew/bin/python3.11',
+        '/usr/local/bin/python3.12',
+        '/usr/local/bin/python3.11',
+        'python3',
+        'python',
+      ];
 
   for (const cmd of candidates) {
     // Only the bare-name macOS form `python3` resolves through PATH to
@@ -1153,7 +1166,7 @@ function pythonInstallGuide() {
   if (process.platform === 'darwin') {
     return {
       description:
-        "WatchTower needs Python 3.8+ with the watchtower-podman " +
+        "WatchTower needs Python 3.10+ with the watchtower-podman " +
         "package installed.\n\n" +
         "Run this in Terminal, then reopen WatchTower:",
       commands: [
@@ -1170,7 +1183,7 @@ function pythonInstallGuide() {
   if (process.platform === 'win32') {
     return {
       description:
-        "WatchTower needs Python 3.8+ with the watchtower-podman " +
+        "WatchTower needs Python 3.10+ with the watchtower-podman " +
         "package installed.\n\n" +
         "Install Python from python.org (check 'Add Python to PATH' " +
         "during install), then run this in PowerShell and reopen " +
@@ -1183,7 +1196,7 @@ function pythonInstallGuide() {
   }
   return {
     description:
-      "WatchTower needs Python 3.8+ with the watchtower-podman " +
+      "WatchTower needs Python 3.10+ with the watchtower-podman " +
       "package installed.\n\n" +
       "Run these in a terminal, then reopen WatchTower.",
     commands: [
@@ -1923,6 +1936,76 @@ function friendlyLaunchError(error) {
   return `WatchTower hit an unexpected error during startup:\n\n${raw}`;
 }
 
+/**
+ * Show launch failures with actionable remediation. Dependency-related
+ * failures get copy/install/docs actions instead of a passive error box.
+ */
+async function showLaunchFailureDialog(error, backendLogPath) {
+  const resolvedWebDist = process.env.WATCHTOWER_WEB_DIST || resolveWebDist();
+  const distIndex = path.join(resolvedWebDist, 'index.html');
+  const distExists = fs.existsSync(distIndex);
+  const parts = [friendlyLaunchError(error)];
+
+  if (!distExists) {
+    if (app.isPackaged) {
+      parts.push(
+        `\nFrontend bundle not found at:\n  ${distIndex}\n` +
+        'This packaged app is missing its bundled frontend. Reinstall WatchTower from the latest release.'
+      );
+    } else {
+      parts.push(
+        `\nFrontend bundle not found at:\n  ${distIndex}\n` +
+        `Build it once with:\n  npm --prefix web install && npm --prefix web run build`
+      );
+    }
+  }
+
+  if (backendLogPath) {
+    parts.push(`\nFor support, attach this log:\n  ${backendLogPath}`);
+  }
+
+  const raw = error?.message ?? String(error);
+  const likelyDependencyIssue =
+    raw.includes('Backend exited before responding') ||
+    raw.includes('Python not found') ||
+    raw.includes('ModuleNotFoundError') ||
+    raw.includes('ImportError');
+
+  if (!likelyDependencyIssue) {
+    dialog.showErrorBox('WatchTower failed to start', parts.join('\n'));
+    return;
+  }
+
+  const guide = pythonInstallGuide();
+  const installCommand = guide.commands.join(' && ');
+  const response = await dialog.showMessageBox({
+    type: 'error',
+    title: 'WatchTower failed to start',
+    message: parts.join('\n'),
+    buttons: ['Copy prerequisite install command', 'Open setup guide', 'Quit'],
+    defaultId: 0,
+    cancelId: 2,
+    noLink: true,
+  });
+
+  if (response.response === 0) {
+    try { clipboard.writeText(installCommand); } catch { /* clipboard unavailable */ }
+    await dialog.showMessageBox({
+      type: 'info',
+      title: 'Copied to clipboard',
+      message: 'Prerequisite install command copied.',
+      detail: 'Paste it into your terminal, run it, then relaunch WatchTower.',
+      buttons: ['OK'],
+      noLink: true,
+    });
+    return;
+  }
+
+  if (response.response === 1) {
+    try { shell.openExternal(guide.docsUrl); } catch { /* offline / no browser */ }
+  }
+}
+
 async function launch() {
   createSplash();
   setSplashStatus('Checking environment', 5);
@@ -2152,23 +2235,11 @@ app.whenReady().then(async () => {
       } catch { /* ignore */ }
     }
 
-    const distIndex = path.join(webRoot, 'dist', 'index.html');
-    const distExists = fs.existsSync(distIndex);
-    const parts = [friendlyLaunchError(error)];
-    if (!distExists) {
-      parts.push(
-        `\nFrontend bundle not found at:\n  ${distIndex}\n` +
-        `Build it once with:\n  npm --prefix web install && npm --prefix web run build`
-      );
-    }
-    if (backendLogPath) {
-      parts.push(`\nFor support, attach this log:\n  ${backendLogPath}`);
-    }
     // Persist the raw error to the diagnostic log so the Send Error Report
     // flow includes the original (URL-bearing) message even though we
     // don't show it to the user.
     appendDiagnostic('launch.failure', error?.stack ?? error?.message ?? String(error));
-    dialog.showErrorBox('WatchTower failed to start', parts.join('\n'));
+    await showLaunchFailureDialog(error, backendLogPath);
     stopProcesses();
     app.quit();
   }
