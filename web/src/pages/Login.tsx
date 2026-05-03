@@ -79,6 +79,11 @@ const Login = () => {
   const [tokenInput, setTokenInput] = useState('');
   const [authStatus, setAuthStatus] = useState<AuthStatus | null>(null);
   const [statusLoading, setStatusLoading] = useState(true);
+  // Other-ways-to-sign-in (guest, dev, API token) collapsed by default
+  // so the GitHub button is the unmistakable primary CTA. Earlier UI
+  // gave each method a full-width button which made guest mode "take
+  // over" and pushed users into the wrong path on first run.
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const oauthReady = Boolean(authStatus?.oauth?.github_configured);
   const deviceFlowReady = Boolean(authStatus?.device_flow?.github_configured);
 
@@ -517,40 +522,17 @@ const Login = () => {
             </div>
             )}
 
-        {/* Dev mode: one-click login */}
-        {!statusLoading && authStatus?.dev_auth?.allow_insecure && (
-          <div className="mb-5 rounded-lg border border-red-400 bg-red-50 px-4 py-3 text-left">
-            <p className="text-sm font-semibold text-red-800 mb-1">⚠ Insecure dev mode enabled</p>
-            <p className="text-xs text-red-700 mb-3">
-              <code className="font-mono bg-red-100 px-1 rounded">WATCHTOWER_ALLOW_INSECURE_DEV_AUTH=true</code> is set on the server.
-              <strong> Any token is accepted</strong> — anyone reaching this page can sign in instantly.
-              Set the env var to <code className="font-mono bg-red-100 px-1 rounded">false</code> in production.
-            </p>
-            <Button
-              onClick={() => void devAutoLogin()}
-              disabled={loading}
-              className="w-full rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-semibold py-5"
-            >
-              {loading ? 'Logging in…' : 'Quick Dev Login →'}
-            </Button>
-          </div>
-        )}
-
-        {/* Server not configured at all */}
+        {/* Server-not-configured is a real blocker (no auth method works
+            at all), so it stays prominent. The dev-mode + owner-mode
+            advisories used to live here as full warning blocks; they're
+            now collapsed under "Server status" at the bottom of the
+            card so they don't compete with the primary sign-in CTA. */}
         {nothingConfigured && (
             <div className="text-left text-sm mb-5 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 space-y-1">
             <p className="font-medium text-amber-800">⚠ Server setup required</p>
             <p className="text-amber-700 text-xs">
               Set <code className="font-mono bg-amber-100 px-1 rounded">WATCHTOWER_API_TOKEN</code> on the server, or configure GitHub OAuth to enable secure team sign-in.
             </p>
-            </div>
-        )}
-
-        {/* Owner mode hint */}
-        {!statusLoading && authStatus?.installation?.owner_mode_enabled && (
-            <div className="text-left text-xs mb-4 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2">
-            <p className="font-medium text-blue-800">Installation ownership is active</p>
-            <p className="text-blue-700 mt-0.5">Ask your owner or admin to invite your account before signing in.</p>
             </div>
         )}
 
@@ -704,95 +686,108 @@ const Login = () => {
               )}
             </div>
 
-            <div className="my-5 flex items-center gap-3">
-              <div className="h-px flex-1 bg-slate-200" />
-              <span className="text-[11px] text-slate-400 uppercase tracking-wider">or</span>
-              <div className="h-px flex-1 bg-slate-200" />
+            {/* SECONDARY actions — small text links so they don't
+                compete with the GitHub sign-in. Earlier versions made
+                "Continue as Guest" and "Quick Dev Login" full-width
+                buttons, which caused users to default to those paths
+                and then get stuck (guest mode can't deploy to remote
+                nodes; dev login should never fire in prod). */}
+            <div className="mt-5 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-xs text-slate-500">
+              <button
+                type="button"
+                onClick={() => setShowAdvanced((v) => !v)}
+                className="hover:text-slate-800 underline underline-offset-2"
+              >
+                {showAdvanced ? 'Hide other options' : 'Other ways to sign in'}
+              </button>
             </div>
 
-            {/* Guest mode — no login required, but limited capabilities */}
-            <div className="text-left">
-              <Button
-                onClick={() => void continueAsGuest()}
-                disabled={loading}
-                variant="outline"
-                className="w-full rounded-lg gap-2 py-5 text-sm font-medium flex items-center justify-center border-slate-300 text-slate-700 hover:bg-slate-50"
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                  <circle cx="12" cy="7" r="4" />
-                </svg>
-                <span>Continue as Guest</span>
-              </Button>
-              <details className="mt-1.5 text-[11px] text-slate-500">
-                <summary className="cursor-pointer text-center hover:text-slate-700">What can guest mode do?</summary>
-                <div className="mt-2 px-3 text-left space-y-1">
-                  <p className="text-slate-700"><strong>Guest mode CAN:</strong></p>
-                  <ul className="list-disc list-inside space-y-0.5 pl-1">
-                    <li>Browse projects and deployments</li>
-                    <li>Run local builds (Nixpacks / Containerfile)</li>
-                    <li>Deploy to <code className="font-mono bg-slate-100 px-0.5 rounded">localhost</code> (containers running on this machine)</li>
-                    <li>Use the failure analyzer + auto-fix loop on local deploys</li>
-                  </ul>
-                  <p className="text-slate-700 pt-1"><strong>Guest mode CAN'T:</strong></p>
-                  <ul className="list-disc list-inside space-y-0.5 pl-1">
-                    <li>Add remote SSH deployment servers</li>
-                    <li>Manage team members</li>
-                    <li>Access private GitHub repos</li>
-                  </ul>
+            {showAdvanced && (
+              <div className="mt-4 pt-4 border-t border-slate-200 text-left space-y-4">
+                {/* Continue as Guest — small, clearly marked as limited. */}
+                <div>
+                  <button
+                    type="button"
+                    onClick={() => void continueAsGuest()}
+                    disabled={loading}
+                    className="text-sm text-slate-700 hover:text-red-700 underline underline-offset-2 disabled:opacity-50"
+                  >
+                    Continue as Guest →
+                  </button>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    No sign-in. Can browse projects + deploy to localhost only. No remote SSH nodes, no team management, no private repos.
+                  </p>
+                </div>
+
+                {/* Dev mode — only when the server explicitly opts in. */}
+                {!statusLoading && authStatus?.dev_auth?.allow_insecure && (
+                  <div>
+                    <button
+                      type="button"
+                      onClick={() => void devAutoLogin()}
+                      disabled={loading}
+                      className="text-sm text-amber-700 hover:text-amber-900 underline underline-offset-2 disabled:opacity-50"
+                    >
+                      Quick dev login →
+                    </button>
+                    <p className="text-[11px] text-amber-700 mt-0.5">
+                      ⚠ Server has <code className="font-mono bg-amber-50 px-1 rounded">WATCHTOWER_ALLOW_INSECURE_DEV_AUTH=true</code>. Skip in production.
+                    </p>
+                  </div>
+                )}
+
+                {/* API token — for headless / CI use. The previous big
+                    block of explanation moved into a collapsed details
+                    so users who don't need it aren't slowed down. */}
+                <div>
+                  <label htmlFor="api-token" className="block text-sm font-medium text-slate-700 mb-1">
+                    Sign in with server API token
+                  </label>
+                  <input
+                    id="api-token"
+                    type="password"
+                    value={tokenInput}
+                    onChange={(e) => setTokenInput(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && void continueWithToken()}
+                    className="w-full rounded-lg border border-slate-300 focus:border-red-700 focus:ring-1 focus:ring-red-700 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition"
+                    placeholder="WATCHTOWER_API_TOKEN"
+                    autoComplete="current-password"
+                  />
+                  <Button
+                    onClick={() => void continueWithToken()}
+                    disabled={loading || !tokenInput.trim()}
+                    variant="outline"
+                    className="w-full mt-2 rounded-lg text-slate-700"
+                  >
+                    {loading ? 'Verifying…' : 'Sign in with API token'}
+                  </Button>
+                  <details className="mt-1.5 text-[11px] text-slate-500">
+                    <summary className="cursor-pointer hover:text-slate-700">What is this?</summary>
+                    <div className="mt-1.5 space-y-1 text-slate-600">
+                      <p>The <code className="font-mono bg-slate-100 px-1 rounded">WATCHTOWER_API_TOKEN</code> set on the server. <strong>Not</strong> a GitHub PAT.</p>
+                      <p>If you installed via <code className="font-mono bg-slate-100 px-1 rounded">./run.sh</code>, the dev token is <code className="font-mono bg-slate-100 px-1 rounded">dev-watchtower-token</code>.</p>
+                    </div>
+                  </details>
+                </div>
+              </div>
+            )}
+
+            {/* Server-state advisories tucked at the bottom — surfaced
+                so the user can see them, but no longer competing with
+                the primary CTA. */}
+            {!statusLoading && (authStatus?.dev_auth?.allow_insecure || authStatus?.installation?.owner_mode_enabled) && (
+              <details className="mt-5 pt-4 border-t border-slate-200 text-left text-xs text-slate-500">
+                <summary className="cursor-pointer hover:text-slate-700">Server status</summary>
+                <div className="mt-2 space-y-2">
+                  {authStatus?.dev_auth?.allow_insecure && (
+                    <p className="text-amber-700">⚠ <strong>Insecure dev mode enabled</strong> — set <code className="font-mono bg-amber-50 px-1 rounded">WATCHTOWER_ALLOW_INSECURE_DEV_AUTH=false</code> in production.</p>
+                  )}
+                  {authStatus?.installation?.owner_mode_enabled && (
+                    <p className="text-blue-700"><strong>Installation ownership is active.</strong> If this is your machine and you're locked out, ask the owner to invite you, or clear <code className="font-mono bg-blue-50 px-1 rounded">~/.watchtower/watchtower.db</code>'s <code className="font-mono bg-blue-50 px-1 rounded">installation_claims</code> row.</p>
+                  )}
                 </div>
               </details>
-            </div>
-
-            <div className="my-5 flex items-center gap-3">
-              <div className="h-px flex-1 bg-slate-200" />
-              <span className="text-[11px] text-slate-400 uppercase tracking-wider">or use</span>
-              <div className="h-px flex-1 bg-slate-200" />
-            </div>
-
-            {/* API token — SECONDARY auth method.
-                Critically: this field accepts the SERVER's WATCHTOWER_API_TOKEN
-                (a deployment-scoped token set when the operator installed
-                WatchTower). It does NOT accept a GitHub Personal Access
-                Token — the previous label + PAT-creation links here led
-                users to create a GitHub PAT, paste it, and get rejected.
-                The post-login flow (Settings → Integrations → GitHub)
-                is where users actually link a GitHub PAT for repo access. */}
-            <div className="text-left">
-              <label htmlFor="api-token" className="block text-xs font-medium text-slate-700 mb-1.5">
-                Sign in with the server's API token
-              </label>
-
-              <div className="mb-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 space-y-2">
-                <p className="text-xs text-slate-700">
-                  This is the <code className="font-mono bg-white border border-slate-200 px-1 rounded">WATCHTOWER_API_TOKEN</code> set on the server when WatchTower was installed. <strong>It is not a GitHub Personal Access Token.</strong>
-                </p>
-                <ul className="text-[11px] text-slate-600 list-disc list-inside space-y-0.5">
-                  <li>Find it in your server's <code className="font-mono bg-white border border-slate-200 px-0.5 rounded">.env</code> file or systemd unit env</li>
-                  <li>If you installed via <code className="font-mono bg-white border border-slate-200 px-0.5 rounded">./run.sh</code>, the dev token is <code className="font-mono bg-white border border-slate-200 px-0.5 rounded">dev-watchtower-token</code></li>
-                  <li>For private repo access, link your GitHub account from Settings → Integrations <em>after</em> sign-in</li>
-                </ul>
-              </div>
-
-              <input
-                id="api-token"
-                type="password"
-                value={tokenInput}
-                onChange={(e) => setTokenInput(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && void continueWithToken()}
-                className="w-full rounded-lg border border-slate-300 focus:border-red-700 focus:ring-1 focus:ring-red-700 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition"
-                placeholder="Paste WATCHTOWER_API_TOKEN"
-                autoComplete="current-password"
-              />
-              <Button
-                onClick={() => void continueWithToken()}
-                disabled={loading || !tokenInput.trim()}
-                variant="outline"
-                className="w-full mt-3 rounded-lg text-slate-700"
-              >
-                {loading ? 'Verifying…' : 'Sign in with API Token'}
-              </Button>
-            </div>
+            )}
           </>
           )}
           </>
