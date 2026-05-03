@@ -266,28 +266,29 @@ async def list_related_projects(
     """List projects that should run alongside this one."""
     project = _load_owned_project(db, project_id, current_user)
 
+    # Single LEFT JOIN — one round-trip instead of 1 + N. Outer join keeps
+    # rows where the related project was deleted but the relation row
+    # still exists; the response carries `None` name/branch for those.
     rows = (
-        db.query(ProjectRelation)
+        db.query(ProjectRelation, Project)
+        .outerjoin(Project, Project.id == ProjectRelation.related_project_id)
         .filter(ProjectRelation.project_id == project.id)
         .order_by(ProjectRelation.order_index.asc(), ProjectRelation.created_at.asc())
         .all()
     )
-    out: List[schemas.ProjectRelationResponse] = []
-    for rel in rows:
-        related = db.query(Project).filter(Project.id == rel.related_project_id).first()
-        out.append(
-            schemas.ProjectRelationResponse(
-                id=rel.id,
-                project_id=rel.project_id,
-                related_project_id=rel.related_project_id,
-                related_project_name=related.name if related else None,
-                related_project_branch=related.repo_branch if related else None,
-                order_index=rel.order_index,
-                note=rel.note,
-                created_at=rel.created_at,
-            )
+    return [
+        schemas.ProjectRelationResponse(
+            id=rel.id,
+            project_id=rel.project_id,
+            related_project_id=rel.related_project_id,
+            related_project_name=related.name if related else None,
+            related_project_branch=related.repo_branch if related else None,
+            order_index=rel.order_index,
+            note=rel.note,
+            created_at=rel.created_at,
         )
-    return out
+        for rel, related in rows
+    ]
 
 
 @router.post(
@@ -402,8 +403,12 @@ async def run_project_with_related(
     """
     project = _load_owned_project(db, project_id, current_user)
 
-    relations = (
-        db.query(ProjectRelation)
+    # Single LEFT JOIN — one round-trip instead of 1 + N. Outer join keeps
+    # the relation row even if the related project was deleted, so we can
+    # still emit a "skipped (deleted)" result item.
+    relation_rows = (
+        db.query(ProjectRelation, Project)
+        .outerjoin(Project, Project.id == ProjectRelation.related_project_id)
         .filter(ProjectRelation.project_id == project.id)
         .order_by(ProjectRelation.order_index.asc(), ProjectRelation.created_at.asc())
         .all()
@@ -417,8 +422,7 @@ async def run_project_with_related(
     skipped: List[schemas.RunWithRelatedResultItem] = []
     seen: set = {project.id}
 
-    for rel in relations:
-        related = db.query(Project).filter(Project.id == rel.related_project_id).first()
+    for rel, related in relation_rows:
         if not related:
             skipped.append(
                 schemas.RunWithRelatedResultItem(
