@@ -9,6 +9,23 @@ Curated, human-friendly history of WatchTower releases. Auto-generated GitHub Re
 
 ---
 
+## 1.6.3 — Fix `pipx install` (and the desktop `.app`)
+
+`pyproject.toml` only declared 8 of the 16 runtime dependencies the app actually imports — `requirements.txt` carried the full list, but pip ignores that file when installing from a wheel. Result: every user who tried `pipx install watchtower-podman` (or used the desktop `.app`, which spawns the pipx-installed backend) hit a `ModuleNotFoundError: No module named 'slowapi'` on first request.
+
+- **Added the 9 missing direct dependencies** to `pyproject.toml`: `slowapi`, `sqlalchemy`, `alembic`, `psycopg2-binary`, `python-dotenv`, `pydantic-settings`, `httpx`, `redis`, `rq`, `openai`, plus `cryptography` (used directly by `_ensure_secret_key`'s Fernet path; previously only there transitively via fabric/paramiko).
+- **Added `; sys_platform == 'linux'` marker to `podman`** so macOS / Windows installs don't trip on the Linux-only Podman SDK wheels — matches what `requirements.txt` already does.
+- **Verified end-to-end** by creating a fresh venv and running `pip install -e .` from the repo + `from watchtower.api import app` — clean import, all routers loaded.
+- Comment in `pyproject.toml` warns future contributors to keep this list in sync with `requirements.txt`.
+
+If you previously installed via `pipx install watchtower-podman` and got the slowapi crash:
+```
+pipx install --force watchtower-podman
+```
+…or just upgrade to 1.6.3 once it lands on PyPI.
+
+Tests: 224 pass.
+
 ## 1.6.2 — Performance pass: bundle, cold start, hot-path indexes
 
 A focused optimisation release. No behaviour changes for end users; everything below is faster or smaller.
