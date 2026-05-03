@@ -1068,6 +1068,78 @@ async def nixpacks_status(_current_user: dict = Depends(util.get_current_user)):
     }
 
 
+@router.get("/environment")
+async def runtime_environment():
+    """Return enough state for the SPA to know *which* WatchTower it is.
+
+    Public endpoint so the badge renders even on the login page (where
+    knowing "you're hitting the dev clone backend, not the .app" is the
+    whole point). No secrets — only paths + flags + version.
+
+    Surfaces:
+      * ``env`` — operator-set ``WATCHTOWER_ENV`` (dev | staging | prod);
+        defaults to "production" so omitting it doesn't accidentally mark
+        a real install as dev.
+      * ``mode`` — best-effort guess at *how* the backend was launched
+        (desktop-spawned | dev-clone | pipx | wheel | docker), based on
+        the process's executable path. Heuristic, but stable enough for
+        a badge.
+      * ``insecure_dev_auth`` — mirror of the existing flag so the
+        badge can warn loudly when set in non-dev installs.
+      * Plus version, hostname, db kind, data dir, web-dist source —
+        the things you'd ask if a user said "is this the right
+        instance?"
+    """
+    import platform
+    import sys
+    from pathlib import Path
+    import sqlalchemy as _sa
+
+    from watchtower import __version__
+    from watchtower.database import engine
+
+    env = os.getenv("WATCHTOWER_ENV", "production").lower()
+    insecure_dev_auth = os.getenv("WATCHTOWER_ALLOW_INSECURE_DEV_AUTH", "false").lower() == "true"
+
+    exe_path = sys.executable.lower()
+    if "/applications/watchtower.app/" in exe_path:
+        mode = "desktop"
+    elif "/.local/pipx/" in exe_path:
+        mode = "pipx"
+    elif "/.venv/" in exe_path or "/venv/" in exe_path:
+        mode = "dev-clone"
+    elif "/site-packages/" in exe_path:
+        mode = "wheel"
+    elif Path("/.dockerenv").exists() or os.getenv("KUBERNETES_SERVICE_HOST"):
+        mode = "container"
+    else:
+        mode = "unknown"
+
+    db_url = str(engine.url)
+    db_kind = "sqlite" if db_url.startswith("sqlite") else (
+        "postgres" if db_url.startswith("postgres") else _sa.make_url(db_url).get_backend_name()
+    )
+    db_path = None
+    if db_url.startswith("sqlite"):
+        # Strip sqlite:/// or sqlite:////
+        db_path = db_url.split("sqlite:///", 1)[-1]
+
+    web_dist_env = os.getenv("WATCHTOWER_WEB_DIST")
+    web_dist_source = "env-override" if web_dist_env else "in-tree"
+
+    return {
+        "env": env,
+        "mode": mode,
+        "version": __version__,
+        "insecure_dev_auth": insecure_dev_auth,
+        "hostname": platform.node(),
+        "platform": platform.platform(terse=True),
+        "python": sys.version.split()[0],
+        "db": {"kind": db_kind, "path": db_path},
+        "web_dist_source": web_dist_source,
+    }
+
+
 @router.get("/status")
 async def runtime_status(_current_user: dict = Depends(util.get_current_user)):
     """Summarize local Podman and WatchTower runtime health."""

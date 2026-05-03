@@ -9,6 +9,31 @@ Curated, human-friendly history of WatchTower releases. Auto-generated GitHub Re
 
 ---
 
+## 1.8.0 — Cloudflare Phase 2 + environment badge + setup-mode bridges
+
+Three meaningful pieces that together close most of the "feels incomplete" gaps from 1.7.x.
+
+### Cloudflare Phase 2 — DNS automation
+The token saved in 1.7.0 starts being useful. Each `CustomDomain` can now be wired to a stored Cloudflare credential; WatchTower creates/updates/deletes the A record automatically.
+
+- New `watchtower/cloudflare_dns.py` service with strict zone-suffix matching (a token scoped to `example.com` resolves correctly for `app.example.com`; never silently falls back to a parent zone the token can't actually access).
+- New columns on `custom_domains`: `cloudflare_credential_id`, `cloudflare_zone_id`, `cloudflare_record_id`, `cloudflare_target_ip`, `cloudflare_synced_at`. Migration `4183fe5d8e83`.
+- New endpoints under `/api/integrations/cloudflare/projects/{id}/domains/{id}/`: `sync` (idempotent — call twice with the same IP, get one record) and `unsync` (treats record-already-gone as success).
+- New **Domains** tab in `ProjectDetail` — add domains, see CF sync status, sync/unsync per-domain. Picks the credential from the dropdown when more than one is connected.
+- Phase 2 keeps `proxied=False` (DNS-only / "grey cloud") so existing Let's Encrypt cert flows continue to work. Phase 3 (Load Balancer) will flip to `proxied=True` when fronting the LB.
+
+### Environment badge
+Tonight's repeat confusion between the installed `.app` and the dev-clone backend was exactly what this catches.
+
+- New `GET /api/runtime/environment` (public — no auth needed; surfaces no secrets) returns `{ env, mode, version, insecure_dev_auth, hostname, platform, python, db, web_dist_source }`. Mode is auto-detected from the executable path (desktop / pipx / dev-clone / wheel / container / unknown).
+- Sidebar footer shows a small color-coded badge **only when** the install isn't a "boring desktop + production" combo. Red for `insecure_dev_auth=true`, amber for non-prod env, slate for non-desktop modes.
+- Operator-set `WATCHTOWER_ENV=dev|staging|production` (defaults to `production`).
+
+### Setup-mode bridges (finishes WIP)
+The `desktop/preload.js` exposed `openTerminal` / `copyText` / `openExternal` to the renderer with no matching `ipcMain.handle` in `main.js` — every renderer call rejected silently. Added the three handlers (Terminal.app on macOS, x-terminal-emulator/xterm on Linux, cmd.exe on Windows; clipboard.writeText; shell.openExternal with http(s)-only validation).
+
+Tests: 226 pass.
+
 ## 1.7.2 — Owner-mode lockout recovery (CLI)
 
 If your sign-in maps to a different internal user_id than the existing installation owner (e.g. token rotation, switching from API token to GitHub OAuth, or a buggy claim from an earlier broken release) you'd get stuck on:

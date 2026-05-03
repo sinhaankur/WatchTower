@@ -322,6 +322,21 @@ export default function Layout({ children }: { children: ReactNode }) {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const { data: updateData } = useUpdateCheck();
   const versionLabel = updateData?.current ? `v${updateData.current}` : '';
+
+  // Environment badge — pulled once at mount. Surfaces when this is
+  // NOT a boring "desktop + production" combo so the user can tell at
+  // a glance which backend / DB they're pointing at. Tonight's repeat
+  // confusion between the .app and the dev clone is exactly what this
+  // catches.
+  const [envInfo, setEnvInfo] = useState<{ env: string; mode: string; insecure_dev_auth: boolean } | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    void fetch('/api/runtime/environment')
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (!cancelled && d) setEnvInfo({ env: d.env, mode: d.mode, insecure_dev_auth: d.insecure_dev_auth }); })
+      .catch(() => { /* non-fatal — just hide the badge */ });
+    return () => { cancelled = true; };
+  }, []);
   const { data: me, isLoading: meLoading } = useMe();
   const { data: activeDeploys } = useActiveDeploymentCount();
   const activeBuildCount = activeDeploys?.active ?? 0;
@@ -534,8 +549,22 @@ export default function Layout({ children }: { children: ReactNode }) {
             a thin top border. The "update available" affordance is the
             only thing meant to draw the eye when relevant. */}
         <div className="mt-3 pt-2 px-1 border-t border-slate-200/70 flex items-center justify-between">
-          <span className="text-[10px] text-slate-400 tracking-wide">
-            WatchTower{versionLabel ? ` ${versionLabel}` : ''}
+          <span className="text-[10px] text-slate-400 tracking-wide flex items-center gap-1.5">
+            <span>WatchTower{versionLabel ? ` ${versionLabel}` : ''}</span>
+            {envInfo && (envInfo.mode !== 'desktop' || envInfo.env !== 'production' || envInfo.insecure_dev_auth) && (
+              <span
+                className={`px-1 py-px rounded text-[9px] font-semibold uppercase tracking-wider ${
+                  envInfo.insecure_dev_auth
+                    ? 'bg-red-100 text-red-700 border border-red-300'
+                    : envInfo.env === 'production'
+                      ? 'bg-slate-100 text-slate-600 border border-slate-300'
+                      : 'bg-amber-100 text-amber-800 border border-amber-300'
+                }`}
+                title={`mode: ${envInfo.mode} · env: ${envInfo.env}${envInfo.insecure_dev_auth ? ' · INSECURE DEV AUTH' : ''}`}
+              >
+                {envInfo.insecure_dev_auth ? 'dev-auth' : envInfo.env === 'production' ? envInfo.mode : envInfo.env}
+              </span>
+            )}
           </span>
           {updateData?.has_update && (
             <button
