@@ -2,6 +2,7 @@
 WatchTower Build Runner
 Handles actual git clone → build → deploy pipeline for projects.
 """
+from watchtower.api.util import utcnow
 
 import asyncio
 import logging
@@ -96,11 +97,11 @@ async def _run_build(deployment_id) -> None:
             deployment_id=deployment.id,
             build_command=_resolve_build_command(db, project),
             status=BuildStatus.RUNNING,
-            started_at=datetime.utcnow(),
+            started_at=utcnow(),
         )
         db.add(build)
         deployment.status = DeploymentStatus.BUILDING
-        deployment.started_at = datetime.utcnow()
+        deployment.started_at = utcnow()
         db.commit()
         db.refresh(build)
 
@@ -115,7 +116,7 @@ async def _run_build(deployment_id) -> None:
             build.build_output = "\n".join(log_lines)
             db.commit()
 
-        _append(f"[WatchTower] Build started at {datetime.utcnow().isoformat()}")
+        _append(f"[WatchTower] Build started at {utcnow().isoformat()}")
         _append(f"[WatchTower] Project: {project.name}  |  Branch: {deployment.branch}")
 
         # ── Step 1: Clone / pull repo ──────────────────────────────────────
@@ -162,11 +163,11 @@ async def _run_build(deployment_id) -> None:
             _append("[WatchTower] ⚠ No deployment nodes configured — build artifacts stored locally only.")
 
         # ── Step 5: Mark success ───────────────────────────────────────────
-        _append(f"\n[WatchTower] ✅ Build complete at {datetime.utcnow().isoformat()}")
+        _append(f"\n[WatchTower] ✅ Build complete at {utcnow().isoformat()}")
         build.status = BuildStatus.SUCCESS
-        build.completed_at = datetime.utcnow()
+        build.completed_at = utcnow()
         deployment.status = DeploymentStatus.LIVE
-        deployment.completed_at = datetime.utcnow()
+        deployment.completed_at = utcnow()
         db.commit()
 
         await _send_notifications(db, project, deployment, success=True)
@@ -177,10 +178,10 @@ async def _run_build(deployment_id) -> None:
             if build:
                 build.build_output = (build.build_output or "") + f"\n[WatchTower] ❌ {exc}"
                 build.status = BuildStatus.FAILED
-                build.completed_at = datetime.utcnow()
+                build.completed_at = utcnow()
             if deployment:
                 deployment.status = DeploymentStatus.FAILED
-                deployment.completed_at = datetime.utcnow()
+                deployment.completed_at = utcnow()
             db.commit()
             await _send_notifications(db, project, deployment, success=False)
         except Exception:

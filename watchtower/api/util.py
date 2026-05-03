@@ -10,6 +10,7 @@ import json
 import time
 import base64
 import hashlib
+from datetime import datetime, timezone
 from typing import Optional
 from fastapi import Header, HTTPException, Request, status
 
@@ -17,6 +18,17 @@ try:
     from cryptography.fernet import Fernet
 except Exception:  # pragma: no cover - dependency check at runtime
     Fernet = None
+
+
+def utcnow() -> datetime:
+    """Return current UTC time as a naive datetime.
+
+    Replacement for the deprecated ``datetime.utcnow()``. Returns a naive
+    UTC datetime so it stays comparable to existing naive ``DateTime``
+    columns in the SQLAlchemy schema — switching the whole schema to
+    timezone-aware columns is a separate, larger migration.
+    """
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 def generate_webhook_secret() -> str:

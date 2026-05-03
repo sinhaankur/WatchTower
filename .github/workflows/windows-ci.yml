@@ -166,24 +166,18 @@ jobs:
           }
           
           Write-Host "✗ Health check failed after $MaxRetries retries" -ForegroundColor Red
-          Write-Host "API log:" -ForegroundColor Red
+          Write-Host "----- api.log -----"
           Get-Content -Path "api.log" -ErrorAction SilentlyContinue | Write-Host
-          Write-Host "API error log:" -ForegroundColor Red
+          Write-Host "----- api-error.log -----"
           Get-Content -Path "api-error.log" -ErrorAction SilentlyContinue | Write-Host
 
-          if ($LastProbeError) {
-            Write-Host "::error file=.github/workflows/windows-ci.yml::Final health probe error: $LastProbeError"
-          }
-
-          $ApiLogTail = @(Get-Content -Path "api.log" -ErrorAction SilentlyContinue | Select-Object -Last 10)
-          foreach ($Line in $ApiLogTail) {
-            Write-Host "::error file=api.log::$Line"
-          }
-
-          $ApiErrorTail = @(Get-Content -Path "api-error.log" -ErrorAction SilentlyContinue | Select-Object -Last 10)
-          foreach ($Line in $ApiErrorTail) {
-            Write-Host "::error file=api-error.log::$Line"
-          }
+          # One clear annotation in the PR view. The full logs above and the
+          # uploaded artifact ("windows-ci-logs") have everything needed for
+          # triage — emitting one annotation per log line previously turned
+          # every uvicorn INFO line into a red "Error:" row, which read as
+          # noise. Keep the logs as Write-Host output, surface the actual
+          # cause once.
+          Write-Host "::error file=.github/workflows/windows-ci.yml,line=1::App Center health check failed after $MaxRetries retries. Last probe error: $LastProbeError. See run logs and the windows-ci-logs artifact for api.log / api-error.log."
 
           exit 1
 
