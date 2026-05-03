@@ -22,7 +22,6 @@ from typing import List, Optional
 import uuid as uuid_module
 from uuid import UUID
 from datetime import datetime, timezone
-import requests
 
 from watchtower.database import (
     get_db, Organization, User, GitHubConnection, TeamMember, OrgNode, InstallationClaim,
@@ -35,6 +34,18 @@ from watchtower.api.rate_limit import limiter
 
 router = APIRouter(prefix="/api", tags=["Enterprise"])
 logger = logging.getLogger(__name__)
+
+
+def __getattr__(name: str):
+    """Lazy-load ``requests`` (~140 ms cold) on first reference. The
+    library is only needed when an OAuth / GHES handler actually fires —
+    no point paying its import cost at every API process startup.
+    Subsequent accesses go straight through the cached module global."""
+    if name == "requests":
+        import requests as _requests
+        globals()["requests"] = _requests
+        return _requests
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 # ---------------------------------------------------------------------------

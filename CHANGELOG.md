@@ -9,6 +9,24 @@ Curated, human-friendly history of WatchTower releases. Auto-generated GitHub Re
 
 ---
 
+## 1.6.2 — Performance pass: bundle, cold start, hot-path indexes
+
+A focused optimisation release. No behaviour changes for end users; everything below is faster or smaller.
+
+- **Frontend bundle: main chunk 508 KB → 301 KB.** Replaced `framer-motion` (loaded just for one 180 ms page-fade) with a CSS keyframe in `App.css` — saves ~140 KB unminified / ~45 KB gzipped. Added a `prefers-reduced-motion` opt-out.
+- **Vendor chunk split.** `vite.config.ts` pins `react`/`react-dom`/`react-router-dom` (~17 KB gzip) and `@tanstack/react-query` (~13 KB gzip) into separate chunks so app-code deploys don't bust their cache for return visitors.
+- **`rollup-plugin-visualizer` wired up.** `ANALYZE=1 npm run build` opens a treemap at `web/dist/stats.html` for future bundle audits.
+- **Backend cold start: 970 ms → 590 ms (−39%).**
+  - `init_db()` fast-path: parses `alembic/versions/*.py` for the head revision and skips the full Alembic load when `alembic_version` already matches. Falls through to the slow path on any mismatch (multiple heads, parse failure, etc.) so new migrations always run.
+  - New `WATCHTOWER_SKIP_DB_INIT=true` env var for production deployments that run `alembic upgrade` out-of-band.
+  - `requests` import in `watchtower/api/enterprise.py` now lazy via module-level `__getattr__` — saves ~140 ms cold (only paid when an OAuth/GHES handler actually fires).
+- **DB hot-path indexes.** Added single-column indexes on `Deployment.project_id`, `Build.deployment_id`, `EnvironmentVariable.project_id`, `CustomDomain.project_id`, `DeploymentNode.deployment_id`, `NotificationWebhook.project_id`, `ProjectRelation.related_project_id`. Plus composite indexes `(deployments.project_id, created_at)` and `(builds.deployment_id, started_at)` for the "latest deployment / build for X" hot queries. Migration: `bcf7346cbb81`.
+- **N+1 queries flattened.** `list_related_projects` and `run_project_with_related` in `api/projects.py` now do a single LEFT JOIN instead of `1 + N` round-trips per relation.
+- **Schema drift fix.** `GitHubDeviceConnectSession` model now declares `nullable=False` on the 5 columns the DB has always had as NOT NULL, and drops `index=True` from `device_code` since the unique constraint already provides the lookup index. Migration `c029f15faa8d` removes the redundant non-unique `ix_github_device_connect_sessions_device_code` index. `alembic check` is now clean for this table.
+- **CLAUDE.md update.** Documented the benign `org_nodes` SAWarning (5 PRAGMA FK entries vs 3 declared — duplicates accumulated from a past batch migration; functionally inert).
+
+Tests: 224 pass.
+
 ## 1.6.0 — GitHub Device Flow + desktop tool detection
 
 End users can finally sign in with GitHub directly from the desktop app, and the runtime status panel correctly detects Tailscale / Docker / Podman on macOS without the user having to fix shell PATH.
