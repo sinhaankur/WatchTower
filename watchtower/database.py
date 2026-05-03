@@ -328,10 +328,25 @@ class CustomDomain(Base):
     tls_enabled = Column(Boolean, default=True)
     tls_cert_path = Column(String, nullable=True)
     letsencrypt_validated = Column(Boolean, default=False)
+
+    # Cloudflare-managed DNS (Phase 2 of the CF integration). When set,
+    # WatchTower owns the A record for this domain; sync endpoint uses
+    # the credential's token to create/update/delete the record. The
+    # zone_id is cached so each sync skips the per-zone lookup roundtrip.
+    cloudflare_credential_id = Column(
+        Uuid(as_uuid=True), ForeignKey("cloudflare_credentials.id"),
+        nullable=True, index=True,
+    )
+    cloudflare_zone_id = Column(String, nullable=True)
+    cloudflare_record_id = Column(String, nullable=True)
+    cloudflare_target_ip = Column(String, nullable=True)
+    cloudflare_synced_at = Column(DateTime, nullable=True)
+
     created_at = Column(DateTime, default=_utcnow)
     updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
 
     project = relationship("Project", back_populates="custom_domains")
+    cloudflare_credential = relationship("CloudflareCredential")
 
 
 class EnvironmentVariable(Base):

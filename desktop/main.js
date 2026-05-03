@@ -1707,6 +1707,61 @@ ipcMain.handle('wt:relaunchApp', () => {
   return { ok: true };
 });
 
+// Setup-mode bridges. Surfaced in the SPA when backend prerequisites
+// (Python venv missing, missing deps, etc.) keep the user on the
+// pre-app shell. Without them the renderer's preload-exposed methods
+// would resolve to "No handler registered for 'wt:openTerminal'", which
+// silently broke setup-recovery affordances.
+//
+// Each handler is intentionally minimal: macOS's `open -a Terminal`,
+// Electron's clipboard module, and shell.openExternal cover the
+// concrete needs of the SetupWizard's recovery panels. Linux falls
+// back to xdg-open/x-terminal-emulator; Windows opens cmd.
+ipcMain.handle('wt:openTerminal', async () => {
+  try {
+    const { spawn } = require('child_process');
+    if (process.platform === 'darwin') {
+      spawn('open', ['-a', 'Terminal']);
+    } else if (process.platform === 'win32') {
+      spawn('cmd.exe', [], { detached: true, stdio: 'ignore' }).unref();
+    } else {
+      // Best-effort on Linux — try x-terminal-emulator first, then xterm.
+      const term = spawn('x-terminal-emulator', [], { detached: true, stdio: 'ignore' });
+      term.on('error', () => {
+        const fallback = spawn('xterm', [], { detached: true, stdio: 'ignore' });
+        fallback.unref();
+      });
+      term.unref();
+    }
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: String(err) };
+  }
+});
+
+ipcMain.handle('wt:copyText', async (_event, text) => {
+  try {
+    clipboard.writeText(typeof text === 'string' ? text : '');
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: String(err) };
+  }
+});
+
+// Mirrors the existing wt:openOAuth helper but for arbitrary URLs (e.g.
+// the dashboard.cloudflare.com / GitHub PAT pages SetupWizard might link
+// to). shell.openExternal already handles the OS-specific browser dispatch.
+ipcMain.handle('wt:openExternal', async (_event, url) => {
+  if (typeof url !== 'string' || !url) return { ok: false, error: 'no url' };
+  if (!/^https?:\/\//i.test(url)) return { ok: false, error: 'http(s) only' };
+  try {
+    await shell.openExternal(url);
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: String(err) };
+  }
+});
+
 // Compose a pre-filled error report email so the user can send a crash
 // or bug straight to the maintainer without copy-pasting versions.
 // Body includes platform, app version, dependency status, and the last

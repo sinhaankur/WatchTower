@@ -91,7 +91,7 @@ function fmtDate(s: string | null) {
 
 // ── Tabs ──────────────────────────────────────────────────────────────────────
 
-const TABS = ['Overview', 'Deployments', 'Build Logs', 'Env Vars', 'Webhooks', 'Related'] as const;
+const TABS = ['Overview', 'Deployments', 'Build Logs', 'Env Vars', 'Domains', 'Webhooks', 'Related'] as const;
 type Tab = typeof TABS[number];
 
 // ── Main component ────────────────────────────────────────────────────────────
@@ -163,6 +163,7 @@ export default function ProjectDetail() {
         {tab === 'Deployments'  && <DeploymentsTab projectId={project.id} />}
         {tab === 'Build Logs'   && <BuildLogsTab projectId={project.id} />}
         {tab === 'Env Vars'     && <EnvVarsTab projectId={project.id} />}
+        {tab === 'Domains'      && <DomainsTab projectId={project.id} />}
         {tab === 'Webhooks'     && <WebhooksTab projectId={project.id} />}
         {tab === 'Related'      && <RelatedTab projectId={project.id} />}
       </div>
@@ -1253,5 +1254,265 @@ function RelatedTab({ projectId }: { projectId: string }) {
         </div>
       )}
     </div>
+  );
+}
+
+// ── DomainsTab ─────────────────────────────────────────────────────────────
+// Manages CustomDomain rows for the project. Phase 2 of the Cloudflare
+// integration is wired here: per-domain "Sync DNS to Cloudflare" so the
+// A record gets created/updated automatically. Operators must have at
+// least one CloudflareCredential (Integrations page) for the sync UI
+// to appear.
+
+type CustomDomain = {
+  id: string;
+  project_id: string;
+  domain: string;
+  is_primary: boolean;
+  tls_enabled: boolean;
+  letsencrypt_validated: boolean;
+  cloudflare_credential_id: string | null;
+  cloudflare_zone_id: string | null;
+  cloudflare_record_id: string | null;
+  cloudflare_target_ip: string | null;
+  cloudflare_synced_at: string | null;
+};
+
+type CfCredential = {
+  id: string;
+  label: string | null;
+  account_name: string | null;
+};
+
+function DomainsTab({ projectId }: { projectId: string }) {
+  const [domains, setDomains] = useState<CustomDomain[] | null>(null);
+  const [creds, setCreds] = useState<CfCredential[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [newDomain, setNewDomain] = useState('');
+  const [adding, setAdding] = useState(false);
+
+  const load = async () => {
+    setError(null);
+    try {
+      const [domResp, credResp] = await Promise.all([
+        apiClient.get<CustomDomain[]>(`/projects/${projectId}/domains`),
+        apiClient.get<CfCredential[]>('/integrations/cloudflare'),
+      ]);
+      setDomains(domResp.data);
+      setCreds(credResp.data);
+    } catch (e) {
+      setError(extractDetail(e, 'Could not load domains'));
+    }
+  };
+
+  useEffect(() => { void load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [projectId]);
+
+  const addDomain = async () => {
+    const d = newDomain.trim().toLowerCase();
+    if (!d) return;
+    setAdding(true);
+    setError(null);
+    try {
+      await apiClient.post(`/projects/${projectId}/domains`, { domain: d });
+      setNewDomain('');
+      void load();
+    } catch (e) {
+      setError(extractDetail(e, 'Could not add domain'));
+    } finally {
+      setAdding(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      {error && (
+        <div className="rounded-lg border border-red-300 bg-red-50 p-3 text-xs text-red-800">{error}</div>
+      )}
+
+      <section className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
+        <h2 className="text-sm font-semibold text-slate-900">Add a domain</h2>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={newDomain}
+            onChange={(e) => setNewDomain(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && void addDomain()}
+            placeholder="app.example.com"
+            className="flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-800 focus:ring-1 focus:ring-slate-800 outline-none"
+          />
+          <button
+            type="button"
+            onClick={() => void addDomain()}
+            disabled={adding || !newDomain.trim()}
+            className="px-3 py-1.5 rounded-md bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white text-sm font-medium"
+          >
+            {adding ? 'Adding…' : 'Add'}
+          </button>
+        </div>
+      </section>
+
+      <section className="rounded-xl border border-slate-200 bg-white">
+        <header className="px-4 py-3 border-b border-slate-100">
+          <h2 className="text-sm font-semibold text-slate-900">Domains</h2>
+        </header>
+        {!domains ? (
+          <p className="px-4 py-3 text-xs text-slate-500">Loading…</p>
+        ) : domains.length === 0 ? (
+          <p className="px-4 py-3 text-xs text-slate-500">No domains yet. Add one above.</p>
+        ) : (
+          <ul className="divide-y divide-slate-100">
+            {domains.map((d) => (
+              <DomainRow
+                key={d.id}
+                domain={d}
+                creds={creds}
+                projectId={projectId}
+                onChanged={() => void load()}
+              />
+            ))}
+          </ul>
+        )}
+      </section>
+    </div>
+  );
+}
+
+function DomainRow({
+  domain,
+  creds,
+  projectId,
+  onChanged,
+}: {
+  domain: CustomDomain;
+  creds: CfCredential[];
+  projectId: string;
+  onChanged: () => void;
+}) {
+  const [showSync, setShowSync] = useState(false);
+  const [credId, setCredId] = useState<string>(domain.cloudflare_credential_id ?? creds[0]?.id ?? '');
+  const [targetIp, setTargetIp] = useState<string>(domain.cloudflare_target_ip ?? '');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const synced = Boolean(domain.cloudflare_record_id);
+
+  const sync = async () => {
+    if (!credId || !targetIp.trim()) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await apiClient.post(`/integrations/cloudflare/projects/${projectId}/domains/${domain.id}/sync`, {
+        credential_id: credId,
+        target_ip: targetIp.trim(),
+      });
+      setShowSync(false);
+      onChanged();
+    } catch (e) {
+      setError(extractDetail(e, 'Sync failed'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const unsync = async () => {
+    if (!confirm('Remove the Cloudflare A record for this domain?')) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await apiClient.post(`/integrations/cloudflare/projects/${projectId}/domains/${domain.id}/unsync`);
+      onChanged();
+    } catch (e) {
+      setError(extractDetail(e, 'Unsync failed'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <li className="px-4 py-3">
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-sm font-medium text-slate-900">{domain.domain}</p>
+          <p className="text-[11px] text-slate-500">
+            {synced ? (
+              <>
+                ✓ Cloudflare DNS → <code className="font-mono">{domain.cloudflare_target_ip}</code>
+                {domain.cloudflare_synced_at && <> · synced {new Date(domain.cloudflare_synced_at).toLocaleString()}</>}
+              </>
+            ) : (
+              creds.length > 0 ? 'DNS not managed by WatchTower.' : 'Connect Cloudflare in Integrations to manage DNS automatically.'
+            )}
+          </p>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          {creds.length > 0 && !showSync && !synced && (
+            <button
+              type="button"
+              onClick={() => setShowSync(true)}
+              className="text-[11px] px-2 py-1 rounded bg-orange-600 hover:bg-orange-700 text-white font-medium"
+            >
+              Sync to Cloudflare
+            </button>
+          )}
+          {synced && (
+            <button
+              type="button"
+              onClick={() => void unsync()}
+              disabled={busy}
+              className="text-[11px] text-red-600 hover:text-red-800 underline underline-offset-2 disabled:opacity-50"
+            >
+              Remove from CF
+            </button>
+          )}
+        </div>
+      </div>
+
+      {showSync && (
+        <div className="mt-3 rounded-md border border-orange-200 bg-orange-50 p-3 space-y-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <label className="block text-[11px] text-slate-700">
+              Cloudflare account
+              <select
+                value={credId}
+                onChange={(e) => setCredId(e.target.value)}
+                className="mt-1 w-full rounded border border-slate-300 bg-white px-2 py-1 text-xs"
+              >
+                {creds.map((c) => (
+                  <option key={c.id} value={c.id}>{c.label || c.account_name || 'Cloudflare'}</option>
+                ))}
+              </select>
+            </label>
+            <label className="block text-[11px] text-slate-700">
+              Target IP (A record)
+              <input
+                type="text"
+                value={targetIp}
+                onChange={(e) => setTargetIp(e.target.value)}
+                placeholder="203.0.113.10"
+                className="mt-1 w-full rounded border border-slate-300 bg-white px-2 py-1 text-xs font-mono"
+              />
+            </label>
+          </div>
+          {error && <p className="text-[11px] text-red-700">{error}</p>}
+          <div className="flex gap-2 justify-end">
+            <button
+              type="button"
+              onClick={() => { setShowSync(false); setError(null); }}
+              className="text-[11px] px-2 py-1 rounded border border-slate-300 text-slate-700 hover:bg-slate-100"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => void sync()}
+              disabled={busy || !credId || !targetIp.trim()}
+              className="text-[11px] px-2 py-1 rounded bg-orange-600 hover:bg-orange-700 disabled:opacity-50 text-white font-medium"
+            >
+              {busy ? 'Syncing…' : 'Verify & sync'}
+            </button>
+          </div>
+        </div>
+      )}
+    </li>
   );
 }
