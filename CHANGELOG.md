@@ -9,6 +9,16 @@ Curated, human-friendly history of WatchTower releases. Auto-generated GitHub Re
 
 ---
 
+## 1.7.1 — Templates page: actionable error messaging
+
+Replaced the generic "Could not load templates" with status-aware messaging:
+
+- **401** → blue info banner reading *"Sign in to view the template catalog"* with a one-click **Sign in →** button straight to `/login`. Previously read like a backend outage when it was actually just an expired session.
+- **5xx** → red banner with a **Retry** button.
+- **Other** → still shows whatever the server returned.
+
+The endpoint itself was never broken for guests (verified end-to-end against the live backend); the bad UX was the SPA conflating "no auth" with "server down."
+
 ## 1.7.0 — Cloudflare integration (Phase 1: foundation)
 
 The first slice of Cloudflare support: **store and verify API tokens** so future phases can use them. Phase 1 ships no user-visible deployment automation on its own — it lays the rails. Roadmap:
