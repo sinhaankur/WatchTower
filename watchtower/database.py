@@ -22,8 +22,19 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 import enum
+
+
+def _utcnow() -> datetime:
+    """Naive UTC ``datetime`` for SQLAlchemy column defaults.
+
+    Replaces the deprecated ``_utcnow`` callable. Returns a naive
+    UTC datetime so values are consistent with the existing schema —
+    every ``DateTime`` column in this module is naive.
+    """
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
 
 def _default_database_url() -> str:
     """Pick a default DATABASE_URL that's actually writable.
@@ -159,8 +170,8 @@ class User(Base):
     # missing (token-auth / guest sessions never have one).
     avatar_url = Column(String, nullable=True)
     is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=_utcnow)
+    updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
 
     organizations = relationship("Organization", back_populates="owner")
     projects = relationship("Project", back_populates="owner")
@@ -173,8 +184,8 @@ class Organization(Base):
     name = Column(String, index=True)
     owner_id = Column(Uuid(as_uuid=True), ForeignKey("users.id"))
     is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=_utcnow)
+    updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
 
     owner = relationship("User", back_populates="organizations")
     projects = relationship("Project", back_populates="organization")
@@ -209,8 +220,8 @@ class Project(Base):
     # but taken at deploy time falls through to a fresh pick.
     recommended_port = Column(Integer, nullable=True)
     is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=_utcnow)
+    updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
 
     organization = relationship("Organization", back_populates="projects")
     owner = relationship("User", back_populates="projects")
@@ -230,7 +241,7 @@ class Deployment(Base):
     status = Column(Enum(DeploymentStatus), default=DeploymentStatus.PENDING, index=True)
     trigger = Column(Enum(DeploymentTrigger), default=DeploymentTrigger.MANUAL)
     pr_number = Column(Integer, nullable=True)  # For PR preview deployments
-    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+    created_at = Column(DateTime, default=_utcnow, index=True)
     started_at = Column(DateTime, nullable=True)
     completed_at = Column(DateTime, nullable=True)
 
@@ -301,8 +312,8 @@ class CustomDomain(Base):
     tls_enabled = Column(Boolean, default=True)
     tls_cert_path = Column(String, nullable=True)
     letsencrypt_validated = Column(Boolean, default=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=_utcnow)
+    updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
 
     project = relationship("Project", back_populates="custom_domains")
 
@@ -315,7 +326,7 @@ class EnvironmentVariable(Base):
     key = Column(String)
     value = Column(String)  # Should be encrypted in production
     environment = Column(Enum(Environment), default=Environment.PRODUCTION)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=_utcnow)
 
     project = relationship("Project", back_populates="env_variables")
 
@@ -347,8 +358,8 @@ class GitHubConnection(Base):
     is_active = Column(Boolean, default=True)
     is_primary = Column(Boolean, default=False)  # Primary account for org
     last_synced = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=_utcnow)
+    updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
 
     user = relationship("User", backref="github_connections")
     organization = relationship("Organization", backref="github_connections")
@@ -366,7 +377,7 @@ class GitHubDeviceConnectSession(Base):
     device_code = Column(String, unique=True, index=True)
     user_id = Column(Uuid(as_uuid=True), ForeignKey("users.id"), index=True)
     org_id = Column(Uuid(as_uuid=True), ForeignKey("organizations.id"), index=True)
-    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+    created_at = Column(DateTime, default=_utcnow, index=True)
     expires_at = Column(DateTime, index=True)
 
     user = relationship("User", backref="github_device_connect_sessions")
@@ -391,7 +402,7 @@ class TeamMember(Base):
     can_manage_team = Column(Boolean, default=False)
     
     is_active = Column(Boolean, default=True)
-    joined_at = Column(DateTime, default=datetime.utcnow)
+    joined_at = Column(DateTime, default=_utcnow)
     invited_at = Column(DateTime, nullable=True)
 
     organization = relationship("Organization", backref="team_members")
@@ -406,9 +417,9 @@ class InstallationClaim(Base):
     owner_user_id = Column(Uuid(as_uuid=True), ForeignKey("users.id"), unique=True)
     owner_github_id = Column(Integer, nullable=True)
     owner_login = Column(String, nullable=True)
-    claimed_at = Column(DateTime, default=datetime.utcnow)
+    claimed_at = Column(DateTime, default=_utcnow)
     github_connected_at = Column(DateTime, nullable=True)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
 
     owner_user = relationship("User", backref="installation_claims")
 
@@ -447,8 +458,8 @@ class OrgNode(Base):
     created_by_user_id = Column(Uuid(as_uuid=True), ForeignKey("users.id"), nullable=True)
     updated_by_user_id = Column(Uuid(as_uuid=True), ForeignKey("users.id"), nullable=True)
     
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=_utcnow)
+    updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
 
     organization = relationship("Organization", backref="nodes")
     networks = relationship("NodeNetwork", secondary="node_network_members", back_populates="nodes")
@@ -472,8 +483,8 @@ class NodeNetwork(Base):
     load_balance = Column(Boolean, default=True)  # Distribute across nodes
     health_check_interval = Column(Integer, default=300)  # seconds
     
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=_utcnow)
+    updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
 
     organization = relationship("Organization", backref="node_networks")
     nodes = relationship("OrgNode", secondary="node_network_members", back_populates="networks")
@@ -491,7 +502,7 @@ class NodeNetworkMember(Base):
     priority = Column(Integer, default=0)
     weight = Column(Integer, default=100)  # Traffic weight percentage
     
-    added_at = Column(DateTime, default=datetime.utcnow)
+    added_at = Column(DateTime, default=_utcnow)
 
 
 class DeploymentNode(Base):
@@ -525,7 +536,7 @@ class ProjectRelation(Base):
     related_project_id = Column(Uuid(as_uuid=True), ForeignKey("projects.id"))
     order_index = Column(Integer, default=0)
     note = Column(String, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=_utcnow)
 
     __table_args__ = (
         UniqueConstraint(
@@ -555,7 +566,7 @@ class AuditEvent(Base):
     __tablename__ = "audit_events"
 
     id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+    created_at = Column(DateTime, default=_utcnow, index=True)
 
     # Who
     actor_user_id = Column(Uuid(as_uuid=True), ForeignKey("users.id"), nullable=True, index=True)
@@ -589,7 +600,7 @@ class NotificationWebhook(Base):
     url = Column(String)                            # Webhook URL
     label = Column(String, nullable=True)
     is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=_utcnow)
 
     project = relationship("Project", backref="notification_webhooks")
 
