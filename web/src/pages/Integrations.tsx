@@ -1198,7 +1198,11 @@ const Integrations = () => {
                 <ServiceControls
                   service="docker"
                   running={docker.daemon_available}
-                  supportedActions={['start', 'stop', 'restart', 'enable', 'disable']}
+                  // enable/disable removed in 1.10: Docker Desktop on
+                  // Mac/Win has no boot-persistence concept the
+                  // backend can toggle; on Linux the user can wire
+                  // systemd themselves if they want it.
+                  supportedActions={['start', 'stop', 'restart']}
                   onDone={() => void load()}
                 />
               ) : undefined}
