@@ -719,6 +719,22 @@ def build_parser() -> argparse.ArgumentParser:
     deploy_app_parser.add_argument("--app", required=True)
     deploy_app_parser.add_argument("--branch", default=None)
 
+    # Recovery for the install-owner-mode lockout: if the operator's
+    # GitHub identity changed (e.g. token rotation gave them a different
+    # internal user_id) and they're now seeing "installation owned by X,
+    # ask owner to invite", running this CLI clears the claim so the
+    # next sign-in re-claims ownership cleanly. Requires shell access to
+    # the host running WatchTower; that's the entire authorization
+    # surface — keeps the recovery path off the public API.
+    subparsers.add_parser(
+        "reset-installation-owner",
+        help=(
+            "Clear the InstallationClaim row so the next sign-in becomes "
+            "the new installation owner. Requires shell access to the "
+            "WatchTower host."
+        ),
+    )
+
     return parser
 
 
@@ -737,6 +753,23 @@ def main() -> None:
     if args.command == "deploy-app":
         result = deploy_registered_app(app_name=args.app, branch=args.branch)
         print(json.dumps(result, indent=2))
+        return
+
+    if args.command == "reset-installation-owner":
+        # Touch the DB directly — avoids spinning up FastAPI / Alembic
+        # for a one-off operation. Idempotent: deleting zero rows is a
+        # success, since "no claim exists" is the desired end state.
+        from watchtower.database import SessionLocal, InstallationClaim
+        session = SessionLocal()
+        try:
+            count = session.query(InstallationClaim).delete(synchronize_session=False)
+            session.commit()
+        finally:
+            session.close()
+        if count == 0:
+            print("No installation claim was present. The next sign-in will become the owner.")
+        else:
+            print(f"Cleared {count} installation claim(s). The next sign-in will become the new owner.")
         return
 
     if args.command == "serve":
