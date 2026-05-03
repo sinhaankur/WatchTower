@@ -69,7 +69,59 @@ type WatchdogStatus = {
   enabled: boolean;
   state: string;
   installed?: boolean;
+  // Platform-aware fields (added in 1.10): when supported is false the
+  // feature isn't available on this OS and the UI should render the
+  // human-readable `message` instead of trying to toggle anything.
+  supported?: boolean;
+  platform?: 'mac' | 'linux' | 'windows';
+  message?: string;
 };
+
+// Structured error payload returned by /runtime/services/{svc}/control
+// when the underlying command fails. The UI uses this to offer "Copy
+// command" / "Open in Terminal" buttons instead of dumping a wall of
+// shell error text on the user.
+type ControlErrorDetail = {
+  message: string;
+  command?: string;
+  needs_terminal?: boolean;
+  platform?: 'mac' | 'linux' | 'windows';
+};
+
+// Shared "this card is for Linux only" presentation. Used by both the
+// Podman watchdog and the WatchTower auto-update daemon cards on
+// Mac/Windows. We deliberately render the same icon and title so the
+// section structure stays consistent — only the body changes from
+// "toggle here" to "doesn't apply on your OS, here's why".
+function PlatformNotApplicable({
+  title,
+  icon,
+  status,
+}: {
+  title: string;
+  icon: string;
+  status: WatchdogStatus;
+}) {
+  const platformLabel = status.platform === 'mac' ? 'macOS' : status.platform === 'windows' ? 'Windows' : status.platform;
+  return (
+    <div className="rounded-xl border border-slate-200 bg-slate-50/40 p-5">
+      <div className="flex items-start gap-3">
+        <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0 border bg-white border-slate-200 opacity-60">
+          {icon}
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2 flex-wrap">
+            <h3 className="text-sm font-semibold text-slate-700">{title}</h3>
+            <span className="text-[10px] px-1.5 py-0.5 rounded-full border bg-slate-100 border-slate-300 text-slate-600">
+              Not applicable on {platformLabel}
+            </span>
+          </div>
+          <p className="text-xs text-slate-600 mt-1">{status.message}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 type WatchtowerConfig = {
   path: string;
@@ -150,14 +202,47 @@ type ControlsProps = {
 function ServiceControls({ service, running, enabled, supportedActions, onDone }: ControlsProps) {
   const [busy, setBusy] = useState<Action | null>(null);
   const [msg, setMsg] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null);
+  // When the backend returns a structured failure that the user can
+  // resolve interactively (most often "sudo: a password is required"),
+  // we surface the attempted command + Copy / Open in Terminal buttons
+  // instead of just dumping the raw error. The detail comes from
+  // _do_service_control() in runtime.py.
+  const [errorDetail, setErrorDetail] = useState<ControlErrorDetail | null>(null);
+  const [copied, setCopied] = useState(false);
 
   const flashMsg = (kind: 'ok' | 'err', text: string) => {
     setMsg({ kind, text });
     setTimeout(() => setMsg(null), 4000);
   };
 
+  const electronAPI: any = typeof window !== 'undefined' ? (window as any).electronAPI : null;
+
+  const copyCommand = async () => {
+    if (!errorDetail?.command) return;
+    if (electronAPI?.copyText) {
+      await electronAPI.copyText(errorDetail.command).catch(() => {});
+    } else {
+      await navigator.clipboard.writeText(errorDetail.command).catch(() => {});
+    }
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1800);
+  };
+
+  const openInTerminal = async () => {
+    if (!errorDetail?.command) return;
+    // Copy the command first so the user only has to paste + Enter once
+    // the terminal window opens. openTerminal() doesn't pass arguments —
+    // it's an "open a fresh shell" bridge — so the clipboard is the
+    // hand-off mechanism.
+    await copyCommand();
+    if (electronAPI?.openTerminal) {
+      await electronAPI.openTerminal().catch(() => {});
+    }
+  };
+
   const doAction = async (action: Action) => {
     setBusy(action);
+    setErrorDetail(null);
     try {
       const r = await apiClient.post(`/runtime/services/${service}/control`, { action });
       const resp = r.data as { message: string };
@@ -165,7 +250,13 @@ function ServiceControls({ service, running, enabled, supportedActions, onDone }
       onDone?.();
     } catch (err: any) {
       const detail = err?.response?.data?.detail;
-      flashMsg('err', typeof detail === 'string' ? detail : `Failed to ${action} ${service}.`);
+      if (detail && typeof detail === 'object' && 'message' in detail) {
+        const d = detail as ControlErrorDetail;
+        setErrorDetail(d);
+        flashMsg('err', d.message);
+      } else {
+        flashMsg('err', typeof detail === 'string' ? detail : `Failed to ${action} ${service}.`);
+      }
     } finally {
       setBusy(null);
     }
@@ -231,6 +322,27 @@ function ServiceControls({ service, running, enabled, supportedActions, onDone }
         <p className={`text-xs font-medium ${msg.kind === 'ok' ? 'text-emerald-700' : 'text-red-600'}`}>
           {msg.kind === 'ok' ? '✓' : '✗'} {msg.text}
         </p>
+      )}
+      {errorDetail?.command && errorDetail.needs_terminal && (
+        <div className="mt-1 rounded-lg bg-slate-900 px-3 py-2 text-[11px] font-mono text-slate-200 flex items-center gap-2 overflow-hidden">
+          <span className="text-slate-500 shrink-0">$</span>
+          <span className="truncate flex-1" title={errorDetail.command}>{errorDetail.command}</span>
+          <button
+            onClick={() => void copyCommand()}
+            className="shrink-0 text-[10px] px-2 py-0.5 rounded bg-slate-700 hover:bg-slate-600 text-slate-200 transition-colors"
+          >
+            {copied ? 'Copied' : 'Copy'}
+          </button>
+          {electronAPI?.openTerminal && (
+            <button
+              onClick={() => void openInTerminal()}
+              className="shrink-0 text-[10px] px-2 py-0.5 rounded bg-emerald-700 hover:bg-emerald-600 text-white transition-colors"
+              title="Copy this command and open a Terminal window"
+            >
+              Open Terminal
+            </button>
+          )}
+        </div>
       )}
     </div>
   );
@@ -347,6 +459,13 @@ function WatchdogCard({ podmanInstalled }: { podmanInstalled: boolean }) {
 
   const enabled = watchdog?.enabled ?? false;
   const active = watchdog?.active ?? false;
+
+  // Mac/Windows: the underlying systemd unit doesn't exist on this OS.
+  // Render guidance instead of a useless toggle. `supported === false`
+  // is set explicitly by the backend on non-Linux hosts.
+  if (watchdog && watchdog.supported === false) {
+    return <PlatformNotApplicable title="Podman Auto-Restart Watchdog" icon="🛡️" status={watchdog} />;
+  }
 
   return (
     <div className={`rounded-xl border p-5 transition-all ${
@@ -479,6 +598,12 @@ function WatchTowerServiceCard() {
 
   const enabled = status?.enabled ?? false;
   const installed = status?.installed ?? false;
+
+  // Mac/Windows: systemd doesn't exist; this card is purely a Linux-server
+  // operations toggle. Show platform guidance instead of "Not installed".
+  if (status && status.supported === false) {
+    return <PlatformNotApplicable title="Auto-Update Daemon" icon="🛡️" status={status} />;
+  }
 
   return (
     <div className={`rounded-xl border p-5 transition-all ${
@@ -1035,8 +1160,16 @@ const Integrations = () => {
               extra={podman?.installed ? (
                 <ServiceControls
                   service="podman"
+                  // On Mac/Windows we read "running" from podman machine
+                  // state instead — but the existing field is good enough
+                  // for the start/stop button visibility heuristic.
                   running={podman.running_containers > 0}
-                  supportedActions={['start', 'stop', 'restart', 'enable', 'disable']}
+                  // enable/disable removed in 1.10: on Mac/Windows the
+                  // start/stop now drives `podman machine`, which has no
+                  // boot-persistence concept. Linux still uses systemd
+                  // under the hood; if you need persistence there, use
+                  // the Podman watchdog card above.
+                  supportedActions={['start', 'stop', 'restart']}
                   onDone={() => void load()}
                 />
               ) : undefined}

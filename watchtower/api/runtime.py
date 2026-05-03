@@ -892,6 +892,38 @@ def _systemd_status(service_name: str) -> str:
     return out or "inactive"
 
 
+def _host_platform() -> str:
+    """Return one of 'mac', 'linux', 'windows' for UI dispatch.
+
+    Used by service-control endpoints to decide whether the systemd-based
+    code path even applies — everything below the watchdog/service surface
+    was originally written assuming Linux+systemd, which silently fails on
+    macOS (no systemctl) and Windows (no systemd at all).
+    """
+    if sys.platform == "darwin":
+        return "mac"
+    if sys.platform == "win32":
+        return "windows"
+    return "linux"
+
+
+# Per-platform message shown when a systemd-only feature is requested on a
+# host without systemd. Keep these short and actionable — the UI surfaces
+# them verbatim under each card.
+_SYSTEMD_PLATFORM_NOTES = {
+    "mac": (
+        "macOS does not use systemd. WatchTower's auto-restart and auto-update "
+        "daemons are intended for Linux server installs. On Mac, your containers "
+        "run while the WatchTower app is open."
+    ),
+    "windows": (
+        "Windows does not use systemd. WatchTower's auto-restart and auto-update "
+        "daemons are intended for Linux server installs. On Windows, run "
+        "WatchTower at startup via Task Scheduler if you need persistent operation."
+    ),
+}
+
+
 def _background_status() -> dict[str, Any]:
     pid = _read_pid()
     running = _is_pid_running(pid)
@@ -1433,7 +1465,25 @@ async def vscode_open(
 
 
 def _podman_watchdog_status() -> dict[str, Any]:
-    """Return whether the Podman auto-restart watchdog is enabled."""
+    """Return whether the Podman auto-restart watchdog is enabled.
+
+    On non-Linux hosts we short-circuit with ``supported: False`` — the
+    feature relies on systemd which doesn't exist on Mac/Windows. The UI
+    uses the ``platform`` + ``message`` to render appropriate guidance
+    instead of a useless "unavailable" toggle.
+    """
+    platform = _host_platform()
+    if platform != "linux":
+        return {
+            "service": "podman-restart.service",
+            "active": False,
+            "enabled": False,
+            "state": "not-applicable",
+            "supported": False,
+            "platform": platform,
+            "message": _SYSTEMD_PLATFORM_NOTES.get(platform, ""),
+        }
+
     restart_state = _systemd_status("podman-restart.service")
     enabled_ok, enabled_out, _, _ = _run_cmd(
         ["systemctl", "is-enabled", "podman-restart.service"], timeout=5
@@ -1443,6 +1493,8 @@ def _podman_watchdog_status() -> dict[str, Any]:
         "active": restart_state == "active",
         "enabled": enabled_ok and enabled_out.strip() in ("enabled", "enabled-runtime"),
         "state": restart_state,
+        "supported": True,
+        "platform": platform,
     }
 
 
@@ -1463,6 +1515,12 @@ async def enable_podman_watchdog(
     Containers must be started with ``--restart=always`` (or ``on-failure``)
     for the service to restart them.  This call also starts the service now.
     """
+    platform = _host_platform()
+    if platform != "linux":
+        raise HTTPException(
+            status_code=status.HTTP_501_NOT_IMPLEMENTED,
+            detail=_SYSTEMD_PLATFORM_NOTES.get(platform, "Not supported on this host."),
+        )
     ok_enable, _, err_enable, _ = _run_cmd(
         ["sudo", "-n", "systemctl", "enable", "--now", "podman-restart.service"],
         timeout=15,
@@ -1490,6 +1548,12 @@ async def disable_podman_watchdog(
     _current_user: dict = Depends(util.get_current_user),
 ):
     """Disable the Podman watchdog service."""
+    platform = _host_platform()
+    if platform != "linux":
+        raise HTTPException(
+            status_code=status.HTTP_501_NOT_IMPLEMENTED,
+            detail=_SYSTEMD_PLATFORM_NOTES.get(platform, "Not supported on this host."),
+        )
     ok, _, err, _ = _run_cmd(
         ["sudo", "-n", "systemctl", "disable", "--now", "podman-restart.service"],
         timeout=15,
@@ -1519,6 +1583,18 @@ _WATCHTOWER_SERVICE = "watchtower.service"
 
 
 def _watchtower_service_status() -> dict[str, Any]:
+    platform = _host_platform()
+    if platform != "linux":
+        return {
+            "service": _WATCHTOWER_SERVICE,
+            "active": False,
+            "enabled": False,
+            "state": "not-applicable",
+            "installed": False,
+            "supported": False,
+            "platform": platform,
+            "message": _SYSTEMD_PLATFORM_NOTES.get(platform, ""),
+        }
     state = _systemd_status(_WATCHTOWER_SERVICE)
     enabled_ok, enabled_out, _, _ = _run_cmd(
         ["systemctl", "is-enabled", _WATCHTOWER_SERVICE], timeout=5
@@ -1533,6 +1609,8 @@ def _watchtower_service_status() -> dict[str, Any]:
         # never ran the install script). Surface that distinctly so the UI
         # can show "install the unit file" instead of an enable toggle.
         "installed": enabled_value not in ("", "not-found"),
+        "supported": True,
+        "platform": platform,
     }
 
 
@@ -1551,6 +1629,12 @@ async def enable_watchtower_service(
     """Enable + start watchtower.service so the auto-update daemon
     runs on boot. Idempotent — calling repeatedly is safe.
     """
+    platform = _host_platform()
+    if platform != "linux":
+        raise HTTPException(
+            status_code=status.HTTP_501_NOT_IMPLEMENTED,
+            detail=_SYSTEMD_PLATFORM_NOTES.get(platform, "Not supported on this host."),
+        )
     ok, _, err, _ = _run_cmd(
         ["sudo", "-n", "systemctl", "enable", "--now", _WATCHTOWER_SERVICE],
         timeout=20,
@@ -1581,6 +1665,12 @@ async def disable_watchtower_service(
     """Stop + disable watchtower.service. Containers will not be
     auto-updated until the service is re-enabled.
     """
+    platform = _host_platform()
+    if platform != "linux":
+        raise HTTPException(
+            status_code=status.HTTP_501_NOT_IMPLEMENTED,
+            detail=_SYSTEMD_PLATFORM_NOTES.get(platform, "Not supported on this host."),
+        )
     ok, _, err, _ = _run_cmd(
         ["sudo", "-n", "systemctl", "disable", "--now", _WATCHTOWER_SERVICE],
         timeout=20,
@@ -1805,9 +1895,13 @@ _SERVICE_MAP: dict[str, dict[str, Any]] = {
         "actions": {"start", "stop", "restart", "enable", "disable"},
     },
     "podman": {
-        "type": "systemd",
+        # On Mac/Windows Podman runs in a Linux VM via `podman machine`,
+        # not as a host systemd unit. _do_service_control() rewrites the
+        # commands per-platform; on Linux it falls back to systemd
+        # (podman.socket).
+        "type": "podman",
         "unit": "podman.socket",
-        "actions": {"start", "stop", "restart", "enable", "disable"},
+        "actions": {"start", "stop", "restart"},
     },
     "docker": {
         "type": "systemd",
@@ -1826,14 +1920,40 @@ class ServiceControlRequest(BaseModel):
     action: str = Field(description="start | stop | restart | enable | disable")
 
 
-def _control_systemd(unit: str, action: str) -> tuple[bool, str]:
-    """Run a sudo systemctl action against a unit and return (ok, message)."""
-    ok, _, err, _ = _run_cmd(
-        ["sudo", "-n", "systemctl", action, unit], timeout=20
-    )
+def _control_systemd(unit: str, action: str) -> tuple[bool, str, list[str]]:
+    """Run a sudo systemctl action against a unit.
+
+    Returns ``(ok, message, command)`` where ``command`` is the argv that
+    was attempted — surfaced to the UI on failure so users can copy or
+    open it in a terminal (since the most common failure here is
+    "sudo: a password is required" which the user can resolve interactively).
+    """
+    cmd = ["sudo", "-n", "systemctl", action, unit]
+    ok, _, err, _ = _run_cmd(cmd, timeout=20)
     if ok:
-        return True, f"{unit}: {action} succeeded."
-    return False, err or f"systemctl {action} {unit} failed."
+        return True, f"{unit}: {action} succeeded.", cmd
+    return False, err or f"systemctl {action} {unit} failed.", cmd
+
+
+def _control_podman(action: str) -> tuple[bool, str, list[str]]:
+    """Start/stop/restart Podman in a platform-aware way.
+
+    On Linux: `sudo systemctl <action> podman.socket` (rootful daemon).
+    On Mac/Windows: `podman machine <action>` (the Linux VM that hosts the
+    container engine — there is no systemd on the host).
+    """
+    platform = _host_platform()
+    if platform == "linux":
+        return _control_systemd("podman.socket", action)
+
+    machine_action = {"start": "start", "stop": "stop", "restart": "restart"}.get(action)
+    if not machine_action:
+        return False, f"podman {action} not supported on {platform}.", []
+    cmd = ["podman", "machine", machine_action]
+    ok, out, err, _ = _run_cmd(cmd, timeout=120)
+    if ok:
+        return True, (out.strip() or f"podman machine {machine_action} succeeded."), cmd
+    return False, (err.strip() or f"podman machine {machine_action} failed."), cmd
 
 
 def _do_service_control(service: str, action: str) -> dict[str, Any]:
@@ -1850,26 +1970,31 @@ def _do_service_control(service: str, action: str) -> dict[str, Any]:
         )
 
     svc_type = cfg["type"]
+    attempted_cmd: list[str] = []
 
     if svc_type == "systemd":
-        ok, msg = _control_systemd(cfg["unit"], action)
+        ok, msg, attempted_cmd = _control_systemd(cfg["unit"], action)
+
+    elif svc_type == "podman":
+        ok, msg, attempted_cmd = _control_podman(action)
 
     elif svc_type == "hybrid":
         # start/stop: use native CLI; enable/disable: use systemd
         if action == "start":
-            cmd = cfg["start_cmd"]
-            ok, _, err, _ = _run_cmd(cmd, timeout=20)
+            attempted_cmd = list(cfg["start_cmd"])
+            ok, _, err, _ = _run_cmd(attempted_cmd, timeout=20)
             msg = f"tailscale up succeeded." if ok else (err or "tailscale up failed.")
         elif action == "stop":
-            cmd = cfg["stop_cmd"]
-            ok, _, err, _ = _run_cmd(cmd, timeout=20)
+            attempted_cmd = list(cfg["stop_cmd"])
+            ok, _, err, _ = _run_cmd(attempted_cmd, timeout=20)
             msg = "tailscale down succeeded." if ok else (err or "tailscale down failed.")
         else:
-            ok, msg = _control_systemd(cfg["unit"], action)
+            ok, msg, attempted_cmd = _control_systemd(cfg["unit"], action)
 
     elif svc_type == "docker_container":
         container = cfg["container"]
-        ok, _, err, _ = _run_cmd(["docker", action, container], timeout=20)
+        attempted_cmd = ["docker", action, container]
+        ok, _, err, _ = _run_cmd(attempted_cmd, timeout=20)
         msg = f"docker {action} {container} succeeded." if ok else (err or f"docker {action} failed.")
 
     else:
@@ -1879,9 +2004,20 @@ def _do_service_control(service: str, action: str) -> dict[str, Any]:
         )
 
     if not ok:
+        # Surface the attempted command so the UI can offer "Copy" /
+        # "Open in Terminal" buttons. The most common failure ("sudo:
+        # a password is required") is trivially resolved by running the
+        # same command interactively, so we make that the obvious next step.
+        needs_sudo = bool(attempted_cmd) and attempted_cmd[0] in {"sudo"}
+        cmd_str = " ".join(shlex.quote(p) for p in attempted_cmd) if attempted_cmd else ""
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=msg,
+            detail={
+                "message": msg,
+                "command": cmd_str,
+                "needs_terminal": needs_sudo or "password is required" in msg.lower(),
+                "platform": _host_platform(),
+            },
         )
 
     return {"service": service, "action": action, "ok": True, "message": msg}
