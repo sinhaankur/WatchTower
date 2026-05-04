@@ -1,6 +1,6 @@
 {
   "name": "watchtower-desktop",
-  "version": "1.12.0",
+  "version": "1.12.1",
   "private": true,
   "description": "WatchTower Desktop",
   "author": {
@@ -74,20 +74,8 @@
     "mac": {
       "icon": "build/icons/app.icns",
       "target": [
-        {
-          "target": "dmg",
-          "arch": [
-            "x64",
-            "arm64"
-          ]
-        },
-        {
-          "target": "zip",
-          "arch": [
-            "x64",
-            "arm64"
-          ]
-        }
+        "dmg",
+        "zip"
       ],
       "category": "public.app-category.developer-tools"
     },
@@ -95,22 +83,8 @@
       "maintainer": "WatchTower Contributors <opensource@sinhaankur.dev>",
       "icon": "build/icons",
       "target": [
-        {
-          "target": "AppImage",
-          "arch": [
-            "x64",
-            "arm64",
-            "armv7l"
-          ]
-        },
-        {
-          "target": "deb",
-          "arch": [
-            "x64",
-            "arm64",
-            "armv7l"
-          ]
-        }
+        "AppImage",
+        "deb"
       ],
       "category": "Development",
       "desktop": {
@@ -122,20 +96,8 @@
     "win": {
       "icon": "build/icons/app.ico",
       "target": [
-        {
-          "target": "nsis",
-          "arch": [
-            "x64",
-            "arm64"
-          ]
-        },
-        {
-          "target": "zip",
-          "arch": [
-            "x64",
-            "arm64"
-          ]
-        }
+        "nsis",
+        "zip"
       ]
     },
     "nsis": {
