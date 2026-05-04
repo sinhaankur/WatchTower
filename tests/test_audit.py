@@ -149,8 +149,13 @@ def test_envvar_delete_records_audit(client: TestClient, db_session):
 
 
 # ── Read endpoint scoping ────────────────────────────────────────────────────
+# All read tests run with WATCHTOWER_TIER=pro because the GET /api/audit
+# endpoint is gated behind the Pro tier (added in 1.12). The audit-WRITE
+# behavior covered earlier in this file is not gated — every install
+# captures audit events; only the read view requires Pro.
 
-def test_audit_read_endpoint_returns_recent_events(client: TestClient):
+def test_audit_read_endpoint_returns_recent_events(client: TestClient, monkeypatch):
+    monkeypatch.setenv("WATCHTOWER_TIER", "pro")
     proj = _create_project(client, "list-host")
     client.put(f"/api/projects/{proj['id']}", json={"repo_branch": "next"})
 
@@ -162,7 +167,8 @@ def test_audit_read_endpoint_returns_recent_events(client: TestClient):
     assert "project.update" in actions
 
 
-def test_audit_read_filters_by_entity_type(client: TestClient):
+def test_audit_read_filters_by_entity_type(client: TestClient, monkeypatch):
+    monkeypatch.setenv("WATCHTOWER_TIER", "pro")
     _create_project(client, "alpha-type")
     proj = _create_project(client, "beta-type")
     # mutate to create another row (project.update on beta-type only)
@@ -175,8 +181,9 @@ def test_audit_read_filters_by_entity_type(client: TestClient):
     assert all(e["entity_type"] == "project" for e in rows)
 
 
-def test_audit_read_includes_request_id_for_traceability(client: TestClient):
+def test_audit_read_includes_request_id_for_traceability(client: TestClient, monkeypatch):
     """Operators trace incidents by request ID — verify the column flows."""
+    monkeypatch.setenv("WATCHTOWER_TIER", "pro")
     custom_rid = "trace-incident-12345"
     client.post(
         "/api/projects",
@@ -199,3 +206,16 @@ def test_audit_read_includes_request_id_for_traceability(client: TestClient):
 def test_audit_read_requires_auth(anon_client: TestClient):
     r = anon_client.get("/api/audit")
     assert r.status_code == 401
+
+
+def test_audit_read_returns_402_on_free_tier(client: TestClient, monkeypatch):
+    """Free-tier installs hit a 402 Payment Required with a structured detail
+    that the frontend uses to render the upgrade card. Regression guard for
+    the Pro-gating in 1.12."""
+    monkeypatch.delenv("WATCHTOWER_TIER", raising=False)
+    r = client.get("/api/audit")
+    assert r.status_code == 402
+    detail = r.json()["detail"]
+    assert detail["tier"] == "free"
+    assert detail["feature"] == "audit-log"
+    assert "Audit Log" in detail["feature_name"]

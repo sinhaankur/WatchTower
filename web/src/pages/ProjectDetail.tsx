@@ -431,6 +431,40 @@ function DeploymentsTab({ projectId }: { projectId: string }) {
     }
   }
 
+  // Per-row in-flight flag so the user can't double-click rollback while
+  // the previous request is mid-air. Backend rolls back via a new
+  // queued deploy + flips the current LIVE row to ROLLED_BACK, so a
+  // refresh after the call gives the user authoritative state.
+  const [rolling, setRolling] = useState<Record<string, boolean>>({});
+
+  async function runRollback(deploymentId: string) {
+    if (rolling[deploymentId]) return;
+    const ok = window.confirm(
+      'Roll back to the previous successful deployment?\n\n' +
+      'This queues a new deployment that re-deploys the prior commit, ' +
+      'and marks the current live deployment as rolled-back.'
+    );
+    if (!ok) return;
+    setRolling(prev => ({ ...prev, [deploymentId]: true }));
+    try {
+      await apiClient.post(`/deployments/${deploymentId}/rollback`);
+      // Optimistic refresh — the new rolled-back-to deployment shows up
+      // at the top of the list, current row flips status. The 10s
+      // polling interval would catch this anyway but immediate feedback
+      // matters here.
+      await load();
+    } catch (e) {
+      const detail = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? 'Rollback failed.';
+      window.alert(typeof detail === 'string' ? detail : JSON.stringify(detail));
+    } finally {
+      setRolling(prev => {
+        const next = { ...prev };
+        delete next[deploymentId];
+        return next;
+      });
+    }
+  }
+
   if (loading) return <p className="text-sm text-muted-foreground">Loading…</p>;
   if (!deployments.length) return <p className="text-sm text-muted-foreground">No deployments yet.</p>;
 
@@ -451,7 +485,9 @@ function DeploymentsTab({ projectId }: { projectId: string }) {
         <tbody className="divide-y divide-border">
           {deployments.map(d => {
             const isFailed = d.status?.toLowerCase() === 'failed';
+            const isLive = d.status?.toLowerCase() === 'live';
             const diag = diagnoses[d.id];
+            const isRollingBack = Boolean(rolling[d.id]);
             return (
               <Fragment key={d.id}>
                 <tr className="hover:bg-muted/30 transition-colors">
@@ -462,14 +498,26 @@ function DeploymentsTab({ projectId }: { projectId: string }) {
                   <td className="px-4 py-3 text-xs text-muted-foreground">{fmtDate(d.created_at)}</td>
                   <td className="px-4 py-3 text-xs text-muted-foreground">{fmtDate(d.completed_at)}</td>
                   <td className="px-4 py-3 text-right">
-                    {isFailed && (
-                      <button
-                        onClick={() => void runDiagnose(d.id)}
-                        className="text-[11px] px-2 py-1 rounded border border-slate-300 hover:border-slate-500 text-slate-600 hover:text-slate-900 transition-colors"
-                      >
-                        {diag ? 'Hide' : 'Diagnose'}
-                      </button>
-                    )}
+                    <div className="inline-flex items-center gap-1.5">
+                      {isFailed && (
+                        <button
+                          onClick={() => void runDiagnose(d.id)}
+                          className="text-[11px] px-2 py-1 rounded border border-slate-300 hover:border-slate-500 text-slate-600 hover:text-slate-900 transition-colors"
+                        >
+                          {diag ? 'Hide' : 'Diagnose'}
+                        </button>
+                      )}
+                      {isLive && (
+                        <button
+                          onClick={() => void runRollback(d.id)}
+                          disabled={isRollingBack}
+                          title="Roll back to the previous successful deployment"
+                          className="text-[11px] px-2 py-1 rounded border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-800 transition-colors disabled:opacity-50"
+                        >
+                          {isRollingBack ? 'Rolling back…' : '↶ Rollback'}
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
                 {diag && (

@@ -775,14 +775,44 @@ def _head_from_version_files() -> str | None:
 
 
 def _alembic_config():
-    """Build an Alembic Config that points at the in-tree ``alembic/`` dir
-    and uses the runtime ``DATABASE_URL`` (so the runner and migration
-    layer always agree on the target database)."""
+    """Build an Alembic Config pointing at our migrations dir.
+
+    Search order:
+      1. ``WATCHTOWER_ALEMBIC_DIR`` env override (operator escape hatch).
+      2. Inside the watchtower package (``watchtower/alembic/``) — used
+         by the bundled-Python desktop install (1.11+) and by any wheel
+         install that includes the migrations as package data.
+      3. Sibling of the watchtower module (``<repo_root>/alembic/``) —
+         used by dev-clone runs (`pip install -e .` from a checkout).
+
+    We pick the FIRST candidate whose ``env.py`` exists so a partial
+    install (e.g. an older wheel without bundled migrations) doesn't
+    silently match an empty directory.
+    """
     from pathlib import Path
     from alembic.config import Config
 
-    repo_root = Path(__file__).resolve().parents[1]
-    cfg = Config(str(repo_root / "alembic.ini"))
-    cfg.set_main_option("script_location", str(repo_root / "alembic"))
-    cfg.set_main_option("sqlalchemy.url", str(engine.url))
-    return cfg
+    candidates: list[Path] = []
+    env_override = os.getenv("WATCHTOWER_ALEMBIC_DIR")
+    if env_override:
+        candidates.append(Path(env_override))
+    pkg_dir = Path(__file__).parent
+    candidates.append(pkg_dir / "alembic")  # bundled-into-package layout
+    candidates.append(pkg_dir.parent / "alembic")  # dev-clone layout
+
+    for alembic_dir in candidates:
+        if (alembic_dir / "env.py").is_file():
+            # Use a sibling alembic.ini if one exists (dev clone provides
+            # one). Otherwise instantiate a bare Config — script_location
+            # below is the only thing alembic actually needs from the ini
+            # for our use case.
+            ini_path = alembic_dir.parent / "alembic.ini"
+            cfg = Config(str(ini_path)) if ini_path.is_file() else Config()
+            cfg.set_main_option("script_location", str(alembic_dir))
+            cfg.set_main_option("sqlalchemy.url", str(engine.url))
+            return cfg
+
+    searched = "\n  ".join(str(c) for c in candidates)
+    raise RuntimeError(
+        f"Could not find alembic/env.py in any expected location:\n  {searched}"
+    )

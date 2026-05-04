@@ -9,6 +9,28 @@ Curated, human-friendly history of WatchTower releases. Auto-generated GitHub Re
 
 ---
 
+## 1.12.0 — License tier infrastructure + Pro feature gating + critical 1.11 fixes
+
+Two distinct workstreams in one release:
+
+### License tier (open-core foundation)
+The plumbing for monetization is in place. Future Pro features can ship and be locked behind a flag from day one — when billing integration lands later (Stripe / Paddle / license keys), the gate stays the same and only the source-of-truth changes from "env var" to "validated license record". No backwards-incompat refactor.
+
+- **`watchtower/api/edition.py`** — `current_tier()` reads `WATCHTOWER_TIER` (`free` | `pro`, defaults `free`). `require_pro("feature-key")` is a FastAPI dependency that returns **402 Payment Required** with structured `{tier, feature, feature_name, feature_description, upgrade_url, message}` on Free tier. The structured detail lets the frontend render feature-specific upsells, not a generic paywall. Five feature keys registered: `audit-log`, `team-rbac`, `multi-region-failover`, `sso`, `priority-support`.
+- **`GET /api/edition`** — exposes the tier + feature flag map to the frontend so it can pre-empt 402s by hiding Pro UI elements.
+- **Frontend gating** — new `useEdition()` + `useProFeature()` hooks (5-min cache, `false` default on loading/error so we never accidentally show a Pro feature to a Free user during a network blip). New `<ProLock feature="...">` component renders a feature-specific upgrade card with name + description + upgrade CTA + settings link.
+- **First Pro feature: Audit Log viewer.** The page existed since 1.6 but is now gated behind `audit-log`. Free installs see the lock card; Pro installs see the table. Backend regression test (`test_audit_read_returns_402_on_free_tier`) guards the 402 contract so future refactors can't silently drop the gate.
+
+### First non-Pro gap fix: Rollback button
+The deployment table now shows a **↶ Rollback** button next to LIVE deployments. Clicks confirm, queue a new deployment that re-deploys the prior commit, and mark the current LIVE row as ROLLED_BACK — backend already supported this since 1.0; the UI just didn't expose it. Per-row in-flight flag prevents double-click races.
+
+### Critical 1.11.0 fixes (these prevented Linux installs from working at all)
+The bundled-Python release in 1.11.0 had two real bugs that would have stranded Linux users:
+- **`alembic/env.py` was missing from the bundled site-packages** — `_alembic_config()` looked at `repo_root/alembic` which resolved to the bundled Python's site-packages root, where the third-party alembic package lives, not our migrations. Fresh DB installs would crash with `ImportError: Can't find Python file`. **Fix:** `_alembic_config()` now searches in priority order: `WATCHTOWER_ALEMBIC_DIR` env override → `<watchtower-package>/alembic/` (where the build script now copies our migrations) → `<repo>/alembic/` (dev clone). Picks the first candidate whose `env.py` exists. The build script now copies the repo's `alembic/` directory into the bundled `site-packages/watchtower/alembic/` so package-relative resolution works in shipped builds.
+- **Linux arm64 cross-install crashed** with `cannot execute binary file: Exec format error` because the script tried to run `python -m pip --version` on the arm64-architecture bundled Python while running on an x64 host. **Fix:** detect host arch first, only invoke the bundled Python when arch matches.
+
+The 1.11.0 macOS DMGs do work (smoke test only runs on Linux). Mac users on 1.11.0 would have hit the alembic bug too on a fresh install, but the data-dir-already-stamped fast path in `init_db()` saved them — anyone with a `~/.watchtower/watchtower.db` from a prior version skipped Alembic entirely. 1.12.0 fixes both classes of users.
+
 ## 1.11.0 — Bundled Python: install once, never touch a terminal
 
 The desktop app no longer depends on `pipx install watchtower-podman`. WatchTower 1.11+ ships its own self-contained Python interpreter (~120 MB) inside the `.app` bundle, with all dependencies pre-installed. The end-user install story is now: download DMG → drag to Applications → double-click. No `pipx`, no PEP 668, no `ModuleNotFoundError`, no second `pipx install` command in a separate terminal step.
