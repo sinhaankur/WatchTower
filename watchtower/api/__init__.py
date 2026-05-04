@@ -77,6 +77,74 @@ def _ensure_dev_api_token() -> None:
     )
 
 
+def _ensure_auth_signing_key() -> None:
+    """Auto-generate WATCHTOWER_AUTH_SECRET on first run if not provided.
+
+    Persists to ``~/.watchtower/auth-signing.key`` (or
+    ``$WATCHTOWER_DATA_DIR/auth-signing.key``) with 0o600 permissions. The
+    key signs user session tokens — if it rotates, every signed-in user
+    is forcibly logged out.
+
+    Pre-1.12.5, ``_auth_signing_secret()`` fell back to
+    ``WATCHTOWER_API_TOKEN`` when ``WATCHTOWER_AUTH_SECRET`` was unset.
+    In Electron, ``desktop/main.js`` generates a fresh random
+    ``WATCHTOWER_API_TOKEN`` on every launch (so an attacker who learned
+    a prior token can't reuse it on a relaunch) — which meant the
+    signing key also rotated every launch, and every persisted session
+    in localStorage was invalidated. Users had to re-authenticate
+    against GitHub on every app restart.
+
+    This helper persists a stable signing key per install, decoupling
+    the API auth token from the session signing key. Electron can keep
+    rotating ``WATCHTOWER_API_TOKEN`` (good for API auth hygiene)
+    without losing user sessions.
+
+    Production deployments should still set ``WATCHTOWER_AUTH_SECRET``
+    explicitly via env / secret manager — the env var wins.
+    """
+    if os.getenv("WATCHTOWER_AUTH_SECRET"):
+        return
+
+    data_dir = Path(
+        os.getenv("WATCHTOWER_DATA_DIR")
+        or os.path.join(os.path.expanduser("~"), ".watchtower")
+    )
+    key_path = data_dir / "auth-signing.key"
+
+    try:
+        if key_path.exists():
+            key = key_path.read_text(encoding="utf-8").strip()
+        else:
+            import secrets as _secrets
+            key = _secrets.token_hex(32)
+            data_dir.mkdir(parents=True, exist_ok=True)
+            try:
+                os.chmod(data_dir, 0o700)
+            except OSError:
+                pass
+            # Atomic write so a crash mid-write can't leave a half-empty file
+            # that would silently invalidate every session.
+            tmp_path = key_path.with_suffix(".key.tmp")
+            tmp_path.write_text(key, encoding="utf-8")
+            try:
+                os.chmod(tmp_path, 0o600)
+            except OSError:
+                pass
+            os.replace(tmp_path, key_path)
+            logger.info(
+                "Generated WATCHTOWER_AUTH_SECRET at %s (0600). "
+                "User sessions will now persist across app restarts.",
+                key_path,
+            )
+        if key:
+            os.environ["WATCHTOWER_AUTH_SECRET"] = key
+    except Exception:
+        logger.exception(
+            "Failed to load or generate WATCHTOWER_AUTH_SECRET; "
+            "user sessions will be invalidated on every restart."
+        )
+
+
 def _ensure_secret_key() -> None:
     """Auto-generate WATCHTOWER_SECRET_KEY on first run if not provided.
 
@@ -165,6 +233,7 @@ init_db()
 async def lifespan(_app: FastAPI):
     logger.info("Starting WatchTower API")
     _ensure_secret_key()
+    _ensure_auth_signing_key()
     # Security: warn loudly when running without a real API token in dev mode.
     if (
         os.getenv("WATCHTOWER_ALLOW_INSECURE_DEV_AUTH", "false").lower() == "true"
