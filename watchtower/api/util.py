@@ -166,27 +166,33 @@ def assert_safe_external_url(url: str) -> str:
 
 
 def _auth_signing_secret() -> str:
-    secret = (
-        os.getenv("WATCHTOWER_AUTH_SECRET")
-        or os.getenv("WATCHTOWER_API_TOKEN")
+    """Return the persistent signing secret used for user-session tokens.
+
+    ``_ensure_auth_signing_key()`` (in ``watchtower/api/__init__.py``)
+    runs at module import + lifespan startup and either reads the key
+    from ``$WATCHTOWER_DATA_DIR/auth-signing.key`` or generates+persists
+    a fresh one — then caches it in ``WATCHTOWER_AUTH_SECRET``. So by the
+    time any request lands here, the env var should always be set.
+
+    The legacy fallback to ``WATCHTOWER_API_TOKEN`` was removed in 1.12.5
+    because it caused a "logged out on every Electron relaunch" bug —
+    Electron generates a fresh random API token per launch and the
+    signing key inherited from it rotated with it.
+    """
+    secret = os.getenv("WATCHTOWER_AUTH_SECRET")
+    if secret:
+        return secret
+    # Defensive: if startup didn't populate the env var (e.g., test
+    # harness skipped lifespan + module-level init), generate an
+    # ephemeral one rather than crashing the request. Sessions issued
+    # under it won't survive a restart, but the API stays available.
+    import logging as _logging
+    _logging.getLogger(__name__).warning(
+        "WATCHTOWER_AUTH_SECRET unset at request time — using ephemeral "
+        "signing key. Sessions will not persist. Investigate startup."
     )
-    if not secret:
-        # In insecure dev mode generate a random per-process secret so sessions
-        # are at least valid only for the lifetime of the process.
-        if os.getenv("WATCHTOWER_ALLOW_INSECURE_DEV_AUTH", "false").lower() == "true":
-            import logging as _logging
-            _logging.getLogger(__name__).warning(
-                "WATCHTOWER_AUTH_SECRET is not set. "
-                "Using a random ephemeral signing key — sessions will not survive restarts."
-            )
-            secret = secrets.token_hex(32)
-            # Cache on the module so all calls in this process use the same key.
-            os.environ["WATCHTOWER_AUTH_SECRET"] = secret
-        else:
-            raise RuntimeError(
-                "WATCHTOWER_AUTH_SECRET or WATCHTOWER_API_TOKEN must be set "
-                "before running WatchTower."
-            )
+    secret = secrets.token_hex(32)
+    os.environ["WATCHTOWER_AUTH_SECRET"] = secret
     return secret
 
 
@@ -205,7 +211,12 @@ def create_user_session_token(
     the token is the SPA's identity cache.
     """
     now = int(time.time())
-    ttl_hours = int(os.getenv("WATCHTOWER_SESSION_TTL_HOURS", "12"))
+    # 30-day default. Pre-1.12.5 was 12 hours, which combined with the
+    # signing-key-rotates-on-Electron-relaunch bug meant most users got
+    # logged out daily or sooner. With persistent signing (1.12.5+) +
+    # 30-day TTL, sessions feel "stay signed in" by default. Operators
+    # can shorten via WATCHTOWER_SESSION_TTL_HOURS for tighter security.
+    ttl_hours = int(os.getenv("WATCHTOWER_SESSION_TTL_HOURS", "720"))
     payload = {
         "uid": user_id,
         "email": email,
