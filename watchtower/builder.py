@@ -366,7 +366,49 @@ async def _run_cmd(
         return False, str(exc)
 
 
+# Hosts that mean "this machine" — we skip SSH and rsync directly.
+# A user evaluating WatchTower on a single laptop hits this path: their
+# "local node" is just an SSH target pointing at 127.0.0.1, but Remote
+# Login is off and ~/.ssh/id_rsa doesn't exist, so SSH-to-self errors.
+# Detecting localhost lets us avoid the entire SSH/keypair yak-shave for
+# what is fundamentally `cp -a` + `bash -c reload`.
+_LOCALHOST_HOSTS = {"127.0.0.1", "::1", "localhost"}
+
+
+def _is_local_node(node: OrgNode) -> bool:
+    return (node.host or "").strip().lower() in _LOCALHOST_HOSTS
+
+
 async def _rsync_to_node(node: OrgNode, src: Path, append) -> tuple[bool, str]:
+    # ── Local-node fast path: skip SSH entirely ────────────────────────────
+    # rsync to a local path runs as the WatchTower process user (no
+    # node.user impersonation — that field is meaningless without SSH).
+    # We mkdir -p the destination first because nothing else on this code
+    # path guarantees it exists, and the cryptic rsync error for a
+    # missing directory ("No such file or directory") obscures the real
+    # issue when a user just registered a fresh local node.
+    if _is_local_node(node):
+        dest = f"{node.remote_path.rstrip('/')}/"
+        try:
+            Path(dest).mkdir(parents=True, exist_ok=True)
+        except OSError as exc:
+            return False, f"could not create local dest {dest}: {exc}"
+        cmd = ["rsync", "-az", "--delete", f"{src}/", dest]
+        append(f"[rsync] → {dest} (local)")
+        proc = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.STDOUT,
+        )
+        stdout, _ = await proc.communicate()
+        output = stdout.decode(errors="replace").strip()
+        for line in output.splitlines():
+            append(f"[rsync] {line}")
+        if proc.returncode != 0:
+            return False, output
+        return True, ""
+
+    # ── Remote SSH path (existing behaviour) ───────────────────────────────
     # All node-* fields below originate from an authenticated org admin via
     # the API, but we still treat them as untrusted because rsync's ``-e``
     # flag is parsed by a shell on the local machine. Quote every piece
@@ -403,6 +445,35 @@ async def _rsync_to_node(node: OrgNode, src: Path, append) -> tuple[bool, str]:
 
 
 async def _ssh_run(node: OrgNode, command: str, append) -> tuple[bool, str]:
+    # ── Local-node fast path: run reload command as a local subprocess ─────
+    # We feed the command through ``bash -lc`` so the same reload script
+    # the user wrote for SSH (e.g. "cd /opt/app && pm2 restart api")
+    # works unchanged — it's just running on this machine instead of via
+    # ssh. The cwd is set to remote_path so relative paths in the script
+    # resolve where the deployed files live.
+    if _is_local_node(node):
+        cwd = node.remote_path or None
+        if cwd:
+            try:
+                Path(cwd).mkdir(parents=True, exist_ok=True)
+            except OSError:
+                cwd = None  # fall back to inheriting WatchTower's cwd
+        append(f"[local] $ {command}")
+        proc = await asyncio.create_subprocess_shell(
+            command,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.STDOUT,
+            cwd=cwd,
+        )
+        stdout, _ = await proc.communicate()
+        output = stdout.decode(errors="replace").strip()
+        for line in output.splitlines():
+            append(f"[local] {line}")
+        if proc.returncode != 0:
+            return False, output
+        return True, ""
+
+    # ── Remote SSH path ────────────────────────────────────────────────────
     ssh_opts = ["-p", str(node.port), "-o", "StrictHostKeyChecking=accept-new"]
     if node.ssh_key_path:
         ssh_opts += ["-i", node.ssh_key_path]
@@ -518,19 +589,29 @@ async def _send_notifications(
 
 def check_ssh_connectivity(node: OrgNode) -> tuple[bool, str]:
     """
-    Try an SSH connection to the node and run `echo ok`.
-    For local nodes (127.0.0.1/localhost) use an HTTP health check instead.
+    Verify the node is reachable for deployment.
+
+    For local nodes (127.0.0.1 / localhost / ::1) we don't go through
+    SSH at all (deploys use the local-fast-path in _rsync_to_node /
+    _ssh_run). The "health" check just confirms remote_path is writable
+    by the WatchTower process user — that's the only thing that can
+    actually fail at deploy time on a local node.
+
     Returns (success, message).
     """
-    if node.host in ("127.0.0.1", "localhost", "::1"):
-        import urllib.request
+    if _is_local_node(node):
+        path = node.remote_path or ""
+        if not path:
+            return True, "Local node registered (no remote_path set)"
         try:
-            with urllib.request.urlopen("http://127.0.0.1:8000/health", timeout=5) as resp:
-                if resp.status == 200:
-                    return True, "Local node healthy (HTTP)"
-        except Exception as exc:
-            return True, "Local node registered (HTTP check unavailable)"
-        return True, "Local node registered"
+            p = Path(path)
+            p.mkdir(parents=True, exist_ok=True)
+            probe = p / ".watchtower-write-probe"
+            probe.write_text("ok", encoding="utf-8")
+            probe.unlink()
+            return True, f"Local node ready ({path} writable)"
+        except OSError as exc:
+            return False, f"Local node {path} not writable: {exc}"
 
     ssh_opts = ["-p", str(node.port), "-o", "StrictHostKeyChecking=accept-new",
                 "-o", "ConnectTimeout=5", "-o", "BatchMode=yes"]
