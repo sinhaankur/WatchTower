@@ -9,6 +9,25 @@ Curated, human-friendly history of WatchTower releases. Auto-generated GitHub Re
 
 ---
 
+## 1.12.5 — Persistent login: stop logging users out on every Electron restart
+
+**Bug**: Desktop users had to re-authenticate against GitHub every time they relaunched the app — sometimes within hours of last sign-in.
+
+### Root cause
+`desktop/main.js` generates a fresh random `WATCHTOWER_API_TOKEN` per Electron launch (security hygiene — a token leaked from a prior run can't be reused on the next launch). Pre-1.12.5, `_auth_signing_secret()` in `watchtower/api/util.py` used that token as the **session-token signing key** when `WATCHTOWER_AUTH_SECRET` was unset. So the signing key rotated with the API token, and every signed user session in `localStorage` became invalid the moment you quit + relaunched the app. The browser-mode launch path (which uses the stable `dev-watchtower-token`) was unaffected — only Electron users hit it.
+
+### Fix
+- **New `_ensure_auth_signing_key()`** in `watchtower/api/__init__.py` (mirrors the existing `_ensure_secret_key()` pattern): on first run, generates a 256-bit hex secret and atomically writes it to `~/.watchtower/auth-signing.key` with `0o600` perms. On subsequent runs, reads it. Sets `WATCHTOWER_AUTH_SECRET` for the process so `_auth_signing_secret()` finds it.
+- **`_auth_signing_secret()` simplified**: only checks `WATCHTOWER_AUTH_SECRET`. The legacy `WATCHTOWER_API_TOKEN` fallback is removed — that's the bug. Last-resort ephemeral generation stays for test harnesses that skip lifespan.
+- **Default session TTL bumped 12h → 30 days** (`WATCHTOWER_SESSION_TTL_HOURS=720`). With persistent signing, sessions survive restarts; with 30-day TTL they survive long idle periods. The two together = "stay signed in" by default. Operators can shorten via env for tighter security.
+
+Electron keeps rotating `WATCHTOWER_API_TOKEN` per launch (good — that's defense against token reuse). Sign-in sessions are now decoupled from API token churn.
+
+### Migration / impact
+Existing signed-in users get logged out **once** when 1.12.5 lands (their old API_TOKEN-signed tokens fail HMAC against the new persistent key). Sign in once after the update — sessions persist from that point forward.
+
+The `~/.watchtower/auth-signing.key` file is per-install. If you delete it, you log everyone out on the next backend start. Back up alongside `secret.key` if you're snapshotting your data dir.
+
 ## 1.12.4 — Bundled Python restored on Windows x64 (built on Linux, packaged on Windows)
 
 Restores the seamless "download .exe, run, done" install experience for Windows x64 that 1.12.3 had to defer. Mac and Linux already had this since 1.11.
