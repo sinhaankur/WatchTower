@@ -9,6 +9,20 @@ Curated, human-friendly history of WatchTower releases. Auto-generated GitHub Re
 
 ---
 
+## 1.12.3 — Defer bundled Python on Windows so the win-x64.exe actually ships
+
+v1.12.2 attempted to fix the missing `win-x64.exe` by rerouting the bundle script through the cross-install path (host `python3 -m pip install --target --platform win_amd64 --only-binary=:all:`). The cross-install **runs** on Windows but is impractically slow — 45+ min on the GitHub Actions windows-latest runner before being cancelled, same effective shape as v1.12.1's native-install hang. Probable cause: Defender scanning each wheel-extracted file on NTFS (a single `pip install --target` for our requirements.txt fans out to ~3000 small files; Linux runners finish the same install in ~3 min).
+
+### What 1.12.3 changes
+- `.github/workflows/release.yml`: `bundle_target` for the windows-x64 matrix entry is now `""` (matching windows-arm64 + linux-armv7l, which already had no PBS target). The Windows x64 installer is now produced **without** an in-bundle Python.
+- The `scripts/build-python-bundle.sh` cross-install fix from 1.12.2 stays in place — when we move the windows bundle off the Windows runner (e.g. cross-install on a Linux runner, upload as artifact, download in the windows-x64 job), the code path is ready.
+
+### What this means for Windows users
+Same as the **1.10.x** experience and **windows-arm64 today**: install the EXE, then if it can't find a Python with `watchtower-podman`, the launcher prompts to `pipx install watchtower-podman` (the existing fallback in `main.js`'s `resolvePython()`). Mac and Linux x64/arm64 continue to ship bundled Python and need no terminal.
+
+### Why ship as a temp regression instead of holding the win-x64.exe
+v1.12.1 has no win-x64.exe at all — Windows x64 users have no installer to download. Shipping a working .exe with a 1-line "you also need pipx" instruction is strictly better than no .exe. The bundled-Python-on-Windows work is tracked as follow-up.
+
 ## 1.12.2 — Windows x64 installer was missing from v1.12.1 (build hang fix)
 
 **The v1.12.1 release shipped without a `WatchTower-1.12.1-win-x64.exe` installer.** Windows x64 users had no installer to download — only the arm64 EXE made it to the release page.
