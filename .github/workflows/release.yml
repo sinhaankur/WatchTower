@@ -68,38 +68,50 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # Each entry's `bundle_target` selects which python-build-standalone
+        # archive to download for the in-app Python bundle (1.11+). Empty
+        # bundle_target = no bundle for that arch; the .app's launcher
+        # falls back to system/pipx Python (legacy 1.10.x behavior).
+        # Currently no PBS target exists for armv7l Linux or arm64
+        # Windows, so those keep the legacy fallback path.
+        # Mac is split into two entries (one per arch) so each DMG ships
+        # its own arch-correct Python bundle — a single matrix entry
+        # building both arches couldn't disambiguate which bundle goes
+        # in which DMG.
         include:
           - os: ubuntu-latest
+            bundle_target: "linux-x64"
             eb_args: --linux AppImage deb --x64
             artifact_glob: "desktop/dist/*x64*"
           - os: ubuntu-latest
+            bundle_target: "linux-arm64"
             eb_args: --linux AppImage deb --arm64
             artifact_glob: "desktop/dist/*arm64*"
-            # arm64 cross-compile needs the ARM64 sysroot libs
             extra_apt: "gcc-aarch64-linux-gnu"
           - os: ubuntu-latest
+            bundle_target: ""
             eb_args: --linux AppImage deb --armv7l
             artifact_glob: "desktop/dist/*armv7l*"
             extra_apt: "gcc-arm-linux-gnueabihf"
           - os: macos-14
-            # macos-14 is the Apple Silicon (M1) runner — required to build
-            # the x64 slice via Rosetta cross-compilation.
-            # We ship separate x64 and arm64 DMGs (configured in
-            # desktop/package.json's mac.target) instead of a single
-            # universal binary because @electron/universal refuses to
-            # merge arch-specific bundled binaries (Nixpacks per-platform
-            # under extraResources/binaries/) without an explicit
-            # x64ArchFiles regex. Two ~150 MB downloads beats two days of
-            # universal-merge config debugging, and matches what
-            # Slack/Discord/Cursor ship.
-            eb_args: --mac --x64 --arm64
-            artifact_glob: "desktop/dist/*.dmg desktop/dist/*.zip"
+            bundle_target: "darwin-arm64"
+            eb_args: --mac --arm64
+            artifact_glob: "desktop/dist/*arm64*"
+            extra_apt: ""
+          - os: macos-14
+            bundle_target: "darwin-x64"
+            eb_args: --mac --x64
+            artifact_glob: "desktop/dist/*x64*"
             extra_apt: ""
           - os: windows-latest
-            # package.json win.target already lists x64 + arm64 arches,
-            # so --win builds both Surface Pro X (arm64) and regular x64 installers.
-            eb_args: --win
-            artifact_glob: "desktop/dist/*.exe desktop/dist/*.zip"
+            bundle_target: "windows-x64"
+            eb_args: --win --x64
+            artifact_glob: "desktop/dist/*x64*"
+            extra_apt: ""
+          - os: windows-latest
+            bundle_target: ""
+            eb_args: --win --arm64
+            artifact_glob: "desktop/dist/*arm64*"
             extra_apt: ""
 
     steps:
@@ -164,6 +176,36 @@ jobs:
             sleep $((attempt * 20))
           done
           exit 1
+        shell: bash
+
+      # ── Build the bundled Python (1.11+) ───────────────────────────────────
+      # Downloads python-build-standalone for the matrix arch, installs
+      # watchtower + dependencies into it, drops the result at
+      # desktop/python-bundle/python/ where electron-builder picks it up
+      # via extraResources. Skipped for arches without a PBS target
+      # (armv7l Linux, arm64 Windows) — those .apps fall back to the
+      # legacy pipx-Python launcher path.
+      - name: Build bundled Python (${{ matrix.bundle_target }})
+        if: matrix.bundle_target != ''
+        run: |
+          # The script's own pip-cross-install path needs a working host
+          # Python — provided by setup-python above.
+          chmod +x scripts/build-python-bundle.sh
+          TARGET=${{ matrix.bundle_target }} ./scripts/build-python-bundle.sh
+          ls -la desktop/python-bundle/python | head -5
+        shell: bash
+
+      - name: Create empty Python bundle placeholder (no PBS target for this arch)
+        if: matrix.bundle_target == ''
+        # extraResources in package.json points at desktop/python-bundle/python.
+        # When we skip the real bundle (armv7l Linux, arm64 Windows — no
+        # PBS target exists), electron-builder still needs the dir to
+        # exist or `extraResources` errors out. A lone .placeholder file
+        # is enough — main.js's resolvePython() detects no python3 here
+        # and falls back to the legacy pipx path.
+        run: |
+          mkdir -p desktop/python-bundle/python
+          echo "no bundled python for this arch — falls back to system/pipx" > desktop/python-bundle/python/.placeholder
         shell: bash
 
       - name: Build & publish installers

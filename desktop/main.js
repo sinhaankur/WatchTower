@@ -1306,22 +1306,42 @@ function probePythonCandidate(cmd) {
 }
 
 function resolvePython() {
-  // Bundled venv next to the desktop app (dev clone path).
+  // ── 1. Bundled Python (highest priority for packaged builds) ─────────────
+  // 1.11+ ships a self-contained Python interpreter inside the .app at
+  // Resources/python/. Looking here FIRST removes the dependency on a
+  // user-installed pipx venv that can vanish, get nuked, or point at a
+  // different Python version. End users never have to install Python.
+  if (app.isPackaged && process.resourcesPath) {
+    const bundled = process.platform === 'win32'
+      ? path.join(process.resourcesPath, 'python', 'python.exe')
+      : path.join(process.resourcesPath, 'python', 'bin', 'python3');
+    if (fs.existsSync(bundled)) return bundled;
+  }
+
+  // ── 2. Dev-clone .venv ───────────────────────────────────────────────────
+  // When running from a source checkout (npm start), the developer's
+  // .venv is the right answer. Skipped in packaged builds since the
+  // bundled Python above always exists.
   if (fs.existsSync(pythonUnix)) return pythonUnix;
   if (fs.existsSync(pythonWin)) return pythonWin;
 
-  // pipx-managed WatchTower install (common on macOS/Linux). Prefer this
-  // ahead of generic PATH python so we avoid stale Xcode/python3.9 picks.
+  // ── 3. Explicit override ─────────────────────────────────────────────────
+  const explicit = process.env.WATCHTOWER_PYTHON;
+  if (explicit && fs.existsSync(explicit)) return explicit;
+
+  // ── 4. Pipx-managed WatchTower install (legacy fallback) ─────────────────
+  // Pre-1.11 .app builds shipped without a bundled Python and required a
+  // sibling `pipx install watchtower-podman`. We still check this so an
+  // upgrader who deletes the new bundle directory by mistake doesn't end
+  // up with a non-functional app, but it's no longer the recommended
+  // path — the bundled Python above is.
   const home = process.env.HOME || process.env.USERPROFILE || '';
   const pipxPython = path.join(home, '.local', 'pipx', 'venvs', 'watchtower-podman', 'bin', 'python');
   if (fs.existsSync(pipxPython) && probePythonCandidate(pipxPython)) return pipxPython;
 
-  // Explicit user override beats every probe.
-  const explicit = process.env.WATCHTOWER_PYTHON;
-  if (explicit && fs.existsSync(explicit)) return explicit;
-
-  // System candidates. On macOS we filter out the /usr/bin/python3 stub
-  // so the GUI doesn't pop the CLT installer mid-launch.
+  // ── 5. System Python (last resort) ───────────────────────────────────────
+  // On macOS we filter out the /usr/bin/python3 stub so the GUI doesn't
+  // pop the Command Line Tools installer mid-launch.
   const candidates = process.platform === 'win32'
     ? ['python3.exe', 'python.exe', 'python']
     : [
@@ -1334,12 +1354,8 @@ function resolvePython() {
       ];
 
   for (const cmd of candidates) {
-    // Only the bare-name macOS form `python3` resolves through PATH to
-    // /usr/bin/python3 — short-circuit with the stub check.
     if (process.platform === 'darwin' && cmd === 'python3') {
       if (isMacOSPythonStub('/usr/bin/python3')) {
-        // Stub detected — skip without probing. Continue to other
-        // candidates (`python`) which usually isn't the stub on macOS.
         continue;
       }
     }
@@ -2263,24 +2279,24 @@ async function showLaunchFailureDialog(error, backendLogPath) {
   const resolvedWebDist = process.env.WATCHTOWER_WEB_DIST || resolveWebDist();
   const distIndex = path.join(resolvedWebDist, 'index.html');
   const distExists = fs.existsSync(distIndex);
-  const parts = [friendlyLaunchError(error)];
+
+  // Plain-English failure dialog. Old copy talked about ImportError /
+  // ModuleNotFoundError / PEP 668 — developer jargon that scared end
+  // users away. New copy assumes the user just wants the app to work
+  // and surfaces "Reinstall" as the primary action since the bundled
+  // Python in 1.11+ means a fresh install is almost always the fix.
+  const userMessage = "WatchTower didn't start correctly.";
+  let detail =
+    "We couldn't get the app's backend running. The most reliable fix is to reinstall the latest version — it bundles everything WatchTower needs in one self-contained download.";
 
   if (!distExists) {
-    if (app.isPackaged) {
-      parts.push(
-        `\nFrontend bundle not found at:\n  ${distIndex}\n` +
-        'This packaged app is missing its bundled frontend. Reinstall WatchTower from the latest release.'
-      );
-    } else {
-      parts.push(
-        `\nFrontend bundle not found at:\n  ${distIndex}\n` +
-        `Build it once with:\n  npm --prefix web install && npm --prefix web run build`
-      );
-    }
+    detail += app.isPackaged
+      ? "\n\nThis install is also missing its bundled frontend, which usually means a partial download. Reinstalling fixes both."
+      : `\n\nFrontend bundle not found at:\n  ${distIndex}\nBuild it once: npm --prefix web install && npm --prefix web run build`;
   }
 
   if (backendLogPath) {
-    parts.push(`\nFor support, attach this log:\n  ${backendLogPath}`);
+    detail += `\n\nIf you want to investigate first, the technical log is at:\n${backendLogPath}`;
   }
 
   const raw = error?.message ?? String(error);
@@ -2291,87 +2307,70 @@ async function showLaunchFailureDialog(error, backendLogPath) {
     raw.includes('ImportError');
 
   if (!likelyDependencyIssue) {
-    dialog.showErrorBox('WatchTower failed to start', parts.join('\n'));
+    dialog.showErrorBox('WatchTower didn\'t start', `${userMessage}\n\n${detail}`);
     return;
   }
 
-  const guide = pythonInstallGuide();
-  const installCommand = guide.commands.join(' && ');
   const isMac = process.platform === 'darwin';
 
-  // On Mac we offer "Reinstall Latest Version" as the first button, since
-  // the most common cause of this dialog is "you're running an old .app
-  // with a known startup bug" — the fix is to swap the bundle. Same
-  // self-replace path the in-app update flow uses.
+  // Reinstall is now the primary action — bundled Python in 1.11+ means
+  // a fresh download fixes essentially every "backend won't start"
+  // failure mode (broken venv, missing dep, deleted pipx). The
+  // help/quit buttons stay for users who want to inspect manually.
   const buttons = isMac
-    ? ['Reinstall Latest Version', 'Copy prerequisite install command', 'Open setup guide', 'Quit']
-    : ['Copy prerequisite install command', 'Open setup guide', 'Quit'];
+    ? ['Reinstall WatchTower', 'View Log', 'Quit']
+    : ['View Log', 'Get Help', 'Quit'];
 
   const response = await dialog.showMessageBox({
-    type: 'error',
-    title: 'WatchTower failed to start',
-    message: parts.join('\n'),
+    type: 'warning',
+    title: "WatchTower didn't start",
+    message: userMessage,
+    detail,
     buttons,
     defaultId: 0,
     cancelId: buttons.length - 1,
     noLink: true,
   });
 
-  if (isMac && response.response === 0) {
-    // Reinstall — fetch latest release tag from GitHub, then run the
-    // self-replace helper. This works even when the backend is broken
-    // because none of it depends on the backend.
-    try {
-      const latest = await fetchLatestReleaseTag();
-      if (!latest) {
-        await dialog.showMessageBox({
-          type: 'warning',
-          title: 'Reinstall failed',
-          message: 'Could not reach GitHub to find the latest version.',
-          detail: 'Check your internet connection and try again, or download manually from the release page.',
-          buttons: ['Open Release Page', 'Cancel'],
-          defaultId: 0,
-        }).then(({ response: r }) => {
-          if (r === 0) shell.openExternal('https://github.com/sinhaankur/WatchTower/releases/latest');
-        });
-        return;
+  if (isMac) {
+    // Mac buttons: [Reinstall WatchTower, View Log, Quit]
+    if (response.response === 0) {
+      try {
+        const latest = await fetchLatestReleaseTag();
+        if (!latest) {
+          await dialog.showMessageBox({
+            type: 'warning',
+            title: 'Reinstall failed',
+            message: 'Could not reach GitHub to find the latest version.',
+            detail: 'Check your internet connection and try again, or download from the release page.',
+            buttons: ['Open Release Page', 'Cancel'],
+            defaultId: 0,
+          }).then(({ response: r }) => {
+            if (r === 0) shell.openExternal('https://github.com/sinhaankur/WatchTower/releases/latest');
+          });
+          return;
+        }
+        await applyMacUpdate(latest, null);
+      } catch (err) {
+        console.warn('[WatchTower] Reinstall failed:', err.message);
+        shell.openExternal('https://github.com/sinhaankur/WatchTower/releases/latest');
       }
-      // Prompt one more time to confirm — this WILL replace /Applications/WatchTower.app.
-      const confirm = await dialog.showMessageBox({
-        type: 'question',
-        title: 'Reinstall WatchTower',
-        message: `Download and install WatchTower ${latest}?`,
-        detail: 'This will replace /Applications/WatchTower.app, strip the Gatekeeper quarantine, and relaunch. The current app will quit during the swap.',
-        buttons: ['Reinstall', 'Cancel'],
-        defaultId: 0,
-        cancelId: 1,
-      });
-      if (confirm.response !== 0) return;
-      await applyMacUpdate(latest, null);
-    } catch (err) {
-      console.warn('[WatchTower] Reinstall failed:', err.message);
-      shell.openExternal('https://github.com/sinhaankur/WatchTower/releases/latest');
+      return;
     }
-    return;
+    if (response.response === 1 && backendLogPath) {
+      try { shell.openPath(backendLogPath); } catch {}
+      return;
+    }
+    return; // Quit
   }
 
-  // Index shifts depending on whether we showed the Reinstall button.
-  const offset = isMac ? 1 : 0;
-  if (response.response === offset) {
-    try { clipboard.writeText(installCommand); } catch { /* clipboard unavailable */ }
-    await dialog.showMessageBox({
-      type: 'info',
-      title: 'Copied to clipboard',
-      message: 'Prerequisite install command copied.',
-      detail: 'Paste it into your terminal, run it, then relaunch WatchTower.',
-      buttons: ['OK'],
-      noLink: true,
-    });
+  // Linux/Windows buttons: [View Log, Get Help, Quit]
+  if (response.response === 0 && backendLogPath) {
+    try { shell.openPath(backendLogPath); } catch {}
     return;
   }
-
-  if (response.response === offset + 1) {
-    try { shell.openExternal(guide.docsUrl); } catch { /* offline / no browser */ }
+  if (response.response === 1) {
+    try { shell.openExternal(pythonInstallGuide().docsUrl); } catch {}
   }
 }
 
