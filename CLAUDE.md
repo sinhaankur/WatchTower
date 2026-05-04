@@ -250,6 +250,19 @@ The TypeScript hook (`useEdition()`, `useProFeature()` in `web/src/hooks/queries
 
 **Tests for Pro-gated routes** must `monkeypatch.setenv("WATCHTOWER_TIER", "pro")` to exercise the unlocked path, and a separate test should hit the route on Free to confirm the 402 contract still holds. See `tests/test_audit.py::test_audit_read_returns_402_on_free_tier` for the pattern.
 
+## Release discipline (READ BEFORE TAGGING)
+
+**Never push a tag without running `./scripts/preflight.sh` first.** **Never call a release Stable without `./scripts/verify-release.sh vX.Y.Z` passing afterward.** The full standard is in `RELEASE_QUALITY.md` at the repo root.
+
+Tonight's session shipped 16 releases (1.6.2 → 1.12.1) because issues were caught after users had them — broken DMGs, missing alembic migrations, cross-arch Python bundles. Every one of those would have been caught by the preflight script. The discipline exists because the alternative is the user paying for our mistakes in confusion and reinstalls. The two scripts:
+
+- `scripts/preflight.sh` — local, before `git tag`. Runs tests, lint, frontend build, electron-builder pack, and verifies the bundled Python actually imports `watchtower + pydantic_core + cryptography + alembic`. Catches structural issues that pass type-checks but break at install-time.
+- `scripts/verify-release.sh vX.Y.Z` — local, after CI succeeds. Downloads each Mac DMG and Linux AppImage from the GitHub Release, runs `file` against each bundle's `_pydantic_core.so`, and confirms the architecture matches the artifact name (so an arm64 DMG never ships with x86_64 binaries again).
+
+If either script fails, **don't auto-update users**. Either re-run the failing CI matrix entry, ship as Beta only (when the channel split lands), or cut a fresh patch with the fix. Don't say "it'll probably work" — every "probably" tonight became a real user incident.
+
+Add new checks to whichever script catches them when a regression slips through. The checklist grows from real failures, not imagined ones.
+
 ## Things that bite
 
 - **Electron mode skips the run.sh-started backend.** When `MODE=desktop`, `run.sh` *kills* anything on port 8000 and lets Electron start its own. Don't add backend-start logic to desktop mode without coordinating with `desktop/main.js`.
