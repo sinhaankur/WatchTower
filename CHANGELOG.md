@@ -9,6 +9,25 @@ Curated, human-friendly history of WatchTower releases. Auto-generated GitHub Re
 
 ---
 
+## 1.11.0 — Bundled Python: install once, never touch a terminal
+
+The desktop app no longer depends on `pipx install watchtower-podman`. WatchTower 1.11+ ships its own self-contained Python interpreter (~120 MB) inside the `.app` bundle, with all dependencies pre-installed. The end-user install story is now: download DMG → drag to Applications → double-click. No `pipx`, no PEP 668, no `ModuleNotFoundError`, no second `pipx install` command in a separate terminal step.
+
+### What changed
+- **`scripts/build-python-bundle.sh`** — downloads the [astral-sh/python-build-standalone](https://github.com/astral-sh/python-build-standalone) tarball for the target arch, installs `requirements.txt` + the watchtower package itself into it, strips `__pycache__` and `pip`/`setuptools`. Supports both native install (when host arch matches) and cross-install via `pip install --target --platform --only-binary` (e.g. building the Mac x64 bundle on the Apple Silicon CI runner). Pinned to `python-build-standalone` tag `20260414`, Python 3.12.13.
+- **`desktop/package.json`** — `extraResources` now includes `python-bundle/python` → `Resources/python` so the bundled interpreter ships inside `WatchTower.app/Contents/Resources/python/`.
+- **`desktop/main.js` `resolvePython()`** — checks the bundled Python at `process.resourcesPath/python/bin/python3` (or `python.exe` on Windows) **first**. The pipx fallback is still there for upgraders who somehow lose the bundled dir, but it's no longer the recommended path. Dev-clone `.venv` and system Python rounds out the chain.
+- **`.github/workflows/release.yml`** — split the Mac matrix entry into two arch-specific entries (the previous single-entry build couldn't disambiguate which Python bundle goes in which DMG). Added a `Build bundled Python` step per matrix entry that runs the script with `TARGET=<bundle_target>`. Arches without a `python-build-standalone` target (armv7l Linux, arm64 Windows) get an empty placeholder dir so `extraResources` doesn't error and fall back to the legacy pipx path at runtime.
+
+### New failure dialog
+Replaced developer-jargon copy ("ImportError", "ModuleNotFoundError", "PEP 668") with plain English: **"WatchTower didn't start"** + plain-English detail + a **Reinstall WatchTower** button as the primary action. A **View Log** button surfaces the technical log for users who want to investigate. The old "Copy prerequisite install command" button is gone — there is no prerequisite anymore.
+
+### Bundle size
+The Mac DMG grows from ~110 MB → ~230 MB. Acceptable trade-off: one click vs. two installs + a terminal. Future optimization: switch to the `_stripped` python-build-standalone variant which drops debug symbols (~20 MB savings), and prune unused stdlib modules.
+
+### Migration
+Existing 1.10.x installs auto-update via the in-app dialog. The first 1.11 launch uses its bundled Python; the user's old `~/.local/pipx/venvs/watchtower-podman` venv becomes orphaned and can be removed with `pipx uninstall watchtower-podman`.
+
 ## 1.10.2 — Auto-update actually installs on unsigned macOS
 
 Auto-update has been quietly broken on Mac since v1: `electron-updater` calls Squirrel.Mac under the hood, which **silently refuses to atomically replace bundles that lack a Developer ID signature**. Users would click "Restart and Install", the app would quit, reopen as the OLD version — and from the user's perspective updates simply didn't work. The 1.10.0 dialog made the prompt visible but didn't fix the install step itself; the manual "Download Manually" fallback worked but required drag-drop.
