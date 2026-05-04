@@ -32,6 +32,7 @@ from sqlalchemy.orm import Session
 
 from watchtower.database import AuditEvent, get_db
 from watchtower.api import util
+from watchtower.api.edition import require_pro
 from watchtower.log_config import get_request_id
 
 router = APIRouter(prefix="/api/audit", tags=["Audit"])
@@ -165,8 +166,13 @@ async def list_audit_events(
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
     current_user: dict = Depends(util.get_current_user),
+    _pro: dict = Depends(require_pro("audit-log")),
 ) -> List[dict]:
     """Return audit events for the caller's organization, newest first.
+
+    **Pro-tier feature.** Free installs hit a 402 here so the frontend
+    can render an upgrade prompt instead of letting the user open an
+    empty audit table.
 
     Cross-org reads are rejected. The org is resolved the same way the
     rest of the API does — via the canonical user→org membership.

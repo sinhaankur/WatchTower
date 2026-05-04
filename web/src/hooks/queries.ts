@@ -27,7 +27,83 @@ export const queryKeys = {
   updateCheck: ['runtime', 'version'] as const,
   me: ['me'] as const,
   activeDeployments: ['deployments', 'active-count'] as const,
+  edition: ['edition'] as const,
+  audit: (params: AuditQueryParams) => ['audit', params] as const,
 } as const;
+
+// ── Edition / license tier ───────────────────────────────────────────────────
+// Drives the Pro lock UI. Long staleTime — the tier doesn't flip mid-session
+// in any normal flow, and refetching on every mount would mean every page
+// loads a /edition request before deciding what to render.
+
+export type ProFeatureKey =
+  | 'audit-log'
+  | 'team-rbac'
+  | 'multi-region-failover'
+  | 'sso'
+  | 'priority-support';
+
+export type EditionResponse = {
+  tier: 'free' | 'pro';
+  is_pro: boolean;
+  features: Record<ProFeatureKey, {
+    name: string;
+    description: string;
+    unlocked: boolean;
+  }>;
+  upgrade_url: string;
+};
+
+export function useEdition() {
+  return useQuery<EditionResponse>({
+    queryKey: queryKeys.edition,
+    queryFn: async () => (await apiClient.get<EditionResponse>('/edition')).data,
+    staleTime: 5 * 60_000,
+    retry: 1,
+  });
+}
+
+// Convenience: returns true iff the named feature is unlocked. Defaults
+// to false (locked) on loading/error so we never accidentally show a Pro
+// feature to a Free user during a network blip.
+export function useProFeature(feature: ProFeatureKey): boolean {
+  const { data } = useEdition();
+  return Boolean(data?.features?.[feature]?.unlocked);
+}
+
+// ── Audit log ────────────────────────────────────────────────────────────────
+// Pro-gated server-side. The hook still runs on Free; it just gets a 402.
+// Page-level UI swaps in the upgrade prompt based on useProFeature('audit-log').
+
+export type AuditQueryParams = {
+  entity_type?: string;
+  action?: string;
+  days?: number;
+  limit?: number;
+};
+
+export type AuditEvent = {
+  id: string;
+  created_at: string;
+  action: string;
+  entity_type: string;
+  entity_id: string | null;
+  org_id: string | null;
+  actor_user_id: string | null;
+  actor_email: string | null;
+  request_id: string | null;
+  client_ip: string | null;
+  extra: Record<string, unknown> | null;
+};
+
+export function useAuditEvents(params: AuditQueryParams, enabled: boolean = true) {
+  return useQuery<AuditEvent[]>({
+    queryKey: queryKeys.audit(params),
+    queryFn: async () => (await apiClient.get<AuditEvent[]>('/audit', { params })).data,
+    enabled,
+    staleTime: 10_000,
+  });
+}
 
 // Polled live so the sidebar badge stays close-to-real-time. 8s is the
 // sweet spot — fast enough that you see a build start, slow enough to

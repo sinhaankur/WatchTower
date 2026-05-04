@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import apiClient from '@/lib/api';
+import { useProFeature } from '@/hooks/queries';
+import { ProLock } from '@/components/ProLock';
 
 type AuditEvent = {
   id: string;
@@ -63,7 +65,14 @@ export default function AuditLog() {
   const [search, setSearch] = useState('');
   const [expanded, setExpanded] = useState<string | null>(null);
 
+  // Pro gate. The /api/audit endpoint returns 402 on Free tier — we don't
+  // bother fetching from it at all if we know the user can't see results.
+  // Avoids a useless 402 in the network tab and lets <ProLock> render
+  // immediately instead of after a fetch round-trip.
+  const isPro = useProFeature('audit-log');
+
   useEffect(() => {
+    if (!isPro) return;
     let cancelled = false;
     setLoading(true);
     setError(null);
@@ -81,14 +90,14 @@ export default function AuditLog() {
         if (!cancelled) {
           const msg = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail
             ?? 'Failed to load audit log';
-          setError(msg);
+          setError(typeof msg === 'string' ? msg : JSON.stringify(msg));
         }
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
     return () => { cancelled = true; };
-  }, [action, entityType, days]);
+  }, [action, entityType, days, isPro]);
 
   const filtered = useMemo(() => {
     if (!search.trim()) return events;
@@ -100,6 +109,28 @@ export default function AuditLog() {
       (e.request_id ?? '').toLowerCase().includes(s)
     );
   }, [events, search]);
+
+  // Free tier: render the upsell card and stop. Header still shows so the
+  // page identity is consistent (user clicked "Audit Log" in the nav and
+  // sees an Audit Log page, not a generic paywall).
+  if (!isPro) {
+    return (
+      <div className="flex-1 overflow-auto bg-slate-50">
+        <header
+          className="px-4 sm:px-6 lg:px-8 py-4 border-b"
+          style={{ borderColor: 'hsl(var(--border-soft))' }}
+        >
+          <h1 className="text-lg font-semibold text-slate-900">Audit Log</h1>
+          <p className="text-xs text-slate-600 mt-0.5">
+            Append-only record of who changed what, scoped to your organization.
+          </p>
+        </header>
+        <main className="px-4 sm:px-6 lg:px-8 py-8 max-w-3xl mx-auto w-full">
+          <ProLock feature="audit-log" />
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="flex-1 overflow-auto bg-slate-50">

@@ -232,6 +232,20 @@ The container-update service searches for `watchtower.yml` in this order: `/etc/
 
 `.dev/` (git-ignored) is the local dev state directory. `api/runtime.py` writes `watchtower-service.{pid,log}` and `terminal-audit.log.enc` (Fernet-encrypted command history) here. `run.sh` separately writes `/tmp/watchtower-{api,web}.log`. Don't commit anything from `.dev/`.
 
+### License tier (Free / Pro) — `watchtower/api/edition.py`
+
+WatchTower ships open-core. The deploy/run-locally/integrations core is free forever. Team-collab, observability, HA, and SSO features are gated behind a Pro tier. The current implementation reads `WATCHTOWER_TIER` env (`free` | `pro`, default `free`) and exposes the result via `GET /api/edition`. When billing integration lands (Stripe / license keys), this becomes a DB lookup against the validated license — same gate function, different source — and existing routes don't change.
+
+**Adding a Pro feature** (3 steps, no exceptions):
+
+1. **Register the feature key** in `PRO_FEATURES` in `watchtower/api/edition.py`. The dict entry is the public contract — frontend reads `name` + `description` for the upsell card.
+2. **Gate the route** with `Depends(require_pro("feature-key"))`. Returns `402 Payment Required` with `{tier, feature, feature_name, feature_description, upgrade_url, message}` on Free. The frontend uses the structured detail to render a feature-specific upsell, not a generic paywall.
+3. **Wrap the page UI** with `<ProLock feature="feature-key">` (in `web/src/components/ProLock.tsx`). Use `useProFeature("feature-key")` to short-circuit the component before any data fetch — avoids a useless 402 in the network tab and renders the lock immediately.
+
+The TypeScript hook (`useEdition()`, `useProFeature()` in `web/src/hooks/queries.ts`) caches the tier for 5 minutes — tier doesn't flip mid-session in any normal flow, and refetching on every mount would mean every page round-trips `/edition` before deciding what to render. Defaults to `false` (locked) on loading/error so we never accidentally show a Pro feature to a Free user during a network blip.
+
+**Tests for Pro-gated routes** must `monkeypatch.setenv("WATCHTOWER_TIER", "pro")` to exercise the unlocked path, and a separate test should hit the route on Free to confirm the 402 contract still holds. See `tests/test_audit.py::test_audit_read_returns_402_on_free_tier` for the pattern.
+
 ## Things that bite
 
 - **Electron mode skips the run.sh-started backend.** When `MODE=desktop`, `run.sh` *kills* anything on port 8000 and lets Electron start its own. Don't add backend-start logic to desktop mode without coordinating with `desktop/main.js`.
