@@ -9,6 +9,26 @@ Curated, human-friendly history of WatchTower releases. Auto-generated GitHub Re
 
 ---
 
+## 1.12.1 — Critical stability fix: per-arch DMG/AppImage/EXE were overwriting each other
+
+**This was the bug behind v1.12.0's `ModuleNotFoundError: pydantic_core._pydantic_core` on Mac**, and the same hazard existed on every platform (it's also why Linux x64's smoke test failed in 1.11.0).
+
+### Root cause
+`desktop/package.json` declared `mac.target.arch: ["x64", "arm64"]` (and analogous per-platform arrays for Linux and Windows). Despite the CI matrix passing `--mac --arm64` or `--mac --x64` to electron-builder per matrix entry, the package.json arch list **adds to** the build set instead of overriding it. So:
+- The Mac arm64 matrix entry built the arm64 DMG (with arm64 Python bundle ✓) **and** the x64 DMG (with arm64 Python bundle ✗).
+- The Mac x64 matrix entry built the x64 DMG (with x64 Python bundle ✓) **and** the arm64 DMG (with x64 Python bundle ✗).
+- Both matrix entries upload to the same GitHub Release, with `overwrite published file` semantics. Whichever job finished second overwrote the other's correct DMG with its wrong-arch one.
+- Result: every published DMG had a 50/50 chance of containing the wrong-arch Python bundle. When the .app's launcher ran `python -m uvicorn ...`, the bundled Python loaded the x86_64 `_pydantic_core.so` on Apple Silicon (or vice versa), which can't be loaded → `ModuleNotFoundError`.
+
+The same overwrite hazard affected Linux (3-way: x64, arm64, armv7l) and Windows (2-way: x64, arm64).
+
+### Fix
+- `mac.target`, `linux.target`, `win.target` simplified to bare target name lists (`["dmg", "zip"]`, `["AppImage", "deb"]`, `["nsis", "zip"]`). Without an `arch` field, electron-builder uses **only** the `--x64` / `--arm64` / `--armv7l` flag passed via the CI matrix's `eb_args`. Each matrix entry now produces exactly one arch's worth of artifacts.
+- **Self-healing fallback in `desktop/main.js`:** `resolvePython()` now runs `probePythonCandidate()` against the bundled Python before returning it. If the bundle is broken (any C-extension dep can't import), it falls through to the dev-clone `.venv` → `WATCHTOWER_PYTHON` env override → pipx Python → system Python chain. Means a partial/broken bundle no longer permanently breaks the app — the .app keeps working with whatever other Python the user has, and the diagnostic log records `python.bundled-broken` so we can see if the regression ever recurs.
+
+### Migration / impact
+v1.12.0 Mac users hit the broken bundle. v1.11.0 Linux x64 users would have hit it too (smoke test caught it). v1.12.1 ships intact bundles for every (platform × arch) combo and won't lose its way even if a future release somehow ships a broken one.
+
 ## 1.12.0 — License tier infrastructure + Pro feature gating + critical 1.11 fixes
 
 Two distinct workstreams in one release:
