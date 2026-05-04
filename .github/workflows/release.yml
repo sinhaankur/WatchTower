@@ -103,8 +103,20 @@ jobs:
             eb_args: --mac --x64
             artifact_glob: "desktop/dist/*x64*"
             extra_apt: ""
+          # windows-x64: bundle_target deliberately empty as of 1.12.3.
+          # The python-build-standalone cross-install path runs but takes
+          # 45+ min on Windows runners (Defender scanning every wheel
+          # extract on NTFS) and on the v1.12.2 attempt didn't finish
+          # within 45 min — same effective hang shape as v1.12.1's
+          # native-install pip self-replace deadlock, just a different
+          # cause. Until we move the bundle build off the Windows
+          # runner (e.g. run cross-install on Linux + upload artifact),
+          # Windows x64 users fall back to the system/pipx Python path
+          # in main.js's resolvePython(), same as windows-arm64 and
+          # linux-armv7l (which never had a PBS target). Mac + Linux x64
+          # + Linux arm64 still get the bundled Python.
           - os: windows-latest
-            bundle_target: "windows-x64"
+            bundle_target: ""
             eb_args: --win --x64
             artifact_glob: "desktop/dist/*x64*"
             extra_apt: ""
