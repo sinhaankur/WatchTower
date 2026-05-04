@@ -23,6 +23,7 @@ from . import (
     builds,
     cloudflare,
     deployments,
+    edition,
     enterprise,
     envvars,
     me,
@@ -339,6 +340,7 @@ app.include_router(audit.router)
 app.include_router(me.router)
 app.include_router(templates.router)
 app.include_router(cloudflare.router)
+app.include_router(edition.router)
 
 # ── Serve React SPA from web/dist (same-origin, no proxy needed) ──────────────
 # Resolution order:

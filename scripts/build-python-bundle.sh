@@ -93,15 +93,11 @@ if [ ! -x "$PYTHON_BIN" ]; then
 fi
 
 echo "==> Installing WatchTower + dependencies into bundled Python"
-echo "    pip --version:"
-"$PYTHON_BIN" -m pip --version
 
-# Cross-arch install support: when the host CPU doesn't match TARGET (e.g.
-# building a Mac x64 bundle on an Apple Silicon runner), we can't run the
-# bundled Python natively. Instead, install dependencies via the host's
-# Python with --target + --platform + --only-binary so pip downloads the
-# right-arch wheels without executing them. The watchtower module itself
-# is pure Python so it installs cleanly either way.
+# Detect host arch FIRST so we know whether the bundled Python can even
+# execute — calling `python -m pip --version` on a cross-arch binary
+# fails with "cannot execute binary file: Exec format error" before we
+# reach the cross-install branch below.
 HOST_TARGET=""
 case "$(uname -s)-$(uname -m)" in
   Darwin-arm64)  HOST_TARGET="darwin-arm64" ;;
@@ -110,6 +106,17 @@ case "$(uname -s)-$(uname -m)" in
   Linux-aarch64) HOST_TARGET="linux-arm64" ;;
 esac
 
+if [ "$TARGET" = "$HOST_TARGET" ] && [ -n "$HOST_TARGET" ]; then
+  echo "    bundled pip --version:"
+  "$PYTHON_BIN" -m pip --version
+fi
+
+# Cross-arch install support: when the host CPU doesn't match TARGET (e.g.
+# building a Mac x64 bundle on an Apple Silicon runner), we can't run the
+# bundled Python natively. Instead, install dependencies via the host's
+# Python with --target + --platform + --only-binary so pip downloads the
+# right-arch wheels without executing them. The watchtower module itself
+# is pure Python so it installs cleanly either way.
 if [ "$TARGET" != "$HOST_TARGET" ] && [ -n "$HOST_TARGET" ]; then
   echo "==> Cross-install: building for $TARGET on $HOST_TARGET host"
   case "$TARGET" in
@@ -145,9 +152,43 @@ else
   "$PYTHON_BIN" -m pip install --no-cache-dir --no-deps "$REPO_ROOT"
 fi
 
+echo "==> Copying alembic migrations into bundled watchtower package"
+# The watchtower package needs the alembic/ directory at runtime to
+# upgrade fresh databases. pyproject.toml's `include = ["watchtower*"]`
+# only picks up the watchtower module itself; alembic/ lives at repo
+# root and is missed by every install path that goes through pip.
+# Copy it INSIDE the installed watchtower module so _alembic_config()
+# finds it via Path(__file__).parent / 'alembic'. This is the path the
+# new fallback in database.py looks at first.
+if [ "$TARGET" = "windows-x64" ]; then
+  WT_PKG_DIR="$OUT_DIR/python/Lib/site-packages/watchtower"
+else
+  PYV="${PYTHON_VERSION%.*}"
+  WT_PKG_DIR="$OUT_DIR/python/lib/python${PYV}/site-packages/watchtower"
+fi
+if [ ! -d "$WT_PKG_DIR" ]; then
+  echo "ERROR: watchtower package not found at $WT_PKG_DIR — install above must have failed silently" >&2
+  exit 1
+fi
+rm -rf "$WT_PKG_DIR/alembic"
+cp -R "$REPO_ROOT/alembic" "$WT_PKG_DIR/alembic"
+echo "    Copied alembic/ ($(du -sh "$WT_PKG_DIR/alembic" | awk '{print $1}'))"
+
 if [ "$TARGET" = "$HOST_TARGET" ]; then
-  echo "==> Verifying watchtower importable from bundled Python"
-  "$PYTHON_BIN" -c "import watchtower, sys; print(f'watchtower {watchtower.__version__} OK on Python {sys.version.split()[0]}')"
+  echo "==> Verifying watchtower importable + alembic discoverable from bundled Python"
+  # Run from a neutral cwd so Python doesn't shadow the bundled
+  # watchtower with the source-tree one (sys.path puts cwd first).
+  # `cd /tmp` is cross-platform enough for Mac/Linux (Windows uses a
+  # different temp path but this verify-step only runs on native-arch
+  # builds; Windows is cross-installed from Linux/Mac runners and skips).
+  (cd /tmp && "$PYTHON_BIN" -c "
+import watchtower, sys
+from pathlib import Path
+pkg = Path(watchtower.__file__).parent
+env_py = pkg / 'alembic' / 'env.py'
+assert env_py.is_file(), f'alembic/env.py missing in bundle at {env_py}'
+print(f'watchtower {watchtower.__version__} OK on Python {sys.version.split()[0]} (alembic env.py at {env_py})')
+")
 else
   echo "==> Skipping import verification (cross-arch build — bundled Python can't run on host)"
 fi
