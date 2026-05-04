@@ -9,6 +9,28 @@ Curated, human-friendly history of WatchTower releases. Auto-generated GitHub Re
 
 ---
 
+## 1.12.4 — Bundled Python restored on Windows x64 (built on Linux, packaged on Windows)
+
+Restores the seamless "download .exe, run, done" install experience for Windows x64 that 1.12.3 had to defer. Mac and Linux already had this since 1.11.
+
+### Why a different pattern for Windows
+v1.11–1.12.3 tried to build the in-app Python bundle on the windows-latest runner during the desktop matrix step. Two failure modes hit us:
+- **v1.11.0 → v1.12.1**: native install via `python.exe -m pip install --upgrade pip` deadlocked indefinitely because Windows file locking blocks pip from replacing its own pip.exe while running.
+- **v1.12.2**: rerouted to cross-install via host `python3 -m pip install --target --platform win_amd64 --only-binary=:all:`. This RUNS on Windows, but takes 45+ min for ~3000 wheel-extracted files (Defender scanning each on NTFS). The CI run timed out or got cancelled at the 45-min wall every time.
+
+The same `pip install --target` finishes in ~3 min on a Linux runner. So 1.12.4 splits the work: build the bundle on Linux, ship it as a CI artifact, download it into the windows-latest desktop job before electron-builder packages the .exe.
+
+### Workflow changes (`.github/workflows/release.yml`)
+- **New job `build-windows-bundle`** runs on `ubuntu-latest`, calls `scripts/build-python-bundle.sh TARGET=windows-x64`, uploads `desktop/python-bundle/python/` as the artifact `windows-x64-python-bundle` with `if-no-files-found: error` (so a silent empty upload fails loudly instead of shipping an empty bundle).
+- **`build-desktop` matrix gains `bundle_source`** with three values:
+  - `inline` — Mac arm64/x64 + Linux x64/arm64. Build on the matrix runner. Same as before.
+  - `artifact` — windows-x64. Downloads from `build-windows-bundle`, then a sanity-check step verifies `python.exe` + `_pydantic_core.pyd` are present before electron-builder runs.
+  - `skip` — linux-armv7l, windows-arm64. No PBS target exists for these. Placeholder dir, system/pipx fallback at runtime.
+- `build-desktop` now `needs: [create-release, build-windows-bundle]`. The Linux bundle build runs in parallel with `create-release` so it usually doesn't extend the critical path; worst case adds ~3 min.
+
+### What this means for users
+Windows x64 users now get the same one-step install experience as Mac/Linux: download `WatchTower-1.12.4-win-x64.exe`, run, dashboard appears. No `pipx install watchtower-podman` required. (Windows arm64 still falls back to system/pipx — no python-build-standalone target exists for that arch.)
+
 ## 1.12.3 — Defer bundled Python on Windows so the win-x64.exe actually ships
 
 v1.12.2 attempted to fix the missing `win-x64.exe` by rerouting the bundle script through the cross-install path (host `python3 -m pip install --target --platform win_amd64 --only-binary=:all:`). The cross-install **runs** on Windows but is impractically slow — 45+ min on the GitHub Actions windows-latest runner before being cancelled, same effective shape as v1.12.1's native-install hang. Probable cause: Defender scanning each wheel-extracted file on NTFS (a single `pip install --target` for our requirements.txt fans out to ~3000 small files; Linux runners finish the same install in ~3 min).

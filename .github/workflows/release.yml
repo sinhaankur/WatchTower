@@ -60,20 +60,75 @@ jobs:
           draft: false
           prerelease: ${{ contains(github.ref_name, '-') }}
 
+  # ── 2.5. Build the windows-x64 Python bundle on a Linux runner ──────────────
+  # Why a separate job? Cross-installing win_amd64 wheels via
+  # `pip install --target --platform win_amd64 --only-binary=:all:` is
+  # ~3 min on a Linux runner but 45+ min on a windows-latest runner
+  # (Defender scanning each of ~3000 small extracted files on NTFS).
+  # v1.12.1 hung at 80+ min on the windows-x64 bundle step (native
+  # install, pip self-replace deadlock). v1.12.2 rerouted to
+  # cross-install but still hit the same 45+ min wall on Windows IO.
+  # v1.12.3 deferred bundling on windows-x64 entirely (system/pipx
+  # fallback). v1.12.4+ fixes it by building the bundle here on Linux,
+  # uploading as an artifact, and downloading it in the windows-x64
+  # desktop matrix entry before electron-builder runs.
+  #
+  # Mac/Linux x64/arm64 still build their bundles inline in the desktop
+  # matrix — those finish in ~3 min on their native runners.
+  build-windows-bundle:
+    name: Build windows-x64 Python bundle (Linux)
+    needs: create-release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Cross-install windows-x64 bundle
+        run: |
+          chmod +x scripts/build-python-bundle.sh
+          TARGET=windows-x64 ./scripts/build-python-bundle.sh
+          # Sanity: pydantic_core's win_amd64 .pyd should be present.
+          find desktop/python-bundle/python -name '_pydantic_core*' | head -3
+        shell: bash
+
+      - name: Upload bundle artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-x64-python-bundle
+          path: desktop/python-bundle/python
+          retention-days: 1
+          # `if-no-files-found: error` so a silent empty upload fails
+          # loudly instead of silently shipping a Windows .exe with no
+          # bundled Python (the 1.12.3 regression we're fixing).
+          if-no-files-found: error
+
   # ── 3. Build desktop installers (parallel matrix) ───────────────────────────
   build-desktop:
     name: Desktop — ${{ matrix.os }}
-    needs: create-release
+    needs: [create-release, build-windows-bundle]
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        # Each entry's `bundle_target` selects which python-build-standalone
-        # archive to download for the in-app Python bundle (1.11+). Empty
-        # bundle_target = no bundle for that arch; the .app's launcher
-        # falls back to system/pipx Python (legacy 1.10.x behavior).
-        # Currently no PBS target exists for armv7l Linux or arm64
-        # Windows, so those keep the legacy fallback path.
+        # `bundle_source` controls how the in-app Python bundle gets into
+        # this matrix entry's desktop/python-bundle/python/:
+        #   - "inline":   Build it here, on this runner (Mac + Linux x64/arm64).
+        #                 Cross-install via build-python-bundle.sh — fast on
+        #                 native or near-native (matching) hosts.
+        #   - "artifact": Download it from the build-windows-bundle job
+        #                 (windows-x64 only). Built on a Linux runner where
+        #                 pip is fast — see build-windows-bundle's comment
+        #                 for the full backstory (v1.12.1 → 1.12.3 saga).
+        #   - "skip":     No PBS target exists for this arch (linux-armv7l,
+        #                 windows-arm64). Drop a placeholder so
+        #                 electron-builder's extraResources doesn't error
+        #                 out; main.js falls back to system/pipx Python.
+        #
+        # `bundle_target` is only used when bundle_source = "inline" — it
+        # picks the python-build-standalone download for the matrix arch.
         # Mac is split into two entries (one per arch) so each DMG ships
         # its own arch-correct Python bundle — a single matrix entry
         # building both arches couldn't disambiguate which bundle goes
@@ -81,47 +136,45 @@ jobs:
         include:
           - os: ubuntu-latest
             bundle_target: "linux-x64"
+            bundle_source: "inline"
             eb_args: --linux AppImage deb --x64
             artifact_glob: "desktop/dist/*x64*"
           - os: ubuntu-latest
             bundle_target: "linux-arm64"
+            bundle_source: "inline"
             eb_args: --linux AppImage deb --arm64
             artifact_glob: "desktop/dist/*arm64*"
             extra_apt: "gcc-aarch64-linux-gnu"
           - os: ubuntu-latest
             bundle_target: ""
+            bundle_source: "skip"
             eb_args: --linux AppImage deb --armv7l
             artifact_glob: "desktop/dist/*armv7l*"
             extra_apt: "gcc-arm-linux-gnueabihf"
           - os: macos-14
             bundle_target: "darwin-arm64"
+            bundle_source: "inline"
             eb_args: --mac --arm64
             artifact_glob: "desktop/dist/*arm64*"
             extra_apt: ""
           - os: macos-14
             bundle_target: "darwin-x64"
+            bundle_source: "inline"
             eb_args: --mac --x64
             artifact_glob: "desktop/dist/*x64*"
             extra_apt: ""
-          # windows-x64: bundle_target deliberately empty as of 1.12.3.
-          # The python-build-standalone cross-install path runs but takes
-          # 45+ min on Windows runners (Defender scanning every wheel
-          # extract on NTFS) and on the v1.12.2 attempt didn't finish
-          # within 45 min — same effective hang shape as v1.12.1's
-          # native-install pip self-replace deadlock, just a different
-          # cause. Until we move the bundle build off the Windows
-          # runner (e.g. run cross-install on Linux + upload artifact),
-          # Windows x64 users fall back to the system/pipx Python path
-          # in main.js's resolvePython(), same as windows-arm64 and
-          # linux-armv7l (which never had a PBS target). Mac + Linux x64
-          # + Linux arm64 still get the bundled Python.
+          # windows-x64: bundle is built on a Linux runner (build-windows-bundle
+          # job above) and downloaded here as an artifact. Restores the
+          # bundled-Python install experience that 1.12.3 had to defer.
           - os: windows-latest
-            bundle_target: ""
+            bundle_target: "windows-x64"
+            bundle_source: "artifact"
             eb_args: --win --x64
             artifact_glob: "desktop/dist/*x64*"
             extra_apt: ""
           - os: windows-latest
             bundle_target: ""
+            bundle_source: "skip"
             eb_args: --win --arm64
             artifact_glob: "desktop/dist/*arm64*"
             extra_apt: ""
@@ -190,15 +243,16 @@ jobs:
           exit 1
         shell: bash
 
-      # ── Build the bundled Python (1.11+) ───────────────────────────────────
-      # Downloads python-build-standalone for the matrix arch, installs
-      # watchtower + dependencies into it, drops the result at
-      # desktop/python-bundle/python/ where electron-builder picks it up
-      # via extraResources. Skipped for arches without a PBS target
-      # (armv7l Linux, arm64 Windows) — those .apps fall back to the
-      # legacy pipx-Python launcher path.
-      - name: Build bundled Python (${{ matrix.bundle_target }})
-        if: matrix.bundle_target != ''
+      # ── Bundled Python: three branches based on bundle_source ──────────────
+      # Mac/Linux x64+arm64: build inline on the matrix runner (fast on
+      # native/matching hosts).
+      # Windows x64: download the bundle built by the build-windows-bundle
+      # job above (built on Linux because Windows runners are 15x slower
+      # at the same pip --target install — see that job's comment).
+      # Linux armv7l + Windows arm64: no PBS target exists, drop a
+      # placeholder. main.js falls back to system/pipx Python.
+      - name: Build bundled Python inline (${{ matrix.bundle_target }})
+        if: matrix.bundle_source == 'inline'
         run: |
           # The script's own pip-cross-install path needs a working host
           # Python — provided by setup-python above.
@@ -207,8 +261,28 @@ jobs:
           ls -la desktop/python-bundle/python | head -5
         shell: bash
 
+      - name: Download bundled Python from artifact (windows-x64)
+        if: matrix.bundle_source == 'artifact'
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-x64-python-bundle
+          path: desktop/python-bundle/python
+
+      - name: Sanity-check downloaded windows-x64 bundle
+        if: matrix.bundle_source == 'artifact'
+        # Belt-and-suspenders: confirm the artifact actually contains
+        # python.exe + a win_amd64 pydantic_core .pyd. If the upload
+        # silently produced an empty bundle, this fails fast here
+        # rather than letting electron-builder package a broken .exe
+        # (the 1.12.3 regression we're undoing was exactly that
+        # failure mode going undetected).
+        run: |
+          ls desktop/python-bundle/python/python.exe
+          find desktop/python-bundle/python -name '_pydantic_core*' | head -3
+        shell: bash
+
       - name: Create empty Python bundle placeholder (no PBS target for this arch)
-        if: matrix.bundle_target == ''
+        if: matrix.bundle_source == 'skip'
         # extraResources in package.json points at desktop/python-bundle/python.
         # When we skip the real bundle (armv7l Linux, arm64 Windows — no
         # PBS target exists), electron-builder still needs the dir to
