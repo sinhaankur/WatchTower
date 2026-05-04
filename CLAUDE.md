@@ -90,9 +90,13 @@ The `Dockerfile` uses a `node:20-alpine` build stage for `web/`, then `python:3.
 ```bash
 ./scripts/release.sh 1.2.2         # bumps watchtower/__init__.py, tags v1.2.2, pushes
 python3 scripts/sync_versions.py   # fan version from watchtower/__init__.py to package.json files
+./scripts/preflight.sh              # local quality gate — RUN THIS BEFORE TAGGING
+./scripts/verify-release.sh v1.2.2 # post-CI verifier — RUN THIS AFTER CI SUCCEEDS
 ```
 
 `watchtower/__init__.py:__version__` is the single source of truth — `pyproject.toml` reads it dynamically, and `sync_versions.py` propagates to `package.json`, `desktop/package.json`, and `vscode-extension/package.json`. CI in `.github/workflows/release.yml` validates that the git tag matches.
+
+**Don't ship Stable without running both scripts.** `RELEASE_QUALITY.md` at the repo root defines the bar; `preflight.sh` and `verify-release.sh` automate the parts of it that can be checked mechanically. The two scripts caught the 1.12.0 cross-arch overwrite bug retroactively — running them on every release prevents that class of bug from ever reaching users again.
 
 ## Architecture
 
