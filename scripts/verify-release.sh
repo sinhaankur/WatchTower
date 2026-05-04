@@ -60,6 +60,30 @@ else
   PASS "Asset count $COUNT in expected range (25-30)"
 fi
 
+# Per-platform installer presence. Catches the v1.12.1 case where the
+# windows-x64 matrix entry hung on `python.exe -m pip install --upgrade
+# pip` (Windows file lock) so the .exe never got published — total
+# count was 22 (still close to 25, fuzzy-match wouldn't always catch
+# this, but a named-asset assertion always will).
+HEAD "Per-platform installer presence"
+VERSION_NUM="${TAG#v}"
+EXPECTED_INSTALLERS=(
+  "WatchTower-${VERSION_NUM}-mac-arm64.dmg"
+  "WatchTower-${VERSION_NUM}-mac-x64.dmg"
+  "WatchTower-${VERSION_NUM}-linux-x86_64.AppImage"
+  "WatchTower-${VERSION_NUM}-linux-arm64.AppImage"
+  "WatchTower-${VERSION_NUM}-linux-armv7l.AppImage"
+  "WatchTower-${VERSION_NUM}-win-x64.exe"
+  "WatchTower-${VERSION_NUM}-win-arm64.exe"
+)
+for asset in "${EXPECTED_INSTALLERS[@]}"; do
+  if echo "$ASSET_NAMES" | grep -qx "$asset"; then
+    PASS "$asset present"
+  else
+    FAIL "$asset MISSING — that platform's matrix job didn't publish"
+  fi
+done
+
 # ──────────────────────────────────────────────────────────────────────────
 # The arch-correctness check — this is the one that would have caught
 # the 1.12.0 Mac DMG cross-contamination. For each platform/arch combo we
