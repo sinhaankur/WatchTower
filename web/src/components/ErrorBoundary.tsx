@@ -32,7 +32,7 @@ export class ErrorBoundary extends Component<Props, State> {
   componentDidCatch(error: Error, info: ErrorInfo): void {
     // Surface the failure to the console so devtools shows the stack.
     // (When metrics arrive, replace this with a real reporter.)
-    // eslint-disable-next-line no-console
+     
     console.error('[ErrorBoundary]', error, info.componentStack);
   }
 

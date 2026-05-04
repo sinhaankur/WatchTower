@@ -177,7 +177,6 @@ const Applications = () => {
     void loadProjects();
     const interval = setInterval(() => void loadProjects(), 15_000);
     return () => clearInterval(interval);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
