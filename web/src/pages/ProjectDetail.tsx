@@ -1355,7 +1355,8 @@ function DomainsTab({ projectId }: { projectId: string }) {
     }
   };
 
-  useEffect(() => { void load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [projectId]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { void load(); }, [projectId]);
 
   const addDomain = async () => {
     const d = newDomain.trim().toLowerCase();
@@ -1596,7 +1597,8 @@ function RunLocallyCard({ projectId }: { projectId: string }) {
     }
   };
 
-  useEffect(() => { void refresh(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [projectId]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { void refresh(); }, [projectId]);
 
   const start = async () => {
     setBusy(true);
