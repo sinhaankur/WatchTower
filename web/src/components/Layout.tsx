@@ -1,10 +1,11 @@
 import { ReactNode, useState, useEffect, type ReactElement } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import BrandLogo from './BrandLogo';
 import TitleBar from './TitleBar';
 import { PageTransition } from './PageTransition';
-import { useUpdateCheck, useMe, useActiveDeploymentCount } from '@/hooks/queries';
+import { useUpdateCheck, useActiveDeploymentCount } from '@/hooks/queries';
 import { CommandPalette, openCommandPalette } from './CommandPalette';
+import { UserMenu } from './UserMenu';
 
 const UPDATE_BANNER_DISMISSED_KEY = 'watchtower:updateBannerDismissed';
 
@@ -298,8 +299,6 @@ function NavLink({ item, pathname, onClick, rail, badge }: NavLinkProps) {
 // ── Layout ────────────────────────────────────────────────────────────────────
 export default function Layout({ children }: { children: ReactNode }) {
   const { pathname } = useLocation();
-  const navigate = useNavigate();
-  const hasSessionToken = Boolean(localStorage.getItem('authToken'));
 
   // Three-state sidebar: 'full' (text + icons), 'rail' (icons only,
   // ~56px wide, label as tooltip), or 'hidden' (no sidebar).
@@ -325,9 +324,7 @@ export default function Layout({ children }: { children: ReactNode }) {
 
   // Environment badge — pulled once at mount. Surfaces when this is
   // NOT a boring "desktop + production" combo so the user can tell at
-  // a glance which backend / DB they're pointing at. Tonight's repeat
-  // confusion between the .app and the dev clone is exactly what this
-  // catches.
+  // a glance which backend / DB they're pointing at.
   const [envInfo, setEnvInfo] = useState<{ env: string; mode: string; insecure_dev_auth: boolean } | null>(null);
   useEffect(() => {
     let cancelled = false;
@@ -337,22 +334,8 @@ export default function Layout({ children }: { children: ReactNode }) {
       .catch(() => { /* non-fatal — just hide the badge */ });
     return () => { cancelled = true; };
   }, []);
-  const { data: me, isLoading: meLoading } = useMe();
   const { data: activeDeploys } = useActiveDeploymentCount();
   const activeBuildCount = activeDeploys?.active ?? 0;
-
-  const handleLogout = () => {
-    // Clear the saved session AND set a sentinel so Login.tsx's auto-login
-    // doesn't immediately re-authenticate from VITE_API_TOKEN. Without the
-    // sentinel, sign-out was a no-op in dev / Electron — Login mounted,
-    // saw the env-baked token, and bounced the user straight back to the
-    // dashboard. The sentinel persists across reloads/launches; it's
-    // cleared on the next deliberate sign-in (GitHub OAuth, guest, manual
-    // token), so signing in again just works.
-    localStorage.setItem('wt:explicitlySignedOut', '1');
-    localStorage.removeItem('authToken');
-    navigate('/login');
-  };
 
   // Wire badge counts per nav path. Right now we only badge
   // /applications with the active deployment count, but this is the
@@ -439,25 +422,12 @@ export default function Layout({ children }: { children: ReactNode }) {
         </div>
       </nav>
 
-      {/* Rail-mode footer: just the avatar + version dot. Full identity
-          card and version line render in 'full' mode below. */}
+      {/* Rail-mode footer: avatar dropdown trigger + update dot. The
+          UserMenu component handles the click-to-open menu (account
+          link, sign out). */}
       {rail && (
         <div className="px-2 py-3 border-t flex flex-col items-center gap-2" style={{ borderColor: 'hsl(var(--border-soft))' }}>
-          {hasSessionToken && me?.avatar_url ? (
-            <img
-              src={me.avatar_url}
-              alt={me?.name ?? me?.email ?? 'Account'}
-              title={me?.email ?? me?.name ?? 'Account'}
-              className="w-7 h-7 rounded-full border border-slate-200"
-            />
-          ) : hasSessionToken ? (
-            <div
-              title={me?.email ?? me?.name ?? 'Account'}
-              className="w-7 h-7 rounded-full bg-slate-200 text-slate-600 text-xs font-semibold flex items-center justify-center uppercase"
-            >
-              {(me?.name ?? me?.email ?? '?').slice(0, 1)}
-            </div>
-          ) : null}
+          <UserMenu rail />
           {updateData?.has_update && (
             <button
               type="button"
@@ -471,80 +441,10 @@ export default function Layout({ children }: { children: ReactNode }) {
       )}
 
       <div className={`px-3 py-3 border-t ${rail ? 'hidden' : ''}`} style={{ borderColor: 'hsl(var(--border-soft))' }}>
-        {hasSessionToken ? (
-          <>
-            {/* Identity badge — who am I, in which org */}
-            {meLoading && !me ? (
-              <div className="flex items-center gap-2 px-2 py-2 rounded-lg bg-white border border-border mb-2 animate-pulse">
-                <div className="w-7 h-7 rounded-full bg-slate-200 shrink-0" />
-                <div className="min-w-0 flex-1 space-y-1">
-                  <div className="h-2.5 w-24 bg-slate-200 rounded" />
-                  <div className="h-2 w-32 bg-slate-100 rounded" />
-                </div>
-              </div>
-            ) : (
-            <div className="flex items-center gap-2 px-2 py-2 rounded-lg bg-white border border-border mb-2">
-              {me?.avatar_url ? (
-                <img
-                  src={me.avatar_url}
-                  alt=""
-                  className="w-7 h-7 rounded-full border border-slate-200 shrink-0"
-                />
-              ) : (
-                <div className="w-7 h-7 rounded-full bg-slate-200 text-slate-600 text-xs font-semibold flex items-center justify-center shrink-0 uppercase">
-                  {(me?.name ?? me?.email ?? '?').slice(0, 1)}
-                </div>
-              )}
-              <div className="min-w-0 flex-1">
-                <p
-                  className="text-[11px] font-medium text-slate-900 truncate flex items-center gap-1"
-                  title={me?.email ?? ''}
-                >
-                  <span className="truncate">
-                    {me?.name ?? me?.email ?? (me?.is_guest ? 'Guest' : 'Signed in')}
-                  </span>
-                  {me?.is_github_authenticated && (
-                    <svg
-                      viewBox="0 0 16 16"
-                      width="11"
-                      height="11"
-                      fill="currentColor"
-                      className="shrink-0 text-slate-700"
-                      aria-label="Signed in with GitHub"
-                    >
-                      <title>Signed in with GitHub</title>
-                      <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z" />
-                    </svg>
-                  )}
-                </p>
-                <p className="text-[10px] text-slate-500 truncate" title={me?.org_name ?? ''}>
-                  {me?.is_guest
-                    ? 'Guest mode · sign in for full features'
-                    : me?.org_name
-                      ? `${me.org_name}${me.role ? ` · ${me.role}` : ''}`
-                      : 'WatchTower'}
-                </p>
-              </div>
-            </div>
-            )}
-            {/* Team used to live here too, but it was a duplicate of
-                the SECONDARY_NAV item — sidebar footer now only carries
-                the action that doesn't fit anywhere else: Sign out. */}
-            <div className="flex justify-end px-1">
-              <button
-                type="button"
-                onClick={() => { handleLogout(); onNavClick?.(); }}
-                className="text-[11px] text-slate-600 hover:text-red-600 transition-colors"
-              >
-                Sign out
-              </button>
-            </div>
-          </>
-        ) : (
-          <Link to="/login" onClick={onNavClick} className="block text-xs text-slate-600 hover:text-red-700 transition-colors px-1">
-            Sign in with GitHub →
-          </Link>
-        )}
+        {/* Identity dropdown — single trigger that exposes account
+            settings + sign out. Replaces the old inline identity card +
+            naked "Sign out" link footer. */}
+        <UserMenu />
         {/* Version line — quiet, single line, separates from chrome with
             a thin top border. The "update available" affordance is the
             only thing meant to draw the eye when relevant. */}
