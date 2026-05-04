@@ -9,6 +9,29 @@ Curated, human-friendly history of WatchTower releases. Auto-generated GitHub Re
 
 ---
 
+## 1.13.0 — Local-first deploys + account UX polish
+
+Two threads ship together: deploy to your own laptop without SSH yak-shaving, and a real account/security page reachable from a proper user menu.
+
+### Local-node deploys: no SSH required (`watchtower/builder.py`)
+Previously, every deploy in WatchTower went through SSH+rsync — even to a node whose host was `127.0.0.1`. That meant a user evaluating WatchTower on their own laptop had to enable Remote Login, generate an SSH keypair, add it to `authorized_keys`, and ensure the node's `user` field matched a real macOS user — to deploy to themselves. New `_is_local_node()` helper detects `127.0.0.1` / `localhost` / `::1` and routes those nodes through a local-subprocess fast path:
+- **`_rsync_to_node()`**: when the target is local, drops the `-e ssh ...` flag and rsyncs to the local path directly. `mkdir -p` the destination first so a fresh node registration produces a useful error if the path isn't creatable.
+- **`_ssh_run()`**: runs the reload command via `asyncio.create_subprocess_shell` with `cwd=remote_path` — same script the user wrote for SSH (e.g. `cd /opt/app && pm2 restart api`) just runs in-process. Output prefixed `[local]` instead of `[ssh]` so deploy logs make it obvious which path ran.
+- **`check_ssh_connectivity()`**: for local nodes, replaces the meaningless "echo ok over SSH" probe with an actual write probe — `mkdir -p remote_path` + write/delete a sentinel file. The old code returned "Local node healthy" even when the deploy path was unwritable; now it tells you up front. Probe file is cleaned up so it doesn't accumulate.
+
+12 new tests in `tests/test_local_deploy.py` pin down `_is_local_node`'s classification (case-insensitive, whitespace-tolerant, IPv6 `::1`) + the writability probe behavior.
+
+### Account & security UX (`web/src/components/UserMenu.tsx`, `web/src/pages/Account.tsx`)
+The previous UI surfaced auth state as a tiny "Sign out" link buried at the bottom of the sidebar. No profile page existed, no way to inspect auth method or org membership, no "click your avatar → menu" pattern users expect from Vercel/Linear/Stripe.
+
+- **New `UserMenu` dropdown** replaces the bare identity card. Click the avatar/name to open a popover with: profile preview (avatar, name, email, org/role), "Account & security" link, "App settings" link, "Sign out". Closes on outside click, Escape, route change, window resize. Renders both rail (icon-only sidebar) and full-mode variants.
+- **New `/account` page** showing a full identity snapshot: avatar, name, email, GitHub ID, user_id, auth method, org name, role, capability matrix (✓ create projects / ✓ manage deployments / ✓ manage nodes / ✓ manage team), and a clear "Sign out" button. Card layout matches the existing settings-page visual language.
+- **Layout cleanup**: removed the duplicate inline identity-card + sign-out link in `Layout.tsx`; the sidebar footer now just renders `<UserMenu />` and the version line. Mobile drawer inherits the same behavior — no separate code path.
+
+### Migration / impact
+- Local-node deploys that previously failed with SSH errors will now Just Work as long as `remote_path` is writable by the WatchTower process user. Existing remote (non-localhost) nodes are unaffected.
+- The user menu replaces the inline identity card + sign-out link — same actions, more obvious entry point.
+
 ## 1.12.5 — Persistent login: stop logging users out on every Electron restart
 
 **Bug**: Desktop users had to re-authenticate against GitHub every time they relaunched the app — sometimes within hours of last sign-in.

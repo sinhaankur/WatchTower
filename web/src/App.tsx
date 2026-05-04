@@ -28,6 +28,7 @@ const Services             = lazy(() => import('./pages/Services'));
 const Integrations         = lazy(() => import('./pages/Integrations'));
 const Settings             = lazy(() => import('./pages/Settings'));
 const AuditLog             = lazy(() => import('./pages/AuditLog'));
+const Account              = lazy(() => import('./pages/Account'));
 const HostConnect          = lazy(() => import('./pages/HostConnect'));
 const GitHubOAuthCallback  = lazy(() => import('./pages/GitHubOAuthCallback'));
 const GitHubLoginCallback  = lazy(() => import('./pages/GitHubLoginCallback'));
@@ -126,6 +127,7 @@ function App() {
             <Route path="/team" element={<RequireAuth><Layout><TeamManagement /></Layout></RequireAuth>} />
             <Route path="/settings" element={<RequireAuth><Layout><Settings /></Layout></RequireAuth>} />
             <Route path="/audit" element={<RequireAuth><Layout><AuditLog /></Layout></RequireAuth>} />
+            <Route path="/account" element={<RequireAuth><Layout><Account /></Layout></RequireAuth>} />
             {/* Legacy redirect */}
             <Route path="/nodes" element={<Navigate to="/servers" replace />} />
             {/* Full-screen pages (wizard & oauth flow — no sidebar) */}
