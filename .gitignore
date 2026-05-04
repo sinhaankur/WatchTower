@@ -162,6 +162,9 @@ watchtower_test.db
 MoonTracker UI /
 node_modules/
 desktop/node_modules/
+# 1.11+ ships a bundled Python inside the .app — built fresh by CI
+# (scripts/build-python-bundle.sh) and ~120 MB. Never check this in.
+desktop/python-bundle/
 
 # Pre-packaged Nixpacks binaries — populated at build time by
 # desktop/scripts/download-nixpacks.py and shipped via electron-builder
