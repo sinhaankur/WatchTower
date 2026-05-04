@@ -1311,11 +1311,35 @@ function resolvePython() {
   // Resources/python/. Looking here FIRST removes the dependency on a
   // user-installed pipx venv that can vanish, get nuked, or point at a
   // different Python version. End users never have to install Python.
+  //
+  // 1.12.1+: actually probe the bundle for importability rather than
+  // trusting that the binary exists. v1.12.0 shipped a broken Mac DMG
+  // where electron-builder dropped some site-packages directories
+  // entirely (pydantic_core was missing) — the binary loaded but
+  // crashed at import. Without this probe, every user would have hit
+  // the broken bundle and the only escape was `rm -rf` from a terminal.
+  // probePythonCandidate runs `import watchtower` which exercises every
+  // critical dep; a broken bundle fails the probe and we fall through
+  // to dev/pipx/system Python below.
   if (app.isPackaged && process.resourcesPath) {
     const bundled = process.platform === 'win32'
       ? path.join(process.resourcesPath, 'python', 'python.exe')
       : path.join(process.resourcesPath, 'python', 'bin', 'python3');
-    if (fs.existsSync(bundled)) return bundled;
+    if (fs.existsSync(bundled)) {
+      if (probePythonCandidate(bundled)) {
+        return bundled;
+      }
+      console.warn(
+        `[WatchTower] Bundled Python at ${bundled} exists but fails ` +
+        `import watchtower probe — falling back to system/pipx Python. ` +
+        `This usually means a partial/broken DMG install; reinstalling ` +
+        `the latest version from GitHub Releases will fix it.`
+      );
+      appendDiagnostic(
+        'python.bundled-broken',
+        `bundled python at ${bundled} failed importability probe`
+      );
+    }
   }
 
   // ── 2. Dev-clone .venv ───────────────────────────────────────────────────
