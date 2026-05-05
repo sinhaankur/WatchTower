@@ -9,6 +9,24 @@ Curated, human-friendly history of WatchTower releases. Auto-generated GitHub Re
 
 ---
 
+## 1.13.1 — Audit pass: stop silently failing, explain prerequisites
+
+User reported "features that don't work and aren't explained." Frontend audit found a small list of silent-failure paths and unclear prerequisite messaging — this release addresses them. The codebase was actually pretty clean overall; this is a focused polish pass, not a rewrite.
+
+### Stop silently failing
+- **`web/src/pages/Dashboard.tsx`** — project delete used to silently fall through to local-cache-only delete on API failure. Pre-1.13.1 the row vanished from the UI but the project still existed on the server, leading to confused "why does my project list keep showing the deleted project after refresh?" support hits and 409 conflicts on re-creation. Now surfaces the API error via a toast and aborts the local delete on server failure.
+- **`web/src/pages/Applications.tsx`** — per-project deployments fetch swallowed every error to "Never deployed." Now distinguishes 404 (genuine no-deployments) from 5xx/network (real error), logging the latter so support can spot patterns instead of users seeing "Never deployed" on a project that has deploys.
+
+### Explain prerequisites
+- **Run Locally card (`ProjectDetail.tsx`)** — header used to say "this Mac" (works on Linux/Windows too if Podman is there) and gave no install hint. Now says "this machine" and lists the install command for each OS (`brew install podman` / `apt install podman` / `winget install RedHat.Podman`) with a link to podman.io docs.
+- **Domains tab (`ProjectDetail.tsx`)** — auto-DNS sync requires a Cloudflare API token under Integrations → Cloudflare. The page worked but didn't say so; users added a domain expecting magic and got nothing. Now: explanatory paragraph at the top, plus an amber "Cloudflare not connected" banner with a deep link when no Cloudflare credential is configured.
+
+### Intentionally Pro-gated (not broken — clearly labeled)
+For reference, the following are gated behind `WATCHTOWER_TIER=pro` and show a `<ProLock>` upgrade card on Free, not a broken page: Audit Log. Other registered Pro keys (`team-rbac`, `multi-region-failover`, `sso`, `priority-support`) don't have UI yet — they're not "broken," they're not built.
+
+### Roadmap (not built — for transparency)
+GitHub App, preview deploys per PR, managed databases, Cloudflare Tunnel exposure (Phase 4), Auto Let's Encrypt, multi-region failover, SSO, team RBAC. Tracked separately.
+
 ## 1.13.0 — Local-first deploys + account UX polish
 
 Two threads ship together: deploy to your own laptop without SSH yak-shaving, and a real account/security page reachable from a proper user menu.
