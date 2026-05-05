@@ -9,6 +9,12 @@ Curated, human-friendly history of WatchTower releases. Auto-generated GitHub Re
 
 ---
 
+## 1.14.3 — Tray "Open WatchTower" menu had the same Windows focus-stealing bug
+
+Caught while reviewing 1.14.2: the tray icon's right-click context menu has an "Open WatchTower" item that calls `mainWindow.show()` + `.focus()` directly, the same flawed pattern that 1.14.2 fixed for `tray.on('click')` and `app.on('second-instance')`. So even after 1.14.2 a Windows user who reaches for the right-click menu (the more discoverable path on Windows where left-click behavior is less standardized) would still see the same "menu item does nothing" symptom. Now uses `bringWindowToFront(mainWindow)` like everything else.
+
+Trivial follow-up to 1.14.2; no other changes. If you're on 1.14.2 and the left-click-on-tray-icon path works for you, you don't need to update — but the upgrade is free since 1.14.3 just routes one more code path through the same helper.
+
 ## 1.14.2 — Windows: relaunch from tray + "where did the window go?" UX
 
 User feedback right after 1.14.1: "after launch first time I close it and when I reopen it now its not opening again." On Windows, clicking the X button on the main window hides it to the system tray (intentional, but misleading because Windows' tray often buries icons in the chevron overflow). Then clicking the desktop shortcut to "reopen" appears to do nothing — Windows fires a `second-instance` event on the tray-resident original, the handler calls `mainWindow.show()` + `.focus()`, but Win32's `SetForegroundWindow` aggressively rejects focus-stealing from a non-user-gesture caller. The window technically un-hides but stays behind whatever the user was looking at, so they think the click did nothing. Repeat clicks accumulate zombie processes and the experience falls apart.

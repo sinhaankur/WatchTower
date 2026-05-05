@@ -2601,12 +2601,12 @@ function createTray() {
   const contextMenu = Menu.buildFromTemplate([
     {
       label: 'Open WatchTower',
-      click: () => {
-        if (mainWindow) {
-          mainWindow.show();
-          mainWindow.focus();
-        }
-      },
+      // Same Windows focus-stealing fix as second-instance + tray.click.
+      // The right-click "Open" menu item used `show + focus` and was
+      // silently broken on Windows for the same reason — users would
+      // pick it from the menu and the window would stay hidden behind
+      // their foreground app.
+      click: () => bringWindowToFront(mainWindow),
     },
     { type: 'separator' },
     {
