@@ -111,7 +111,19 @@ const Applications = () => {
             const depRes = await apiClient.get(`/projects/${p.id}/deployments`);
             const deps = (depRes.data as Deployment[]) ?? [];
             lastDeployment = deps[0] ?? null;
-          } catch { /* non-fatal */ }
+          } catch (err) {
+            // Distinguish "no deployments yet" (404 / empty) from "API
+            // error" (500 / network). The empty case is fine and the
+            // row should render as "Never deployed". The error case
+            // should at least log so we can spot pattern in support.
+            // Pre-1.13.1, this catch swallowed everything — users saw
+            // "Never deployed" even when their projects had deploys
+            // that the API failed to return.
+            const status = (err as { response?: { status?: number } })?.response?.status;
+            if (status && status !== 404) {
+              console.warn(`[Applications] failed to load deployments for project ${p.id}:`, err);
+            }
+          }
           return {
             id:               String(p.id),
             name:             p.name ?? 'Unnamed',
