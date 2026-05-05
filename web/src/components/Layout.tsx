@@ -180,6 +180,19 @@ function IconPuzzle() {
     </svg>
   );
 }
+// Stack-of-containers icon for the "Local Containers" admin view.
+// Simpler than a play-button-in-a-box — communicates "things running"
+// without overlapping with the existing IconBox (Applications).
+function IconContainers() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="3" width="18" height="6" rx="1" />
+      <rect x="3" y="11" width="18" height="6" rx="1" />
+      <line x1="7" y1="6" x2="7.01" y2="6" />
+      <line x1="7" y1="14" x2="7.01" y2="14" />
+    </svg>
+  );
+}
 
 // Sidebar information architecture:
 //   PRIMARY = "what am I working with?" — daily-flow surfaces in the
@@ -205,10 +218,11 @@ const PRIMARY_NAV: NavItem[] = [
 ];
 
 const SECONDARY_NAV: NavItem[] = [
-  { path: '/integrations', label: 'Integrations', Icon: IconPuzzle },
-  { path: '/team',         label: 'Team',         Icon: IconUsers },
-  { path: '/audit',        label: 'Audit Log',    Icon: IconShield },
-  { path: '/settings',     label: 'Settings',     Icon: IconSettings },
+  { path: '/integrations',     label: 'Integrations',     Icon: IconPuzzle },
+  { path: '/local-containers', label: 'Local Containers', Icon: IconContainers },
+  { path: '/team',             label: 'Team',             Icon: IconUsers },
+  { path: '/audit',            label: 'Audit Log',        Icon: IconShield },
+  { path: '/settings',         label: 'Settings',         Icon: IconSettings },
 ];
 
 // A small, opinionated section header. Slate-400 + uppercase +
