@@ -1,12 +1,24 @@
 name: Build Desktop Installers
 
-# Manual trigger only — tag-based release builds are handled by release.yml
+# Manual trigger or PR. Tag-based release builds are handled by release.yml.
+#
+# Why no `paths:` filter on `pull_request:`:
+#   The repo's branch protection requires `Build (ubuntu-latest)`,
+#   `Build (macos-latest)`, and `Build (windows-latest)` to report a
+#   status before merge. With a `paths:` filter, a PR that doesn't
+#   touch desktop/ or web/ (e.g. #87, which only changed Dockerfile +
+#   .github/workflows) would never trigger this workflow — branch
+#   protection would then sit forever on "Expected — Waiting for
+#   status to be reported" and the PR could not merge.
+#
+#   The fix: always trigger on PRs, but have each matrix job exit
+#   early (with success) when there are no relevant path changes.
+#   That way the required check always reports green in ≤10s for
+#   irrelevant PRs, while still running the full ~10-min build when
+#   desktop/ or web/ actually change.
 on:
   workflow_dispatch:
   pull_request:
-    paths:
-      - "desktop/**"
-      - "web/**"
 
 permissions:
   contents: read
@@ -31,41 +43,79 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        # fetch-depth: 0 so we have the PR base commit available for
+        # `git diff` in the path-change gate below. Default depth=1
+        # only has HEAD and would make the diff fail.
+        with:
+          fetch-depth: 0
+
+      - name: Detect relevant path changes
+        id: changes
+        shell: bash
+        run: |
+          # workflow_dispatch (manual rerun) always builds — humans
+          # only trigger this when they want to test installers.
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "needed=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::workflow_dispatch — building unconditionally."
+            exit 0
+          fi
+          BASE="${{ github.event.pull_request.base.sha }}"
+          HEAD="${{ github.event.pull_request.head.sha }}"
+          # Triple-dot diff = changes on PR side since branch point —
+          # what GitHub's "Files changed" tab shows.
+          CHANGED=$(git diff --name-only "$BASE...$HEAD" 2>/dev/null || true)
+          if echo "$CHANGED" | grep -qE '^(desktop/|web/|\.github/workflows/build-desktop-installers\.yml$)'; then
+            echo "needed=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::Relevant paths changed — building installers."
+          else
+            echo "needed=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::No changes under desktop/ or web/ — reporting success without building."
+          fi
 
       # ── Build web frontend first ──────────────────────────────────────────
       - uses: actions/setup-node@v4
+        if: steps.changes.outputs.needed == 'true'
         with:
           node-version: 20
           cache: npm
           cache-dependency-path: web/package-lock.json
 
       - name: Install web dependencies
+        if: steps.changes.outputs.needed == 'true'
         run: npm --prefix web install
 
       - name: Build frontend (web/dist)
+        if: steps.changes.outputs.needed == 'true'
         run: npm --prefix web run build
 
       # ── Build desktop ─────────────────────────────────────────────────────
       - uses: actions/setup-node@v4
+        if: steps.changes.outputs.needed == 'true'
         with:
           node-version: 20
           cache: npm
           cache-dependency-path: desktop/package-lock.json
 
       - uses: actions/setup-python@v5
+        if: steps.changes.outputs.needed == 'true'
         with:
-          python-version: "3.11"
+          python-version: "3.12"
 
       - name: Install Pillow
+        if: steps.changes.outputs.needed == 'true'
         run: pip install Pillow
 
       - name: Install desktop dependencies
+        if: steps.changes.outputs.needed == 'true'
         run: npm --prefix desktop install
 
       - name: Build installers (no publish)
+        if: steps.changes.outputs.needed == 'true'
         run: npm --prefix desktop run dist -- ${{ matrix.eb_args }}
 
       - name: Upload installer artifacts
+        if: steps.changes.outputs.needed == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact }}
