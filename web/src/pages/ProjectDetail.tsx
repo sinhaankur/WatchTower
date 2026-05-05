@@ -1382,6 +1382,24 @@ function DomainsTab({ projectId }: { projectId: string }) {
 
       <section className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
         <h2 className="text-sm font-semibold text-slate-900">Add a domain</h2>
+        <p className="text-[11px] text-slate-500">
+          Adding a domain here records it on the project. Automatic DNS sync to Cloudflare requires a Cloudflare API token configured under{' '}
+          <a href="/integrations" className="underline hover:text-slate-700">Integrations → Cloudflare</a>.
+          Without it, you'll still need to point the DNS record at this server manually.
+        </p>
+        {creds && creds.length === 0 && (
+          <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-2 text-[11px] text-amber-800">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="mt-0.5 shrink-0">
+              <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+              <line x1="12" y1="9" x2="12" y2="13" />
+              <line x1="12" y1="17" x2="12.01" y2="17" />
+            </svg>
+            <div>
+              <strong>Cloudflare not connected.</strong> You can still add a domain, but DNS won't auto-update.{' '}
+              <a href="/integrations" className="underline hover:text-amber-900">Connect Cloudflare →</a>
+            </div>
+          </div>
+        )}
         <div className="flex gap-2">
           <input
             type="text"
@@ -1632,7 +1650,14 @@ function RunLocallyCard({ projectId }: { projectId: string }) {
         <div>
           <h2 className="text-sm font-semibold">Run Locally</h2>
           <p className="text-[11px] text-muted-foreground mt-0.5">
-            Spin up the latest build as a Podman container on this Mac. Free, instant, no server needed.
+            Spin up the latest build as a Podman container on this machine. Free, instant, no server needed.
+            <br />
+            <span className="text-[10.5px]">
+              Requires <a href="https://podman.io/docs/installation" target="_blank" rel="noopener noreferrer" className="underline hover:text-slate-700">Podman</a> installed locally
+              {' '}(<code className="font-mono">brew install podman</code> on macOS,
+              {' '}<code className="font-mono">apt install podman</code> on Linux,
+              {' '}<a href="https://podman.io/docs/installation#windows" target="_blank" rel="noopener noreferrer" className="underline hover:text-slate-700">winget install RedHat.Podman</a> on Windows).
+            </span>
           </p>
         </div>
         {!run && (

@@ -224,7 +224,18 @@ const Dashboard = () => {
 
   const deleteProject = async (id: string) => {
     if (dataSource === 'server') {
-      try { await apiClient.delete(`/projects/${id}`); } catch { /* best-effort */ }
+      try {
+        await apiClient.delete(`/projects/${id}`);
+      } catch (err) {
+        // Surface the failure instead of silently falling through to a
+        // local-cache-only delete. Pre-1.13.1 the catch swallowed errors
+        // entirely — users saw the row vanish from the dashboard but
+        // the project still existed on the server, leading to confused
+        // re-creation attempts that 409'd.
+        showNotice('error', parseApiError(err, 'Failed to delete project on server. The row will reappear after refresh.'));
+        setConfirmDelete(null);
+        return;
+      }
     }
     const next = projects.filter((p) => p.id !== id);
     setProjects(next);
