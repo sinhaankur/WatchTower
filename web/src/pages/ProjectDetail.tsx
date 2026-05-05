@@ -1587,24 +1587,59 @@ function DomainRow({
 }
 
 // ── RunLocallyCard ─────────────────────────────────────────────────────────
-// Spawns a Podman container on this Mac after a build completes. Idempotent
-// — re-running stops the prior container and starts a fresh one. Static-site
-// projects get nginx; Containerfile-based projects build + run their own
-// image. Closes the "develop locally before paying for a server" loop.
+// Spawns a Podman container on this machine after a build completes.
+// Idempotent — Run Locally stops the prior container and starts a fresh
+// build. Restart bounces the existing container without rebuilding.
+// Static-site projects get nginx; Containerfile-based projects build + run
+// their own image. Closes the "develop locally before paying for a server"
+// loop.
 
 type LocalRun = {
   project_id: string;
+  project_name?: string;
   url: string;
   port: number;
   container_id: string;
+  container_name?: string;
   image: string;
   serving_path: string | null;
+  started_at?: string | null;
 };
+
+// Tiny human-readable elapsed-time formatter. We could pull date-fns but
+// it's already not a dep here and this is one place — 8 lines wins.
+function _uptimeLabel(startedAtIso?: string | null): string {
+  if (!startedAtIso) return '';
+  const t = Date.parse(startedAtIso);
+  if (Number.isNaN(t)) return '';
+  const sec = Math.max(0, Math.floor((Date.now() - t) / 1000));
+  if (sec < 60) return `${sec}s`;
+  if (sec < 3600) return `${Math.floor(sec / 60)}m`;
+  if (sec < 86400) return `${Math.floor(sec / 3600)}h ${Math.floor((sec % 3600) / 60)}m`;
+  return `${Math.floor(sec / 86400)}d ${Math.floor((sec % 86400) / 3600)}h`;
+}
 
 function RunLocallyCard({ projectId }: { projectId: string }) {
   const [run, setRun] = useState<LocalRun | null>(null);
   const [busy, setBusy] = useState(false);
+  const [busyAction, setBusyAction] = useState<'start' | 'restart' | 'stop' | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Logs panel state. Keeping it inside the card avoids prop-drilling
+  // and lets the panel close on container stop without external wiring.
+  const [logsOpen, setLogsOpen] = useState(false);
+  const [logs, setLogs] = useState<string>('');
+  const [logsLoading, setLogsLoading] = useState(false);
+  const [autoFollow, setAutoFollow] = useState(true);
+
+  // Tick the uptime label every 5s so a "running for 0s" doesn't sit
+  // there frozen. Cheaper than polling /run-locally for the same info.
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    if (!run) return;
+    const id = setInterval(() => setTick((n) => n + 1), 5000);
+    return () => clearInterval(id);
+  }, [run]);
 
   const refresh = async () => {
     try {
@@ -1620,6 +1655,7 @@ function RunLocallyCard({ projectId }: { projectId: string }) {
 
   const start = async () => {
     setBusy(true);
+    setBusyAction('start');
     setError(null);
     try {
       const r = await apiClient.post<LocalRun>(`/projects/${projectId}/run-locally`, {});
@@ -1628,21 +1664,65 @@ function RunLocallyCard({ projectId }: { projectId: string }) {
       setError(extractDetail(e, 'Could not start local container'));
     } finally {
       setBusy(false);
+      setBusyAction(null);
+    }
+  };
+
+  const restart = async () => {
+    setBusy(true);
+    setBusyAction('restart');
+    setError(null);
+    try {
+      const r = await apiClient.post<LocalRun>(`/projects/${projectId}/run-locally/restart`, {});
+      setRun(r.data);
+    } catch (e) {
+      setError(extractDetail(e, 'Could not restart local container'));
+    } finally {
+      setBusy(false);
+      setBusyAction(null);
     }
   };
 
   const stop = async () => {
     setBusy(true);
+    setBusyAction('stop');
     setError(null);
     try {
       await apiClient.delete(`/projects/${projectId}/run-locally`);
       setRun(null);
+      setLogsOpen(false);
+      setLogs('');
     } catch (e) {
       setError(extractDetail(e, 'Could not stop container'));
     } finally {
       setBusy(false);
+      setBusyAction(null);
     }
   };
+
+  const fetchLogs = async () => {
+    setLogsLoading(true);
+    try {
+      const r = await apiClient.get<{ logs: string }>(`/projects/${projectId}/run-locally/logs?tail=200`);
+      setLogs(r.data.logs ?? '');
+    } catch (e) {
+      setLogs(`(failed to fetch logs: ${extractDetail(e, 'unknown error')})`);
+    } finally {
+      setLogsLoading(false);
+    }
+  };
+
+  // Auto-refresh logs every 3s while panel open + follow on. Stops when
+  // panel closes or follow toggles off — avoids hammering podman logs
+  // when the user isn't looking.
+  useEffect(() => {
+    if (!run || !logsOpen) return;
+    void fetchLogs();
+    if (!autoFollow) return;
+    const id = setInterval(() => void fetchLogs(), 3000);
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [run, logsOpen, autoFollow, projectId]);
 
   return (
     <div className="rounded-xl border border-border bg-card overflow-hidden">
@@ -1667,7 +1747,7 @@ function RunLocallyCard({ projectId }: { projectId: string }) {
             disabled={busy}
             className="px-3 py-1.5 rounded-md bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-medium"
           >
-            {busy ? 'Starting…' : 'Run Locally'}
+            {busyAction === 'start' ? 'Starting…' : 'Run Locally'}
           </button>
         )}
       </div>
@@ -1679,7 +1759,7 @@ function RunLocallyCard({ projectId }: { projectId: string }) {
         )}
         {run ? (
           <div className="space-y-3">
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 flex-wrap">
               <span className="inline-flex items-center gap-1.5 text-xs px-2 py-1 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse" />
                 Running
@@ -1692,19 +1772,41 @@ function RunLocallyCard({ projectId }: { projectId: string }) {
               >
                 {run.url} ↗
               </a>
+              {run.started_at && (
+                <span className="text-[11px] text-muted-foreground">
+                  Up <span className="tabular-nums">{_uptimeLabel(run.started_at)}</span>
+                </span>
+              )}
             </div>
             <p className="text-[11px] text-muted-foreground">
               Image: <code className="font-mono">{run.image}</code> · Container: <code className="font-mono">{run.container_id.slice(0, 12)}</code>
               {run.serving_path && <> · Serving: <code className="font-mono">{run.serving_path}</code></>}
             </p>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
+              <button
+                type="button"
+                onClick={() => void restart()}
+                disabled={busy}
+                title="Bounce the existing container without rebuilding the image (picks up env-var changes, recovers from crashes)"
+                className="text-xs px-3 py-1.5 rounded-md border border-border hover:bg-muted disabled:opacity-50"
+              >
+                {busyAction === 'restart' ? 'Restarting…' : 'Restart'}
+              </button>
               <button
                 type="button"
                 onClick={() => void start()}
                 disabled={busy}
+                title="Stop and rebuild from scratch (picks up new code from the latest deploy)"
                 className="text-xs px-3 py-1.5 rounded-md border border-border hover:bg-muted disabled:opacity-50"
               >
-                {busy ? '…' : 'Restart'}
+                {busyAction === 'start' ? 'Rebuilding…' : 'Rebuild'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setLogsOpen((v) => !v)}
+                className="text-xs px-3 py-1.5 rounded-md border border-border hover:bg-muted"
+              >
+                {logsOpen ? 'Hide logs' : 'Show logs'}
               </button>
               <button
                 type="button"
@@ -1712,9 +1814,43 @@ function RunLocallyCard({ projectId }: { projectId: string }) {
                 disabled={busy}
                 className="text-xs px-3 py-1.5 rounded-md border border-red-300 text-red-700 hover:bg-red-50 disabled:opacity-50"
               >
-                Stop
+                {busyAction === 'stop' ? 'Stopping…' : 'Stop'}
               </button>
             </div>
+
+            {/* Logs panel — collapsible, polls every 3s while open + follow */}
+            {logsOpen && (
+              <div className="rounded-lg border border-slate-300 bg-slate-950 overflow-hidden">
+                <div className="px-3 py-2 border-b border-slate-800 bg-slate-900 flex items-center justify-between">
+                  <div className="flex items-center gap-3 text-[11px] text-slate-300">
+                    <span className="font-medium">Container logs</span>
+                    <span className="text-slate-500">last 200 lines</span>
+                    {logsLoading && <span className="text-slate-500">refreshing…</span>}
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <label className="flex items-center gap-1.5 text-[11px] text-slate-300 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={autoFollow}
+                        onChange={(e) => setAutoFollow(e.target.checked)}
+                        className="accent-emerald-500"
+                      />
+                      Follow
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => void fetchLogs()}
+                      className="text-[11px] text-slate-300 hover:text-white"
+                    >
+                      Refresh
+                    </button>
+                  </div>
+                </div>
+                <pre className="p-3 m-0 text-[11px] leading-snug text-slate-200 font-mono overflow-auto max-h-72 whitespace-pre-wrap break-words">
+                  {logs || (logsLoading ? '' : '(no output yet — try refreshing or trigger some traffic)')}
+                </pre>
+              </div>
+            )}
           </div>
         ) : (
           <p className="text-xs text-muted-foreground">

@@ -9,6 +9,39 @@ Curated, human-friendly history of WatchTower releases. Auto-generated GitHub Re
 
 ---
 
+## 1.14.0 — Phase B: complete local Podman lifecycle (logs, restart, dashboard)
+
+The Run Locally feature shipped in 1.10.x as "build → run a container → here's a URL," but managing it stopped there. To see logs you had to drop to a terminal and run `podman logs <name>`. To restart you had to either rebuild from scratch (slow) or `podman restart` from the CLI. To see what was running across multiple projects you had to remember each project's detail page. Phase B closes those gaps.
+
+### Backend (`watchtower/local_runner.py` + `watchtower/api/local_runs.py`)
+- **`logs(project_id, tail=200)`** — wraps `podman logs --tail N` and returns the combined stdout+stderr as a string. Tail clamped 1-5000 to keep responses bounded. Cleans up the state sidecar if the container was removed externally so the UI stops polling a ghost.
+- **`restart_locally(project_id)`** — `podman restart <name>` against the existing container. Cheap "bounce" path that picks up env-var changes or recovers from a crash without paying a full image rebuild. Refreshes `started_at` so the uptime label resets correctly. Returns None when no container exists, so the caller can fall back to `run_locally`.
+- **`list_running()`** — walks the JSON state sidecar dir (`$WATCHTOWER_BUILD_DIR/_local_runs/*.json`), light-probes each container with `podman container exists`, and clears stale state inline. Self-healing: a container removed externally drops out of the next response. Cheaper than `podman ps` in the common case (most installs have zero or one local container).
+- **`_started_at_iso(name)`** — live `podman inspect --format '{{.State.StartedAt}}'` so the UI's uptime label survives an external `podman restart`.
+- **`LocalRunStatus`** gains `started_at` (ISO timestamp) and `project_name` (for the dashboard table). Both round-trip the JSON sidecar; legacy state files without them load fine (default to None) so the upgrade doesn't 500 on existing installs.
+- **3 new endpoints**:
+  - `GET  /api/projects/{id}/run-locally/logs?tail=200`
+  - `POST /api/projects/{id}/run-locally/restart` (audit-logged as `project.run_locally_restart`)
+  - `GET  /api/local-containers` — cross-project list, joined with `Project.name` from the DB in a single query (no N+1).
+- All run-locally endpoint payloads now share `_serialize_local_run()` so POST / GET / restart return identical shapes including `started_at`, `container_name`, and `project_name`.
+
+### Frontend
+- **`RunLocallyCard` (in `ProjectDetail.tsx`)** rewritten:
+  - Separate **Restart** (cheap, no rebuild) and **Rebuild** (full re-run with new code) buttons. Tooltips explain the difference. Pre-1.14.0 the "Restart" button silently called the rebuild path.
+  - **Show logs / Hide logs** toggle that opens a dark-themed log panel. Polls every 3s while open + Follow checkbox is on; manual Refresh works either way. Auto-closes when the container is stopped.
+  - **Uptime label** ("Up 2h 14m") next to the URL, ticking every 5s. Computed client-side from the API's `started_at` so we don't poll for it.
+  - Per-action busy state — clicking Stop while Restart is mid-flight no longer races state.
+- **New `/local-containers` page** (in sidebar Admin section, between Integrations and Team): table view of every WatchTower-managed local container across all projects with project name, URL, image, uptime, and per-row Restart/Stop actions. Auto-refreshes every 5s; uptime ticks every 10s without re-fetching. Project name links to that project's detail page.
+
+### Tests
+6 new tests in `tests/test_local_runner.py` cover the graceful-when-no-state behaviors (the user-visible "click button → nothing breaks" paths) plus state-sidecar JSON round-trip including the new `started_at` / `project_name` fields and backward compatibility with legacy state files.
+
+### Roadmap (still pending)
+- Live CPU/memory monitoring (would need `podman stats --stream`)
+- Multi-container compose-style apps (would need `podman-compose`)
+- Persistent named volumes for stateful local development
+- Phase C: Cloudflare Tunnel exposure so a local container can be reached at `app.example.com` without port-forwarding
+
 ## 1.13.1 — Audit pass: stop silently failing, explain prerequisites
 
 User reported "features that don't work and aren't explained." Frontend audit found a small list of silent-failure paths and unclear prerequisite messaging — this release addresses them. The codebase was actually pretty clean overall; this is a focused polish pass, not a rewrite.

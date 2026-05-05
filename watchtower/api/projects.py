@@ -258,14 +258,7 @@ async def run_project_locally(
         extra={"port": status_obj.port, "image": status_obj.image},
     )
     db.commit()
-    return {
-        "project_id": str(project.id),
-        "url": status_obj.url,
-        "port": status_obj.port,
-        "container_id": status_obj.container_id,
-        "image": status_obj.image,
-        "serving_path": status_obj.serving_path,
-    }
+    return _serialize_local_run(project, status_obj)
 
 
 @router.get("/{project_id}/run-locally")
@@ -279,14 +272,7 @@ async def get_local_run_status(
     state = local_runner.status_locally(str(project.id))
     if state is None:
         return None
-    return {
-        "project_id": str(project.id),
-        "url": state.url,
-        "port": state.port,
-        "container_id": state.container_id,
-        "image": state.image,
-        "serving_path": state.serving_path,
-    }
+    return _serialize_local_run(project, state)
 
 
 @router.delete("/{project_id}/run-locally", status_code=status.HTTP_204_NO_CONTENT)
@@ -299,6 +285,85 @@ async def stop_local_run(
     project = _load_owned_project(db, project_id, current_user)
     local_runner.stop_locally(str(project.id))
     return None
+
+
+@router.post("/{project_id}/run-locally/restart")
+async def restart_local_run(
+    project_id: UUID,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(util.get_current_user),
+):
+    """Restart the project's existing local container without rebuilding.
+
+    Cheap "bounce the container" path — picks up env-var changes or
+    recovers from a crash without paying the rebuild cost. If no
+    container is currently running, returns 404 and the caller should
+    POST /run-locally to start a fresh one.
+    """
+    project = _load_owned_project(db, project_id, current_user)
+    try:
+        state = local_runner.restart_locally(str(project.id))
+    except local_runner.LocalRunError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    if state is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No local container is running for this project. Click Run Locally to start one.",
+        )
+    audit_log.record_for_user(
+        db, current_user,
+        action="project.run_locally_restart",
+        entity_type="project",
+        entity_id=project.id,
+        org_id=project.org_id,
+        request=request,
+        extra={"port": state.port, "image": state.image},
+    )
+    db.commit()
+    return _serialize_local_run(project, state)
+
+
+@router.get("/{project_id}/run-locally/logs")
+async def get_local_run_logs(
+    project_id: UUID,
+    tail: int = 200,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(util.get_current_user),
+):
+    """Return the most recent ``tail`` lines of the project's local
+    container logs (combined stdout + stderr). Returns ``{logs: ""}``
+    with a 200 if no container is running, so the UI can render an
+    empty state without juggling 404s on the polling path.
+
+    Polling-based for now (frontend re-fetches every few seconds when
+    the logs panel is open). SSE upgrade is a future enhancement —
+    polling is plenty for a single user watching their own dev
+    container, and avoids the connection-handling complexity.
+    """
+    project = _load_owned_project(db, project_id, current_user)
+    try:
+        text = local_runner.logs(str(project.id), tail=tail)
+    except local_runner.LocalRunError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    return {"logs": text, "tail": tail}
+
+
+def _serialize_local_run(project, state):
+    """Single source of truth for the local-run JSON shape — keeps the
+    POST/GET/restart endpoint payloads in lock-step so the UI doesn't
+    have to special-case which one returned what."""
+    return {
+        "project_id": str(project.id),
+        "project_name": project.name,
+        "url": state.url,
+        "port": state.port,
+        "container_id": state.container_id,
+        "container_name": state.container_name,
+        "image": state.image,
+        "serving_path": state.serving_path,
+        "started_at": state.started_at,
+    }
 
 
 def _load_owned_project(db: Session, project_id: UUID, current_user: dict) -> Project:

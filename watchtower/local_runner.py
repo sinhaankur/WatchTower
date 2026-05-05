@@ -59,6 +59,15 @@ class LocalRunStatus:
     url: str
     image: str
     serving_path: Optional[str] = None  # build output dir for static sites
+    # ISO-8601 timestamp of when WatchTower spawned the container. Stays
+    # in the JSON sidecar so the UI can render uptime without a per-load
+    # `podman inspect`. Container restarts (`podman restart`) don't reset
+    # this — `_started_at_iso()` is computed live for that case.
+    started_at: Optional[str] = None
+    # Convenience flag for the dashboard list — populated by
+    # ``status_locally`` / ``list_running``, never persisted (mtime can
+    # change after a host reboot, etc.).
+    project_name: Optional[str] = None
 
 
 # ── Internal helpers ──────────────────────────────────────────────────────────
@@ -254,6 +263,8 @@ def run_locally(project_id: str, project_name: str, recommended_port: Optional[i
             port=host_port,
             url=f"http://localhost:{host_port}",
             image=image_tag,
+            started_at=_started_at_iso(name),
+            project_name=project_name,
         )
         _save_state(status)
         logger.info("Local run started for project %s: %s", project_name, status.url)
@@ -282,6 +293,8 @@ def run_locally(project_id: str, project_name: str, recommended_port: Optional[i
             url=f"http://localhost:{host_port}",
             image=image_tag,
             serving_path=str(static_output),
+            started_at=_started_at_iso(name),
+            project_name=project_name,
         )
         _save_state(status)
         logger.info("Local run (static) started for project %s: %s", project_name, status.url)
@@ -299,11 +312,142 @@ def stop_locally(project_id: str) -> None:
     _stop_existing(project_id)
 
 
+def restart_locally(project_id: str) -> Optional[LocalRunStatus]:
+    """Restart the existing container without rebuilding the image.
+
+    Different from re-running ``run_locally`` — that path stops, removes,
+    and rebuilds. ``restart_locally`` is the cheap "bounce the container"
+    path for picking up an env-var change or recovering from a crash
+    without paying the rebuild cost. If no container is currently running
+    for this project, returns None and the caller should fall back to
+    ``run_locally``.
+    """
+    state = _load_state(project_id)
+    if not state:
+        return None
+    podman = _podman()
+    rc, out = _run_cmd([podman, "restart", state.container_name], timeout=30)
+    if rc != 0:
+        # Container vanished out from under us (manual ``podman rm``,
+        # host reboot, etc.). Clear the state so the UI doesn't claim
+        # "running" indefinitely; caller should re-run from scratch.
+        _clear_state(project_id)
+        raise LocalRunError(
+            f"Could not restart container {state.container_name} — it may have been removed externally. "
+            f"Click Run Locally to start a fresh one. Detail: {out[-400:]}"
+        )
+    # Update started_at so the UI's uptime counter resets correctly.
+    state.started_at = _started_at_iso(state.container_name) or state.started_at
+    _save_state(state)
+    return state
+
+
+def logs(project_id: str, tail: int = 200) -> str:
+    """Return the most recent N lines of container output as a single
+    string. Combines stdout + stderr the way operators expect from
+    ``podman logs``. Returns empty string for a stopped container —
+    callers can detect that via ``status_locally`` first if they need to
+    distinguish 'no logs yet' from 'no container running'.
+    """
+    state = _load_state(project_id)
+    if not state:
+        return ""
+    podman = _podman()
+    # ``--tail`` accepts an integer; clamp to a sane range so a typo'd
+    # negative or absurdly huge value can't return a 50 MB blob.
+    tail_arg = max(1, min(int(tail), 5000))
+    rc, out = _run_cmd(
+        [podman, "logs", "--tail", str(tail_arg), state.container_name],
+        timeout=15,
+    )
+    if rc != 0:
+        # Container was removed externally — clear state and return empty
+        # rather than raise, so the UI can still render "no logs" cleanly.
+        if "no such container" in out.lower():
+            _clear_state(project_id)
+            return ""
+        # Other errors: surface to the caller.
+        raise LocalRunError(f"podman logs failed:\n{out[-1000:]}")
+    return out
+
+
+def _started_at_iso(container_name: str) -> Optional[str]:
+    """Live-probe the container's start time. We could read it from the
+    state file, but ``podman restart`` doesn't update that, so the live
+    probe is correct after a restart. Returns None if the container
+    isn't reachable (in which case the caller should fall back to the
+    persisted ``started_at`` if any).
+    """
+    podman = _podman()
+    rc, out = _run_cmd(
+        [podman, "inspect", "--format", "{{.State.StartedAt}}", container_name],
+        timeout=10,
+    )
+    if rc != 0:
+        return None
+    iso = out.strip()
+    return iso or None
+
+
+def list_running() -> list[LocalRunStatus]:
+    """Return every project this WatchTower install has running locally.
+
+    Walks the JSON state directory, lightly probes each container to
+    confirm it's alive (clearing stale state on the fly), and returns
+    the survivors with live ``started_at`` populated.
+
+    Backs the new /api/local-containers dashboard endpoint. Cheaper than
+    ``podman ps`` in the common case (zero or one running container)
+    because we only shell out for the projects we already know about.
+    """
+    if not _RUNS_DIR.is_dir():
+        return []
+    out: list[LocalRunStatus] = []
+    podman_bin: Optional[str]
+    try:
+        podman_bin = _podman()
+    except LocalRunError:
+        # No podman → no live containers to verify, but state files
+        # might exist. Treat them all as stale.
+        for f in _RUNS_DIR.glob("*.json"):
+            try:
+                f.unlink()
+            except OSError:
+                pass
+        return []
+
+    for f in sorted(_RUNS_DIR.glob("*.json")):
+        try:
+            data = json.loads(f.read_text())
+            state = LocalRunStatus(**data)
+        except (ValueError, TypeError):
+            try: f.unlink()
+            except OSError: pass
+            continue
+        # Liveness check
+        rc, _ = _run_cmd(
+            [podman_bin, "container", "exists", state.container_name],
+            timeout=10,
+        )
+        if rc != 0:
+            try: f.unlink()
+            except OSError: pass
+            continue
+        live_started = _started_at_iso(state.container_name)
+        if live_started:
+            state.started_at = live_started
+        out.append(state)
+    return out
+
+
 def status_locally(project_id: str) -> Optional[LocalRunStatus]:
     """Return the cached state, or None if the container has been
     stopped / never started. We do a lightweight liveness check — if the
     container disappeared (host reboot, manual ``podman rm``) we clear
-    the cache so the UI doesn't claim "running" indefinitely."""
+    the cache so the UI doesn't claim "running" indefinitely.
+
+    Refreshes ``started_at`` on every call so the UI's uptime stays
+    correct even after a ``podman restart`` from outside WatchTower."""
     state = _load_state(project_id)
     if not state:
         return None
@@ -315,4 +459,8 @@ def status_locally(project_id: str) -> Optional[LocalRunStatus]:
     if rc != 0:
         _clear_state(project_id)
         return None
+    live_started = _started_at_iso(state.container_name)
+    if live_started and live_started != state.started_at:
+        state.started_at = live_started
+        _save_state(state)
     return state
