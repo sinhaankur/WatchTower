@@ -162,12 +162,39 @@ if [ "$USE_CROSS_INSTALL" = "true" ]; then
   for p in $PIP_PLATFORM; do
     PLATFORM_ARGS="$PLATFORM_ARGS --platform $p"
   done
+  # Pin pip to the BUNDLED interpreter's ABI, not the host's. Without
+  # --python-version + --implementation + --abi, pip selects wheels
+  # matching whichever Python is driving the install — i.e. the host
+  # `python3` from setup-python in CI. When the host is 3.11 (per
+  # release.yml) and the bundle is 3.12 (per PYTHON_VERSION above),
+  # pip writes cp311 .pyd files into a bundle whose interpreter only
+  # accepts cp312, and every native dep dies at import with
+  # "No module named 'pydantic_core._pydantic_core'". This was the
+  # 1.14.0 win-x64 ship-blocker — confirmed via the user's
+  # desktop-backend.log (cp311-win_amd64.pyd shipped with python312.dll).
+  PYV_SHORT="${PYTHON_VERSION%.*}"           # 3.12.13 → 3.12
+  PYV_NODOT="${PYV_SHORT//./}"               # 3.12   → 312
+  ABI_ARGS="--python-version $PYV_SHORT --implementation cp --abi cp${PYV_NODOT}"
   python3 -m pip install --no-cache-dir --target "$SITE_PACKAGES" \
-    $PLATFORM_ARGS --only-binary=:all: --upgrade \
+    $PLATFORM_ARGS $ABI_ARGS --only-binary=:all: --upgrade \
     -r "$REPO_ROOT/requirements.txt"
   # Install watchtower itself (pure Python → no platform constraint needed).
   python3 -m pip install --no-cache-dir --target "$SITE_PACKAGES" \
     --no-deps --upgrade "$REPO_ROOT"
+
+  # Belt-and-suspenders: scan the freshly-installed bundle for any .pyd
+  # / .so files whose ABI tag doesn't match the bundled Python. If pip
+  # ever silently falls back to a different ABI (e.g. a wheel only
+  # publishes cp311 for the platform), we want to fail the build here
+  # rather than ship a bundle that crashes on first import.
+  WRONG_ABI=$(find "$SITE_PACKAGES" \( -name "*.pyd" -o -name "*.so" \) \
+    | grep -E "\.(cp|pp)[0-9]+-" \
+    | grep -v -E "\.cp${PYV_NODOT}-" || true)
+  if [ -n "$WRONG_ABI" ]; then
+    echo "ERROR: bundle has native extensions with wrong ABI tag (expected cp${PYV_NODOT}):" >&2
+    echo "$WRONG_ABI" | sed 's|^|  |' >&2
+    exit 1
+  fi
 else
   echo "==> Native install: $TARGET matches host"
   "$PYTHON_BIN" -m pip install --no-cache-dir --upgrade pip
