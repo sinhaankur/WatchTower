@@ -9,6 +9,28 @@ Curated, human-friendly history of WatchTower releases. Auto-generated GitHub Re
 
 ---
 
+## 1.14.3 — Tray "Open WatchTower" menu had the same Windows focus-stealing bug
+
+Caught while reviewing 1.14.2: the tray icon's right-click context menu has an "Open WatchTower" item that calls `mainWindow.show()` + `.focus()` directly, the same flawed pattern that 1.14.2 fixed for `tray.on('click')` and `app.on('second-instance')`. So even after 1.14.2 a Windows user who reaches for the right-click menu (the more discoverable path on Windows where left-click behavior is less standardized) would still see the same "menu item does nothing" symptom. Now uses `bringWindowToFront(mainWindow)` like everything else.
+
+Trivial follow-up to 1.14.2; no other changes. If you're on 1.14.2 and the left-click-on-tray-icon path works for you, you don't need to update — but the upgrade is free since 1.14.3 just routes one more code path through the same helper.
+
+## 1.14.2 — Windows: relaunch from tray + "where did the window go?" UX
+
+User feedback right after 1.14.1: "after launch first time I close it and when I reopen it now its not opening again." On Windows, clicking the X button on the main window hides it to the system tray (intentional, but misleading because Windows' tray often buries icons in the chevron overflow). Then clicking the desktop shortcut to "reopen" appears to do nothing — Windows fires a `second-instance` event on the tray-resident original, the handler calls `mainWindow.show()` + `.focus()`, but Win32's `SetForegroundWindow` aggressively rejects focus-stealing from a non-user-gesture caller. The window technically un-hides but stays behind whatever the user was looking at, so they think the click did nothing. Repeat clicks accumulate zombie processes and the experience falls apart.
+
+### Fix
+
+- **`bringWindowToFront(win)` helper** in `desktop/main.js` does the standard Electron foregrounding dance: restore if minimized, show if hidden, then `setAlwaysOnTop(true)` → `setAlwaysOnTop(false)` to bypass focus-stealing prevention on Windows + Linux. macOS skips the toggle since Dock activation handles foregrounding correctly.
+- **`app.on('second-instance')`** uses the helper. Also adds a diagnostic log entry (`second-instance: received argv=...`) so future "is this event even firing?" debugging doesn't need a code change. Falls back to re-running `launch()` if the original instance lost its main window — covers the edge case where a prior `loadURL` failed and the window was destroyed but the process kept the singleton lock.
+- **`tray.on('click')`** uses the same helper, fixing single-clicking the tray icon as a recovery path on Windows (previously also silently broken for the same reason).
+- **Lock-denied path** switched from `app.quit()` to `app.exit(0)`. `quit()` schedules an async teardown that on Windows can let `whenReady` still fire, briefly creating a second splash before quit propagates. `exit(0)` terminates immediately so a duplicate process can't ever show its own splash.
+- **Close-to-tray balloon** rewritten with platform-specific copy. The Windows variant explicitly says "look for the icon in the notification area, near the clock" + "right-click it and choose Quit to actually close" — addresses the "I can't find the tray icon" + "X should mean close" mismatches together. Also writes a `window.close-to-tray` diagnostic line every time so support reports are unambiguous about whether the user hid-to-tray or quit-via-menu.
+
+### What this fixes for you
+
+If WatchTower's main window won't come back after you closed it, killing the existing `WatchTower.exe` processes from Task Manager and relaunching is no longer required — the tray icon (right-click > Open) and the desktop shortcut both reliably bring the window back on 1.14.2+. If you don't want the X button to hide-to-tray at all, right-click the tray icon and choose Quit instead of clicking X.
+
 ## 1.14.1 — Windows-x64 ship-blocker: bundled Python ABI mismatch (also fixes mac-x64 + linux-arm64)
 
 Reported by a Windows user: WatchTower-1.14.0-win-x64.exe installs cleanly but the splash flashes for a few seconds and the app vanishes — running as Administrator made no difference (same crash, just with elevated privileges). The diagnostic at `~/.watchtower/logs/desktop-electron.log` tagged it as `Backend exited before responding`, and the bundled Python's `desktop-backend.log` had the smoking gun: `ModuleNotFoundError: No module named 'pydantic_core._pydantic_core'`.
