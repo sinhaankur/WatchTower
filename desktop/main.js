@@ -1087,17 +1087,54 @@ function tryAcquireSingletonLock() {
 
 const gotSingleInstanceLock = tryAcquireSingletonLock();
 if (!gotSingleInstanceLock) {
-  // Another instance is genuinely running — focus it and exit immediately.
-  app.quit();
+  // Another instance is genuinely running. The original receives a
+  // 'second-instance' event below and brings its window forward.
+  // Use exit(0) instead of quit() so this duplicate process dies
+  // immediately — quit() schedules an async teardown which on Windows
+  // can let `app.whenReady()` still fire, briefly creating a second
+  // splash window before quit propagates. exit(0) terminates now.
+  app.exit(0);
 }
 
-app.on('second-instance', () => {
-  // If the user tries to open a second instance, just focus the existing window.
-  if (mainWindow) {
-    if (!mainWindow.isVisible()) mainWindow.show();
-    if (mainWindow.isMinimized()) mainWindow.restore();
-    mainWindow.focus();
+/**
+ * Reliably bring a hidden / minimized / backgrounded BrowserWindow to
+ * the foreground. The naive `win.show(); win.focus()` pattern is
+ * silently ignored on Windows + sometimes Linux because Win32's
+ * SetForegroundWindow has aggressive focus-stealing prevention — the
+ * window is technically shown but stays behind whatever the user was
+ * looking at, so clicking the tray icon or relaunching the app
+ * appears to do nothing. The alwaysOnTop true→false toggle is the
+ * standard Electron workaround. macOS doesn't need it (Dock activation
+ * handles foregrounding correctly), so we keep that path clean.
+ */
+function bringWindowToFront(win) {
+  if (!win || win.isDestroyed()) return;
+  if (win.isMinimized()) win.restore();
+  if (!win.isVisible()) win.show();
+  if (process.platform !== 'darwin') {
+    win.setAlwaysOnTop(true);
+    win.setAlwaysOnTop(false);
   }
+  win.focus();
+}
+
+app.on('second-instance', (event, argv) => {
+  // Diagnostic: confirms the original instance received the event
+  // (rules out "is the second-instance handler even firing?" when
+  // users report "clicking the icon does nothing"). argv is shown so
+  // future protocol-handler / deep-link work can use it.
+  appendDiagnostic('second-instance', `received argv=${JSON.stringify(argv || [])}`);
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    bringWindowToFront(mainWindow);
+    return;
+  }
+  // Original instance lost its main window (e.g., loadURL failed and
+  // the window was closed). Recreate the launch flow from scratch
+  // rather than leaving the user stuck with a tray-only zombie.
+  appendDiagnostic('second-instance', 'mainWindow missing — relaunching');
+  launch().catch((err) =>
+    appendDiagnostic('second-instance.relaunch.failure', err && err.stack ? err.stack : String(err))
+  );
 });
 
 let backendProcess;
@@ -2599,13 +2636,13 @@ function createTray() {
   ]);
   tray.setContextMenu(contextMenu);
   tray.on('click', () => {
-    if (mainWindow) {
-      if (mainWindow.isVisible()) {
-        mainWindow.focus();
-      } else {
-        mainWindow.show();
-        mainWindow.focus();
-      }
+    // Same Windows focus-stealing-prevention dance as second-instance.
+    // Without bringWindowToFront's alwaysOnTop toggle, single-clicking
+    // the tray icon to bring back a hidden window does nothing on
+    // recent Windows builds — the window is shown but stays behind the
+    // user's current foreground app.
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      bringWindowToFront(mainWindow);
     }
   });
 }
@@ -2626,16 +2663,33 @@ app.whenReady().then(async () => {
     }
 
     // Hide to tray instead of quitting when the window X is clicked.
+    //
+    // On Windows the tray icon often hides inside the system tray
+    // overflow chevron (the small ^ in the notification area), so
+    // "click the tray icon to reopen" is misleading — users genuinely
+    // can't find it. Tell them where to look + how to actually quit so
+    // they don't end up clicking the desktop shortcut and getting a
+    // splash that hangs because the original is still in the tray.
+    // Balloons are also frequently suppressed (Focus Assist), so we
+    // also log every close so that diagnostic reports are unambiguous
+    // about whether the user closed-to-tray vs. quit-via-tray-menu.
     mainWindow?.on('close', (event) => {
       if (!isQuitting) {
         event.preventDefault();
         mainWindow.hide();
-        // Show a one-time hint on Linux/Windows (macOS uses the dock).
+        appendDiagnostic(
+          'window.close-to-tray',
+          'X clicked — window hidden, tray icon owns the app. To fully quit: right-click tray > Quit.'
+        );
         if (process.platform !== 'darwin' && tray) {
+          const platformHint =
+            process.platform === 'win32'
+              ? "WatchTower is still running in the system tray (look for the icon in the notification area, near the clock). Right-click it and choose Quit to actually close."
+              : 'Running in the background. Click the tray icon to reopen, or right-click for Quit.';
           tray.displayBalloon && tray.displayBalloon({
             iconType: 'info',
-            title: 'WatchTower',
-            content: 'Running in the background. Click the tray icon to reopen.',
+            title: 'WatchTower is still running',
+            content: platformHint,
           });
         }
       }
