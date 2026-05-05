@@ -178,10 +178,63 @@ verify_linux_appimage() {
   fi
 }
 
+# Windows x64 .zip — easier to verify than the NSIS .exe (no 7zip needed).
+# We check that every native .pyd matches the bundled Python's ABI tag.
+# The .zip and the .exe come from the same electron-builder run, so what's
+# in the .zip is exactly what the .exe writes to disk after install.
+#
+# Catches the 1.14.0 ship-blocker: pip's cross-install from a host Python
+# 3.11 wrote cp311-win_amd64.pyd files into a bundle whose interpreter is
+# python312.dll. The user's first-launch backend log was a textbook
+# "ModuleNotFoundError: No module named 'pydantic_core._pydantic_core'"
+# in fastapi → pydantic → pydantic_core's native loader. Filename-only
+# check, no Windows host needed.
+verify_windows_zip() {
+  local arch="$1"   # x64
+  local zip="WatchTower-$VERSION-win-${arch}.zip"
+  local zip_path
+  zip_path=$(DOWNLOAD "$zip") || return 1
+  local extract_dir="$WORK_DIR/win-${arch}"
+  mkdir -p "$extract_dir"
+  if ! unzip -q -o "$zip_path" -d "$extract_dir" >/dev/null 2>&1; then
+    FAIL "$zip: failed to unzip"
+    return 1
+  fi
+  local py_dll
+  py_dll=$(find "$extract_dir" -maxdepth 6 -name 'python3*.dll' \
+    -not -name 'python3.dll' 2>/dev/null | head -1)
+  if [ -z "$py_dll" ]; then
+    FAIL "$zip: bundled python interpreter DLL missing (no python3XY.dll)"
+    return 1
+  fi
+  # python312.dll → 312
+  local expected_abi
+  expected_abi=$(basename "$py_dll" | sed -E 's/^python([0-9]+)\.dll$/\1/')
+  local pyds
+  pyds=$(find "$extract_dir" -name '*.pyd' 2>/dev/null)
+  if [ -z "$pyds" ]; then
+    FAIL "$zip: no .pyd files found in bundle (extract failed?)"
+    return 1
+  fi
+  local mismatched
+  mismatched=$(echo "$pyds" \
+    | grep -E "\.(cp|pp)[0-9]+-" \
+    | grep -v -E "\.cp${expected_abi}-" || true)
+  if [ -n "$mismatched" ]; then
+    FAIL "$zip: native extensions tagged for the WRONG Python ABI " \
+      "(bundle is cp${expected_abi}, but found):"
+    echo "$mismatched" | sed 's|^|    |'
+    FAIL "  This is the 1.14.0-class bug. Block release."
+  else
+    PASS "$zip: all .pyd files match bundle ABI cp${expected_abi}"
+  fi
+}
+
 verify_mac_dmg arm64 "arm64"
 verify_mac_dmg x64 "x86_64"
 verify_linux_appimage x64 "x86-64"
 verify_linux_appimage arm64 "aarch64"
+verify_windows_zip x64
 # Note: armv7l + Windows arm64 don't ship a python-build-standalone bundle
 # (no PBS target exists), so there's nothing to arch-verify there. They
 # fall back to system/pipx Python at runtime.
