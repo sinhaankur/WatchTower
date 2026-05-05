@@ -9,6 +9,35 @@ Curated, human-friendly history of WatchTower releases. Auto-generated GitHub Re
 
 ---
 
+## 1.14.1 — Windows-x64 ship-blocker: bundled Python ABI mismatch (also fixes mac-x64 + linux-arm64)
+
+Reported by a Windows user: WatchTower-1.14.0-win-x64.exe installs cleanly but the splash flashes for a few seconds and the app vanishes — running as Administrator made no difference (same crash, just with elevated privileges). The diagnostic at `~/.watchtower/logs/desktop-electron.log` tagged it as `Backend exited before responding`, and the bundled Python's `desktop-backend.log` had the smoking gun: `ModuleNotFoundError: No module named 'pydantic_core._pydantic_core'`.
+
+### Root cause
+
+The bundled Python interpreter is **3.12.13** (per `scripts/build-python-bundle.sh`'s pinned `PYTHON_VERSION`), but `release.yml`'s `setup-python` step used **3.11**. When `build-python-bundle.sh` cross-installs win_amd64 wheels via `python3 -m pip install --target ... --platform win_amd64 --only-binary=:all:`, pip selects wheels matching the **driving** interpreter's ABI tag (cp311), not the **bundled** interpreter's (cp312). Result: every native `.pyd` shipped — `_pydantic_core`, `cryptography`'s `_rust`, `pynacl`, `psycopg2`, `sqlalchemy/cyextension/*`, `markupsafe._speedups`, etc. — was tagged `cp311-win_amd64`, and the bundled `python.exe` (3.12) refused to load any of them.
+
+The same cross-install path runs for **mac-x64** (host: arm64 macos-14 runner) and **linux-arm64** (host: x86_64 ubuntu runner), so those bundles shipped just as broken. They went unflagged because:
+- The CI smoke test runs only on linux-x64, which uses the native install path (host == target → bundled python drives pip → cp312 wheels).
+- `verify-release.sh` checked the .so/.pyd architecture (x86-64 / arm64) but not the Python ABI tag, so a cp311 wheel for the right arch passed verification.
+- `preflight.sh`'s bundled-import check runs only on Darwin-arm64, which is also native install.
+
+### Fix (3 layers)
+
+- **`scripts/build-python-bundle.sh`** — derive the ABI tag from `PYTHON_VERSION` and pass `--python-version 3.12 --implementation cp --abi cp312` to pip's cross-install. After install, the script scans the bundle for any `.pyd` / `.so` whose ABI tag doesn't match and fails the build loudly (no more silent-ship). Works regardless of which host Python drives the script.
+- **`.github/workflows/release.yml`** — bumped `setup-python` from 3.11 to 3.12 in both the `build-windows-bundle` job and the `build-desktop` matrix. Defense in depth: even if someone accidentally reverts the explicit pip ABI args, the host Python now matches the bundled Python so wheels are still compatible.
+- **`scripts/verify-release.sh`** — new `verify_windows_zip` step downloads the .zip, locates the bundled `python3XY.dll` to derive the expected ABI tag, then asserts every `.pyd` filename matches. Catches this exact regression class on every future release without needing a Windows host. (The .zip is built by the same electron-builder run as the .exe so the contents are identical.)
+
+### User workaround for current 1.14.0 installs
+
+Until 1.14.1 is published, the app's existing `resolvePython()` fallback already handles this — the bundled-Python probe runs `import watchtower`, sees the ImportError, logs `python.bundled-broken`, and falls through to system Python. So:
+
+1. Install Python 3.12 from python.org (check "Add Python to PATH" during install).
+2. `py -3.12 -m pip install watchtower-podman`.
+3. Reopen WatchTower — it'll pick up the system Python automatically. No reinstall needed.
+
+After 1.14.1 ships, the bundled Python alone is sufficient and the system install can be removed.
+
 ## 1.14.0 — Phase B: complete local Podman lifecycle (logs, restart, dashboard)
 
 The Run Locally feature shipped in 1.10.x as "build → run a container → here's a URL," but managing it stopped there. To see logs you had to drop to a terminal and run `podman logs <name>`. To restart you had to either rebuild from scratch (slow) or `podman restart` from the CLI. To see what was running across multiple projects you had to remember each project's detail page. Phase B closes those gaps.
