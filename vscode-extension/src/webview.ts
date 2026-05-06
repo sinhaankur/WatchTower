@@ -83,7 +83,7 @@ export async function openDashboard(
 
   // Refresh icon in the editor title bar (built-in VS Code icon).
   panel.iconPath = vscode.Uri.parse(
-    "https://raw.githubusercontent.com/sinhaankur/WatchTower/main/desktop/assets/wt-logo.svg"
+    "https://raw.githubusercontent.com/Node2-io/WatchTowerOps/main/desktop/assets/wt-logo.svg"
   );
 
   panel.webview.html = renderHtml(dashboardUrl, baseUrl);

@@ -226,7 +226,7 @@ React 19 + Vite + React Query + Zustand + Tailwind. Path alias `@` → `web/src`
 
 ### Desktop (`desktop/`)
 
-Electron wrapper. `desktop/main.js` spawns the Python backend itself in packaged builds, and uses `electron-updater` against GitHub Releases (`sinhaankur/WatchTower`) for auto-update. In dev/unpackaged it falls back to the GitHub API to surface "update available" without auto-installing. `npm` is resolved via `path.dirname(process.execPath)` first because Electron does not inherit shell PATH on Linux/macOS.
+Electron wrapper. `desktop/main.js` spawns the Python backend itself in packaged builds, and uses `electron-updater` against GitHub Releases (`Node2-io/WatchTowerOps`) for auto-update. In dev/unpackaged it falls back to the GitHub API to surface "update available" without auto-installing. `npm` is resolved via `path.dirname(process.execPath)` first because Electron does not inherit shell PATH on Linux/macOS.
 
 ### Configuration discovery
 

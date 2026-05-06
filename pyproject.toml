@@ -7,7 +7,7 @@ name = "watchtower-podman"
 description = "Podman update and multi-node website deployment automation"
 readme = "README.md"
 requires-python = ">=3.8"
-license = "MIT"
+license = "Apache-2.0"
 dynamic = ["version"]
 authors = [
   { name = "WatchTower Contributors" }
@@ -63,10 +63,10 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/sinhaankur/WatchTower"
-Documentation = "https://sinhaankur.github.io/WatchTower/"
-Issues = "https://github.com/sinhaankur/WatchTower/issues"
-Source = "https://github.com/sinhaankur/WatchTower"
+Homepage = "https://github.com/Node2-io/WatchTowerOps"
+Documentation = "https://Node2-io.github.io/WatchTowerOps/"
+Issues = "https://github.com/Node2-io/WatchTowerOps/issues"
+Source = "https://github.com/Node2-io/WatchTowerOps"
 
 [project.scripts]
 watchtower = "watchtower.cli:main"

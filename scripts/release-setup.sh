@@ -72,8 +72,8 @@ create_tag() {
     echo -e "  • PyPI (watchtower-podman)"
     echo ""
     echo -e "${BLUE}Monitor the release:${NC}"
-    echo -e "  https://github.com/sinhaankur/WatchTower/actions"
-    echo -e "  https://github.com/sinhaankur/WatchTower/releases"
+    echo -e "  https://github.com/Node2-io/WatchTowerOps/actions"
+    echo -e "  https://github.com/Node2-io/WatchTowerOps/releases"
 }
 
 # Function to show branch protection setup
@@ -85,7 +85,7 @@ show_branch_protection() {
     echo ""
     echo -e "${YELLOW}To protect the main branch, visit:${NC}"
     echo ""
-    echo "  https://github.com/sinhaankur/WatchTower/settings/branches"
+    echo "  https://github.com/Node2-io/WatchTowerOps/settings/branches"
     echo ""
     echo -e "${YELLOW}Or follow these steps:${NC}"
     echo "  1. Go to Settings → Branches"
@@ -128,7 +128,7 @@ show_release_workflow() {
     echo ""
     echo "  Docker:   docker pull ghcr.io/sinhaankur/watchtower:v1.2.3"
     echo "  PyPI:     pip install watchtower-podman==1.2.3"
-    echo "  GitHub:   https://github.com/sinhaankur/WatchTower/releases"
+    echo "  GitHub:   https://github.com/Node2-io/WatchTowerOps/releases"
     echo ""
 }
 
@@ -146,10 +146,10 @@ show_documentation() {
     echo "  • ${GREEN}README.md${NC} — Main project documentation"
     echo ""
     echo -e "${YELLOW}External Links:${NC}"
-    echo "  • Releases: https://github.com/sinhaankur/WatchTower/releases"
-    echo "  • Container Registry: https://github.com/sinhaankur/WatchTower/pkgs/container/watchtower"
+    echo "  • Releases: https://github.com/Node2-io/WatchTowerOps/releases"
+    echo "  • Container Registry: https://github.com/Node2-io/WatchTowerOps/pkgs/container/watchtower"
     echo "  • PyPI: https://pypi.org/project/watchtower-podman/"
-    echo "  • Actions: https://github.com/sinhaankur/WatchTower/actions"
+    echo "  • Actions: https://github.com/Node2-io/WatchTowerOps/actions"
     echo ""
 }
 

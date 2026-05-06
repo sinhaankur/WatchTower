@@ -112,7 +112,7 @@ def require_pro(feature_key: str):
                 "feature": feature_key,
                 "feature_name": feature["name"],
                 "feature_description": feature["description"],
-                "upgrade_url": "https://github.com/sinhaankur/WatchTower#pro-features",
+                "upgrade_url": "https://github.com/Node2-io/WatchTowerOps#pro-features",
                 "message": (
                     f"{feature['name']} is a Pro feature. Upgrade your installation "
                     "to enable it (set WATCHTOWER_TIER=pro on the host)."
@@ -156,5 +156,5 @@ async def get_edition(
             }
             for key, meta in PRO_FEATURES.items()
         },
-        "upgrade_url": "https://github.com/sinhaankur/WatchTower#pro-features",
+        "upgrade_url": "https://github.com/Node2-io/WatchTowerOps#pro-features",
     }

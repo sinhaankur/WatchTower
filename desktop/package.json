@@ -7,7 +7,7 @@
     "name": "WatchTower Contributors",
     "email": "opensource@sinhaankur.dev"
   },
-  "homepage": "https://github.com/sinhaankur/WatchTower",
+  "homepage": "https://github.com/Node2-io/WatchTowerOps",
   "main": "main.js",
   "scripts": {
     "start": "electron --no-sandbox .",

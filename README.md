@@ -1,12 +1,12 @@
 # WatchTower
 
 <p align="center">
-  <a href="https://github.com/sinhaankur/WatchTower/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT License" /></a>
+  <a href="https://github.com/Node2-io/WatchTowerOps/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0%20%2F%20ELv2-blue.svg" alt="Apache 2.0 + Elastic License 2.0" /></a>
   <img src="https://img.shields.io/badge/python-3.8%2B-blue.svg" alt="Python 3.8+" />
   <img src="https://img.shields.io/badge/node-18%2B-brightgreen.svg" alt="Node 18+" />
-  <a href="https://github.com/sinhaankur/WatchTower/pkgs/container/watchtower"><img src="https://img.shields.io/badge/container-GHCR-blueviolet.svg" alt="GHCR" /></a>
-  <a href="https://sinhaankur.github.io/WatchTower/"><img src="https://img.shields.io/badge/docs-GitHub%20Pages-orange.svg" alt="Docs" /></a>
-  <a href="https://github.com/sinhaankur/WatchTower/issues"><img src="https://img.shields.io/github/issues/sinhaankur/WatchTower.svg" alt="Issues" /></a>
+  <a href="https://github.com/Node2-io/WatchTowerOps/pkgs/container/watchtower"><img src="https://img.shields.io/badge/container-GHCR-blueviolet.svg" alt="GHCR" /></a>
+  <a href="https://Node2-io.github.io/WatchTowerOps/"><img src="https://img.shields.io/badge/docs-GitHub%20Pages-orange.svg" alt="Docs" /></a>
+  <a href="https://github.com/Node2-io/WatchTowerOps/issues"><img src="https://img.shields.io/github/issues/Node2-io/WatchTowerOps.svg" alt="Issues" /></a>
 </p>
 
 <p align="center">
@@ -40,7 +40,7 @@ Manage everything from the **Integrations** page: see live connection status for
 ## Get Running in 30 Seconds
 
 ```bash
-git clone https://github.com/sinhaankur/WatchTower.git
+git clone https://github.com/Node2-io/WatchTowerOps.git
 cd WatchTower
 ./run.sh
 ```
@@ -68,7 +68,7 @@ That's it. `run.sh` will:
 Use the single-node app compose file for a production-like local run:
 
 ```bash
-git clone https://github.com/sinhaankur/WatchTower.git
+git clone https://github.com/Node2-io/WatchTowerOps.git
 cd WatchTower
 
 # Optional: set your own strong token first
@@ -207,7 +207,7 @@ The 1.5.x series — and especially the 1.5.10 → 1.5.12 cluster — moved Watc
 - **Branch protection on `main`.** Build (Linux/macOS/Windows matrix) + Trivy filesystem & container scans must pass before merge.
 - **Stale `chore/release-*` branches and unused workflows pruned.** Repository is back to a single canonical branch (`main`) with a clean release pipeline.
 
-> See `git log v1.5.10..v1.5.12 --oneline` for the full commit list, or browse [the Releases page](https://github.com/sinhaankur/WatchTower/releases) for installer downloads.
+> See `git log v1.5.10..v1.5.12 --oneline` for the full commit list, or browse [the Releases page](https://github.com/Node2-io/WatchTowerOps/releases) for installer downloads.
 
 ---
 
@@ -226,8 +226,8 @@ WatchTower is **fully functional** and suitable for:
 |---------|-----------|----------|
 | **Docker** | `docker pull ghcr.io/sinhaankur/watchtower:latest` | Production & staging |
 | **Python** | `pipx install watchtower-podman` (Ubuntu 24+ / Debian 12+ / Fedora 38+) or `pip install watchtower-podman` in a venv on older distros | Development & automation |
-| **Source** | [GitHub Releases](https://github.com/sinhaankur/WatchTower/releases) | Development, customization |
-| **Git** | `git clone https://github.com/sinhaankur/WatchTower.git` | Contributor setup |
+| **Source** | [GitHub Releases](https://github.com/Node2-io/WatchTowerOps/releases) | Development, customization |
+| **Git** | `git clone https://github.com/Node2-io/WatchTowerOps.git` | Contributor setup |
 
 ### Key Documentation
 
@@ -240,7 +240,7 @@ WatchTower is **fully functional** and suitable for:
 
 ```bash
 # Single node (30 seconds)
-git clone https://github.com/sinhaankur/WatchTower.git && cd WatchTower && ./run.sh
+git clone https://github.com/Node2-io/WatchTowerOps.git && cd WatchTower && ./run.sh
 
 # Docker (production-like)
 docker compose -f docker-compose.app.yml up -d
@@ -444,7 +444,7 @@ Optional helper command:
 
 - Source files are in `docs/`
 - Deployment workflow: `.github/workflows/deploy-pages.yml`
-- URL: `https://sinhaankur.github.io/WatchTower/`
+- URL: `https://Node2-io.github.io/WatchTowerOps/`
 
 If Pages has never been enabled on this repository:
 
@@ -520,7 +520,7 @@ sudo apt install podman
 2. Clone repository:
 
 ```bash
-git clone https://github.com/sinhaankur/WatchTower.git
+git clone https://github.com/Node2-io/WatchTowerOps.git
 cd WatchTower
 ```
 
@@ -928,7 +928,7 @@ Optional helper:
 
 - Source: `docs/`
 - Workflow: `.github/workflows/deploy-pages.yml`
-- URL: <https://sinhaankur.github.io/WatchTower/>
+- URL: <https://Node2-io.github.io/WatchTowerOps/>
 
 If Pages has never been enabled:
 
@@ -1013,12 +1013,15 @@ When adding features, include:
 
 ## License
 
-MIT License. See `LICENSE`.
+WatchTower is open-core. Code outside `pro/` is licensed under the
+[Apache License 2.0](LICENSE); code inside `pro/` is licensed under the
+[Elastic License 2.0](pro/LICENSE). See [LICENSING.md](LICENSING.md) for
+the full explanation, what's free vs. Pro, and trademark notes.
 
 ## Support
 
-- Issues: <https://github.com/sinhaankur/WatchTower/issues>
-- Docs: <https://github.com/sinhaankur/WatchTower>
+- Issues: <https://github.com/Node2-io/WatchTowerOps/issues>
+- Docs: <https://github.com/Node2-io/WatchTowerOps>
 
 ## Acknowledgments
 

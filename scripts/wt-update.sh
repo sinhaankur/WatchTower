@@ -105,14 +105,14 @@ if [[ "$SKIP_INSTALL" -eq 0 ]]; then
     # /releases/latest is a 302 to /releases/tag/v<X.Y.Z>; pull the tag
     # out of the redirect target. -I is HEAD, -L follows redirects, but
     # we want the FIRST hop's location (which is the resolved tag).
-    TAG=$(curl -sI https://github.com/sinhaankur/WatchTower/releases/latest \
+    TAG=$(curl -sI https://github.com/Node2-io/WatchTowerOps/releases/latest \
             | awk -F/ '/^[Ll]ocation:/{print $NF; exit}' | tr -d '\r\n')
   fi
   if [[ -z "$TAG" || ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
     echo "  could not resolve tag (got: '$TAG')"; exit 1
   fi
   ASSET="WatchTower-${TAG#v}-linux-${DEB_ARCH}.deb"
-  URL="https://github.com/sinhaankur/WatchTower/releases/download/${TAG}/${ASSET}"
+  URL="https://github.com/Node2-io/WatchTowerOps/releases/download/${TAG}/${ASSET}"
   echo "  $TAG → $ASSET"
 
   step "5/6: download + install"

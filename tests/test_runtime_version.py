@@ -36,7 +36,7 @@ def test_version_reports_update_when_remote_is_newer(client: TestClient):
     fake = {
         "latest": "99.0.0",
         "tag_name": "v99.0.0",
-        "release_url": "https://github.com/sinhaankur/WatchTower/releases/tag/v99.0.0",
+        "release_url": "https://github.com/Node2-io/WatchTowerOps/releases/tag/v99.0.0",
         "published_at": "2099-01-01T00:00:00Z",
         "name": "v99.0.0",
     }
@@ -55,7 +55,7 @@ def test_version_no_update_when_remote_is_same(client: TestClient):
     fake = {
         "latest": watchtower.__version__,
         "tag_name": f"v{watchtower.__version__}",
-        "release_url": "https://github.com/sinhaankur/WatchTower/releases/latest",
+        "release_url": "https://github.com/Node2-io/WatchTowerOps/releases/latest",
         "published_at": "2026-01-01T00:00:00Z",
         "name": f"v{watchtower.__version__}",
     }

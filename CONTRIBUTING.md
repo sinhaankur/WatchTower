@@ -45,7 +45,7 @@ Thank you for considering contributing to WatchTower! This document provides gui
 
 ```bash
 # Clone the repository
-git clone https://github.com/sinhaankur/WatchTower.git
+git clone https://github.com/Node2-io/WatchTowerOps.git
 cd WatchTower
 
 # Install dependencies
