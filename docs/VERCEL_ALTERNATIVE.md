@@ -191,7 +191,7 @@ Tailscale secures SSH for ops
 
 ### Option 1: Single Node (Fastest)
 ```bash
-git clone https://github.com/sinhaankur/WatchTower.git
+git clone https://github.com/Node2-io/WatchTowerOps.git
 cd WatchTower
 ./run.sh                        # Starts on 127.0.0.1:8000
 ```
@@ -260,9 +260,9 @@ WatchTower automatically creates a preview slot and posts the URL on your PR.
 
 ## Support & Community
 
-- **Issues & Bug Reports:** [GitHub Issues](https://github.com/sinhaankur/WatchTower/issues)
-- **Documentation:** [Full Docs](https://sinhaankur.github.io/WatchTower/)
-- **Discussions:** [GitHub Discussions](https://github.com/sinhaankur/WatchTower/discussions)
+- **Issues & Bug Reports:** [GitHub Issues](https://github.com/Node2-io/WatchTowerOps/issues)
+- **Documentation:** [Full Docs](https://Node2-io.github.io/WatchTowerOps/)
+- **Discussions:** [GitHub Discussions](https://github.com/Node2-io/WatchTowerOps/discussions)
 - **Roadmap:** [PLATFORM_BUILD_SUMMARY.md](./PLATFORM_BUILD_SUMMARY.md)
 
 ---

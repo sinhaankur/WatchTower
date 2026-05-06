@@ -1,6 +1,6 @@
 # GitHub Pages Documentation Improvements — Complete
 
-Your GitHub Pages documentation at `https://sinhaankur.github.io/WatchTower/` has been completely redesigned to better explain WatchTower to DevOps teams and new users.
+Your GitHub Pages documentation at `https://Node2-io.github.io/WatchTowerOps/` has been completely redesigned to better explain WatchTower to DevOps teams and new users.
 
 ---
 
@@ -150,7 +150,7 @@ New footer link: **"vs Vercel"** pointing to full comparison document
 
 ## What Users See Now
 
-When someone visits `https://sinhaankur.github.io/WatchTower/`:
+When someone visits `https://Node2-io.github.io/WatchTowerOps/`:
 
 1. **Hero** — Sees this is a Vercel/PaaS alternative with cost savings
 2. **Chips** — Understand key features (HA, watchdog, integrations, low cost)
@@ -176,7 +176,7 @@ When someone visits `https://sinhaankur.github.io/WatchTower/`:
 
 ## Next Steps
 
-1. **View the live site**: https://sinhaankur.github.io/WatchTower/
+1. **View the live site**: https://Node2-io.github.io/WatchTowerOps/
 2. **Share with DevOps teams** — Point them to the DevOps Use Cases section
 3. **Use the comparison table** — Mention in pitches to CTOs
 4. **Link to Vercel Alternative doc** — For teams wanting deep-dive (available from comparison section)

@@ -1,6 +1,6 @@
 # WatchTower Ops for VS Code
 
-Deploy, monitor, and manage your [WatchTower](https://github.com/sinhaankur/WatchTower) projects without leaving the editor. WatchTower Ops adds a sidebar, status bar, and command palette integration that talks directly to your WatchTower API server — local, remote, or self-hosted.
+Deploy, monitor, and manage your [WatchTower](https://github.com/Node2-io/WatchTowerOps) projects without leaving the editor. WatchTower Ops adds a sidebar, status bar, and command palette integration that talks directly to your WatchTower API server — local, remote, or self-hosted.
 
 WatchTower itself is a desktop-first deployment control plane for projects backed by Podman (or Docker) and Nixpacks. This extension is the IDE-side companion: trigger a deploy, watch logs stream, roll back a bad deployment, or pop open the project's live URL — all from inside VS Code.
 
@@ -27,7 +27,7 @@ Or search for **WatchTower Ops** in the Extensions sidebar (`Ctrl+Shift+X` / `�
 
 ### 2. Run a WatchTower API server
 
-The extension talks to a running WatchTower backend. Easiest option — install the desktop app from the [GitHub Releases page](https://github.com/sinhaankur/WatchTower/releases) and launch it. The backend starts on `http://127.0.0.1:8000` by default.
+The extension talks to a running WatchTower backend. Easiest option — install the desktop app from the [GitHub Releases page](https://github.com/Node2-io/WatchTowerOps/releases) and launch it. The backend starts on `http://127.0.0.1:8000` by default.
 
 Other options:
 - **PyPI** (Ubuntu 24.04+ / Debian 12+ / Fedora 38+ / recent Homebrew): `pipx install watchtower-podman` then `watchtower-deploy serve`. Older distros: `pip install watchtower-podman`
@@ -84,10 +84,10 @@ All commands are available via the command palette:
 
 ## Links
 
-- 🏠 **Project home:** [github.com/sinhaankur/WatchTower](https://github.com/sinhaankur/WatchTower)
-- 📦 **Desktop app:** [Releases](https://github.com/sinhaankur/WatchTower/releases)
+- 🏠 **Project home:** [github.com/Node2-io/WatchTowerOps](https://github.com/Node2-io/WatchTowerOps)
+- 📦 **Desktop app:** [Releases](https://github.com/Node2-io/WatchTowerOps/releases)
 - 🐍 **Python package:** [`pip install watchtower-podman`](https://pypi.org/project/watchtower-podman/)
-- 🐛 **Issues / feature requests:** [github.com/sinhaankur/WatchTower/issues](https://github.com/sinhaankur/WatchTower/issues)
+- 🐛 **Issues / feature requests:** [github.com/Node2-io/WatchTowerOps/issues](https://github.com/Node2-io/WatchTowerOps/issues)
 
 ## License
 

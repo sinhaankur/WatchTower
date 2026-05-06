@@ -57,7 +57,7 @@ pip install watchtower-podman==1.2.2
 ### Option 3: Source Code (Development)
 ```bash
 # Clone specific version
-git clone --branch v1.2.2 https://github.com/sinhaankur/WatchTower.git
+git clone --branch v1.2.2 https://github.com/Node2-io/WatchTowerOps.git
 cd WatchTower
 ./run.sh
 ```
@@ -66,14 +66,14 @@ cd WatchTower
 ```bash
 # Download config for v1.2.2
 curl -o docker-compose.app.yml \
-  https://raw.githubusercontent.com/sinhaankur/WatchTower/v1.2.2/docker-compose.app.yml
+  https://raw.githubusercontent.com/Node2-io/WatchTowerOps/v1.2.2/docker-compose.app.yml
 
 # Run it
 docker compose up -d
 ```
 
 ### Option 5: GitHub Releases
-Visit: https://github.com/sinhaankur/WatchTower/releases
+Visit: https://github.com/Node2-io/WatchTowerOps/releases
 - Download source archives (`.zip`, `.tar.gz`)
 - View release notes
 - Download container image references
@@ -88,7 +88,7 @@ Visit: https://github.com/sinhaankur/WatchTower/releases
 
 1. **Go to:**
    ```
-   https://github.com/sinhaankur/WatchTower/settings/branches
+   https://github.com/Node2-io/WatchTowerOps/settings/branches
    ```
 
 2. **Click "Add rule"** and configure:
@@ -210,13 +210,13 @@ git push origin v1.2.3
 
 | Version | Status | Download | Released |
 |---------|--------|----------|----------|
-| v1.2.2 | ✅ **Latest** | [Docker](https://github.com/sinhaankur/WatchTower/pkgs/container/watchtower) / [PyPI](https://pypi.org/project/watchtower-podman/) / [GitHub](https://github.com/sinhaankur/WatchTower/releases/tag/v1.2.2) | Latest |
-| v1.2.1 | ✅ Stable | [Docker](https://github.com/sinhaankur/WatchTower/pkgs/container/watchtower) / [PyPI](https://pypi.org/project/watchtower-podman/1.2.1/) / [GitHub](https://github.com/sinhaankur/WatchTower/releases/tag/v1.2.1) | Earlier |
-| v1.2.0 | ✅ Stable | [Docker](https://github.com/sinhaankur/WatchTower/pkgs/container/watchtower) / [PyPI](https://pypi.org/project/watchtower-podman/1.2.0/) | Earlier |
-| v1.1.0 | ✅ Stable | [Docker](https://github.com/sinhaankur/WatchTower/pkgs/container/watchtower) / [PyPI](https://pypi.org/project/watchtower-podman/1.1.0/) | Earlier |
-| v1.0.0 | ✅ Original | [Docker](https://github.com/sinhaankur/WatchTower/pkgs/container/watchtower) / [PyPI](https://pypi.org/project/watchtower-podman/1.0.0/) | Earlier |
+| v1.2.2 | ✅ **Latest** | [Docker](https://github.com/Node2-io/WatchTowerOps/pkgs/container/watchtower) / [PyPI](https://pypi.org/project/watchtower-podman/) / [GitHub](https://github.com/Node2-io/WatchTowerOps/releases/tag/v1.2.2) | Latest |
+| v1.2.1 | ✅ Stable | [Docker](https://github.com/Node2-io/WatchTowerOps/pkgs/container/watchtower) / [PyPI](https://pypi.org/project/watchtower-podman/1.2.1/) / [GitHub](https://github.com/Node2-io/WatchTowerOps/releases/tag/v1.2.1) | Earlier |
+| v1.2.0 | ✅ Stable | [Docker](https://github.com/Node2-io/WatchTowerOps/pkgs/container/watchtower) / [PyPI](https://pypi.org/project/watchtower-podman/1.2.0/) | Earlier |
+| v1.1.0 | ✅ Stable | [Docker](https://github.com/Node2-io/WatchTowerOps/pkgs/container/watchtower) / [PyPI](https://pypi.org/project/watchtower-podman/1.1.0/) | Earlier |
+| v1.0.0 | ✅ Original | [Docker](https://github.com/Node2-io/WatchTowerOps/pkgs/container/watchtower) / [PyPI](https://pypi.org/project/watchtower-podman/1.0.0/) | Earlier |
 
-**View all releases:** https://github.com/sinhaankur/WatchTower/releases
+**View all releases:** https://github.com/Node2-io/WatchTowerOps/releases
 
 ---
 
@@ -270,7 +270,7 @@ Create GitHub Release with:
   - Installation instructions
 ```
 
-**Result:** Users can download from https://github.com/sinhaankur/WatchTower/releases
+**Result:** Users can download from https://github.com/Node2-io/WatchTowerOps/releases
 
 ---
 
@@ -297,30 +297,30 @@ docker run -p 8000:8000 ghcr.io/sinhaankur/watchtower:v1.2.2
 ### Share These Links
 
 **For Developers (want features):**
-- Main docs: https://github.com/sinhaankur/WatchTower
-- Get started: https://github.com/sinhaankur/WatchTower#get-running-in-30-seconds
+- Main docs: https://github.com/Node2-io/WatchTowerOps
+- Get started: https://github.com/Node2-io/WatchTowerOps#get-running-in-30-seconds
 
 **For DevOps/Ops (want to cut costs):**
-- Vercel alternative: https://github.com/sinhaankur/WatchTower/blob/main/docs/VERCEL_ALTERNATIVE.md
+- Vercel alternative: https://github.com/Node2-io/WatchTowerOps/blob/main/docs/VERCEL_ALTERNATIVE.md
 - Cost comparison: [see VERCEL_ALTERNATIVE.md](./docs/VERCEL_ALTERNATIVE.md#real-world-example-blog--api)
 
 **For IT/Security (want control):**
-- Implementation guide: https://github.com/sinhaankur/WatchTower/blob/main/docs/IMPLEMENTATION_GUIDE.md
-- Branch protection: https://github.com/sinhaankur/WatchTower/blob/main/BRANCH_PROTECTION.md
+- Implementation guide: https://github.com/Node2-io/WatchTowerOps/blob/main/docs/IMPLEMENTATION_GUIDE.md
+- Branch protection: https://github.com/Node2-io/WatchTowerOps/blob/main/BRANCH_PROTECTION.md
 
 **For Everyone (download options):**
-- Docker: https://github.com/sinhaankur/WatchTower/pkgs/container/watchtower
+- Docker: https://github.com/Node2-io/WatchTowerOps/pkgs/container/watchtower
 - PyPI: https://pypi.org/project/watchtower-podman/
-- GitHub Releases: https://github.com/sinhaankur/WatchTower/releases
+- GitHub Releases: https://github.com/Node2-io/WatchTowerOps/releases
 
 ---
 
 ## 📞 Support & Community
 
-- **Issues:** https://github.com/sinhaankur/WatchTower/issues
-- **Discussions:** https://github.com/sinhaankur/WatchTower/discussions
-- **Releases:** https://github.com/sinhaankur/WatchTower/releases
-- **Docs:** https://sinhaankur.github.io/WatchTower/
+- **Issues:** https://github.com/Node2-io/WatchTowerOps/issues
+- **Discussions:** https://github.com/Node2-io/WatchTowerOps/discussions
+- **Releases:** https://github.com/Node2-io/WatchTowerOps/releases
+- **Docs:** https://Node2-io.github.io/WatchTowerOps/
 
 ---
 

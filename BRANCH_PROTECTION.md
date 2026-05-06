@@ -89,7 +89,7 @@ If you prefer to configure via CLI:
 gh auth login
 
 # Add branch protection rule for main
-gh api repos/sinhaankur/WatchTower/branches/main/protection \
+gh api repos/Node2-io/WatchTowerOps/branches/main/protection \
   --method PUT \
   --input - << 'EOF'
 {
