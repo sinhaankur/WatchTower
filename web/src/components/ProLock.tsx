@@ -47,7 +47,7 @@ export function ProLock({ feature }: { feature: ProFeatureKey }) {
           </p>
           <div className="mt-5 flex flex-wrap gap-2">
             <a
-              href={data?.upgrade_url ?? 'https://github.com/sinhaankur/WatchTower'}
+              href={data?.upgrade_url ?? 'https://github.com/Node2-io/WatchTowerOps'}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-sm font-semibold transition-colors"

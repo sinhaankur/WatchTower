@@ -2224,7 +2224,7 @@ async def service_control(
 # for an hour to stay well under the 60-req/hr unauthenticated rate limit.
 
 _GITHUB_RELEASES_URL = (
-    "https://api.github.com/repos/sinhaankur/WatchTower/releases/latest"
+    "https://api.github.com/repos/Node2-io/WatchTowerOps/releases/latest"
 )
 _UPDATE_CACHE_TTL_SEC = 3600  # 1 hour
 _update_cache: dict[str, Any] = {"value": None, "fetched_at": 0.0}

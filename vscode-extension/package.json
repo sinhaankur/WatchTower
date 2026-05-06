@@ -21,7 +21,7 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/sinhaankur/WatchTower"
+    "url": "https://github.com/Node2-io/WatchTowerOps"
   },
   "main": "./out/extension.js",
   "activationEvents": [],

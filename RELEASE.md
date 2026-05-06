@@ -101,7 +101,7 @@ WatchTower includes CI/CD workflows that trigger on tags:
 **How users get it:**
 ```bash
 # Download via GitHub releases page
-https://github.com/sinhaankur/WatchTower/releases
+https://github.com/Node2-io/WatchTowerOps/releases
 ```
 
 **What's included:**
@@ -163,11 +163,11 @@ git push origin v1.2.2
 **How users get the source:**
 ```bash
 # Via GitHub releases page
-https://github.com/sinhaankur/WatchTower/releases/download/v1.2.2/watchtower-1.2.2.tar.gz
-https://github.com/sinhaankur/WatchTower/releases/download/v1.2.2/watchtower-1.2.2.zip
+https://github.com/Node2-io/WatchTowerOps/releases/download/v1.2.2/watchtower-1.2.2.tar.gz
+https://github.com/Node2-io/WatchTowerOps/releases/download/v1.2.2/watchtower-1.2.2.zip
 
 # Via git clone
-git clone --branch v1.2.2 https://github.com/sinhaankur/WatchTower.git
+git clone --branch v1.2.2 https://github.com/Node2-io/WatchTowerOps.git
 ```
 
 ---
@@ -243,14 +243,14 @@ pip install watchtower-podman
 
 ### Method 3: Source Code (Development)
 ```bash
-git clone --branch v1.2.2 https://github.com/sinhaankur/WatchTower.git
+git clone --branch v1.2.2 https://github.com/Node2-io/WatchTowerOps.git
 cd WatchTower
 ./run.sh
 ```
 
 ### Method 4: Docker Compose (Production)
 ```bash
-curl -O https://raw.githubusercontent.com/sinhaankur/WatchTower/v1.2.2/docker-compose.app.yml
+curl -O https://raw.githubusercontent.com/Node2-io/WatchTowerOps/v1.2.2/docker-compose.app.yml
 docker compose -f docker-compose.app.yml up -d
 ```
 
@@ -260,7 +260,7 @@ docker compose -f docker-compose.app.yml up -d
 
 ### On GitHub
 ```
-https://github.com/sinhaankur/WatchTower/releases
+https://github.com/Node2-io/WatchTowerOps/releases
 ```
 
 ### Via CLI

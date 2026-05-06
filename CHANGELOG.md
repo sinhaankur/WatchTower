@@ -1,6 +1,6 @@
 # Changelog
 
-Curated, human-friendly history of WatchTower releases. Auto-generated GitHub Release notes (per-PR summaries) are at https://github.com/sinhaankur/WatchTower/releases — this file groups changes by theme + skips the routine ones.
+Curated, human-friendly history of WatchTower releases. Auto-generated GitHub Release notes (per-PR summaries) are at https://github.com/Node2-io/WatchTowerOps/releases — this file groups changes by theme + skips the routine ones.
 
 ## Versioning
 
@@ -237,7 +237,7 @@ This release replaces the broken Squirrel-based path with a self-written DMG sel
 
 ### Failure-dialog escape hatch
 Even when WatchTower can't start (broken backend, missing dependencies), the user can now recover **without ever opening a terminal**. The "WatchTower failed to start" dialog gains a **Reinstall Latest Version** button (Mac only) that:
-- Hits `api.github.com/repos/sinhaankur/WatchTower/releases/latest` for the current tag.
+- Hits `api.github.com/repos/Node2-io/WatchTowerOps/releases/latest` for the current tag.
 - Confirms with the user (this WILL replace `/Applications/WatchTower.app`).
 - Runs the same self-replace helper.
 
@@ -526,4 +526,4 @@ The user reported "JavaScript error dialogs always there" + "stuck on splash wit
 
 ## Older releases
 
-See https://github.com/sinhaankur/WatchTower/releases for v1.5.0–v1.5.12 release notes.
+See https://github.com/Node2-io/WatchTowerOps/releases for v1.5.0–v1.5.12 release notes.

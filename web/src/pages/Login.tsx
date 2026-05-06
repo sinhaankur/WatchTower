@@ -561,7 +561,7 @@ const Login = () => {
                   </p>
                   <p className="mt-1 text-blue-600">
                     <a
-                      href="https://github.com/sinhaankur/WatchTower#github-authentication"
+                      href="https://github.com/Node2-io/WatchTowerOps#github-authentication"
                       target="_blank"
                       rel="noopener noreferrer"
                       className="hover:underline"
@@ -627,7 +627,7 @@ const Login = () => {
                       // button doesn't work").
                       if (!oauthReady && !deviceFlowReady) {
                         window.open(
-                          'https://github.com/sinhaankur/WatchTower#github-authentication',
+                          'https://github.com/Node2-io/WatchTowerOps#github-authentication',
                           '_blank',
                           'noopener,noreferrer',
                         );
