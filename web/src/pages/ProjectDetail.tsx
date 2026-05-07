@@ -23,6 +23,7 @@ type Project = {
   use_case: string;
   repo_url: string;
   repo_branch: string;
+  build_command: string | null;
   created_at: string;
 };
 
@@ -346,6 +347,8 @@ function OverviewTab({ project }: { project: Project }) {
 
       <RunLocallyCard projectId={project.id} />
 
+      <BuildCommandCard project={project} />
+
       <div className="rounded-xl border border-border bg-card overflow-hidden">
         <div className="px-5 py-4 border-b border-border bg-muted/30">
           <h2 className="text-sm font-semibold">GitHub Webhook URL</h2>
@@ -359,6 +362,110 @@ function OverviewTab({ project }: { project: Project }) {
             Copy
           </button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ── BuildCommandCard ──────────────────────────────────────────────────────────
+// Inline editor for Project.build_command. NULL/empty in the DB means
+// "auto-detect at deploy time based on lockfile" — shown to the user as
+// "Auto-detect" so they don't have to know about the column being nullable.
+
+function BuildCommandCard({ project }: { project: Project }) {
+  const [saved, setSaved] = useState<string | null>(project.build_command);
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState<string>(project.build_command ?? '');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const placeholder = 'npm install && npm run build';
+
+  const startEdit = () => {
+    setDraft(saved ?? '');
+    setError(null);
+    setEditing(true);
+  };
+
+  const cancel = () => {
+    setEditing(false);
+    setError(null);
+  };
+
+  const save = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const trimmed = draft.trim();
+      const resp = await apiClient.put(`/projects/${project.id}`, {
+        build_command: trimmed,
+      });
+      const next: string | null = resp.data?.build_command ?? null;
+      setSaved(next && next.length > 0 ? next : null);
+      setEditing(false);
+    } catch (err) {
+      setError(extractDetail(err, 'Failed to save build command'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="rounded-xl border border-border bg-card overflow-hidden">
+      <div className="px-5 py-4 border-b border-border bg-muted/30 flex items-center justify-between">
+        <h2 className="text-sm font-semibold">Build Command</h2>
+        {!editing && (
+          <button
+            onClick={startEdit}
+            className="text-xs px-3 py-1 rounded border border-border hover:bg-muted transition-colors"
+          >
+            {saved ? 'Edit' : 'Override'}
+          </button>
+        )}
+      </div>
+      <div className="px-5 py-4 flex flex-col gap-3">
+        {!editing && (
+          <>
+            <code className="text-xs bg-muted rounded px-3 py-2 break-all font-mono">
+              {saved ?? `Auto-detect (default: ${placeholder})`}
+            </code>
+            <p className="text-xs text-muted-foreground">
+              {saved
+                ? 'Custom override. Runs verbatim during every deploy.'
+                : 'WatchTower picks an install command (npm / pnpm / yarn / bun) based on the lockfile in your repo, then runs `npm run build`. Set an override to run a different pipeline.'}
+            </p>
+          </>
+        )}
+        {editing && (
+          <>
+            <input
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              placeholder={placeholder}
+              className="w-full text-sm font-mono px-3 py-2 rounded border border-border bg-white focus:outline-none focus:border-blue-500"
+            />
+            <p className="text-xs text-muted-foreground">
+              Leave blank to fall back to auto-detect.
+            </p>
+            {error && <p className="text-xs text-red-600">{error}</p>}
+            <div className="flex gap-2">
+              <button
+                onClick={save}
+                disabled={busy}
+                className="text-xs px-3 py-1.5 rounded bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 transition-colors"
+              >
+                {busy ? 'Saving…' : 'Save'}
+              </button>
+              <button
+                onClick={cancel}
+                disabled={busy}
+                className="text-xs px-3 py-1.5 rounded border border-border hover:bg-muted disabled:opacity-50 transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

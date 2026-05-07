@@ -18,7 +18,7 @@ from urllib.parse import urlsplit, urlunsplit
 import json as _json
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional
 from uuid import UUID
 
 from sqlalchemy.orm import Session
@@ -92,7 +92,9 @@ async def _run_build(deployment_id) -> None:
 
         project: Project = deployment.project
 
-        # Create / reset build record
+        # Create / reset build record. The build_command is resolved a second
+        # time *after* clone (once we can see the actual lockfile), so the
+        # placeholder here just records intent for the queued state.
         build = Build(
             deployment_id=deployment.id,
             build_command=_resolve_build_command(db, project),
@@ -132,7 +134,14 @@ async def _run_build(deployment_id) -> None:
         env_vars = _load_env_vars(db, project)
 
         # ── Step 3: Run build command ──────────────────────────────────────
-        build_cmd = build.build_command
+        # Re-resolve now that we can inspect the cloned repo. If the user
+        # set Project.build_command explicitly we honour that. Otherwise we
+        # pick npm/pnpm/yarn/bun based on the lockfile actually present —
+        # avoids the `npm ci` failure when a project has no package-lock.json.
+        build_cmd = _resolve_build_command(db, project, repo_dir=repo_dir)
+        if build_cmd != build.build_command:
+            build.build_command = build_cmd
+            db.commit()
         if build_cmd:
             _append(f"\n[WatchTower] Running build: {build_cmd}")
             ok, err = await _run_cmd(build_cmd, cwd=repo_dir, env_vars=env_vars, append=_append)
@@ -176,7 +185,12 @@ async def _run_build(deployment_id) -> None:
         logger.exception("Build runner error for deployment %s", deployment_id)
         try:
             if build:
-                build.build_output = (build.build_output or "") + f"\n[WatchTower] ❌ {exc}"
+                output = build.build_output or ""
+                hint = _humanize_failure(output, build.build_command or "")
+                tail = f"\n[WatchTower] ❌ {exc}"
+                if hint:
+                    tail += f"\n\n[WatchTower] 💡 {hint}"
+                build.build_output = output + tail
                 build.status = BuildStatus.FAILED
                 build.completed_at = utcnow()
             if deployment:
@@ -492,19 +506,110 @@ async def _ssh_run(node: OrgNode, command: str, append) -> tuple[bool, str]:
     return True, ""
 
 
-def _resolve_build_command(db: Session, project: Project) -> str:
-    if project.use_case == UseCaseType.NETLIFY_LIKE:
-        cfg = db.query(NetlifeLikeConfig).filter_by(project_id=project.id).first()
-        return "npm ci && npm run build" if cfg else "npm ci && npm run build"
-    if project.use_case == UseCaseType.VERCEL_LIKE:
-        cfg = db.query(VericelLikeConfig).filter_by(project_id=project.id).first()
-        return "npm ci && npm run build" if cfg else "npm ci && npm run build"
+def _resolve_build_command(
+    db: Session,
+    project: Project,
+    repo_dir: Optional[Path] = None,
+) -> str:
+    """Pick the install/build command for *project*.
+
+    Resolution order:
+      1. ``project.build_command`` if the user set one (honoured verbatim)
+      2. Use-case default, with the install half chosen by lockfile inspection
+         when ``repo_dir`` is provided
+
+    Passing ``repo_dir`` is what enables npm-vs-pnpm-vs-yarn-vs-bun detection.
+    The placeholder pre-clone call (no repo_dir) falls back to ``npm install``
+    so a lockfile-less project doesn't immediately fail with the cryptic
+    ``npm ci`` help-text dump that prompted this whole rewrite.
+    """
+    if project.build_command:
+        return project.build_command
+
     if project.use_case == UseCaseType.DOCKER_PLATFORM:
         cfg = db.query(DockerPlatformConfig).filter_by(project_id=project.id).first()
         if cfg:
             return f"docker build -t watchtower-{project.id} -f {cfg.dockerfile_path} ."
         return "docker build -t watchtower-app ."
+
+    if project.use_case in (UseCaseType.NETLIFY_LIKE, UseCaseType.VERCEL_LIKE):
+        install = _detect_node_install(repo_dir) if repo_dir else "npm install"
+        return f"{install} && npm run build"
+
     return ""
+
+
+def _detect_node_install(repo_dir: Path) -> str:
+    """Pick the install command based on whichever lockfile lives in *repo_dir*.
+
+    Order matches typical project precedence: a project with both pnpm and
+    npm lockfiles is overwhelmingly a pnpm project that has a stale
+    package-lock.json from earlier in its history.
+    """
+    if (repo_dir / "pnpm-lock.yaml").exists():
+        return "pnpm install --frozen-lockfile"
+    if (repo_dir / "yarn.lock").exists():
+        return "yarn install --frozen-lockfile"
+    if (repo_dir / "bun.lockb").exists() or (repo_dir / "bun.lock").exists():
+        return "bun install --frozen-lockfile"
+    if (repo_dir / "package-lock.json").exists():
+        return "npm ci"
+    # No lockfile: `npm ci` would fail with a help-text dump. Fall back to
+    # plain `npm install` which works without a lockfile and generates one.
+    return "npm install"
+
+
+# Build-failure patterns we know how to translate into a one-line nudge.
+# Each (id, predicate, hint) tuple is checked in order; first match wins.
+_FAILURE_HINTS: list[tuple[str, Callable[[str, str], bool], str]] = [
+    (
+        "npm-ci-no-lockfile",
+        lambda out, cmd: (
+            "npm ci" in cmd
+            and "npm error" in out
+            and (
+                "package-lock.json" in out
+                or "ic, install-clean, isntall-clean" in out
+                or "clean-install" in out
+            )
+        ),
+        (
+            "Build runs `npm ci`, which requires a `package-lock.json`. "
+            "Either commit a lockfile to the repo, or open Project Settings "
+            "and change the build command to `npm install && npm run build`."
+        ),
+    ),
+    (
+        "missing-package-json",
+        lambda out, cmd: "ENOENT" in out and "package.json" in out,
+        (
+            "No `package.json` found in the repo root. If your app lives in "
+            "a subdirectory, override the build command to `cd <dir> && "
+            "npm install && npm run build`."
+        ),
+    ),
+    (
+        "missing-dockerfile",
+        lambda out, cmd: cmd.startswith("docker build") and "Dockerfile" in out and "no such file" in out.lower(),
+        (
+            "`docker build` couldn't find the Dockerfile. Set its path under "
+            "Project Settings → Dockerfile path."
+        ),
+    ),
+]
+
+
+def _humanize_failure(output: str, build_cmd: str) -> Optional[str]:
+    """Return a one-line operator-friendly hint for a known build failure."""
+    if not output:
+        return None
+    for _id, predicate, hint in _FAILURE_HINTS:
+        try:
+            if predicate(output, build_cmd):
+                return hint
+        except Exception:
+            continue
+    return None
 
 
 def _resolve_output_path(db: Session, project: Project, repo_dir: Path) -> Path:
@@ -641,7 +746,10 @@ def detect_framework(repo_url: str, branch: str = "main") -> dict:
     Falls back to cloning a shallow copy when direct fetch fails.
     """
     framework = "unknown"
-    build_command = "npm ci && npm run build"
+    # Lockfile-less default. The runner re-resolves to `npm ci` (or pnpm /
+    # yarn / bun) once the repo is cloned and the lockfile is visible —
+    # this string is just the wizard's "first guess" to show the user.
+    build_command = "npm install && npm run build"
     output_dir = "dist"
     detected = False
 
@@ -700,9 +808,12 @@ def _parse_package_json(pkg: dict) -> tuple[str, str, str]:
         **pkg.get("devDependencies", {}),
     }
     scripts = pkg.get("scripts", {})
-    build_cmd = scripts.get("build", "npm ci && npm run build")
-    if "npm ci" not in build_cmd:
-        build_cmd = f"npm ci && {build_cmd}"
+    # Default to a lockfile-less install so the wizard's first guess works
+    # for fresh repos. The runner picks the right install command (npm ci /
+    # pnpm / yarn / bun) at deploy time once the lockfile is visible.
+    build_cmd = scripts.get("build", "npm run build")
+    if "install" not in build_cmd and "npm ci" not in build_cmd:
+        build_cmd = f"npm install && {build_cmd}"
 
     # Framework detection by known deps
     if "next" in deps:

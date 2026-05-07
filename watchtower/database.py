@@ -214,6 +214,11 @@ class Project(Base):
     launch_url = Column(String, nullable=True)
     repo_url = Column(String)
     repo_branch = Column(String, default="main")
+    # User-provided override for the install/build pipeline. When NULL the
+    # builder picks a sensible default at deploy time based on the lockfile
+    # present in the cloned repo (npm/pnpm/yarn/bun) plus the project's
+    # use_case. See watchtower/builder.py:_resolve_build_command.
+    build_command = Column(String, nullable=True)
     webhook_secret = Column(String)
     # Port WatchTower picked (or the user accepted/overrode) at create
     # time. Used as the deploy-time default for the local-podman runner;
