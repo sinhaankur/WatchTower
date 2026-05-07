@@ -101,6 +101,9 @@ class ProjectBase(BaseModel):
     launch_url: Optional[str] = None
     repo_url: str
     repo_branch: str = "main"
+    # User override for the install/build pipeline. NULL = let the builder
+    # pick a default based on the detected lockfile + use_case.
+    build_command: Optional[str] = None
     # Set by the wizard from /api/runtime/recommend-port. Optional so the
     # legacy SSH/rsync flow that doesn't need a port can omit it.
     recommended_port: Optional[int] = None
@@ -113,6 +116,7 @@ class ProjectCreate(ProjectBase):
 class ProjectUpdate(BaseModel):
     name: Optional[str] = None
     repo_branch: Optional[str] = None
+    build_command: Optional[str] = None
     is_active: Optional[bool] = None
     recommended_port: Optional[int] = None
 

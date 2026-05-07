@@ -84,6 +84,7 @@ async def create_project(
             launch_url=project_data.launch_url,
             repo_url=project_data.repo_url,
             repo_branch=project_data.repo_branch,
+            build_command=project_data.build_command,
             webhook_secret=webhook_secret,
             recommended_port=project_data.recommended_port,
             org_id=org.id,
@@ -174,6 +175,14 @@ async def update_project(
     if project_data.repo_branch and project_data.repo_branch != project.repo_branch:
         changes["repo_branch"] = {"from": project.repo_branch, "to": project_data.repo_branch}
         project.repo_branch = project_data.repo_branch
+    # build_command is opt-in: pydantic gives us None when the field was
+    # absent. Empty string ("") means the user explicitly cleared it back
+    # to "auto-detect" — store NULL so _resolve_build_command falls
+    # through to the lockfile-based default.
+    if project_data.build_command is not None and project_data.build_command != (project.build_command or ""):
+        new_cmd = project_data.build_command.strip() or None
+        changes["build_command"] = {"from": project.build_command, "to": new_cmd}
+        project.build_command = new_cmd
     if project_data.is_active is not None and project_data.is_active != project.is_active:
         changes["is_active"] = {"from": project.is_active, "to": project_data.is_active}
         project.is_active = project_data.is_active

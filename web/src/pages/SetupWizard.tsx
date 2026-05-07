@@ -396,7 +396,7 @@ const SetupWizard = () => {
     repo_url: '',
     local_folder_path: '',
     repo_branch: 'main',
-    build_command: 'npm ci && npm run build',
+    build_command: 'npm install && npm run build',
     project_name: '',
     launch_url: 'http://localhost:3000',
     output_dir: 'dist',
@@ -1115,7 +1115,7 @@ const SetupWizard = () => {
                   </div>
                   <div>
                     <Label htmlFor="build_command">Build/Run Command {data.source_type === 'github' ? '*' : '(optional)'}</Label>
-                    <Input id="build_command" value={data.build_command} onChange={(e) => setField('build_command', e.target.value)} className="mt-1.5 rounded-md border-border bg-white" placeholder={data.source_type === 'github' ? 'npm ci && npm run build' : 'npm run dev'} />
+                    <Input id="build_command" value={data.build_command} onChange={(e) => setField('build_command', e.target.value)} className="mt-1.5 rounded-md border-border bg-white" placeholder={data.source_type === 'github' ? 'npm install && npm run build' : 'npm run dev'} />
                   </div>
                 </div>
                 </>
