@@ -186,8 +186,10 @@
       same "printed page" as the copyright notice for easier
       identification within third-party archives.
 
-   Copyright 2026 Ankur Sinha (assignment to Node2.io [Canadian numbered
-   corporation, registration in progress] pending — see LICENSING.md).
+   Copyright 2026 The WatchTower Authors. See AUTHORS at the repository
+   root for the list of contributors. Each contributor retains copyright
+   in their own contributions; the project as a whole is collectively
+   "The WatchTower Authors".
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
