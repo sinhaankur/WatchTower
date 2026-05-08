@@ -35,6 +35,8 @@
       "output": "dist"
     },
     "icon": "build/icons/app",
+    "compression": "maximum",
+    "npmRebuild": false,
     "files": [
       "main.js",
       "preload.js",
@@ -66,8 +68,8 @@
     "publish": [
       {
         "provider": "github",
-        "owner": "sinhaankur",
-        "repo": "WatchTower",
+        "owner": "Node2-io",
+        "repo": "WatchTowerOps",
         "releaseType": "release"
       }
     ],
@@ -80,7 +82,7 @@
       "category": "public.app-category.developer-tools"
     },
     "linux": {
-      "maintainer": "WatchTower Contributors <opensource@sinhaankur.dev>",
+      "maintainer": "The WatchTower Authors <opensource@sinhaankur.dev>",
       "icon": "build/icons",
       "target": [
         "AppImage",
