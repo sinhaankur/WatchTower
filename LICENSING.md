@@ -15,18 +15,15 @@ by which directory it sits in.
 
 ## Copyright holder
 
-Current copyright holder for all original work in this repository is
-**Ankur Sinha**, the original author. A Canadian numbered corporation
-operating as **Node2.io** is being formed; on registration, copyright in
-this codebase will be assigned to that corporation by a written IP
-Assignment Agreement, and the copyright notices in `LICENSE`, `pro/LICENSE`,
-and this file will be updated accordingly. Until then, all licensing terms
-above are granted by Ankur Sinha and continue to apply to all downstream
-users of the software both before and after the assignment.
+Copyright in this codebase is held collectively by **The WatchTower Authors**
+— every contributor retains copyright in their own contributions. The
+canonical list of contributors lives in [`AUTHORS`](AUTHORS) at the
+repository root and grows by pull request: each new contributor adds
+themselves in the same change that introduces their first contribution.
 
-For commercial licensing, security disclosures, or legal questions during
-this transition period, contact the addresses listed at the bottom of this
-file.
+There is no central copyright assignment. Contributions are licensed
+inbound under the same terms that govern outbound distribution (see
+[Contributing](#contributing) below).
 
 ## What's in each tier
 
@@ -42,8 +39,8 @@ most individual operators and small teams need:
 - Single-node and basic multi-node deployment over SSH
 - Local LLM agent (any OpenAI-compatible endpoint)
 
-The **`pro/` tier** (Elastic License 2.0) covers features sold under a
-Node2.io Commercial Subscription Agreement:
+The **`pro/` tier** (Elastic License 2.0) covers features available under
+a separate commercial agreement with The WatchTower Authors:
 
 - GitHub Enterprise Server (GHES) integration
 - Audit log retention and export
@@ -53,8 +50,8 @@ Node2.io Commercial Subscription Agreement:
 - Priority email support with response SLA
 
 The authoritative list of Pro features lives in
-`watchtower/api/edition.py` (`PRO_FEATURES`). License keys issued by Node2.io
-unlock the runtime gate in `pro/`.
+`watchtower/api/edition.py` (`PRO_FEATURES`). License keys issued by The
+WatchTower Authors unlock the runtime gate in `pro/`.
 
 ## Why two licenses
 
@@ -70,30 +67,35 @@ This is the same split used by Elastic, Sentry, AppFlowy, and Sourcegraph.
 
 ## Trademarks
 
-"WatchTower" and "Node2.io" are intended trademarks of the forthcoming
-Node2.io corporation; trademark applications are pending. The Apache 2.0
-license does **not** grant trademark rights — see Section 6 of the Apache
-License. You may build and distribute your own fork, but you must not call
-it "WatchTower" or imply it is the official Node2.io product.
+"WatchTower" is an unregistered trademark held by The WatchTower Authors.
+The Apache 2.0 license does **not** grant trademark rights — see
+Section 6 of the Apache License. You may build and distribute your own
+fork, but you must not call it "WatchTower" or imply it is the official
+project.
 
 ## Commercial licensing
 
-A Node2.io Commercial Subscription Agreement (CSA) supersedes the Elastic
-License for paying customers and may also relicense `pro/` content for
-specific contractual purposes (OEM, reseller, regulated environments).
-Contact <licensing@node2.io> for commercial terms.
+A separate commercial agreement with The WatchTower Authors supersedes
+the Elastic License for paying customers and may also relicense `pro/`
+content for specific contractual purposes (OEM, reseller, regulated
+environments). To inquire, open a private security advisory or a labelled
+issue at <https://github.com/Node2-io/WatchTowerOps/issues>; a maintainer
+will route the request.
 
 ## Contributing
 
-By submitting a contribution to this repository you agree to the
-Contributor License Agreement (CLA), which assigns Node2.io (or, prior to
-its incorporation, the current copyright holder) the right to relicense
-your contribution under the same terms as the surrounding directory. The
-CLA is administered through cla-assistant.io and is required for all
-non-trivial PRs. (Setup pending — see `CONTRIBUTING.md`.)
+This project follows the **inbound = outbound** convention: by submitting
+a pull request, you agree to license your contribution under the same
+terms that govern the directory it lands in (Apache 2.0 outside `pro/`,
+Elastic License 2.0 inside `pro/`). You retain copyright in your own
+work — there is no copyright assignment.
+
+Add yourself to the [`AUTHORS`](AUTHORS) file in the same pull request
+that introduces your first contribution. See [`CONTRIBUTING.md`](CONTRIBUTING.md)
+for the full workflow.
 
 ## Questions
 
-- General licensing questions → <licensing@node2.io>
-- Security disclosures → <security@node2.io>
-- Commercial sales → <sales@node2.io>
+- General licensing questions → open an issue at <https://github.com/Node2-io/WatchTowerOps/issues>
+- Security disclosures → use [GitHub Security Advisories](https://github.com/Node2-io/WatchTowerOps/security/advisories/new)
+- Commercial inquiries → open a labelled issue (a maintainer will follow up privately)

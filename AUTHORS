@@ -1,0 +1,18 @@
+# AUTHORS
+
+This file lists the individuals who hold copyright in the WatchTower
+codebase. Contributions are licensed inbound under the same terms that
+govern the directory they land in (Apache 2.0 outside `pro/`, Elastic
+License 2.0 inside `pro/`). Each contributor retains copyright in their
+own work; the project as a whole is collectively "The WatchTower Authors".
+
+Add yourself by including a line in the same pull request that introduces
+your first contribution:
+
+    Name <email>           — first commit YYYY-MM-DD
+
+Order is chronological by first contribution.
+
+## Authors
+
+Ankur Sinha <14087196+sinhaankur@users.noreply.github.com>  — initial author, 2024
