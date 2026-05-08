@@ -21,6 +21,10 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+          cache: 'pip'
+          cache-dependency-path: |
+            pyproject.toml
+            requirements.txt
 
       - name: Install dependencies
         run: |
@@ -92,6 +96,11 @@ jobs:
           # for the wrong ABI" surprises if those flags ever get
           # accidentally reverted. See 1.14.0 ship-blocker analysis.
           python-version: "3.12"
+          cache: 'pip'
+          cache-dependency-path: |
+            pyproject.toml
+            requirements.txt
+            scripts/build-python-bundle.sh
 
       - name: Cross-install windows-x64 bundle
         run: |
@@ -238,6 +247,11 @@ jobs:
           # bundled Python. (linux-arm64 + darwin-x64 hit the same
           # cross-install path; mac-arm64 + linux-x64 are native.)
           python-version: "3.12"
+          cache: 'pip'
+          cache-dependency-path: |
+            pyproject.toml
+            requirements.txt
+            scripts/build-python-bundle.sh
 
       - name: Install Pillow (installer image generation)
         run: pip install Pillow

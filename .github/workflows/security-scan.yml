@@ -34,8 +34,21 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
       - name: Build container image
-        run: docker build -t watchtower:security-scan .
+        # Reuse the GHA layer cache populated by publish-container.yml
+        # (read-only — never write from this workflow). Without buildx
+        # + cache-from, every PR rebuilt the apt + pip + npm layers from
+        # scratch, ~5 minutes per run on a path that's just a security
+        # gate. `load: true` keeps the image addressable for trivy below.
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: watchtower:security-scan
+          cache-from: type=gha
 
       - name: Run Trivy image scan
         uses: aquasecurity/trivy-action@v0.24.0
