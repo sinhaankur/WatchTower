@@ -1,5 +1,17 @@
 # syntax=docker/dockerfile:1.7
-FROM node:20-alpine AS web-builder
+# --platform=$BUILDPLATFORM pins the web-builder stage to the native build
+# host's architecture (amd64 on GitHub Actions). web/dist is just static
+# HTML/CSS/JS — platform-independent — so there's no reason to run `npm
+# ci` inside QEMU-emulated arm64. Without this pin, `docker buildx build
+# --platform linux/amd64,linux/arm64 .` runs the entire web-builder
+# under arm64 emulation, where npm postinstall scripts that download
+# native binaries (esbuild, swc, sharp) stall forever on emulated
+# network calls. v1.14.3's `WatchTower Deployer / build-and-push` job
+# hung for 3 hours on `RUN npm ci --legacy-peer-deps` for exactly this
+# reason. With BUILDPLATFORM the same step finishes in ~30s. The final
+# `COPY --from=web-builder` below brings the same dist/ output into
+# both amd64 and arm64 runtime images.
+FROM --platform=$BUILDPLATFORM node:20-alpine AS web-builder
 
 WORKDIR /web
 COPY web/package*.json ./

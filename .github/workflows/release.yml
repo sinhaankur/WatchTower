@@ -84,7 +84,14 @@ jobs:
 
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          # Match the bundled interpreter version pinned in
+          # scripts/build-python-bundle.sh (PYTHON_VERSION). Defense in
+          # depth: the script already passes --python-version/--abi to
+          # pip explicitly so the host version doesn't strictly matter,
+          # but keeping host == target removes a class of "wheel selected
+          # for the wrong ABI" surprises if those flags ever get
+          # accidentally reverted. See 1.14.0 ship-blocker analysis.
+          python-version: "3.12"
 
       - name: Cross-install windows-x64 bundle
         run: |
@@ -225,7 +232,12 @@ jobs:
 
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          # See note in build-windows-bundle above — this must match
+          # PYTHON_VERSION in scripts/build-python-bundle.sh so pip's
+          # cross-install picks wheels with the right ABI tag for the
+          # bundled Python. (linux-arm64 + darwin-x64 hit the same
+          # cross-install path; mac-arm64 + linux-x64 are native.)
+          python-version: "3.12"
 
       - name: Install Pillow (installer image generation)
         run: pip install Pillow

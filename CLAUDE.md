@@ -48,12 +48,13 @@ There is no `web/test` script — frontend has no automated tests. `npm run buil
 ### Tests
 
 ```bash
-pytest tests/                          # whole suite (only test_config.py exists today)
-pytest tests/test_config.py::test_default_config -v   # single test
-pytest --cov=watchtower tests/         # with coverage (needs pytest-cov)
+pytest tests/                                       # whole suite
+pytest tests/test_audit.py -v                       # one file
+pytest tests/test_audit.py::test_audit_read_returns_402_on_free_tier -v   # one test
+pytest --cov=watchtower tests/                      # with coverage (needs pytest-cov)
 ```
 
-Tests are sparse — most API/builder/desktop modules have no coverage. Treat new behaviour as needing a smoke test, not a comprehensive suite, unless the user asks otherwise.
+`tests/conftest.py` is the fixture entry point — it sets up an in-memory SQLite, monkeypatches `WATCHTOWER_API_TOKEN` / `WATCHTOWER_AUTH_SECRET`, and exposes a `client` fixture wired to `watchtower.api:app`. Reuse it rather than building app instances by hand. Coverage spans audit, agent, builder + UUID coercion, queue, GitHub device flow, rate limit, security fixes, SPA security headers, health check, local runner, deployments active count, backup/export, templates, and more — when adding behaviour, prefer extending an existing file in the same domain over creating a new one.
 
 ### VS Code extension (`vscode-extension/`)
 
@@ -106,7 +107,7 @@ python3 scripts/sync_versions.py   # fan version from watchtower/__init__.py to 
 
 - Runs `init_db()` and `_ensure_dev_api_token()` at **module import time** (NOT in lifespan — Alembic 1.13's `command.upgrade()` deadlocks uvicorn 0.29's lifespan, the call returns but `lifespan.startup.complete` is never sent → backend hangs forever, splash sits, smoke test times out at 90s). `_ensure_secret_key()` stays in lifespan (auto-generates a Fernet key at `~/.watchtower/secret.key` with `0600` perms if `WATCHTOWER_SECRET_KEY` is unset).
 - Default DB path falls through `DATABASE_URL` env → `$WATCHTOWER_DATA_DIR/watchtower.db` → `~/.watchtower/watchtower.db`, and only uses `./watchtower.db` if the file already exists in cwd (preserves dev-clone behaviour). The fallback is what makes the packaged AppImage work — its cwd is a read-only FUSE mount.
-- Mounts routers from `watchtower/api/{projects,deployments,builds,webhooks,setup,enterprise,runtime,envvars,notifications}.py`. All routers prefix `/api/...` and depend on `util.get_current_user`.
+- Mounts routers from `watchtower/api/{projects,deployments,builds,webhooks,setup,enterprise,runtime,envvars,notifications,agent,audit,me,templates,cloudflare,edition,local_runs}.py`. All routers prefix `/api/...` and depend on `util.get_current_user`.
 - Mounts `web/dist/assets` as static, and serves the React SPA via a `spa_fallback` route that path-traversal-guards every request (resolves the candidate and requires it to live inside `web/dist`).
 - Conditionally enables `/docs` only when `WATCHTOWER_ENABLE_DOCS=true`.
 
