@@ -27,11 +27,27 @@ export default defineConfig({
   build: {
     rollupOptions: {
       output: {
-        // Pin slow-changing deps into a vendor chunk so app-code deploys
-        // don't bust the cache for return visitors.
-        manualChunks: {
-          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
-          'vendor-query': ['@tanstack/react-query'],
+        // Pin slow-changing deps into vendor chunks so app-code deploys
+        // don't bust the cache for return visitors. Function form is
+        // required: the array form only matches bare specifiers like
+        // `react-dom`, but React 18+ pulls in `react-dom/client` which
+        // is a *different* path and ended up in the main bundle —
+        // ballooning it past 300 KB. Matching by node_modules path
+        // catches all subpaths of each package.
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return;
+          if (id.includes('@tanstack/react-query')) return 'vendor-query';
+          if (id.includes('@radix-ui')) return 'vendor-radix';
+          if (id.includes('node_modules/axios/')) return 'vendor-axios';
+          if (
+            id.includes('node_modules/react/') ||
+            id.includes('node_modules/react-dom/') ||
+            id.includes('node_modules/react-router-dom/') ||
+            id.includes('node_modules/react-router/') ||
+            id.includes('node_modules/scheduler/')
+          ) {
+            return 'vendor-react';
+          }
         },
       },
     },
