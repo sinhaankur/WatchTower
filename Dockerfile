@@ -1,17 +1,22 @@
+# syntax=docker/dockerfile:1.7
 FROM node:20-alpine AS web-builder
 
 WORKDIR /web
 COPY web/package*.json ./
-RUN npm ci --legacy-peer-deps
+# BuildKit cache mount preserves npm's download cache across builds — even
+# when a dependency change invalidates this layer, the tarballs we already
+# pulled stay on disk and the next install is offline-fast.
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci --prefer-offline --no-audit --no-fund
 COPY web/ ./
 RUN npm run build
 
 
 FROM python:3.12-slim-bookworm
 
-LABEL org.opencontainers.image.title="Wt" \
-    org.opencontainers.image.description="Wt deployment control plane with Podman and App Center workflows" \
-    org.opencontainers.image.source="https://github.com/sinhaankur/WatchTower"
+LABEL org.opencontainers.image.title="WatchTower" \
+    org.opencontainers.image.description="WatchTower deployment control plane with Podman and App Center workflows" \
+    org.opencontainers.image.source="https://github.com/Node2-io/WatchTowerOps"
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
@@ -27,8 +32,15 @@ WORKDIR /app
 COPY . /app
 COPY --from=web-builder /web/dist /app/web/dist
 
-RUN pip install --no-cache-dir --upgrade pip \
-    && pip install --no-cache-dir .
+# BuildKit cache mount keeps pip's wheel cache across builds. pyproject's
+# `dynamic = ["version"]` (read from watchtower/__init__.py) means we
+# can't cleanly separate dep install from package install, but the cache
+# mount means a code-only change re-runs the install step against an
+# already-warm wheel cache instead of redownloading every dep over the
+# network. The cache itself never lands in the final image.
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install --upgrade pip \
+    && pip install .
 
 EXPOSE 8000
 
