@@ -18,8 +18,15 @@ from urllib.parse import urlsplit, urlunsplit
 import json as _json
 from datetime import datetime
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Awaitable, Callable, Optional
 from uuid import UUID
+
+try:
+    import fcntl  # POSIX file locks for per-project workspace mutex
+    _HAS_FCNTL = True
+except ImportError:  # pragma: no cover - Windows fallback
+    fcntl = None  # type: ignore
+    _HAS_FCNTL = False
 
 from sqlalchemy.orm import Session
 
@@ -45,6 +52,24 @@ logger = logging.getLogger(__name__)
 BUILD_BASE = Path(os.getenv("WATCHTOWER_BUILD_DIR", "/tmp/watchtower-builds"))
 BUILD_BASE.mkdir(parents=True, exist_ok=True)
 
+# Persistent per-project workspaces and package-manager caches live under
+# stable subtrees of BUILD_BASE so they survive across deploys. The cache
+# directory is shared across all builds of a given project — npm/pnpm/etc
+# all handle concurrent reads on their cache directories internally.
+_WORKSPACES_DIR = BUILD_BASE / "workspaces"
+_CACHES_DIR = BUILD_BASE / "caches"
+_LOCKS_DIR = BUILD_BASE / "locks"
+for _d in (_WORKSPACES_DIR, _CACHES_DIR, _LOCKS_DIR):
+    _d.mkdir(parents=True, exist_ok=True)
+
+# Log-flush tuning. Every line gets queued in memory; we only commit the
+# joined `build.build_output` to the DB once we've accumulated this many
+# lines OR this much wall-clock time has elapsed since the last flush —
+# whichever comes first. Keeps the WebSocket tail responsive while removing
+# the per-line db.commit() that used to dominate build CPU on long logs.
+_LOG_FLUSH_LINES = 25
+_LOG_FLUSH_INTERVAL_SECS = 0.5
+
 
 # ---------------------------------------------------------------------------
 # Public API
@@ -62,6 +87,160 @@ async def run_build_async(deployment_id: str) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Log writer — batched DB commits
+# ---------------------------------------------------------------------------
+
+
+class _LogWriter:
+    """Buffered build-log writer.
+
+    Collects lines in memory and commits the joined ``build.build_output``
+    to the DB at most every ``_LOG_FLUSH_LINES`` lines or every
+    ``_LOG_FLUSH_INTERVAL_SECS`` seconds. The previous implementation
+    committed once per line, which on a 5,000-line build did 5,000
+    commits and rebuilt the entire output string each time (quadratic).
+    """
+
+    __slots__ = ("db", "build", "lines", "_last_flush", "_pending")
+
+    def __init__(self, db: Session, build: Build) -> None:
+        self.db = db
+        self.build = build
+        self.lines: list[str] = []
+        self._last_flush = time.monotonic()
+        self._pending = 0
+
+    def write(self, line: str) -> None:
+        self.lines.append(line)
+        self._pending += 1
+        if (
+            self._pending >= _LOG_FLUSH_LINES
+            or (time.monotonic() - self._last_flush) >= _LOG_FLUSH_INTERVAL_SECS
+        ):
+            self.flush()
+
+    def flush(self) -> None:
+        if not self._pending:
+            # Even with no new lines, callers may invoke flush() at status
+            # transitions — re-joining is fine but skipping the commit when
+            # nothing changed is the cheap path.
+            return
+        try:
+            self.build.build_output = "\n".join(self.lines)
+            self.db.commit()
+        except Exception:
+            # Don't let a transient DB hiccup kill the build.
+            logger.exception("Build log flush failed; continuing")
+        finally:
+            self._last_flush = time.monotonic()
+            self._pending = 0
+
+
+# ---------------------------------------------------------------------------
+# Subprocess streaming
+# ---------------------------------------------------------------------------
+
+
+async def _stream_proc(
+    proc: asyncio.subprocess.Process,
+    append: Callable[[str], None],
+    prefix: str = "",
+) -> int:
+    """Read ``proc.stdout`` chunked, splitting on newlines, calling
+    ``append`` for each completed line. Returns the process exit code.
+
+    Replaces the old ``proc.communicate()`` pattern, which buffered the
+    entire output before yielding any line — meaning the WebSocket "live
+    tail" never showed anything until the build finished. We read raw
+    chunks (rather than ``readline()``) so that pathological output with
+    a >64KB single line doesn't trip asyncio's StreamReader limit.
+    """
+    if proc.stdout is None:
+        return await proc.wait()
+    buf = b""
+    while True:
+        chunk = await proc.stdout.read(4096)
+        if not chunk:
+            break
+        buf += chunk
+        while b"\n" in buf:
+            line_b, buf = buf.split(b"\n", 1)
+            line = line_b.decode(errors="replace").rstrip("\r")
+            append(f"{prefix}{line}" if prefix else line)
+    if buf:
+        line = buf.decode(errors="replace").rstrip("\r")
+        append(f"{prefix}{line}" if prefix else line)
+    return await proc.wait()
+
+
+# ---------------------------------------------------------------------------
+# Workspace + cache management
+# ---------------------------------------------------------------------------
+
+
+def _acquire_workspace_lock(project_id) -> Optional[object]:
+    """Try to grab an exclusive non-blocking flock on the per-project lock
+    file. Returns the open file handle on success (caller releases by
+    closing it) or ``None`` if another build of the same project already
+    holds the lock — in which case the caller should fall back to a
+    per-deploy ephemeral workspace.
+
+    Returns ``None`` on platforms without ``fcntl`` (Windows) so we
+    transparently fall back to per-deploy workspaces there.
+    """
+    if not _HAS_FCNTL:
+        return None
+    lock_path = _LOCKS_DIR / f"{project_id}.lock"
+    try:
+        fh = open(lock_path, "w")
+    except OSError:
+        return None
+    try:
+        fcntl.flock(fh.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)  # type: ignore[union-attr]
+        return fh
+    except (BlockingIOError, OSError):
+        fh.close()
+        return None
+
+
+def _release_workspace_lock(fh: Optional[object]) -> None:
+    if fh is None:
+        return
+    try:
+        fcntl.flock(fh.fileno(), fcntl.LOCK_UN)  # type: ignore[union-attr,attr-defined]
+    except Exception:
+        pass
+    try:
+        fh.close()  # type: ignore[attr-defined]
+    except Exception:
+        pass
+
+
+def _pkg_cache_env(project_id) -> dict[str, str]:
+    """Per-project cache directories for the JS package managers we
+    support. Setting these env vars (rather than a global $HOME-wide
+    cache) keeps projects isolated — a cache poisoning issue in one
+    project can't leak into another — while still avoiding the network
+    round-trip on the second-and-subsequent builds.
+    """
+    base = _CACHES_DIR / str(project_id)
+    npm = base / "npm"
+    pnpm = base / "pnpm-store"
+    yarn = base / "yarn"
+    bun = base / "bun"
+    for d in (npm, pnpm, yarn, bun):
+        d.mkdir(parents=True, exist_ok=True)
+    return {
+        "NPM_CONFIG_CACHE": str(npm),
+        "PNPM_STORE_DIR": str(pnpm),
+        # Yarn 1 reads YARN_CACHE_FOLDER; Yarn 3+ uses YARN_GLOBAL_FOLDER too.
+        "YARN_CACHE_FOLDER": str(yarn),
+        "YARN_GLOBAL_FOLDER": str(yarn),
+        "BUN_INSTALL_CACHE_DIR": str(bun),
+    }
+
+
+# ---------------------------------------------------------------------------
 # Internal pipeline
 # ---------------------------------------------------------------------------
 
@@ -69,6 +248,12 @@ async def run_build_async(deployment_id: str) -> None:
 async def _run_build(deployment_id) -> None:
     db: Session = SessionLocal()
     workspace: Optional[Path] = None
+    workspace_is_persistent = False
+    workspace_lock: Optional[object] = None
+    build: Optional[Build] = None
+    deployment: Optional[Deployment] = None
+    project: Optional[Project] = None
+    writer: Optional[_LogWriter] = None
     # Coerce string IDs to UUID. enqueue_build always passes str(deployment.id)
     # so that the value survives RQ's JSON-serialised job payload, but the
     # `Deployment.id` column is Uuid(as_uuid=True) and SQLAlchemy's UUID type
@@ -90,7 +275,7 @@ async def _run_build(deployment_id) -> None:
             logger.error("Build runner: deployment %s not found", deployment_id)
             return
 
-        project: Project = deployment.project
+        project = deployment.project
 
         # Create / reset build record. The build_command is resolved a second
         # time *after* clone (once we can see the actual lockfile), so the
@@ -107,31 +292,47 @@ async def _run_build(deployment_id) -> None:
         db.commit()
         db.refresh(build)
 
-        workspace = BUILD_BASE / str(deployment.id)
+        writer = _LogWriter(db, build)
+        append = writer.write
+
+        # ── Workspace setup ────────────────────────────────────────────────
+        # Try to grab the per-project lock; if held, fall back to a
+        # per-deploy ephemeral workspace so concurrent deploys never race
+        # on the same git checkout.
+        workspace_lock = _acquire_workspace_lock(project.id)
+        if workspace_lock is not None:
+            workspace = _WORKSPACES_DIR / str(project.id)
+            workspace_is_persistent = True
+        else:
+            workspace = BUILD_BASE / str(deployment.id)
         workspace.mkdir(parents=True, exist_ok=True)
+        repo_dir = workspace / "repo"
 
-        log_lines: list[str] = []
-
-        def _append(line: str) -> None:
-            log_lines.append(line)
-            # Write incrementally so WebSocket tail can pick it up
-            build.build_output = "\n".join(log_lines)
-            db.commit()
-
-        _append(f"[WatchTower] Build started at {utcnow().isoformat()}")
-        _append(f"[WatchTower] Project: {project.name}  |  Branch: {deployment.branch}")
+        append(f"[WatchTower] Build started at {utcnow().isoformat()}")
+        append(f"[WatchTower] Project: {project.name}  |  Branch: {deployment.branch}")
+        if workspace_is_persistent:
+            append("[WatchTower] Reusing per-project workspace + package cache")
 
         # ── Step 1: Clone / pull repo ──────────────────────────────────────
-        repo_dir = workspace / "repo"
-        clone_url = _resolve_clone_url(db, project, _append)
+        clone_url = _resolve_clone_url(db, project, append)
         ok, err = await _clone_repo(
-            clone_url, deployment.branch, repo_dir, _append, display_url=project.repo_url
+            clone_url,
+            deployment.branch,
+            repo_dir,
+            append,
+            display_url=project.repo_url,
+            allow_reuse=workspace_is_persistent,
         )
         if not ok:
             raise RuntimeError(f"Git clone failed: {err}")
 
         # ── Step 2: Resolve env vars ───────────────────────────────────────
         env_vars = _load_env_vars(db, project)
+        # Inject per-project package-manager caches. User env vars win on
+        # collision so an operator who really wants $NPM_CONFIG_CACHE
+        # pointed elsewhere can still override.
+        cache_env = _pkg_cache_env(project.id)
+        merged_env = {**cache_env, **env_vars}
 
         # ── Step 3: Run build command ──────────────────────────────────────
         # Re-resolve now that we can inspect the cloned repo. If the user
@@ -143,36 +344,48 @@ async def _run_build(deployment_id) -> None:
             build.build_command = build_cmd
             db.commit()
         if build_cmd:
-            _append(f"\n[WatchTower] Running build: {build_cmd}")
-            ok, err = await _run_cmd(build_cmd, cwd=repo_dir, env_vars=env_vars, append=_append)
+            append(f"\n[WatchTower] Running build: {build_cmd}")
+            ok, err = await _run_cmd(
+                build_cmd, cwd=repo_dir, env_vars=merged_env, append=append
+            )
             if not ok:
                 raise RuntimeError(f"Build command failed: {err}")
         else:
-            _append("[WatchTower] No build command — skipping build step.")
+            append("[WatchTower] No build command — skipping build step.")
 
-        # ── Step 4: Deploy to nodes ────────────────────────────────────────
+        # ── Step 4: Deploy to nodes (in parallel) ──────────────────────────
         output_path = _resolve_output_path(db, project, repo_dir)
         nodes = _get_deployment_nodes(db, deployment)
 
         if nodes:
             deployment.status = DeploymentStatus.DEPLOYING
+            writer.flush()
             db.commit()
-            _append(f"\n[WatchTower] Deploying to {len(nodes)} node(s)…")
-            for node in nodes:
-                ok, err = await _rsync_to_node(node, output_path, _append)
+            append(f"\n[WatchTower] Deploying to {len(nodes)} node(s) in parallel…")
+            results = await asyncio.gather(
+                *[_deploy_to_one_node(node, output_path, append) for node in nodes],
+                return_exceptions=True,
+            )
+            failures: list[tuple[str, str]] = []
+            for node, result in zip(nodes, results):
+                label = node.host or "node"
+                if isinstance(result, BaseException):
+                    failures.append((label, str(result)))
+                    continue
+                ok, err = result  # type: ignore[misc]
                 if not ok:
-                    raise RuntimeError(f"Deploy to {node.host} failed: {err}")
-                # Reload service on node
-                if node.reload_command:
-                    _append(f"[WatchTower] Reloading service on {node.host}…")
-                    ok, err = await _ssh_run(node, node.reload_command, _append)
-                    if not ok:
-                        _append(f"[WatchTower] ⚠ Reload command failed: {err}")
+                    failures.append((label, err))
+            if failures:
+                joined = "; ".join(f"{h}: {e}" for h, e in failures)
+                raise RuntimeError(
+                    f"Deploy failed on {len(failures)}/{len(nodes)} node(s): {joined}"
+                )
         else:
-            _append("[WatchTower] ⚠ No deployment nodes configured — build artifacts stored locally only.")
+            append("[WatchTower] ⚠ No deployment nodes configured — build artifacts stored locally only.")
 
         # ── Step 5: Mark success ───────────────────────────────────────────
-        _append(f"\n[WatchTower] ✅ Build complete at {utcnow().isoformat()}")
+        append(f"\n[WatchTower] ✅ Build complete at {utcnow().isoformat()}")
+        writer.flush()
         build.status = BuildStatus.SUCCESS
         build.completed_at = utcnow()
         deployment.status = DeploymentStatus.LIVE
@@ -185,6 +398,10 @@ async def _run_build(deployment_id) -> None:
         logger.exception("Build runner error for deployment %s", deployment_id)
         try:
             if build:
+                # Make sure any buffered lines are persisted before we
+                # overwrite build_output with the failure tail.
+                if writer is not None:
+                    writer.flush()
                 output = build.build_output or ""
                 hint = _humanize_failure(output, build.build_command or "")
                 tail = f"\n[WatchTower] ❌ {exc}"
@@ -201,13 +418,56 @@ async def _run_build(deployment_id) -> None:
         except Exception:
             pass
     finally:
+        # Final log flush so any tail lines from success/failure paths
+        # actually land in the DB rather than being orphaned in memory.
+        if writer is not None:
+            try:
+                writer.flush()
+            except Exception:
+                pass
         db.close()
-        # Clean up workspace to avoid disk fill-up
-        if workspace and workspace.exists():
+        # Ephemeral per-deploy workspaces get deleted to avoid disk
+        # fill-up. Persistent per-project workspaces stay so the next
+        # build can reuse the git history and node_modules.
+        if workspace and workspace.exists() and not workspace_is_persistent:
             try:
                 shutil.rmtree(workspace)
             except Exception:
                 pass
+        _release_workspace_lock(workspace_lock)
+
+
+# ---------------------------------------------------------------------------
+# Multi-node deploy helper (parallel)
+# ---------------------------------------------------------------------------
+
+
+async def _deploy_to_one_node(
+    node: OrgNode,
+    output_path: Path,
+    append: Callable[[str], None],
+) -> tuple[bool, str]:
+    """Rsync + reload one node, prefixing every log line with the node host
+    so parallel deploys produce readable interleaved output. Returns
+    ``(ok, error)`` — never raises.
+    """
+    label = node.host or "node"
+    prefix = f"[{label}] "
+    try:
+        ok, err = await _rsync_to_node(node, output_path, append, prefix=prefix)
+        if not ok:
+            return False, err
+        if node.reload_command:
+            append(f"{prefix}Reloading service…")
+            ok, err = await _ssh_run(node, node.reload_command, append, prefix=prefix)
+            if not ok:
+                # Reload failure is logged loudly but doesn't abort the
+                # deploy — files already landed. Surface as a warning,
+                # same as the previous sequential path did.
+                append(f"{prefix}⚠ Reload command failed: {err}")
+        return True, ""
+    except Exception as exc:
+        return False, str(exc)
 
 
 # ---------------------------------------------------------------------------
@@ -221,20 +481,51 @@ async def _clone_repo(
     dest: Path,
     append,
     display_url: Optional[str] = None,
+    allow_reuse: bool = False,
 ) -> tuple[bool, str]:
-    if dest.exists():
-        shutil.rmtree(dest)
+    """Bring *dest* up to date with *repo_url* @ *branch*.
 
+    When ``allow_reuse`` is true and *dest* is already a git checkout, we
+    do an incremental ``git fetch + reset --hard`` instead of a fresh
+    clone. Saves a full repo-content download on every build, which on
+    large monorepos can dominate the build time.
+    """
     # Local-folder source: the wizard stores the path as `local://<abs path>`.
     # Git would treat `local://` as a remote-helper scheme and fail with
-    # "git: 'remote-local' is not a git command". Copy the directory instead
-    # so deploys work for projects that aren't backed by a git remote.
+    # "git: 'remote-local' is not a git command". Copy/sync the directory
+    # instead so deploys work for projects that aren't backed by a git remote.
     if repo_url.startswith("local://"):
         src = Path(repo_url.removeprefix("local://"))
         if not src.is_dir():
             msg = f"source folder not found: {src}"
             append(f"[local] {msg}")
             return False, msg
+        # rsync is dramatically faster than shutil.copytree for repeated
+        # syncs of the same source — it only copies changed bytes. Falls
+        # back to copytree when rsync is unavailable.
+        if shutil.which("rsync"):
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            dest.mkdir(parents=True, exist_ok=True)
+            append(f"[local] Syncing {src} → build dir…")
+            cmd = [
+                "rsync", "-a", "--delete",
+                "--exclude=.git/", "--exclude=node_modules/",
+                "--exclude=__pycache__/", "--exclude=.venv/",
+                "--exclude=dist/", "--exclude=build/",
+                f"{str(src).rstrip('/')}/", f"{str(dest).rstrip('/')}/",
+            ]
+            proc = await asyncio.create_subprocess_exec(
+                *cmd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.STDOUT,
+            )
+            rc = await _stream_proc(proc, append, prefix="[local] ")
+            if rc != 0:
+                return False, f"rsync exit {rc}"
+            return True, ""
+        # No rsync available — fresh copytree (slower, but works).
+        if dest.exists():
+            shutil.rmtree(dest)
         append(f"[local] Copying {src} → build dir…")
         try:
             shutil.copytree(
@@ -251,22 +542,78 @@ async def _clone_repo(
         return True, ""
 
     shown = display_url or _redact_url(repo_url)
+
+    # Reuse path: existing git checkout → fetch + reset to the requested
+    # branch tip. This is the workhorse of the "persistent workspace"
+    # optimization. Anything that can't be brought up cleanly falls
+    # through to a fresh clone below.
+    if allow_reuse and (dest / ".git").is_dir():
+        append(f"[git] Updating existing checkout @ {branch}…")
+        # Re-point origin to the (possibly token-rewritten) URL — the
+        # token will have rotated since the last build.
+        await _git_quiet(["git", "-C", str(dest), "remote", "set-url", "origin", repo_url])
+        proc = await asyncio.create_subprocess_exec(
+            "git", "-C", str(dest),
+            "fetch", "--depth=1", "origin", branch,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.STDOUT,
+        )
+        rc = await _stream_proc(proc, append, prefix="[git] ")
+        if rc == 0:
+            proc = await asyncio.create_subprocess_exec(
+                "git", "-C", str(dest), "reset", "--hard", "FETCH_HEAD",
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.STDOUT,
+            )
+            rc = await _stream_proc(proc, append, prefix="[git] ")
+            if rc == 0:
+                # Drop untracked junk (stale build outputs, etc.) but
+                # keep node_modules — that's the cache the workspace
+                # exists to preserve.
+                proc = await asyncio.create_subprocess_exec(
+                    "git", "-C", str(dest),
+                    "clean", "-fdx", "--exclude=node_modules", "--exclude=.next/cache",
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.STDOUT,
+                )
+                await _stream_proc(proc, append, prefix="[git] ")
+                return True, ""
+        # Reuse path failed — wipe and fall through to fresh clone.
+        append("[git] Existing checkout couldn't be updated; falling back to fresh clone")
+        try:
+            shutil.rmtree(dest)
+        except Exception:
+            pass
+
+    if dest.exists():
+        shutil.rmtree(dest)
     append(f"[git] Cloning {shown} @ {branch}…")
     proc = await asyncio.create_subprocess_exec(
-        "git", "clone", "--depth=1", "--branch", branch, repo_url, str(dest),
+        "git", "clone", "--depth=1", "--single-branch", "--branch", branch, repo_url, str(dest),
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.STDOUT,
     )
-    stdout, _ = await proc.communicate()
-    output = stdout.decode(errors="replace").strip()
-    # Make sure we never echo the embedded token back to logs.
-    safe_output = _redact_url(output) if output else output
-    if safe_output:
-        for line in safe_output.splitlines():
-            append(f"[git] {line}")
-    if proc.returncode != 0:
-        return False, safe_output
+
+    # Capture lines into a buffer first so we can run them through the
+    # URL redactor before they reach the log — git's stderr can echo back
+    # the embedded x-access-token: PAT on auth failure.
+    captured: list[str] = []
+    rc = await _stream_proc(proc, captured.append)
+    for line in captured:
+        append(f"[git] {_redact_url(line)}")
+    if rc != 0:
+        return False, _redact_url("\n".join(captured))
     return True, ""
+
+
+async def _git_quiet(cmd: list[str]) -> int:
+    """Run a git command discarding output; returns exit code."""
+    proc = await asyncio.create_subprocess_exec(
+        *cmd,
+        stdout=asyncio.subprocess.DEVNULL,
+        stderr=asyncio.subprocess.DEVNULL,
+    )
+    return await proc.wait()
 
 
 def _redact_url(text: str) -> str:
@@ -357,6 +704,11 @@ async def _run_cmd(
     timeout: int = 600,
 ) -> tuple[bool, str]:
     env = {**os.environ, **env_vars}
+    # BuildKit gives us --cache-from semantics + remote cache reuse for
+    # `docker build`, so default it on. Operator can still set
+    # DOCKER_BUILDKIT=0 in env_vars to override if a particular Dockerfile
+    # is incompatible.
+    env.setdefault("DOCKER_BUILDKIT", "1")
     try:
         proc = await asyncio.create_subprocess_shell(
             cmd,
@@ -366,15 +718,12 @@ async def _run_cmd(
             stderr=asyncio.subprocess.STDOUT,
         )
         try:
-            stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=timeout)
+            rc = await asyncio.wait_for(_stream_proc(proc, append), timeout=timeout)
         except asyncio.TimeoutError:
             proc.kill()
             return False, f"Build timed out after {timeout}s"
-        output = stdout.decode(errors="replace").strip()
-        for line in output.splitlines():
-            append(line)
-        if proc.returncode != 0:
-            return False, f"exit code {proc.returncode}"
+        if rc != 0:
+            return False, f"exit code {rc}"
         return True, ""
     except Exception as exc:
         return False, str(exc)
@@ -393,7 +742,12 @@ def _is_local_node(node: OrgNode) -> bool:
     return (node.host or "").strip().lower() in _LOCALHOST_HOSTS
 
 
-async def _rsync_to_node(node: OrgNode, src: Path, append) -> tuple[bool, str]:
+async def _rsync_to_node(
+    node: OrgNode,
+    src: Path,
+    append,
+    prefix: str = "",
+) -> tuple[bool, str]:
     # ── Local-node fast path: skip SSH entirely ────────────────────────────
     # rsync to a local path runs as the WatchTower process user (no
     # node.user impersonation — that field is meaningless without SSH).
@@ -408,18 +762,18 @@ async def _rsync_to_node(node: OrgNode, src: Path, append) -> tuple[bool, str]:
         except OSError as exc:
             return False, f"could not create local dest {dest}: {exc}"
         cmd = ["rsync", "-az", "--delete", f"{src}/", dest]
-        append(f"[rsync] → {dest} (local)")
+        append(f"{prefix}[rsync] → {dest} (local)")
         proc = await asyncio.create_subprocess_exec(
             *cmd,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.STDOUT,
         )
-        stdout, _ = await proc.communicate()
-        output = stdout.decode(errors="replace").strip()
-        for line in output.splitlines():
-            append(f"[rsync] {line}")
-        if proc.returncode != 0:
-            return False, output
+        captured: list[str] = []
+        rc = await _stream_proc(proc, captured.append)
+        for line in captured:
+            append(f"{prefix}[rsync] {line}")
+        if rc != 0:
+            return False, "\n".join(captured)
         return True, ""
 
     # ── Remote SSH path (existing behaviour) ───────────────────────────────
@@ -443,22 +797,27 @@ async def _rsync_to_node(node: OrgNode, src: Path, append) -> tuple[bool, str]:
         "-e", ssh_e,
         f"{src}/", dest,
     ]
-    append(f"[rsync] → {dest}")
+    append(f"{prefix}[rsync] → {dest}")
     proc = await asyncio.create_subprocess_exec(
         *cmd,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.STDOUT,
     )
-    stdout, _ = await proc.communicate()
-    output = stdout.decode(errors="replace").strip()
-    for line in output.splitlines():
-        append(f"[rsync] {line}")
-    if proc.returncode != 0:
-        return False, output
+    captured: list[str] = []
+    rc = await _stream_proc(proc, captured.append)
+    for line in captured:
+        append(f"{prefix}[rsync] {line}")
+    if rc != 0:
+        return False, "\n".join(captured)
     return True, ""
 
 
-async def _ssh_run(node: OrgNode, command: str, append) -> tuple[bool, str]:
+async def _ssh_run(
+    node: OrgNode,
+    command: str,
+    append,
+    prefix: str = "",
+) -> tuple[bool, str]:
     # ── Local-node fast path: run reload command as a local subprocess ─────
     # We feed the command through ``bash -lc`` so the same reload script
     # the user wrote for SSH (e.g. "cd /opt/app && pm2 restart api")
@@ -472,19 +831,19 @@ async def _ssh_run(node: OrgNode, command: str, append) -> tuple[bool, str]:
                 Path(cwd).mkdir(parents=True, exist_ok=True)
             except OSError:
                 cwd = None  # fall back to inheriting WatchTower's cwd
-        append(f"[local] $ {command}")
+        append(f"{prefix}[local] $ {command}")
         proc = await asyncio.create_subprocess_shell(
             command,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.STDOUT,
             cwd=cwd,
         )
-        stdout, _ = await proc.communicate()
-        output = stdout.decode(errors="replace").strip()
-        for line in output.splitlines():
-            append(f"[local] {line}")
-        if proc.returncode != 0:
-            return False, output
+        captured: list[str] = []
+        rc = await _stream_proc(proc, captured.append)
+        for line in captured:
+            append(f"{prefix}[local] {line}")
+        if rc != 0:
+            return False, "\n".join(captured)
         return True, ""
 
     # ── Remote SSH path ────────────────────────────────────────────────────
@@ -497,12 +856,12 @@ async def _ssh_run(node: OrgNode, command: str, append) -> tuple[bool, str]:
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.STDOUT,
     )
-    stdout, _ = await proc.communicate()
-    output = stdout.decode(errors="replace").strip()
-    for line in output.splitlines():
-        append(f"[ssh] {line}")
-    if proc.returncode != 0:
-        return False, output
+    captured: list[str] = []
+    rc = await _stream_proc(proc, captured.append)
+    for line in captured:
+        append(f"{prefix}[ssh] {line}")
+    if rc != 0:
+        return False, "\n".join(captured)
     return True, ""
 
 
@@ -528,9 +887,20 @@ def _resolve_build_command(
 
     if project.use_case == UseCaseType.DOCKER_PLATFORM:
         cfg = db.query(DockerPlatformConfig).filter_by(project_id=project.id).first()
-        if cfg:
-            return f"docker build -t watchtower-{project.id} -f {cfg.dockerfile_path} ."
-        return "docker build -t watchtower-app ."
+        dockerfile = cfg.dockerfile_path if cfg else "Dockerfile"
+        # --cache-from + BUILDKIT_INLINE_CACHE lets layer reuse work
+        # across builds of the same project. On the first build the
+        # cache image doesn't exist; BuildKit silently no-ops
+        # --cache-from for missing images, so this is safe.
+        cache_tag = f"watchtower-{project.id}:cache"
+        latest_tag = f"watchtower-{project.id}:latest"
+        return (
+            f"docker build "
+            f"--cache-from {cache_tag} "
+            f"--build-arg BUILDKIT_INLINE_CACHE=1 "
+            f"-t {latest_tag} -t {cache_tag} "
+            f"-f {dockerfile} ."
+        )
 
     if project.use_case in (UseCaseType.NETLIFY_LIKE, UseCaseType.VERCEL_LIKE):
         install = _detect_node_install(repo_dir) if repo_dir else "npm install"

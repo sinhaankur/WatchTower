@@ -313,8 +313,20 @@ class TestRunBuildPipeline:
     mocking out git/rsync/ssh so no network or filesystem access is needed."""
 
     def _make_completed_proc(self, returncode: int = 0, stdout: bytes = b"ok\n"):
+        # The builder now streams subprocess output via proc.stdout.read()
+        # + proc.wait(), so the mock has to model both. proc.stdout.read(n)
+        # yields the canned bytes once then b"" forever (EOF).
         proc = AsyncMock()
         proc.returncode = returncode
+        stdout_reader = AsyncMock()
+        pending = [stdout]
+
+        async def _read(_n: int = -1) -> bytes:
+            return pending.pop(0) if pending else b""
+
+        stdout_reader.read = _read
+        proc.stdout = stdout_reader
+        proc.wait = AsyncMock(return_value=returncode)
         proc.communicate = AsyncMock(return_value=(stdout, b""))
         return proc
 
