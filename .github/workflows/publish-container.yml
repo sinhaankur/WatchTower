@@ -14,6 +14,14 @@ permissions:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    # Defensive cap: a healthy multi-arch build with the BUILDPLATFORM
+    # fix in the Dockerfile (web-builder pinned to native amd64) finishes
+    # in ~10 minutes. Without that pin we previously hung 3+ hours on
+    # `npm ci` under arm64 QEMU. 30 minutes leaves headroom for the
+    # legitimately-slow Python pip install on arm64 emulation while
+    # ensuring any future regression that revives the hang fails fast
+    # instead of burning runner minutes.
+    timeout-minutes: 30
     steps:
       - name: Checkout
         uses: actions/checkout@v4
