@@ -50,3 +50,8 @@ jobs:
           platforms: linux/amd64,linux/arm64
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          # GHA cache backend persists BuildKit layer + cache-mount data
+          # across runs, so repeat container builds reuse the npm wheel
+          # cache and the apt layer instead of rebuilding from scratch.
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
