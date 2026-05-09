@@ -35,7 +35,23 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/runtime", tags=["Runtime"])
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
-DEV_DIR = ROOT_DIR / ".dev"
+
+
+def _resolve_dev_dir() -> Path:
+    # Mirrors the DB-path fallthrough so packaged builds (where ROOT_DIR lives
+    # inside a read-only .app bundle) don't try to mkdir into site-packages.
+    # Order: explicit data dir → repo-root .dev only if it already exists
+    # (dev-clone behaviour) → ~/.watchtower/.dev.
+    env_data_dir = os.getenv("WATCHTOWER_DATA_DIR")
+    if env_data_dir:
+        return Path(env_data_dir).expanduser() / ".dev"
+    repo_dev = ROOT_DIR / ".dev"
+    if repo_dev.exists():
+        return repo_dev
+    return Path.home() / ".watchtower" / ".dev"
+
+
+DEV_DIR = _resolve_dev_dir()
 PID_FILE = DEV_DIR / "watchtower-service.pid"
 LOG_FILE = DEV_DIR / "watchtower-service.log"
 TERMINAL_AUDIT_FILE = DEV_DIR / "terminal-audit.log.enc"
