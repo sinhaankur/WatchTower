@@ -20,6 +20,7 @@ const SetupWizard          = lazy(() => import('./pages/SetupWizard'));
 const ProjectDetail        = lazy(() => import('./pages/ProjectDetail'));
 const Templates            = lazy(() => import('./pages/Templates'));
 const TeamManagement       = lazy(() => import('./pages/TeamManagement'));
+const InviteAccept         = lazy(() => import('./pages/InviteAccept'));
 const Servers              = lazy(() => import('./pages/Servers'));
 const Applications         = lazy(() => import('./pages/Applications'));
 const LocalNode            = lazy(() => import('./pages/LocalNode'));
@@ -126,6 +127,7 @@ function App() {
             <Route path="/integrations" element={<RequireAuth><Layout><Integrations /></Layout></RequireAuth>} />
             <Route path="/host-connect" element={<RequireAuth><Layout><HostConnect /></Layout></RequireAuth>} />
             <Route path="/team" element={<RequireAuth><Layout><TeamManagement /></Layout></RequireAuth>} />
+            <Route path="/invite/:token" element={<RequireAuth><InviteAccept /></RequireAuth>} />
             <Route path="/settings" element={<RequireAuth><Layout><Settings /></Layout></RequireAuth>} />
             <Route path="/audit" element={<RequireAuth><Layout><AuditLog /></Layout></RequireAuth>} />
             <Route path="/account" element={<RequireAuth><Layout><Account /></Layout></RequireAuth>} />

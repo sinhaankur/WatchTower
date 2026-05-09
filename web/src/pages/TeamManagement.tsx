@@ -84,6 +84,8 @@ const TeamManagement = () => {
   const [currentUserEmail, setCurrentUserEmail] = useState('');
   const [updatingMember, setUpdatingMember] = useState<string | null>(null);
   const [removingMember, setRemovingMember] = useState<string | null>(null);
+  const [lastInvite, setLastInvite] = useState<{ url: string; email: string; emailSent: boolean } | null>(null);
+  const [inviteCopied, setInviteCopied] = useState(false);
 
   const ownerCount = useMemo(() => members.filter((m) => m.role === 'owner').length, [members]);
 
@@ -132,8 +134,10 @@ const TeamManagement = () => {
     setInviting(true);
     setActionError('');
     setActionSuccess('');
+    setLastInvite(null);
+    setInviteCopied(false);
     try {
-      await apiClient.post(`/orgs/${orgId}/team-members`, {
+      const resp = await apiClient.post(`/orgs/${orgId}/team-members`, {
         email,
         role,
         can_create_projects: true,
@@ -141,14 +145,36 @@ const TeamManagement = () => {
         can_manage_nodes: role === 'owner' || role === 'admin',
         can_manage_team: role === 'owner' || role === 'admin',
       });
+      const body = resp.data as { invitation_url?: string; email_sent?: boolean };
+      const invitedEmail = email;
       setEmail('');
       setRole('developer');
-      setActionSuccess(`Invitation sent to ${email}.`);
+      if (body?.invitation_url) {
+        setLastInvite({ url: body.invitation_url, email: invitedEmail, emailSent: !!body.email_sent });
+      }
+      setActionSuccess(
+        body?.email_sent
+          ? `Invitation email sent to ${invitedEmail}.`
+          : `Invitation created for ${invitedEmail}. Email wasn't sent (no SMTP) — copy the invite link below.`,
+      );
       await refreshData(orgId);
-    } catch {
-      setActionError('Failed to invite member. Check the email address and try again.');
+    } catch (err: any) {
+      const detail = err?.response?.data?.detail;
+      setActionError(detail || 'Failed to invite member. Check the email address and try again.');
     } finally {
       setInviting(false);
+    }
+  };
+
+  const copyInviteUrl = async () => {
+    if (!lastInvite) return;
+    try {
+      await navigator.clipboard.writeText(lastInvite.url);
+      setInviteCopied(true);
+      window.setTimeout(() => setInviteCopied(false), 2000);
+    } catch {
+      // Some browsers block clipboard in non-secure contexts; the textbox stays
+      // selectable so the admin can manually copy.
     }
   };
 
@@ -173,11 +199,12 @@ const TeamManagement = () => {
     setActionError('');
     setActionSuccess('');
     try {
-      await apiClient.put(`/team-members/${memberId}`, { is_active: false });
+      await apiClient.delete(`/team-members/${memberId}`);
       setActionSuccess(`${memberEmail} has been removed.`);
       await refreshData(orgId);
-    } catch {
-      setActionError('Failed to remove member.');
+    } catch (err: any) {
+      const detail = err?.response?.data?.detail;
+      setActionError(detail || 'Failed to remove member.');
     } finally {
       setRemovingMember(null);
     }
@@ -313,6 +340,27 @@ const TeamManagement = () => {
           <div className="flex items-start gap-2 border border-red-200 bg-red-50 rounded-md px-4 py-3">
             <span className="text-red-500 mt-0.5">✗</span>
             <p className="text-sm text-red-700">{actionError}</p>
+          </div>
+        )}
+
+        {lastInvite && (
+          <div className="border border-amber-200 bg-amber-50 rounded-md px-4 py-3 space-y-2">
+            <p className="text-sm text-amber-900">
+              {lastInvite.emailSent
+                ? `Invitation email sent to ${lastInvite.email}. They can also use this link:`
+                : `Email wasn't sent (no SMTP configured). Send this link to ${lastInvite.email}:`}
+            </p>
+            <div className="flex items-center gap-2">
+              <Input
+                readOnly
+                value={lastInvite.url}
+                onFocus={(e) => e.currentTarget.select()}
+                className="font-mono text-xs bg-white"
+              />
+              <Button type="button" variant="outline" onClick={copyInviteUrl}>
+                {inviteCopied ? 'Copied' : 'Copy'}
+              </Button>
+            </div>
           </div>
         )}
 

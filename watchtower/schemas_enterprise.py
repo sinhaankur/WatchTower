@@ -94,6 +94,9 @@ class TeamMemberResponse(TeamMemberBase):
     is_active: bool
     joined_at: datetime
     invited_at: Optional[datetime]
+    accepted_at: Optional[datetime] = None
+    invitation_url: Optional[str] = None
+    email_sent: Optional[bool] = None
 
     class Config:
         from_attributes = True
@@ -106,6 +109,25 @@ class TeamMemberUpdate(BaseModel):
     can_manage_nodes: Optional[bool] = None
     can_manage_team: Optional[bool] = None
     is_active: Optional[bool] = None
+
+
+class PendingInvitationResponse(BaseModel):
+    id: UUID
+    org_id: UUID
+    org_name: str
+    email: str
+    role: TeamRole
+    invited_at: Optional[datetime]
+    invitation_token: str
+
+    class Config:
+        from_attributes = True
+
+
+class AcceptInvitationResponse(BaseModel):
+    member: TeamMemberResponse
+    org_id: UUID
+    org_name: str
 
 
 # ============================================================================

@@ -9,6 +9,7 @@ import hmac
 import json
 import base64
 import hashlib
+import secrets
 import smtplib
 import subprocess
 from email.mime.text import MIMEText
@@ -41,13 +42,22 @@ logger = logging.getLogger(__name__)
 # Email helpers
 # ---------------------------------------------------------------------------
 
+def _app_base_url() -> str:
+    return os.getenv("WATCHTOWER_APP_URL", "http://localhost:8000").rstrip("/")
+
+
+def _build_invitation_url(token: str) -> str:
+    return f"{_app_base_url()}/invite/{token}"
+
+
 def _send_invitation_email(
     to_email: str,
     org_name: str,
     role: str,
     inviter_name: str,
-) -> None:
-    """Send a team-invitation email via SMTP.
+    invite_url: str,
+) -> bool:
+    """Send a team-invitation email via SMTP. Returns True on success.
 
     Reads configuration from environment variables:
       WATCHTOWER_SMTP_HOST     — SMTP server hostname (required to send)
@@ -55,35 +65,32 @@ def _send_invitation_email(
       WATCHTOWER_SMTP_USER     — login username (optional for local relays)
       WATCHTOWER_SMTP_PASSWORD — login password (optional for local relays)
       WATCHTOWER_SMTP_FROM     — From address, default noreply@watchtower.local
-      WATCHTOWER_APP_URL       — base URL shown in the invitation link
 
     If ``WATCHTOWER_SMTP_HOST`` is not set, the function logs a warning and
-    returns without raising — callers should still complete the DB write.
+    returns False — the caller should expose the invite URL through the
+    response body so the admin can share it manually.
     """
     smtp_host = os.getenv("WATCHTOWER_SMTP_HOST")
     if not smtp_host:
         logger.warning(
             "Team invitation email NOT sent to %s — WATCHTOWER_SMTP_HOST is unset. "
-            "Set WATCHTOWER_SMTP_HOST (and optionally WATCHTOWER_SMTP_PORT / "
-            "WATCHTOWER_SMTP_USER / WATCHTOWER_SMTP_PASSWORD) to enable email.",
+            "Returning the invite URL in the API response so the admin can share "
+            "it manually. Set WATCHTOWER_SMTP_HOST to enable automatic email.",
             to_email,
         )
-        return
+        return False
 
     smtp_port = int(os.getenv("WATCHTOWER_SMTP_PORT", "587"))
     smtp_user = os.getenv("WATCHTOWER_SMTP_USER", "")
     smtp_password = os.getenv("WATCHTOWER_SMTP_PASSWORD", "")
     from_addr = os.getenv("WATCHTOWER_SMTP_FROM", "noreply@watchtower.local")
-    app_url = os.getenv("WATCHTOWER_APP_URL", "http://localhost:8000").rstrip("/")
-
-    login_link = f"{app_url}/login"
 
     subject = f"You've been invited to join {org_name} on WatchTower"
     body_text = (
         f"Hi,\n\n"
         f"{inviter_name} has invited you to join the organization \"{org_name}\" "
         f"on WatchTower as a {role}.\n\n"
-        f"To accept the invitation, sign in here:\n{login_link}\n\n"
+        f"Accept the invitation here:\n{invite_url}\n\n"
         f"If you did not expect this invitation, you can safely ignore this email.\n\n"
         f"— The WatchTower Team"
     )
@@ -91,7 +98,7 @@ def _send_invitation_email(
         f"<p>Hi,</p>"
         f"<p><strong>{inviter_name}</strong> has invited you to join the organization "
         f"<strong>{org_name}</strong> on WatchTower as a <em>{role}</em>.</p>"
-        f"<p><a href=\"{login_link}\">Accept invitation &rarr;</a></p>"
+        f"<p><a href=\"{invite_url}\">Accept invitation &rarr;</a></p>"
         f"<p>If you did not expect this invitation, you can safely ignore this email.</p>"
         f"<p>&mdash; The WatchTower Team</p>"
     )
@@ -113,15 +120,17 @@ def _send_invitation_email(
                 server.login(smtp_user, smtp_password)
             server.sendmail(from_addr, [to_email], msg.as_string())
         logger.info("Invitation email sent to %s for org %s", to_email, org_name)
+        return True
     except Exception:
         # Non-fatal — the DB record was already committed, the user can be
-        # notified out-of-band. Log at ERROR so operators notice.
+        # notified out-of-band via the URL returned in the API response.
         logger.exception(
             "Failed to send invitation email to %s (SMTP %s:%s)",
             to_email,
             smtp_host,
             smtp_port,
         )
+        return False
 
 
 
@@ -1799,7 +1808,21 @@ async def invite_team_member(
     if not current_member or not _is_owner_or_admin(current_member):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only admins can invite members")
     
+    # Reject duplicate pending invites for the same email in this org —
+    # otherwise an admin double-clicking creates two orphan rows and the
+    # invitee's accept-link race becomes confusing.
+    existing = db.query(TeamMember).filter(
+        TeamMember.org_id == org_id,
+        func.lower(TeamMember.email) == member_data.email.lower(),
+    ).first()
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="A team member with this email already exists in the organization.",
+        )
+
     try:
+        invite_token = secrets.token_urlsafe(32)
         new_member = TeamMember(
             org_id=org_id,
             email=member_data.email,
@@ -1808,25 +1831,34 @@ async def invite_team_member(
             can_manage_deployments=member_data.can_manage_deployments,
             can_manage_nodes=member_data.can_manage_nodes,
             can_manage_team=member_data.can_manage_team,
-            invited_at=utcnow()
+            is_active=False,
+            invited_at=utcnow(),
+            invitation_token=invite_token,
         )
-        
+
         db.add(new_member)
         db.commit()
         db.refresh(new_member)
 
-        # Resolve org name and inviter display name for the email.
+        invite_url = _build_invitation_url(invite_token)
         org = db.query(Organization).filter(Organization.id == org_id).first()
         org_name = org.name if org else str(org_id)
         inviter_name = current_user.get("name") or current_user.get("email") or "A WatchTower admin"
-        _send_invitation_email(
+        email_sent = _send_invitation_email(
             to_email=member_data.email,
             org_name=org_name,
-            role=member_data.role.value if hasattr(member_data.role, "value") else str(member_data.role),
+            role=_role_value(member_data.role),
             inviter_name=inviter_name,
+            invite_url=invite_url,
         )
 
+        # Synthetic response-only attributes — TeamMemberResponse declares
+        # them with defaults, so pydantic from_attributes picks them up.
+        new_member.invitation_url = invite_url  # type: ignore[attr-defined]
+        new_member.email_sent = email_sent  # type: ignore[attr-defined]
         return new_member
+    except HTTPException:
+        raise
     except Exception:
         db.rollback()
         logger.exception("Inviting team member failed")
@@ -1874,6 +1906,166 @@ async def update_team_member(
     db.commit()
     db.refresh(member)
     return member
+
+
+@router.delete("/team-members/{member_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_team_member(
+    member_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(util.get_current_user),
+):
+    """Remove a team member or revoke a pending invitation."""
+    user_id = _current_user_uuid(current_user)
+    _ensure_user_org_member(db, current_user)
+    member = db.query(TeamMember).filter(TeamMember.id == member_id).first()
+    if not member:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Member not found")
+
+    current_member = db.query(TeamMember).filter(
+        TeamMember.org_id == member.org_id,
+        TeamMember.user_id == user_id,
+    ).first()
+    if not current_member or not _is_owner_or_admin(current_member):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only admins can remove members",
+        )
+
+    # Owners can't be deleted via this endpoint — guards against accidental
+    # self-deletion locking the org out. Demote then re-delete if intentional.
+    if member.role == TeamRole.OWNER:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Cannot remove the organization owner",
+        )
+
+    db.delete(member)
+    db.commit()
+    return None
+
+
+# ============================================================================
+# Invitation acceptance — token-based, decoupled from email matching
+# ============================================================================
+
+@router.post("/invitations/{token}/accept", response_model=schemas.AcceptInvitationResponse)
+async def accept_invitation(
+    token: str,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(util.get_current_user),
+):
+    """Redeem a tokenized team invitation.
+
+    The caller must be authenticated AND the email on their session must
+    match (case-insensitive) the address the invitation was sent to.
+    Without this check the token would be a transferable bearer
+    credential — anyone who saw the URL (mistyped Slack channel, copy
+    in a server access log, forwarded email) could claim the invited
+    role for themselves and lock out the legitimate invitee, who can
+    no longer redeem (token is burned on accept, and ``user_id IS NULL``
+    is required for both the email-based auto-link in
+    ``_ensure_user_org_member`` and ``GET /invitations/pending``).
+
+    If the GitHub primary email doesn't match the typed invite address
+    (a real case for users with +alias addresses or shared mailboxes),
+    the legitimate path is for the inviter to re-invite at the address
+    GitHub actually returns — much smaller blast radius than letting
+    any authenticated user redeem.
+    """
+    user_id = _current_user_uuid(current_user)
+    caller_email = (current_user.get("email") or "").strip().lower()
+    member = db.query(TeamMember).filter(
+        TeamMember.invitation_token == token
+    ).first()
+    if not member:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Invitation not found or already accepted",
+        )
+
+    # Already redeemed — token is one-shot. We clear it on accept, so a
+    # non-null match here means the row is freshly minted and unredeemed.
+    if member.accepted_at is not None:
+        raise HTTPException(
+            status_code=status.HTTP_410_GONE,
+            detail="This invitation has already been accepted",
+        )
+
+    invited_email = (member.email or "").strip().lower()
+    if not caller_email or caller_email != invited_email:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=(
+                "This invitation was issued to a different email address. "
+                "Sign in with the account it was sent to, or ask an admin "
+                "to re-invite at your current email."
+            ),
+        )
+
+    # Block re-binding if the same user already has another active
+    # membership in this org (e.g. they were invited twice, accepted the
+    # first one). Returning 409 keeps the second token harmless.
+    duplicate = db.query(TeamMember).filter(
+        TeamMember.org_id == member.org_id,
+        TeamMember.user_id == user_id,
+        TeamMember.id != member.id,
+    ).first()
+    if duplicate:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="You are already a member of this organization",
+        )
+
+    member.user_id = user_id
+    member.is_active = True
+    member.accepted_at = utcnow()
+    member.joined_at = member.joined_at or utcnow()
+    member.invitation_token = None  # one-shot — burn the token
+    db.commit()
+    db.refresh(member)
+
+    org = db.query(Organization).filter(Organization.id == member.org_id).first()
+    return schemas.AcceptInvitationResponse(
+        member=schemas.TeamMemberResponse.model_validate(member),
+        org_id=member.org_id,
+        org_name=org.name if org else str(member.org_id),
+    )
+
+
+@router.get("/invitations/pending", response_model=List[schemas.PendingInvitationResponse])
+async def list_pending_invitations(
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(util.get_current_user),
+):
+    """List invitations addressed to the caller's email that haven't been accepted yet.
+
+    Powers the "you have a pending invite" banner in the SPA after sign-in.
+    Match is case-insensitive on email; tokens are not exposed unless the
+    caller's email matches.
+    """
+    caller_email = (current_user.get("email") or "").strip().lower()
+    if not caller_email:
+        return []
+
+    rows = db.query(TeamMember).filter(
+        TeamMember.invitation_token.isnot(None),
+        TeamMember.accepted_at.is_(None),
+        func.lower(TeamMember.email) == caller_email,
+    ).all()
+
+    out: List[schemas.PendingInvitationResponse] = []
+    for m in rows:
+        org = db.query(Organization).filter(Organization.id == m.org_id).first()
+        out.append(schemas.PendingInvitationResponse(
+            id=m.id,
+            org_id=m.org_id,
+            org_name=org.name if org else str(m.org_id),
+            email=m.email,
+            role=m.role,
+            invited_at=m.invited_at,
+            invitation_token=m.invitation_token,
+        ))
+    return out
 
 
 # ============================================================================
