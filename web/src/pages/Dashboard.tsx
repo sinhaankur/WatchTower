@@ -195,7 +195,7 @@ const Dashboard = () => {
 
     try {
       const proj = await apiClient.get('/projects');
-      const rows = (proj.data as any[]) ?? [];
+      const rows = Array.isArray(proj.data) ? (proj.data as any[]) : [];
       const mapped = rows.map((p) => ({
         id:               String(p.id),
         name:             p.name ?? 'Unnamed Project',
@@ -474,11 +474,11 @@ const Dashboard = () => {
         </div>
 
         {/* Monitored containers (if any) */}
-        {(runtimeStatus?.podman.sample_containers?.length ?? 0) > 0 && (
+        {Array.isArray(runtimeStatus?.podman?.sample_containers) && runtimeStatus.podman.sample_containers.length > 0 && (
           <div className="rounded-xl border border-border bg-card p-5">
             <h2 className="text-sm font-semibold text-slate-900 mb-3">Monitored Containers</h2>
             <div className="space-y-2">
-              {runtimeStatus!.podman.sample_containers.map((c) => (
+              {runtimeStatus.podman.sample_containers.map((c) => (
                 <div key={c.name} className="flex items-center gap-3 p-3 rounded-lg bg-muted/40 hover:bg-muted/60 transition-colors">
                   <StatusDot running={c.state === 'running'} />
                   <div className="flex-1 min-w-0">
