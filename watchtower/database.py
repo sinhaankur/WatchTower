@@ -445,6 +445,9 @@ class TeamMember(Base):
     joined_at = Column(DateTime, default=_utcnow)
     invited_at = Column(DateTime, nullable=True)
 
+    invitation_token = Column(String(64), nullable=True, unique=True, index=True)
+    accepted_at = Column(DateTime, nullable=True)
+
     organization = relationship("Organization", backref="team_members")
     user = relationship("User", backref="team_memberships")
 
