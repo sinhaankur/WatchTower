@@ -2,6 +2,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import apiClient from '@/lib/api';
+import useCountUp from '@/hooks/useCountUp';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type LocalProject = {
@@ -71,10 +72,18 @@ function deduplicateProjects<T extends LocalProject>(projects: T[]): T[] {
 
 // ── Small components ──────────────────────────────────────────────────────────
 function StatCard({ label, value, sub, accent }: { label: string; value: string | number; sub?: string; accent?: string }) {
+  // Numeric values get a count-up so a stat going from 0 → 7 reads as
+  // a state change, not just a layout swap. Strings (e.g. version "5.8.2")
+  // render as-is. The hook is called unconditionally with a normalised
+  // number so the rules-of-hooks rule is satisfied; we only display
+  // the animated value when the original `value` was numeric.
+  const isNumber = typeof value === 'number';
+  const animated = useCountUp(isNumber ? (value as number) : 0);
+  const display = isNumber ? animated : value;
   return (
-    <div className="rounded-xl border border-border bg-card p-5 hover:border-red-300 transition-colors shadow-sm">
+    <div className="rounded-xl border border-border bg-card p-5 hover:border-red-300 hover:-translate-y-0.5 transition-[transform,border-color] duration-150 shadow-sm">
       <p className="text-xs text-muted-foreground uppercase tracking-wider mb-2">{label}</p>
-      <p className={`text-3xl font-bold ${accent ?? 'text-foreground'}`}>{value}</p>
+      <p className={`text-3xl font-bold tabular-nums ${accent ?? 'text-foreground'}`}>{display}</p>
       {sub && <p className="text-xs text-muted-foreground mt-1">{sub}</p>}
     </div>
   );

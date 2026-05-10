@@ -10,6 +10,7 @@ import Login from './pages/Login';
 import Layout from './components/Layout';
 import ErrorBoundary from './components/ErrorBoundary';
 import RouteErrorBoundary from './components/RouteErrorBoundary';
+import { PageTransition } from './components/PageTransition';
 import { Toaster } from './lib/toast';
 import './App.css';
 
@@ -111,7 +112,11 @@ function RequireAuth({ children }: { children: ReactElement }) {
  * a new page is tedious enough to skip the boundary "just for now".
  */
 function withChrome(pageName: string, element: ReactElement, opts: { bare?: boolean } = {}): ReactElement {
-  const wrapped = opts.bare ? element : <Layout>{element}</Layout>;
+  // PageTransition keys off pathname so its fade-in fires every time the
+  // route changes — the chrome (Layout/RequireAuth) doesn't unmount, so
+  // without keying we'd only animate on first load.
+  const animated = <PageTransition>{element}</PageTransition>;
+  const wrapped = opts.bare ? animated : <Layout>{animated}</Layout>;
   return (
     <RequireAuth>
       <RouteErrorBoundary pageName={pageName}>{wrapped}</RouteErrorBoundary>

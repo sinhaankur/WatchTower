@@ -24,3 +24,102 @@
 .badge-stopped  { @apply bg-red-50 text-red-800 border border-red-300; }
 .badge-building { @apply bg-amber-50 text-amber-900 border border-amber-300; }
 .badge-unknown  { @apply bg-slate-100 text-slate-700 border border-slate-300; }
+
+/* ──────────────────────────────────────────────────────────────────
+ * Micro-animation utilities.
+ *
+ * Pure CSS; no framer-motion. Used for first-paint polish (fades,
+ * skeleton shimmer, status pulses) without bundling another animation
+ * runtime. Every animation is wrapped by the reduced-motion query so
+ * users with that system preference get instant transitions.
+ *
+ * Naming: prefix everything with `anim-` so it's grep-able and we
+ * don't collide with Tailwind's `animate-*` shorthands.
+ * ────────────────────────────────────────────────────────────────── */
+
+@keyframes anim-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes anim-fade-in-up {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes anim-scale-in {
+  from { opacity: 0; transform: scale(0.96); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+@keyframes anim-shimmer {
+  0%   { background-position: -468px 0; }
+  100% { background-position: 468px 0; }
+}
+
+@keyframes anim-pulse-soft {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: 0.7; transform: scale(0.92); }
+}
+
+.anim-fade-in        { animation: anim-fade-in 200ms ease-out both; }
+.anim-fade-in-up     { animation: anim-fade-in-up 250ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+.anim-scale-in       { animation: anim-scale-in 200ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+.anim-pulse-soft     { animation: anim-pulse-soft 2s ease-in-out infinite; }
+
+/*
+ * Stagger up to ~12 children. Apply `anim-stagger` to a list and
+ * `anim-fade-in-up` to each child — the children animate in 30ms
+ * apart, top-to-bottom. Cap is hard-coded so we don't blow up on
+ * 300-row tables; rows past the cap just appear instantly.
+ */
+.anim-stagger > * { animation-delay: 0ms; }
+.anim-stagger > *:nth-child(1)  { animation-delay:  20ms; }
+.anim-stagger > *:nth-child(2)  { animation-delay:  50ms; }
+.anim-stagger > *:nth-child(3)  { animation-delay:  80ms; }
+.anim-stagger > *:nth-child(4)  { animation-delay: 110ms; }
+.anim-stagger > *:nth-child(5)  { animation-delay: 140ms; }
+.anim-stagger > *:nth-child(6)  { animation-delay: 170ms; }
+.anim-stagger > *:nth-child(7)  { animation-delay: 200ms; }
+.anim-stagger > *:nth-child(8)  { animation-delay: 230ms; }
+.anim-stagger > *:nth-child(9)  { animation-delay: 260ms; }
+.anim-stagger > *:nth-child(10) { animation-delay: 290ms; }
+.anim-stagger > *:nth-child(11) { animation-delay: 320ms; }
+.anim-stagger > *:nth-child(12) { animation-delay: 350ms; }
+
+/* Skeleton-loader shimmer. Apply to a sized box (e.g. h-4 w-32). */
+.anim-skeleton {
+  background: linear-gradient(
+    90deg,
+    rgb(241 245 249 / 1) 0%,
+    rgb(226 232 240 / 1) 50%,
+    rgb(241 245 249 / 1) 100%
+  );
+  background-size: 936px 100%;
+  animation: anim-shimmer 1.4s linear infinite;
+}
+
+/* Active-press scale for buttons. Tailwind's active: variant is per-
+   button; centralising here means every <button> in the app gets the
+   feedback for free without auditing every call site. */
+button:not(:disabled):active,
+[role="button"]:not([aria-disabled="true"]):active {
+  transform: scale(0.97);
+  transition: transform 50ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .anim-fade-in,
+  .anim-fade-in-up,
+  .anim-scale-in,
+  .anim-pulse-soft,
+  .anim-skeleton,
+  .anim-stagger > * {
+    animation: none !important;
+    transition: none !important;
+  }
+  button:active,
+  [role="button"]:active {
+    transform: none;
+  }
+}
