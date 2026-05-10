@@ -61,6 +61,20 @@ export function DiagnosticsCard() {
     setError(null);
     try {
       const r = await apiClient.get<DiagnosticReport>('/diagnose');
+      // Validate the shape rather than trusting the type assertion.
+      // An older backend without this route returns HTML via the SPA
+      // fallback, which axios happily parses as a "200 success". Without
+      // a check the next render crashes on `report.summary.fail`.
+      const ok =
+        r.data
+        && typeof r.data === 'object'
+        && Array.isArray((r.data as DiagnosticReport).checks)
+        && (r.data as DiagnosticReport).summary
+        && typeof (r.data as DiagnosticReport).summary === 'object';
+      if (!ok) {
+        setError('Diagnostics endpoint not available on this server. Restart the API to pick up the new /api/diagnose route.');
+        return;
+      }
       setReport(r.data);
     } catch (e) {
       const detail = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
@@ -109,19 +123,19 @@ export function DiagnosticsCard() {
             check here first — the fix is usually setting an env var.
           </p>
         </div>
-        {report && (
+        {report?.summary && (
           <div className="shrink-0 flex items-center gap-1 text-[10px] font-medium uppercase tracking-wide">
-            {report.summary.fail > 0 && (
+            {(report.summary.fail ?? 0) > 0 && (
               <span className={`px-2 py-0.5 rounded-full border ${STATUS_BADGE.fail}`}>
                 {report.summary.fail} fail
               </span>
             )}
-            {report.summary.warn > 0 && (
+            {(report.summary.warn ?? 0) > 0 && (
               <span className={`px-2 py-0.5 rounded-full border ${STATUS_BADGE.warn}`}>
                 {report.summary.warn} warn
               </span>
             )}
-            {report.summary.ok > 0 && (
+            {(report.summary.ok ?? 0) > 0 && (
               <span className={`px-2 py-0.5 rounded-full border ${STATUS_BADGE.ok}`}>
                 {report.summary.ok} ok
               </span>
@@ -140,7 +154,7 @@ export function DiagnosticsCard() {
         <p className="text-xs text-slate-500">Running checks…</p>
       )}
 
-      {report && (
+      {report && Array.isArray(report.checks) && (
         <ul className="space-y-1.5">
           {report.checks.map((c) => (
             <li key={c.id} className="flex items-start gap-2.5 py-1">
