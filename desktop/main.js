@@ -2585,11 +2585,33 @@ async function launch() {
 }
 
 function createTray() {
+  // macOS: use the monochrome template PNG so the system auto-inverts for
+  // light/dark mode and renders at native menu-bar size (~22px). Feeding
+  // the full-color .icns to Tray() makes the icon huge and clashing.
+  // Linux/Windows: use the colour favicon — those platforms don't have
+  // the template-image convention.
+  const trayTemplate = path.join(iconsDir, 'trayTemplate.png');
   const fallbackIcon = path.join(iconsDir, 'favicon-128.png');
-  const iconPath = isLoadableImage(APP_ICON) ? APP_ICON : (isLoadableImage(fallbackIcon) ? fallbackIcon : null);
+  const isMac = process.platform === 'darwin';
+  const preferred = isMac && isLoadableImage(trayTemplate) ? trayTemplate : null;
+  const iconPath =
+    preferred
+    || (isLoadableImage(APP_ICON) ? APP_ICON : null)
+    || (isLoadableImage(fallbackIcon) ? fallbackIcon : null);
 
   try {
-    tray = iconPath ? new Tray(iconPath) : new Tray(nativeImage.createEmpty());
+    if (iconPath) {
+      const img = nativeImage.createFromPath(iconPath);
+      // Resize once on Mac so the menu bar gets a 22px image (Retina @2x
+      // is auto-picked up if the file ends in @2x.png).
+      const trayImg = isMac && iconPath === trayTemplate
+        ? img
+        : (isMac ? img.resize({ width: 18, height: 18 }) : img);
+      if (isMac && iconPath === trayTemplate) trayImg.setTemplateImage(true);
+      tray = new Tray(trayImg);
+    } else {
+      tray = new Tray(nativeImage.createEmpty());
+    }
   } catch (error) {
     // Never crash app startup due to a tray icon decode/format issue.
     console.warn('[WatchTower] Tray icon load failed, continuing without icon:', error.message);
@@ -2649,6 +2671,21 @@ function createTray() {
 
 app.whenReady().then(async () => {
   try {
+    // macOS: in unpackaged dev mode the dock icon comes from
+    // Electron.app's bundle (the generic Electron logo), since
+    // BrowserWindow.icon is ignored on Mac. Override with our app
+    // icon so `npm start` looks like the production app. Packaged
+    // builds get the correct icon from electron-builder's .icns
+    // baked into the bundle, so we only need this in dev.
+    if (process.platform === 'darwin' && !app.isPackaged && APP_ICON && app.dock) {
+      try {
+        const dockImg = nativeImage.createFromPath(APP_ICON);
+        if (!dockImg.isEmpty()) app.dock.setIcon(dockImg);
+      } catch (e) {
+        console.warn('[WatchTower] failed to set dock icon:', e?.message || e);
+      }
+    }
+
     await launch();
     createTray();
 

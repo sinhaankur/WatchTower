@@ -10,9 +10,9 @@
   "homepage": "https://github.com/Node2-io/WatchTowerOps",
   "main": "main.js",
   "scripts": {
-    "start": "electron --no-sandbox .",
+    "start": "node scripts/start-electron.js",
     "prep:icons": "node -e \"require('fs').mkdirSync('build/icons',{recursive:true})\"",
-    "icons": "npm run prep:icons && icon-gen -i ../assets/wt-logo.svg -o build/icons",
+    "icons": "npm run prep:icons && icon-gen -i ../assets/wt-logo.svg -o build/icons && node scripts/gen-tray-icon.js",
     "installer-images": "python3 scripts/gen-installer-images.py",
     "nixpacks": "python3 scripts/download-nixpacks.py",
     "pack": "electron-builder --dir",
