@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import apiClient from '@/lib/api';
+import DiagnosticsCard from '@/components/DiagnosticsCard';
 import {
   useVSCodeStatus,
   useUpdateCheck,
@@ -785,6 +786,9 @@ const Settings = () => {
 
         {/* WatchTower version + update check */}
         <UpdateCheckCard />
+
+        {/* Subsystem diagnostics — first stop for "why doesn't X work?" */}
+        <DiagnosticsCard />
 
         {/* System dependencies + diagnostics */}
         <SystemCard />

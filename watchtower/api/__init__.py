@@ -412,6 +412,8 @@ app.include_router(templates.router)
 app.include_router(cloudflare.router)
 app.include_router(edition.router)
 app.include_router(local_runs.router)
+from watchtower.api import diagnose  # noqa: E402
+app.include_router(diagnose.router)
 
 # ── Serve React SPA from web/dist (same-origin, no proxy needed) ──────────────
 # Resolution order:
