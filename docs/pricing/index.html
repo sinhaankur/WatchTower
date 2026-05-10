@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pricing — WatchTower</title>
+  <meta name="description" content="WatchTower is open-core. Free forever for the deploy/run-locally/integrations core. Pro tier adds team RBAC, audit log, HA failover, SSO, and priority support.">
+  <link rel="icon" type="image/svg+xml" href="/wt-logo.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/_assets/site.css">
+  <style>
+    .tier-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 20px;
+      margin-top: 28px;
+    }
+    .tier {
+      border: 2px solid var(--wt-border);
+      border-radius: 16px;
+      padding: 28px;
+      background: var(--wt-panel);
+      box-shadow: var(--shadow);
+      display: flex;
+      flex-direction: column;
+    }
+    .tier.featured {
+      background: linear-gradient(180deg, rgba(253, 230, 138, 0.35), rgba(255, 255, 255, 1));
+    }
+    .tier .tier-label {
+      font-size: 0.78rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--wt-text-dim);
+      margin-bottom: 6px;
+    }
+    .tier h2 { margin: 0; font-size: 1.6rem; }
+    .tier .price {
+      margin-top: 14px;
+      font-size: 2rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+    }
+    .tier .price span { font-size: 1rem; color: var(--wt-text-dim); font-weight: 500; }
+    .tier ul {
+      margin: 18px 0 24px;
+      padding-left: 0;
+      list-style: none;
+    }
+    .tier li {
+      padding: 10px 0;
+      border-bottom: 1px solid var(--wt-border-soft);
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      font-size: 0.92rem;
+    }
+    .tier li:last-child { border-bottom: none; }
+    .tier li .check { color: var(--wt-ok-text); font-weight: 700; }
+    .tier li .feat-name { font-weight: 700; }
+    .tier li .feat-desc { display: block; color: var(--wt-text-dim); font-size: 0.85rem; margin-top: 2px; }
+    .tier .footer-cta {
+      margin-top: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .faq h3 { margin-top: 0; font-size: 1.05rem; }
+    .faq + .faq { margin-top: 16px; }
+  </style>
+</head>
+<body>
+<div class="page-shell">
+
+<nav class="site-nav" aria-label="Site sections">
+  <a class="brand" href="/">
+    <span class="brand-mark"><img src="/wt-logo.svg" alt="WatchTower logo"></span>
+    <span>WatchTower</span>
+  </a>
+  <div class="nav-links">
+    <a class="nav-link" href="/">Home</a>
+    <a class="nav-link" href="/how-it-works/">How it works</a>
+    <a class="nav-link active" href="/pricing/">Pricing</a>
+    <a class="nav-link" href="/blog/">Blog</a>
+    <a class="nav-link" href="/viewer.html">Docs</a>
+  </div>
+  <a class="nav-cta" href="https://github.com/Node2-io/WatchTowerOps" target="_blank" rel="noopener">⭐ GitHub</a>
+</nav>
+
+<main class="site-main">
+
+  <section class="site-hero">
+    <span class="eyebrow">Pricing</span>
+    <h1>Open-core. Free forever for the core. Pro for teams.</h1>
+    <p class="lead">
+      WatchTower is Apache-2.0 + ELv2. Self-host the whole thing for free.
+      Pro adds the features teams need to run production-grade infra together —
+      team RBAC, audit log, multi-region failover, SSO, priority support.
+    </p>
+  </section>
+
+  <div class="tier-grid">
+
+    <div class="tier">
+      <span class="tier-label">Open core</span>
+      <h2>Free</h2>
+      <p class="price">$0 <span>/ forever</span></p>
+      <ul>
+        <li><span class="check">✓</span><div><span class="feat-name">All deploy + build features</span><span class="feat-desc">Git-push deploys, multi-node SSH, container update daemon, templates, webhooks, queues.</span></div></li>
+        <li><span class="check">✓</span><div><span class="feat-name">Single-user installs</span><span class="feat-desc">Personal infra, homelabs, side projects.</span></div></li>
+        <li><span class="check">✓</span><div><span class="feat-name">All integrations</span><span class="feat-desc">Cloudflare, Tailscale, GitHub OAuth + Device Flow, SMTP, LLM agent.</span></div></li>
+        <li><span class="check">✓</span><div><span class="feat-name">Self-host on your hardware</span><span class="feat-desc">No data leaves your servers. SQLite or Postgres backend.</span></div></li>
+        <li><span class="check">✓</span><div><span class="feat-name">Community support</span><span class="feat-desc">GitHub Issues + Discussions.</span></div></li>
+      </ul>
+      <div class="footer-cta">
+        <a class="cta-btn" href="https://github.com/Node2-io/WatchTowerOps/releases/latest" target="_blank" rel="noopener">Download</a>
+        <a class="cta-btn ghost" href="/how-it-works/">See how it works</a>
+      </div>
+    </div>
+
+    <div class="tier featured">
+      <span class="tier-label">For teams</span>
+      <h2>Pro</h2>
+      <p class="price">Coming soon <span>· launching with billing</span></p>
+      <ul>
+        <li><span class="check">✓</span><div><span class="feat-name">Everything in Free</span><span class="feat-desc">All Free features included.</span></div></li>
+        <li><span class="check">✓</span><div><span class="feat-name">Audit Log</span><span class="feat-desc">See every who-did-what — project create, deploy trigger, env-var change. SOC 2 / ISO 27001 evidence.</span></div></li>
+        <li><span class="check">✓</span><div><span class="feat-name">Team Roles &amp; Permissions</span><span class="feat-desc">Owner / maintainer / viewer per org. Restrict who can deploy to production vs. staging.</span></div></li>
+        <li><span class="check">✓</span><div><span class="feat-name">Multi-region Failover</span><span class="feat-desc">Same project across primary + standby nodes. Cloudflare Load Balancer routes + fails over.</span></div></li>
+        <li><span class="check">✓</span><div><span class="feat-name">SSO (SAML / OIDC)</span><span class="feat-desc">Okta, Google Workspace, Azure AD, any SAML 2.0 / OIDC. SCIM-driven offboarding.</span></div></li>
+        <li><span class="check">✓</span><div><span class="feat-name">Priority Email Support</span><span class="feat-desc">Direct email with response SLA. Migration + HA architecture review.</span></div></li>
+      </ul>
+      <div class="footer-cta">
+        <a class="cta-btn ghost" href="https://github.com/Node2-io/WatchTowerOps/discussions" target="_blank" rel="noopener">Get notified at launch</a>
+      </div>
+    </div>
+
+  </div>
+
+  <section class="panel" style="margin-top: 32px;">
+    <h2>FAQ</h2>
+    <div class="faq">
+      <h3>What's the license?</h3>
+      <p>The Free tier is Apache 2.0 + Elastic License v2 (ELv2). You can use it for anything except offering WatchTower itself as a hosted SaaS to third parties. Building products on top of WatchTower is fine.</p>
+    </div>
+    <div class="faq">
+      <h3>Can I switch between Free and Pro?</h3>
+      <p>Yes. Pro features are gated by a single env var today (<code>WATCHTOWER_TIER=pro</code>). When billing launches, this becomes a license-key check. Removing the key takes you back to Free — your data stays put, the gated routes return 402 with an upgrade prompt.</p>
+    </div>
+    <div class="faq">
+      <h3>Will Pro be self-hosted too?</h3>
+      <p>Yes. Pro features run inside the same FastAPI process. License validation pings a license server, but that's the only network call. No telemetry, no usage reporting.</p>
+    </div>
+    <div class="faq">
+      <h3>I just want the deploy stuff. Do I need Pro?</h3>
+      <p>No. Free covers everything most operators need. Pro is specifically for team collaboration, compliance, and HA — situations where having multiple humans share an installation creates new requirements.</p>
+    </div>
+  </section>
+
+</main>
+
+<footer class="site-footer">
+  WatchTower — open-core (Apache 2.0 + ELv2). <a href="https://github.com/Node2-io/WatchTowerOps">Source on GitHub</a>.
+</footer>
+
+</div>
+</body>
+</html>
