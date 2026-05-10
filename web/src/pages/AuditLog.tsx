@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import apiClient from '@/lib/api';
 import { useProFeature } from '@/hooks/queries';
 import { ProLock } from '@/components/ProLock';
+import EmptyState from '@/components/EmptyState';
 
 type AuditEvent = {
   id: string;
@@ -211,9 +212,11 @@ export default function AuditLog() {
         {/* Events list */}
         <div className="rounded-xl border border-border bg-card overflow-hidden">
           {!loading && filtered.length === 0 && (
-            <div className="p-10 text-center text-sm text-slate-500">
-              No audit events match the current filters.
-            </div>
+            <EmptyState
+              compact
+              title="Nothing in the log yet"
+              description="As people create projects, trigger deploys, or change env vars, those actions land here. Adjust the filters above if you expected something specific."
+            />
           )}
           {filtered.map((e) => {
             const tone = actionTone(e.action);
