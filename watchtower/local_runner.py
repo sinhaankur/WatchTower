@@ -34,8 +34,11 @@ import json
 import logging
 import os
 import shutil
+import signal
 import socket
 import subprocess
+import sys
+import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Optional
@@ -68,6 +71,12 @@ class LocalRunStatus:
     # ``status_locally`` / ``list_running``, never persisted (mtime can
     # change after a host reboot, etc.).
     project_name: Optional[str] = None
+    # When kind="python-http-server", this is the PID of the spawned
+    # python http.server subprocess instead of a podman container. The
+    # container_* fields are filled with placeholder values so the UI
+    # can render the same "Live at http://…" pill without branching.
+    kind: str = "podman"  # "podman" | "python-http-server"
+    pid: Optional[int] = None
 
 
 # ── Internal helpers ──────────────────────────────────────────────────────────
@@ -88,6 +97,84 @@ def _podman() -> str:
         "Neither podman nor docker is on PATH. Install podman with "
         "`brew install podman && podman machine init && podman machine start`."
     )
+
+
+def _have_container_runtime() -> bool:
+    """Check whether a container runtime is available WITHOUT raising.
+    Used by run_locally to decide whether to fall back to the no-Podman
+    Python http.server path for static sites."""
+    try:
+        _podman()
+        return True
+    except LocalRunError:
+        return False
+
+
+def _serve_static_with_python(serving_path: Path, port: int) -> int:
+    """Spawn `python -m http.server <port> -d <serving_path>` and return
+    its PID. Used as a fallback when Podman/Docker isn't installed and
+    the project is a static site — the user just wants to see their
+    files at a URL, not learn container tooling.
+
+    Logs go to the local-runs state directory so they're discoverable
+    without `ps`-ing for the process. The subprocess is detached from
+    our process group so a Ctrl-C on the WatchTower API doesn't kill
+    it; stop_locally() sends an explicit SIGTERM by PID."""
+    log_dir = _RUNS_DIR / "logs"
+    log_dir.mkdir(parents=True, exist_ok=True)
+    log_path = log_dir / f"http-server-{port}.log"
+
+    log_fp = open(log_path, "ab")  # binary append; subprocess writes raw bytes
+    cmd = [
+        sys.executable, "-m", "http.server",
+        str(port),
+        "--bind", "127.0.0.1",
+        "--directory", str(serving_path),
+    ]
+    proc = subprocess.Popen(
+        cmd,
+        stdout=log_fp,
+        stderr=log_fp,
+        cwd=str(serving_path),
+        # New process group so the server keeps running if the API restarts.
+        start_new_session=True,
+    )
+    # Brief pause + liveness probe so we fail fast if it crashed at boot
+    # (e.g. port collision the kernel didn't catch). The bind-then-close
+    # in _pick_free_port races with this rare-but-possible.
+    time.sleep(0.3)
+    if proc.poll() is not None:
+        log_fp.close()
+        try:
+            tail = log_path.read_text()[-1500:]
+        except Exception:
+            tail = "(no log captured)"
+        raise LocalRunError(
+            f"Static-site server failed to start on port {port}. "
+            f"Last log: {tail}"
+        )
+    return proc.pid
+
+
+def _iso_now() -> str:
+    """ISO-8601 timestamp for the python http.server path — that runtime
+    has no equivalent of `podman inspect StartedAt`, so we just record
+    spawn-time when we save state."""
+    from datetime import datetime, timezone
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _process_alive(pid: int) -> bool:
+    """True if a process with the given PID is still running.
+    Uses kill(pid, 0) which is non-fatal — returns immediately with
+    success if the process exists, OSError(ESRCH) otherwise."""
+    if pid <= 0:
+        return False
+    try:
+        os.kill(pid, 0)
+        return True
+    except (OSError, ProcessLookupError):
+        return False
 
 
 def _pick_free_port() -> int:
@@ -151,12 +238,32 @@ def _run_cmd(args: list[str], cwd: Optional[Path] = None, timeout: int = 120) ->
 
 
 def _stop_existing(project_id: str) -> None:
-    """Idempotent: removes any prior container we started for this
-    project. Failing-soft because a missing container is the desired
-    end state."""
+    """Idempotent: removes any prior container OR python http.server we
+    started for this project. Failing-soft because a missing process
+    is the desired end state.
+
+    Branch on the recorded `kind` so we don't ask Podman to remove a
+    pure-Python server (and don't try to SIGTERM a container PID we
+    never recorded). When Podman isn't available at all we skip the
+    container path silently — there's nothing to clean up there."""
     name = _container_name(project_id)
-    podman = _podman()
-    _run_cmd([podman, "rm", "-f", name], timeout=15)
+    prior = _load_state(project_id)
+    if prior and prior.kind == "python-http-server" and prior.pid:
+        if _process_alive(prior.pid):
+            try:
+                os.kill(prior.pid, signal.SIGTERM)
+                # Give it a moment to flush + exit cleanly.
+                for _ in range(20):
+                    if not _process_alive(prior.pid):
+                        break
+                    time.sleep(0.05)
+                if _process_alive(prior.pid):
+                    os.kill(prior.pid, signal.SIGKILL)
+            except (OSError, ProcessLookupError):
+                pass
+    if _have_container_runtime():
+        podman = _podman()
+        _run_cmd([podman, "rm", "-f", name], timeout=15)
     _clear_state(project_id)
 
 
@@ -218,18 +325,75 @@ def run_locally(project_id: str, project_name: str, recommended_port: Optional[i
 
     ``recommended_port`` is the in-container port to expose for
     Dockerfile-based projects (defaults to 3000). Static-site path
-    always exposes nginx's port 80 internally.
+    serves on whatever ``_pick_free_port`` returns.
+
+    Three paths in priority order:
+      1. Containerfile/Dockerfile — podman build + run (REQUIRES container runtime)
+      2. Static output dir + container runtime available — nginx mounts the dir
+      3. Static output dir + NO container runtime — pure-Python http.server
+
+    Path (3) is the "I just want to see my Portfolio at a URL" case — a
+    hand-coded static site, no Node, no Docker, no surface area to learn.
+    Tradeoff: no caching headers, no compression, slow on large sites.
+    Fine for previewing; not a production server.
     """
-    podman = _podman()
     repo_dir = _project_workspace(project_id)
 
-    _stop_existing(project_id)
+    # Detect the workspace shape FIRST so we can pick the right runtime.
+    # _find_static_output returns repo_dir itself when there's an
+    # index.html and no package.json — that's our hand-coded-site case.
+    static_output = _find_static_output(repo_dir)
+    containerfile = _has_containerfile(repo_dir)
 
+    have_runtime = _have_container_runtime()
+    if containerfile and not have_runtime:
+        raise LocalRunError(
+            "This project has a Dockerfile/Containerfile but Podman/Docker "
+            "isn't installed. Install Podman with `brew install podman && "
+            "podman machine init && podman machine start`, or remove the "
+            "Dockerfile to fall back to the static-site path."
+        )
+
+    # If we have neither a Dockerfile nor a static output, there's nothing
+    # to serve — surface that explicitly before we even resolve podman.
+    if not containerfile and not static_output:
+        raise LocalRunError(
+            "No Containerfile / Dockerfile found, and no static-site output "
+            "(dist/, build/, _site/, out/, public/, or index.html at the "
+            "repo root). Add one of those, or trigger a deploy that produces "
+            "a build output."
+        )
+
+    _stop_existing(project_id)
     name = _container_name(project_id)
     host_port = _pick_free_port()
 
-    static_output = _find_static_output(repo_dir)
-    containerfile = _has_containerfile(repo_dir)
+    # Static site without a container runtime → Python http.server fallback.
+    # No build, no podman pull, no image management. Just a URL.
+    if static_output and not containerfile and not have_runtime:
+        pid = _serve_static_with_python(static_output, host_port)
+        status = LocalRunStatus(
+            project_id=project_id,
+            container_id=f"py-{pid}",
+            container_name=name,
+            port=host_port,
+            url=f"http://localhost:{host_port}",
+            image="python-http-server",
+            serving_path=str(static_output),
+            started_at=_iso_now(),
+            project_name=project_name,
+            kind="python-http-server",
+            pid=pid,
+        )
+        _save_state(status)
+        logger.info(
+            "Local run (python http.server) started for %s: %s (pid=%d)",
+            project_name, status.url, pid,
+        )
+        return status
+
+    # From here on we definitely have a container runtime.
+    podman = _podman()
 
     if containerfile:
         # Build then run the project's own image. Tag with the project
@@ -321,10 +485,17 @@ def restart_locally(project_id: str) -> Optional[LocalRunStatus]:
     without paying the rebuild cost. If no container is currently running
     for this project, returns None and the caller should fall back to
     ``run_locally``.
+
+    For the python http.server path there's no equivalent of
+    ``podman restart``; we return None so the caller falls back to a
+    fresh run_locally(), which respawns the subprocess with the same
+    serving_path (cheap — no build to redo).
     """
     state = _load_state(project_id)
     if not state:
         return None
+    if state.kind == "python-http-server":
+        return None  # caller falls back to run_locally
     podman = _podman()
     rc, out = _run_cmd([podman, "restart", state.container_name], timeout=30)
     if rc != 0:
@@ -352,6 +523,20 @@ def logs(project_id: str, tail: int = 200) -> str:
     state = _load_state(project_id)
     if not state:
         return ""
+
+    if state.kind == "python-http-server":
+        # Read the on-disk log we point the subprocess at.
+        log_path = _RUNS_DIR / "logs" / f"http-server-{state.port}.log"
+        if not log_path.is_file():
+            return ""
+        try:
+            text = log_path.read_text(errors="replace")
+        except OSError:
+            return ""
+        lines = text.splitlines()
+        tail_n = max(1, min(int(tail), 5000))
+        return "\n".join(lines[-tail_n:])
+
     podman = _podman()
     # ``--tail`` accepts an integer; clamp to a sane range so a typo'd
     # negative or absurdly huge value can't return a 50 MB blob.
@@ -407,14 +592,7 @@ def list_running() -> list[LocalRunStatus]:
     try:
         podman_bin = _podman()
     except LocalRunError:
-        # No podman → no live containers to verify, but state files
-        # might exist. Treat them all as stale.
-        for f in _RUNS_DIR.glob("*.json"):
-            try:
-                f.unlink()
-            except OSError:
-                pass
-        return []
+        podman_bin = None
 
     for f in sorted(_RUNS_DIR.glob("*.json")):
         try:
@@ -424,7 +602,23 @@ def list_running() -> list[LocalRunStatus]:
             try: f.unlink()
             except OSError: pass
             continue
-        # Liveness check
+
+        if state.kind == "python-http-server":
+            # PID-based liveness — no Podman query needed.
+            if state.pid and _process_alive(state.pid):
+                out.append(state)
+            else:
+                try: f.unlink()
+                except OSError: pass
+            continue
+
+        if podman_bin is None:
+            # State references a container but we can't query the runtime.
+            # Treat as stale — better to clear than to lie about uptime.
+            try: f.unlink()
+            except OSError: pass
+            continue
+
         rc, _ = _run_cmd(
             [podman_bin, "container", "exists", state.container_name],
             timeout=10,
@@ -441,15 +635,29 @@ def list_running() -> list[LocalRunStatus]:
 
 
 def status_locally(project_id: str) -> Optional[LocalRunStatus]:
-    """Return the cached state, or None if the container has been
-    stopped / never started. We do a lightweight liveness check — if the
-    container disappeared (host reboot, manual ``podman rm``) we clear
-    the cache so the UI doesn't claim "running" indefinitely.
+    """Return the cached state, or None if the runtime is no longer
+    alive. We do a lightweight liveness check — if the container or
+    Python http.server process disappeared (host reboot, manual ``podman
+    rm``, ``kill``) we clear the cache so the UI doesn't claim "running"
+    indefinitely.
 
     Refreshes ``started_at`` on every call so the UI's uptime stays
     correct even after a ``podman restart`` from outside WatchTower."""
     state = _load_state(project_id)
     if not state:
+        return None
+
+    if state.kind == "python-http-server":
+        # No container_inspect equivalent — just check the PID.
+        if not state.pid or not _process_alive(state.pid):
+            _clear_state(project_id)
+            return None
+        return state
+
+    if not _have_container_runtime():
+        # Stale state from a previous Podman session that's no longer
+        # available — best to clear it so the UI doesn't lie.
+        _clear_state(project_id)
         return None
     podman = _podman()
     rc, _ = _run_cmd(
