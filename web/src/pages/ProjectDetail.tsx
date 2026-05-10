@@ -306,11 +306,98 @@ function HealthCheckCard({ projectId }: { projectId: string }) {
             {result.error && (
               <p className="text-[11px] opacity-80">{result.error}</p>
             )}
+            {(() => {
+              const hint = _healthCheckHint(result);
+              if (!hint) return null;
+              return (
+                <div className="mt-2 pt-2 border-t border-current/20 space-y-1">
+                  <p className="text-[10px] uppercase font-bold tracking-wide opacity-70">
+                    Suggested fix
+                  </p>
+                  <p className="text-[11px] opacity-90">{hint}</p>
+                </div>
+              );
+            })()}
           </div>
         )}
       </div>
     </div>
   );
+}
+
+/**
+ * Translate a HealthResult into an actionable one-liner.
+ *
+ * Health Check used to dump the raw exception ("HTTPConnectionPool…
+ * NewConnectionError…") and leave the user to figure out what to do.
+ * Now we recognise the common shapes and tell them. Returns null when
+ * the result is healthy or doesn't match a known pattern.
+ */
+function _healthCheckHint(r: HealthResult): string | null {
+  if (r.status === 'healthy') return null;
+  const err = (r.error || '').toLowerCase();
+  const code = r.response_code;
+
+  // Connection-level failures — nothing listening at the URL.
+  if (
+    r.status === 'unreachable'
+    && (err.includes('connection refused')
+        || err.includes('newconnectionerror')
+        || err.includes('failed to establish'))
+  ) {
+    return (
+      "Nothing is listening on that URL. Either the app crashed, hasn't been "
+      + "deployed, or isn't running locally. Click Run Locally to spin it up "
+      + "(scroll down on this page), or check the latest deploy in Build Logs."
+    );
+  }
+
+  if (r.status === 'unreachable' && (err.includes('timed out') || err.includes('timeout'))) {
+    return (
+      "The request timed out. The app may be starting up — wait 10–20 seconds "
+      + "and probe again. If it persists, the app is taking too long to "
+      + "respond — check the deploy logs for a stuck process."
+    );
+  }
+
+  if (r.status === 'unreachable' && (err.includes('name resolution') || err.includes('nodename') || err.includes('getaddrinfo'))) {
+    return (
+      "DNS lookup failed. The hostname doesn't resolve — check the project's "
+      + "configured URL and that the deploy actually landed."
+    );
+  }
+
+  // HTTP-level non-success.
+  if (code === 404) {
+    return (
+      `The server responded but the path "${r.url ? new URL(r.url).pathname : '/health'}" `
+      + "wasn't found. Most apps don't expose /health by default — try / or "
+      + "the path your framework uses. Static sites usually use / and return "
+      + "200 from any HTML file."
+    );
+  }
+  if (code === 401 || code === 403) {
+    return (
+      "The server responded but rejected the probe. The health endpoint is "
+      + "behind auth — either remove auth from this path, or use a different "
+      + "path that doesn't require it."
+    );
+  }
+  if (code !== null && code >= 500) {
+    return (
+      `The server returned ${code}. The app is running but the health endpoint `
+      + "is throwing. Check the app's own logs (or Run Locally → Show logs) "
+      + "for the underlying error."
+    );
+  }
+  if (code !== null && code >= 300 && code < 400) {
+    return (
+      `The server returned ${code} — a redirect. Health probes don't follow `
+      + "redirects. Use the destination URL or expose the same content directly."
+    );
+  }
+
+  return null;
 }
 
 // ── OverviewTab ───────────────────────────────────────────────────────────────
@@ -1097,10 +1184,13 @@ function WebhooksTab({ projectId }: { projectId: string }) {
   const [hooks, setHooks] = useState<Webhook[]>([]);
   const [loading, setLoading] = useState(true);
   const [url, setUrl] = useState('');
-  const [provider, setProvider] = useState('discord');
+  const [provider, setProvider] = useState('slack');
   const [label, setLabel] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showGuide, setShowGuide] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<{ ok: boolean; detail?: string } | null>(null);
 
   async function load() {
     try {
@@ -1123,11 +1213,29 @@ function WebhooksTab({ projectId }: { projectId: string }) {
       await apiClient.post(`/projects/${projectId}/webhooks`, { url: url.trim(), provider, label: label || undefined });
       setUrl('');
       setLabel('');
+      setTestResult(null);
       await load();
     } catch (e: any) {
       setError(e?.response?.data?.detail ?? 'Failed to add webhook');
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function testHook() {
+    if (!url.trim()) return;
+    setTesting(true);
+    setTestResult(null);
+    try {
+      const r = await apiClient.post<{ ok: boolean; status_code?: number; detail?: string }>(
+        `/projects/${projectId}/webhooks/test`,
+        { url: url.trim(), provider, label: label || undefined },
+      );
+      setTestResult({ ok: r.data.ok, detail: r.data.detail });
+    } catch (e: any) {
+      setTestResult({ ok: false, detail: e?.response?.data?.detail ?? 'Test request failed' });
+    } finally {
+      setTesting(false);
     }
   }
 
@@ -1146,25 +1254,72 @@ function WebhooksTab({ projectId }: { projectId: string }) {
   return (
     <div className="max-w-3xl flex flex-col gap-6">
       <div className="rounded-xl border border-border bg-card p-5">
-        <h3 className="text-sm font-semibold mb-1">Add Notification Webhook</h3>
+        <div className="flex items-start justify-between gap-3 mb-1">
+          <h3 className="text-sm font-semibold">Add Notification Webhook</h3>
+          <button
+            type="button"
+            onClick={() => setShowGuide((v) => !v)}
+            className="text-[11px] text-blue-700 hover:underline whitespace-nowrap"
+          >
+            {showGuide ? 'Hide setup guide' : 'How do I get a webhook URL?'}
+          </button>
+        </div>
         <p className="text-xs text-muted-foreground mb-4">
-          Receive deploy success / failure notifications in Discord or Slack.
+          Receive deploy success / failure notifications in Slack or Discord.
         </p>
+
+        {showGuide && provider === 'slack' && (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 mb-4 text-xs text-amber-900 space-y-2">
+            <p className="font-semibold">Slack Incoming Webhook setup (~2 min):</p>
+            <ol className="list-decimal pl-5 space-y-1">
+              <li>Go to <a href="https://api.slack.com/apps" target="_blank" rel="noopener noreferrer" className="underline font-mono">api.slack.com/apps</a> → <strong>Create New App</strong> → <strong>From scratch</strong>.</li>
+              <li>Name it "WatchTower" (or whatever) and pick the workspace.</li>
+              <li>In the app, go to <strong>Incoming Webhooks</strong> → toggle <strong>On</strong> → click <strong>Add New Webhook to Workspace</strong>.</li>
+              <li>Pick the channel to post to. Slack returns a URL starting with <code className="font-mono">https://hooks.slack.com/services/…</code> — copy it.</li>
+              <li>Paste it below + click <strong>Test</strong> to verify, then <strong>Add</strong>.</li>
+            </ol>
+          </div>
+        )}
+        {showGuide && provider === 'discord' && (
+          <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-3 mb-4 text-xs text-indigo-900 space-y-2">
+            <p className="font-semibold">Discord Webhook setup (~30 s):</p>
+            <ol className="list-decimal pl-5 space-y-1">
+              <li>Right-click the channel in Discord → <strong>Edit Channel</strong> → <strong>Integrations</strong> → <strong>Webhooks</strong> → <strong>New Webhook</strong>.</li>
+              <li>Click <strong>Copy Webhook URL</strong> (starts with <code className="font-mono">https://discord.com/api/webhooks/…</code>).</li>
+              <li>Paste it below + click <strong>Test</strong> to verify, then <strong>Add</strong>.</li>
+            </ol>
+          </div>
+        )}
+
         {error && <p className="text-xs text-red-600 mb-3">{error}</p>}
+        {testResult && (
+          <div
+            className={`rounded-md border p-2.5 mb-3 text-xs ${
+              testResult.ok
+                ? 'border-emerald-300 bg-emerald-50 text-emerald-800'
+                : 'border-red-300 bg-red-50 text-red-800'
+            }`}
+          >
+            {testResult.ok
+              ? `Test message delivered. Check the ${provider} channel — you should see "🦉 Test message from WatchTower".`
+              : (testResult.detail || 'Test failed.')}
+          </div>
+        )}
+
         <div className="flex gap-2 flex-wrap">
           <select
             value={provider}
-            onChange={e => setProvider(e.target.value)}
+            onChange={e => { setProvider(e.target.value); setTestResult(null); }}
             className="border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 bg-card"
           >
-            <option value="discord">Discord</option>
             <option value="slack">Slack</option>
+            <option value="discord">Discord</option>
           </select>
           <input
             value={url}
-            onChange={e => setUrl(e.target.value)}
-            placeholder="Webhook URL"
-            className="flex-1 min-w-[280px] border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 bg-background"
+            onChange={e => { setUrl(e.target.value); setTestResult(null); }}
+            placeholder={provider === 'slack' ? 'https://hooks.slack.com/services/…' : 'https://discord.com/api/webhooks/…'}
+            className="flex-1 min-w-[280px] border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 bg-background font-mono text-[12px]"
           />
           <input
             value={label}
@@ -1173,8 +1328,16 @@ function WebhooksTab({ projectId }: { projectId: string }) {
             className="w-36 border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 bg-background"
           />
           <button
+            onClick={testHook}
+            disabled={testing || saving || !url.trim()}
+            className="px-3 py-2 rounded-lg border border-border text-slate-700 hover:bg-slate-50 text-sm disabled:opacity-50"
+            title="Send a synthetic test message to verify the webhook URL works before saving"
+          >
+            {testing ? 'Testing…' : 'Test'}
+          </button>
+          <button
             onClick={addHook}
-            disabled={saving || !url.trim()}
+            disabled={saving || testing || !url.trim()}
             className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-medium disabled:opacity-50 transition-colors"
           >
             {saving ? 'Saving…' : 'Add'}
@@ -1711,6 +1874,10 @@ type LocalRun = {
   image: string;
   serving_path: string | null;
   started_at?: string | null;
+  // Set on the Python-http-server fallback path so the UI can label
+  // "Static-site preview" vs "Container" without inspecting the image.
+  kind?: 'podman' | 'python-http-server';
+  pid?: number | null;
 };
 
 // Tiny human-readable elapsed-time formatter. We could pull date-fns but
@@ -1837,10 +2004,12 @@ function RunLocallyCard({ projectId }: { projectId: string }) {
         <div>
           <h2 className="text-sm font-semibold">Run Locally</h2>
           <p className="text-[11px] text-muted-foreground mt-0.5">
-            Spin up the latest build as a Podman container on this machine. Free, instant, no server needed.
+            Serve the latest build on a localhost URL. Static sites work
+            without any extra tooling — WatchTower spins up a built-in
+            preview server.
             <br />
             <span className="text-[10.5px]">
-              Requires <a href="https://podman.io/docs/installation" target="_blank" rel="noopener noreferrer" className="underline hover:text-slate-700">Podman</a> installed locally
+              For Dockerfile-based projects you'll need <a href="https://podman.io/docs/installation" target="_blank" rel="noopener noreferrer" className="underline hover:text-slate-700">Podman</a>
               {' '}(<code className="font-mono">brew install podman</code> on macOS,
               {' '}<code className="font-mono">apt install podman</code> on Linux,
               {' '}<a href="https://podman.io/docs/installation#windows" target="_blank" rel="noopener noreferrer" className="underline hover:text-slate-700">winget install RedHat.Podman</a> on Windows).
@@ -1871,6 +2040,14 @@ function RunLocallyCard({ projectId }: { projectId: string }) {
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse" />
                 Running
               </span>
+              {run.kind === 'python-http-server' && (
+                <span
+                  title="Served by Python's built-in http.server (no Podman). Fine for previewing static files; not a production server."
+                  className="inline-flex text-[10.5px] px-2 py-0.5 rounded-full border border-amber-300 bg-amber-50 text-amber-800"
+                >
+                  Static preview
+                </span>
+              )}
               <a
                 href={run.url}
                 target="_blank"
@@ -1886,8 +2063,18 @@ function RunLocallyCard({ projectId }: { projectId: string }) {
               )}
             </div>
             <p className="text-[11px] text-muted-foreground">
-              Image: <code className="font-mono">{run.image}</code> · Container: <code className="font-mono">{run.container_id.slice(0, 12)}</code>
-              {run.serving_path && <> · Serving: <code className="font-mono">{run.serving_path}</code></>}
+              {run.kind === 'python-http-server' ? (
+                <>
+                  Mode: <code className="font-mono">python http.server</code>
+                  {run.pid != null && <> · PID: <code className="font-mono">{run.pid}</code></>}
+                  {run.serving_path && <> · Serving: <code className="font-mono">{run.serving_path}</code></>}
+                </>
+              ) : (
+                <>
+                  Image: <code className="font-mono">{run.image}</code> · Container: <code className="font-mono">{run.container_id.slice(0, 12)}</code>
+                  {run.serving_path && <> · Serving: <code className="font-mono">{run.serving_path}</code></>}
+                </>
+              )}
             </p>
             <div className="flex items-center gap-2 flex-wrap">
               <button
@@ -1961,7 +2148,12 @@ function RunLocallyCard({ projectId }: { projectId: string }) {
           </div>
         ) : (
           <p className="text-xs text-muted-foreground">
-            Not running. Trigger a deploy first (the <strong>Deploy Now</strong> button up top), then come back here and click <strong>Run Locally</strong>. Static sites get served by nginx; Dockerfile-based projects build + run their own image.
+            Not running. Trigger a deploy first (the <strong>Deploy Now</strong> button up top), then come back here and click <strong>Run Locally</strong>.
+            <br />
+            Static sites are served by Python's built-in HTTP server when
+            Podman isn't installed (no extra setup); upgrade to Podman + nginx
+            for a closer-to-production preview. Dockerfile-based projects
+            always require Podman.
           </p>
         )}
       </div>

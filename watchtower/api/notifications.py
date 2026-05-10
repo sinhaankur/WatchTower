@@ -103,3 +103,109 @@ async def delete_webhook(
     db.delete(hook)
     db.commit()
     return None
+
+
+class WebhookTestRequest(BaseModel):
+    provider: str  # "slack" | "discord"
+    url: HttpUrl
+    label: Optional[str] = None
+
+
+class WebhookTestResponse(BaseModel):
+    ok: bool
+    status_code: Optional[int] = None
+    detail: Optional[str] = None
+
+
+@router.post("/{project_id}/webhooks/test", response_model=WebhookTestResponse)
+async def test_webhook(
+    project_id: UUID,
+    body: WebhookTestRequest,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(util.get_current_user),
+):
+    """Send a synthetic 'this is a test from WatchTower' message to the
+    given webhook URL, then report what happened. Lets users verify a
+    Slack/Discord webhook URL is correct *before* committing it to a
+    project — the alternative is configuring it, triggering a real
+    deploy, and waiting to see if a notification shows up.
+
+    The webhook itself isn't saved by this call. Side-effect free
+    against the WatchTower DB; only side-effect is the test message
+    delivered to the third-party endpoint.
+    """
+    import json as _json
+    import urllib.request
+    import urllib.error
+    import re
+
+    project = _get_project_or_404(db, project_id, util.canonical_user_id(db, current_user))
+
+    provider = (body.provider or "").lower().strip()
+    if provider not in {"slack", "discord"}:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="provider must be 'slack' or 'discord'",
+        )
+
+    url_str = str(body.url)
+    # Cheap shape check so users get a clearer error than the upstream's
+    # 404 / 401 when they paste the wrong thing entirely.
+    if provider == "slack" and not re.match(r"^https://hooks\.slack\.com/services/", url_str):
+        return WebhookTestResponse(
+            ok=False,
+            detail=(
+                "Slack webhook URLs start with `https://hooks.slack.com/services/...`. "
+                "The URL you pasted doesn't match — double-check you copied the full "
+                "Webhook URL from your Slack app's Incoming Webhooks page."
+            ),
+        )
+    if provider == "discord" and "discord.com/api/webhooks" not in url_str:
+        return WebhookTestResponse(
+            ok=False,
+            detail=(
+                "Discord webhook URLs contain `discord.com/api/webhooks`. "
+                "Copy the full URL from Channel Settings → Integrations → Webhooks."
+            ),
+        )
+
+    label = body.label or "test"
+    text = (
+        f"🦉 Test message from WatchTower\n"
+        f"Project: {project.name}  ·  Webhook label: {label}\n"
+        f"If you see this, the webhook is wired up correctly."
+    )
+    payload = (
+        {"text": text} if provider == "slack" else {"content": text}
+    )
+    data = _json.dumps(payload).encode("utf-8")
+    req = urllib.request.Request(
+        url_str,
+        data=data,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            return WebhookTestResponse(ok=True, status_code=resp.status)
+    except urllib.error.HTTPError as e:
+        body_snippet = ""
+        try:
+            body_snippet = e.read().decode("utf-8", errors="replace")[:200]
+        except Exception:
+            pass
+        return WebhookTestResponse(
+            ok=False,
+            status_code=e.code,
+            detail=f"{provider.capitalize()} responded {e.code}: {body_snippet or e.reason}",
+        )
+    except urllib.error.URLError as e:
+        return WebhookTestResponse(
+            ok=False,
+            detail=f"Could not reach {provider}: {e.reason}",
+        )
+    except Exception as e:
+        return WebhookTestResponse(
+            ok=False,
+            detail=f"Unexpected error: {e}",
+        )
