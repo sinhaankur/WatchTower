@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import apiClient from '@/lib/api';
+import Skeleton from '@/components/Skeleton';
 
 type EnvVar = {
   key: string;
@@ -168,7 +169,25 @@ export default function Templates() {
           </div>
         )}
         {!templates && !error && (
-          <p className="text-sm text-slate-600">Loading templates…</p>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3" aria-busy="true" aria-label="Loading templates">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <article
+                key={i}
+                className="rounded-xl border border-slate-200 bg-white p-4 flex flex-col gap-3"
+              >
+                <div className="flex items-start gap-3">
+                  <Skeleton className="w-9 h-9 rounded-lg" />
+                  <div className="flex-1 space-y-2">
+                    <Skeleton className="h-3.5 w-24" />
+                    <Skeleton className="h-3 w-16" />
+                  </div>
+                </div>
+                <Skeleton className="h-3 w-full" />
+                <Skeleton className="h-3 w-5/6" />
+                <Skeleton className="h-7 w-full mt-2" />
+              </article>
+            ))}
+          </div>
         )}
         {templates && filtered.length === 0 && (
           <p className="text-sm text-slate-600">
@@ -176,11 +195,11 @@ export default function Templates() {
           </p>
         )}
 
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3 anim-stagger">
           {filtered.map(template => (
             <article
               key={template.slug}
-              className="rounded-xl border border-slate-800 bg-card p-4 shadow-[2px_2px_0_0_#1f2937] flex flex-col gap-3"
+              className="anim-fade-in-up rounded-xl border border-slate-800 bg-card p-4 shadow-[2px_2px_0_0_#1f2937] flex flex-col gap-3 transition-shadow hover:shadow-[3px_3px_0_0_#1f2937]"
             >
               <div className="flex items-start gap-3">
                 <div className="w-9 h-9 rounded-lg border border-slate-800 bg-amber-100 flex items-center justify-center text-[11px] font-mono font-bold text-slate-900 shadow-[1px_1px_0_0_#1f2937] uppercase">
