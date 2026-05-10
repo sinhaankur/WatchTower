@@ -8,6 +8,24 @@ const net = require('net');
 const os = require('os');
 const path = require('path');
 
+// Override the app name in dev mode so the OS chrome (About panel,
+// Recent Items, app.getName()) reads "WatchTower" instead of the stock
+// "Electron" baked into node_modules/electron/dist/Electron.app's
+// Info.plist. Packaged builds get the right name from electron-builder
+// (productName in package.json), so this only matters when running
+// from source. MUST run before app is ready — once the runtime caches
+// the name, this is a no-op.
+//
+// Caveat: the macOS menu-bar leftmost slot ALSO reads from the running
+// .app's CFBundleName, which we can't change without renaming
+// Electron.app on disk. We override the menu template (createAppMenu
+// below) so the menu still says "WatchTower" — that's good enough for
+// most users. Force-quit dialogs and Activity Monitor still show the
+// process binary name; that's a hard limit of running from source.
+if (!app.isPackaged) {
+  app.setName('WatchTower');
+}
+
 // ── Global safety net: silent diagnostic capture ─────────────────────────
 //
 // Goal: the app should NEVER show a "JavaScript error in the main process"
@@ -2684,6 +2702,89 @@ app.whenReady().then(async () => {
       } catch (e) {
         console.warn('[WatchTower] failed to set dock icon:', e?.message || e);
       }
+    }
+
+    // Custom application menu so the macOS menu bar's leftmost item
+    // says "WatchTower" instead of the stock "Electron". On non-mac
+    // platforms the first menu template entry doesn't have the same
+    // privilege but the title still appears in About / version dialogs.
+    // Kept minimal — just the standard Edit/View/Window/Help groups
+    // plus the WatchTower app menu. Roles are platform-aware so
+    // Cmd+Q / Alt+F4 / etc. all work without us re-implementing them.
+    try {
+      const isMac = process.platform === 'darwin';
+      const appName = 'WatchTower';
+      app.setAboutPanelOptions({
+        applicationName: appName,
+        applicationVersion: app.getVersion(),
+        copyright: `© ${new Date().getFullYear()} WatchTower contributors`,
+      });
+      const template = [
+        ...(isMac
+          ? [{
+              label: appName,
+              submenu: [
+                { role: 'about', label: `About ${appName}` },
+                { type: 'separator' },
+                { role: 'services' },
+                { type: 'separator' },
+                { role: 'hide', label: `Hide ${appName}` },
+                { role: 'hideOthers' },
+                { role: 'unhide' },
+                { type: 'separator' },
+                { role: 'quit', label: `Quit ${appName}` },
+              ],
+            }]
+          : []),
+        {
+          label: 'Edit',
+          submenu: [
+            { role: 'undo' }, { role: 'redo' }, { type: 'separator' },
+            { role: 'cut' }, { role: 'copy' }, { role: 'paste' },
+            ...(isMac ? [{ role: 'selectAll' }] : [{ role: 'delete' }, { type: 'separator' }, { role: 'selectAll' }]),
+          ],
+        },
+        {
+          label: 'View',
+          submenu: [
+            { role: 'reload' }, { role: 'forceReload' }, { role: 'toggleDevTools' },
+            { type: 'separator' },
+            { role: 'resetZoom' }, { role: 'zoomIn' }, { role: 'zoomOut' },
+            { type: 'separator' },
+            { role: 'togglefullscreen' },
+          ],
+        },
+        {
+          label: 'Window',
+          submenu: [
+            { role: 'minimize' }, { role: 'zoom' },
+            ...(isMac
+              ? [{ type: 'separator' }, { role: 'front' }, { type: 'separator' }, { role: 'window' }]
+              : [{ role: 'close' }]),
+          ],
+        },
+        {
+          role: 'help',
+          submenu: [
+            {
+              label: `${appName} on GitHub`,
+              click: () => shell.openExternal('https://github.com/sinhaankur/WatchTower'),
+            },
+            {
+              label: 'Open Diagnostics',
+              click: () => {
+                if (mainWindow && !mainWindow.isDestroyed()) {
+                  bringWindowToFront(mainWindow);
+                  mainWindow.webContents.executeJavaScript("window.location.assign('/settings');").catch(() => {});
+                }
+              },
+            },
+          ],
+        },
+      ];
+      Menu.setApplicationMenu(Menu.buildFromTemplate(template));
+    } catch (e) {
+      console.warn('[WatchTower] failed to install application menu:', e?.message || e);
     }
 
     await launch();
