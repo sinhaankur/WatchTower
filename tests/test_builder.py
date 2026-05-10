@@ -148,6 +148,38 @@ class TestResolveBuildCommand:
         cmd = _resolve_build_command(db, project)
         assert "npm" in cmd
 
+    def test_static_site_without_package_json_skips_build(self, db, project, tmp_path):
+        """A NETLIFY_LIKE project whose repo has no package.json (a hand-coded
+        static HTML site) gets an empty build command — npm install would
+        crash with ENOENT. The deploy step still ships the files. This is
+        the "Portfolio at /Users/.../Portfolio" case from a real user."""
+        project.use_case = UseCaseType.NETLIFY_LIKE
+        db.commit()
+        # repo dir with index.html but no package.json
+        (tmp_path / "index.html").write_text("<html><body>hi</body></html>")
+        cmd = _resolve_build_command(db, project, repo_dir=tmp_path)
+        assert cmd == ""
+
+    def test_static_site_with_package_json_runs_build(self, db, project, tmp_path):
+        """Counterpart to the above — a NETLIFY_LIKE project WITH a
+        package.json gets the normal install + build pipeline."""
+        project.use_case = UseCaseType.NETLIFY_LIKE
+        db.commit()
+        (tmp_path / "package.json").write_text('{"name": "x", "scripts": {"build": "echo"}}')
+        cmd = _resolve_build_command(db, project, repo_dir=tmp_path)
+        assert "npm" in cmd and "build" in cmd
+
+    def test_explicit_build_command_overrides_static_short_circuit(self, db, project, tmp_path):
+        """If the user set a custom build_command, we honour it verbatim
+        even on a no-package.json repo. They might be running a Makefile,
+        a shell script, or a non-Node toolchain (Hugo, Jekyll, etc.)."""
+        project.use_case = UseCaseType.NETLIFY_LIKE
+        project.build_command = "make site"
+        db.commit()
+        # No package.json in tmp_path — the new short-circuit would normally fire.
+        cmd = _resolve_build_command(db, project, repo_dir=tmp_path)
+        assert cmd == "make site"
+
     def test_docker_without_config(self, db, project):
         project.use_case = UseCaseType.DOCKER_PLATFORM
         db.commit()
@@ -370,6 +402,18 @@ class TestRunBuildPipeline:
         # git clone succeeds, build command fails
         mock_exec.return_value = self._make_completed_proc()
         mock_shell.return_value = self._make_completed_proc(returncode=1, stdout=b"npm ERR! missing script\n")
+
+        # Pin an explicit build command so the new "no package.json →
+        # skip build" short-circuit in _resolve_build_command doesn't
+        # apply. This test verifies build-failure handling, which only
+        # makes sense if a build is actually run.
+        db = SessionLocal()
+        try:
+            project = db.query(Deployment).filter(Deployment.id == deployment.id).first().project
+            project.build_command = "npm run build"
+            db.commit()
+        finally:
+            db.close()
 
         run_build_sync(str(deployment.id))
 

@@ -903,6 +903,15 @@ def _resolve_build_command(
         )
 
     if project.use_case in (UseCaseType.NETLIFY_LIKE, UseCaseType.VERCEL_LIKE):
+        # If the repo has no package.json at root, npm install will hard-fail
+        # with the cryptic "ENOENT: package.json" output we saw users hit on
+        # plain static-HTML sites (hand-coded portfolios, JAMstack sources
+        # already pre-built, mirrored static directories). Skip the build
+        # entirely for those — files copy as-is via the deploy step. Users
+        # who actually need a build can set Project.build_command explicitly,
+        # which short-circuits this branch above.
+        if repo_dir is not None and not (repo_dir / "package.json").exists():
+            return ""
         install = _detect_node_install(repo_dir) if repo_dir else "npm install"
         return f"{install} && npm run build"
 
@@ -953,9 +962,23 @@ _FAILURE_HINTS: list[tuple[str, Callable[[str, str], bool], str]] = [
         "missing-package-json",
         lambda out, cmd: "ENOENT" in out and "package.json" in out,
         (
-            "No `package.json` found in the repo root. If your app lives in "
-            "a subdirectory, override the build command to `cd <dir> && "
-            "npm install && npm run build`."
+            "No `package.json` in the repo root. If this is a hand-coded "
+            "static site (just HTML/CSS/JS files), update WatchTower — "
+            "newer versions auto-detect this and skip the build. If your "
+            "app lives in a subdirectory, set Build Command to "
+            "`cd <dir> && npm install && npm run build`."
+        ),
+    ),
+    (
+        "no-deploy-target",
+        lambda out, cmd: (
+            "no deployment nodes" in out.lower()
+            or "no nodes configured" in out.lower()
+        ),
+        (
+            "This project has no deployment target. Add a server under "
+            "Servers, or for static sites use Run Locally to serve from "
+            "this machine without a remote node."
         ),
     ),
     (
