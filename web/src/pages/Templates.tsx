@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import apiClient from '@/lib/api';
 import Skeleton from '@/components/Skeleton';
+import EmptyState from '@/components/EmptyState';
 
 type EnvVar = {
   key: string;
@@ -190,9 +191,25 @@ export default function Templates() {
           </div>
         )}
         {templates && filtered.length === 0 && (
-          <p className="text-sm text-slate-600">
-            {filter ? 'No templates match your filter.' : 'No templates available.'}
-          </p>
+          <EmptyState
+            title={filter ? 'Nothing matches that filter' : 'No templates available'}
+            description={
+              filter
+                ? `No template name, description, or category matches "${filter}". Try a different search.`
+                : 'The template catalog is empty. Restart the API or check the server-side template_catalog module.'
+            }
+            action={
+              filter ? (
+                <button
+                  type="button"
+                  onClick={() => setFilter('')}
+                  className="text-xs px-3 py-1.5 rounded-lg border border-slate-300 hover:bg-slate-50 font-medium"
+                >
+                  Clear filter
+                </button>
+              ) : null
+            }
+          />
         )}
 
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3 anim-stagger">
