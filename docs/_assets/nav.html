@@ -1,0 +1,27 @@
+<!--
+  Single source of truth for the top nav. New pages copy-paste this block
+  rather than fetching at runtime — no JS dependency, no FOUC. When
+  changing nav links: update here AND search-replace across:
+    docs/index.html  (legacy: nav also lives in the sidebar)
+    docs/how-it-works/index.html
+    docs/pricing/index.html
+    docs/blog/index.html
+    docs/docs/index.html (when added)
+
+  The {{ACTIVE}} marker is meant to be replaced per-page so the matching
+  nav-link gets the .active class.
+-->
+<nav class="site-nav" aria-label="Site sections">
+  <a class="brand" href="/">
+    <span class="brand-mark"><img src="/wt-logo.svg" alt="WatchTower logo"></span>
+    <span>WatchTower</span>
+  </a>
+  <div class="nav-links">
+    <a class="nav-link" href="/">Home</a>
+    <a class="nav-link" href="/how-it-works/">How it works</a>
+    <a class="nav-link" href="/pricing/">Pricing</a>
+    <a class="nav-link" href="/blog/">Blog</a>
+    <a class="nav-link" href="/viewer.html">Docs</a>
+  </div>
+  <a class="nav-cta" href="https://github.com/Node2-io/WatchTowerOps" target="_blank" rel="noopener">⭐ GitHub</a>
+</nav>

@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Release notes &amp; updates — WatchTower</title>
+  <meta name="description" content="What's new in WatchTower. Release notes, architecture deep-dives, and update announcements.">
+  <link rel="icon" type="image/svg+xml" href="/wt-logo.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/_assets/site.css">
+  <style>
+    .timeline {
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      margin-top: 28px;
+    }
+    .post {
+      border: 2px solid var(--wt-border);
+      border-radius: 14px;
+      padding: 22px 24px;
+      background: var(--wt-panel);
+      box-shadow: 2px 2px 0 0 var(--wt-border);
+    }
+    .post header {
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 8px;
+    }
+    .post h2 { margin: 0; font-size: 1.15rem; }
+    .post .ver {
+      display: inline-block;
+      padding: 2px 8px;
+      font-size: 0.78rem;
+      font-weight: 700;
+      border-radius: 6px;
+      background: var(--wt-accent-soft);
+      border: 1px solid var(--wt-border);
+    }
+    .post .meta { color: var(--wt-text-dim); font-size: 0.84rem; }
+    .post p { margin: 8px 0 0; color: var(--wt-text-dim); font-size: 0.95rem; }
+    .post .tags { margin-top: 10px; display: flex; gap: 6px; flex-wrap: wrap; }
+    .post .tag {
+      font-size: 0.75rem;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: rgba(15, 23, 42, 0.05);
+      color: var(--wt-text-dim);
+    }
+  </style>
+</head>
+<body>
+<div class="page-shell">
+
+<nav class="site-nav" aria-label="Site sections">
+  <a class="brand" href="/">
+    <span class="brand-mark"><img src="/wt-logo.svg" alt="WatchTower logo"></span>
+    <span>WatchTower</span>
+  </a>
+  <div class="nav-links">
+    <a class="nav-link" href="/">Home</a>
+    <a class="nav-link" href="/how-it-works/">How it works</a>
+    <a class="nav-link" href="/pricing/">Pricing</a>
+    <a class="nav-link active" href="/blog/">Blog</a>
+    <a class="nav-link" href="/viewer.html">Docs</a>
+  </div>
+  <a class="nav-cta" href="https://github.com/Node2-io/WatchTowerOps" target="_blank" rel="noopener">⭐ GitHub</a>
+</nav>
+
+<main class="site-main">
+
+  <section class="site-hero">
+    <span class="eyebrow">Updates</span>
+    <h1>Release notes &amp; updates</h1>
+    <p class="lead">
+      What's new in WatchTower, why each change matters, and what to look out for
+      when you upgrade. The full machine-readable history is on
+      <a href="https://github.com/Node2-io/WatchTowerOps/releases" target="_blank" rel="noopener">GitHub Releases</a>.
+    </p>
+  </section>
+
+  <div class="timeline">
+
+    <article class="post">
+      <header>
+        <span class="ver">v1.14.3</span>
+        <h2>Tray menu also had the Windows focus-stealing bug</h2>
+        <span class="meta">2026-05</span>
+      </header>
+      <p>
+        Caught while reviewing 1.14.2: the tray icon's right-click "Open WatchTower"
+        item still called <code>mainWindow.show()</code> + <code>.focus()</code> directly —
+        the same flawed pattern fixed elsewhere. Now routes through
+        <code>bringWindowToFront()</code>. Trivial follow-up; no other changes.
+      </p>
+      <div class="tags"><span class="tag">desktop</span><span class="tag">bugfix</span></div>
+    </article>
+
+    <article class="post">
+      <header>
+        <span class="ver">v1.14.2</span>
+        <h2>Windows: relaunch from tray + "where did the window go?" UX</h2>
+        <span class="meta">2026-05</span>
+      </header>
+      <p>
+        On Windows, X-button hides to the system tray, but
+        <code>SetForegroundWindow</code> rejects focus-stealing from non-user-gesture
+        callers — so re-clicking the desktop shortcut appeared to do nothing. New
+        <code>bringWindowToFront()</code> helper does the standard restore + show +
+        always-on-top toggle dance.
+      </p>
+      <div class="tags"><span class="tag">desktop</span><span class="tag">windows</span><span class="tag">ux</span></div>
+    </article>
+
+    <article class="post">
+      <header>
+        <span class="ver">v1.14.1</span>
+        <h2>Bundled Python ABI mismatch broke win-x64 / mac-x64 / linux-arm64</h2>
+        <span class="meta">2026-05</span>
+      </header>
+      <p>
+        CI was building one Python bundle and shipping it across all platform/arch
+        combos. <code>_pydantic_core.so</code> on a Mac arm64 DMG was an x86_64
+        binary, so the app silently exited at startup. <code>verify-release.sh</code>
+        was added to grep <code>file</code> output of every artifact's bundled
+        <code>.so</code>s — running it on every release prevents this class of
+        regression from reaching users again.
+      </p>
+      <div class="tags"><span class="tag">ci</span><span class="tag">release-quality</span></div>
+    </article>
+
+    <article class="post">
+      <header>
+        <span class="ver">v1.14.0</span>
+        <h2>Complete local Podman lifecycle — logs, restart, dashboard</h2>
+        <span class="meta">2026-05</span>
+      </header>
+      <p>
+        Local containers tab now shows full lifecycle: per-container logs (tailed),
+        restart, stop, image inspection. Dashboard surfaces running counts pulled
+        from <code>podman ps</code>. No remote nodes required — useful for homelab
+        operators running everything on one machine.
+      </p>
+      <div class="tags"><span class="tag">feature</span><span class="tag">runtime</span></div>
+    </article>
+
+    <article class="post">
+      <header>
+        <span class="ver">v1.13.0</span>
+        <h2>Local-first deploys + account/security UX</h2>
+        <span class="meta">2026-05</span>
+      </header>
+      <p>
+        New "deploy locally first, ship to a remote later" workflow. Lets you
+        validate a project on your laptop, see logs, debug build issues — then
+        register a remote node and replay the same deploy with one click.
+        Account/security panel surfaces session age, signed-in identity, and
+        active API tokens.
+      </p>
+      <div class="tags"><span class="tag">feature</span><span class="tag">workflow</span></div>
+    </article>
+
+  </div>
+
+  <div class="cta-row" style="justify-content: center; margin-top: 40px;">
+    <a class="cta-btn ghost" href="https://github.com/Node2-io/WatchTowerOps/releases" target="_blank" rel="noopener">See all releases on GitHub</a>
+    <a class="cta-btn ghost" href="https://github.com/Node2-io/WatchTowerOps/blob/main/CHANGELOG.md" target="_blank" rel="noopener">Full CHANGELOG.md</a>
+  </div>
+
+</main>
+
+<footer class="site-footer">
+  WatchTower — open-core (Apache 2.0 + ELv2). <a href="https://github.com/Node2-io/WatchTowerOps">Source on GitHub</a>.
+</footer>
+
+</div>
+</body>
+</html>

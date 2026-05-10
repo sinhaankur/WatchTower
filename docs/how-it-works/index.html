@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>How WatchTower works — architecture &amp; flow</title>
+  <meta name="description" content="A walkthrough of how WatchTower deploys apps to your servers — from git push to running container, with no third-party cloud in the loop.">
+  <link rel="icon" type="image/svg+xml" href="/wt-logo.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/_assets/site.css">
+  <style>
+    .pipeline {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 14px;
+      margin: 28px 0;
+    }
+    .stage {
+      border: 2px solid var(--wt-border);
+      border-radius: 12px;
+      padding: 16px;
+      background: var(--wt-panel-soft);
+      box-shadow: 2px 2px 0 0 var(--wt-border);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .stage .stage-num {
+      font-size: 0.75rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--wt-text-dim);
+    }
+    .stage h3 { margin: 0; font-size: 1rem; }
+    .stage p { margin: 0; font-size: 0.88rem; color: var(--wt-text-dim); }
+    pre {
+      background: #0f172a;
+      color: #f1f5f9;
+      border-radius: 10px;
+      padding: 16px 18px;
+      overflow-x: auto;
+      font-size: 0.85rem;
+    }
+    .arch-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 16px;
+      margin-top: 16px;
+    }
+    .arch-card {
+      border: 2px solid var(--wt-border);
+      border-radius: 12px;
+      padding: 16px;
+      background: var(--wt-panel);
+      box-shadow: 2px 2px 0 0 var(--wt-border);
+    }
+    .arch-card h4 { margin: 0 0 8px; font-size: 0.95rem; }
+    .arch-card p { font-size: 0.86rem; color: var(--wt-text-dim); margin: 0; }
+  </style>
+</head>
+<body>
+<div class="page-shell">
+
+<nav class="site-nav" aria-label="Site sections">
+  <a class="brand" href="/">
+    <span class="brand-mark"><img src="/wt-logo.svg" alt="WatchTower logo"></span>
+    <span>WatchTower</span>
+  </a>
+  <div class="nav-links">
+    <a class="nav-link" href="/">Home</a>
+    <a class="nav-link active" href="/how-it-works/">How it works</a>
+    <a class="nav-link" href="/pricing/">Pricing</a>
+    <a class="nav-link" href="/blog/">Blog</a>
+    <a class="nav-link" href="/viewer.html">Docs</a>
+  </div>
+  <a class="nav-cta" href="https://github.com/Node2-io/WatchTowerOps" target="_blank" rel="noopener">⭐ GitHub</a>
+</nav>
+
+<main class="site-main">
+
+  <section class="site-hero">
+    <span class="eyebrow">How it works</span>
+    <h1>Git push → running container, on your hardware</h1>
+    <p class="lead">
+      WatchTower deploys apps to servers you own over SSH. No proxies, no third-party
+      build cloud, no per-deploy fees. Here's the full lifecycle.
+    </p>
+  </section>
+
+  <section class="panel">
+    <h2>The deploy pipeline</h2>
+    <div class="pipeline">
+      <div class="stage">
+        <span class="stage-num">1 / 6</span>
+        <h3>Trigger</h3>
+        <p>GitHub webhook, manual button, scheduled cron, or CLI. WatchTower verifies the HMAC signature, dedupes replays, and enqueues a build.</p>
+      </div>
+      <div class="stage">
+        <span class="stage-num">2 / 6</span>
+        <h3>Queue</h3>
+        <p>If Redis is configured the build goes to RQ; otherwise it falls back to in-process BackgroundTasks. Builds survive API restarts on the Redis path.</p>
+      </div>
+      <div class="stage">
+        <span class="stage-num">3 / 6</span>
+        <h3>Build</h3>
+        <p>Worker clones the repo into <code>$WATCHTOWER_BUILD_DIR</code>, runs the build command, and packages the artifact. Build env detected via Nixpacks or your custom command.</p>
+      </div>
+      <div class="stage">
+        <span class="stage-num">4 / 6</span>
+        <h3>Ship</h3>
+        <p>rsync over SSH (via fabric) to each <code>OrgNode</code> registered to the project. SSH keys are encrypted at rest with Fernet.</p>
+      </div>
+      <div class="stage">
+        <span class="stage-num">5 / 6</span>
+        <h3>Reload</h3>
+        <p>Each node runs its configured reload command — systemd unit restart, container swap, nginx reload, whatever you set. WatchTower waits for healthy.</p>
+      </div>
+      <div class="stage">
+        <span class="stage-num">6 / 6</span>
+        <h3>Observe</h3>
+        <p><code>Deployment.status</code> updates live in the dashboard. Failed deploys auto-rollback if the previous artifact is still on the node.</p>
+      </div>
+    </div>
+    <div class="callout">
+      The whole pipeline runs on the WatchTower process you control — no
+      third party sees your code, your env vars, or your build artifacts.
+      Same threat model as running CI locally.
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>What's inside the WatchTower process</h2>
+    <p>One FastAPI app at <code>watchtower.api:app</code>. Same process serves the React SPA from <code>web/dist</code> in production — no separate frontend server.</p>
+    <div class="arch-grid">
+      <div class="arch-card">
+        <h4>API + auth</h4>
+        <p>Routers under <code>/api/*</code>. Auth via signed user-session token (GitHub OAuth or Device Flow) or a static <code>WATCHTOWER_API_TOKEN</code> for CI.</p>
+      </div>
+      <div class="arch-card">
+        <h4>Database</h4>
+        <p>SQLite by default at <code>~/.watchtower/watchtower.db</code>. Postgres-capable via <code>DATABASE_URL</code>. Migrations are Alembic-driven.</p>
+      </div>
+      <div class="arch-card">
+        <h4>Build queue</h4>
+        <p>RQ + Redis when configured; FastAPI BackgroundTasks otherwise. Probe failure cached for the process lifetime so a missing broker doesn't add 2s to every webhook.</p>
+      </div>
+      <div class="arch-card">
+        <h4>Builder</h4>
+        <p>Clone → build → package → rsync → SSH reload. Per-deploy isolation in <code>$WATCHTOWER_BUILD_DIR</code>. Audit log records every mutation.</p>
+      </div>
+      <div class="arch-card">
+        <h4>Container watcher</h4>
+        <p>Optional <code>watchtower start</code> daemon polls running Podman containers, pulls newer images, and restarts on a schedule. Configured via <code>config/watchtower.yml</code>.</p>
+      </div>
+      <div class="arch-card">
+        <h4>LLM agent</h4>
+        <p>Provider-agnostic — speaks any OpenAI-compatible endpoint (Ollama, LM Studio, OpenAI, OpenRouter). Tools run under the caller's identity, no privilege escalation.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>Try it in 60 seconds</h2>
+    <pre><code># 1. clone and run
+git clone https://github.com/Node2-io/WatchTowerOps.git
+cd WatchTowerOps
+./run.sh
+
+# 2. open http://127.0.0.1:8000
+
+# 3. (optional) connect a remote host via SSH from the dashboard,
+#    register a project, push to its git repo to trigger a deploy
+</code></pre>
+    <div class="cta-row">
+      <a class="cta-btn" href="https://github.com/Node2-io/WatchTowerOps/releases/latest" target="_blank" rel="noopener">Download desktop app</a>
+      <a class="cta-btn ghost" href="/viewer.html?doc=quick_reference">Read the docs</a>
+    </div>
+  </section>
+
+</main>
+
+<footer class="site-footer">
+  WatchTower — open-core (Apache 2.0 + ELv2). <a href="https://github.com/Node2-io/WatchTowerOps">Source on GitHub</a>.
+</footer>
+
+</div>
+</body>
+</html>
