@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import axios from 'axios';
 import apiClient from '@/lib/api';
 import { Input } from '@/components/ui/input';
+import EmptyState from '@/components/EmptyState';
 import { Label } from '@/components/ui/label';
 import { StatusPill, nodeStatusTone } from '@/components/ui/status-pill';
 import { useMe } from '@/hooks/queries';
@@ -447,28 +448,29 @@ const Servers = () => {
           </div>
 
           {nodes.length === 0 && !loading && (
-            <div className="text-center py-14 border border-dashed border-border rounded-xl">
-              <div className="w-12 h-12 rounded-xl bg-red-50 border border-red-200 flex items-center justify-center mx-auto mb-3">
-                <span className="text-xl">🖥</span>
-              </div>
-              <p className="text-sm font-medium text-slate-900">No servers yet</p>
-              <p className="text-xs text-slate-600 mt-1 mb-4">Add your first server to start deploying applications.</p>
-              <div className="flex items-center justify-center gap-3">
-                {!isGuest && (
-                  <button
-                    onClick={() => setShowForm(true)}
-                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-border text-slate-700 hover:bg-slate-100 text-sm transition-colors"
-                  >
-                    + Add Remote Server
-                  </button>
-                )}
-                <Link
-                  to="/servers/local"
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-red-700 hover:bg-red-800 text-white text-sm transition-colors border border-slate-800 shadow-[2px_2px_0_0_#1f2937]"
-                >
-                  💻 Use This PC
-                </Link>
-              </div>
+            <div className="border border-dashed border-border rounded-xl px-6">
+              <EmptyState
+                title="No servers yet"
+                description="Add your first server to start deploying applications. Use this Mac as a server, or connect a remote one over SSH."
+                action={
+                  <>
+                    {!isGuest && (
+                      <button
+                        onClick={() => setShowForm(true)}
+                        className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-border text-slate-700 hover:bg-slate-100 text-sm transition-colors"
+                      >
+                        + Add Remote Server
+                      </button>
+                    )}
+                    <Link
+                      to="/servers/local"
+                      className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-red-700 hover:bg-red-800 text-white text-sm transition-colors border border-slate-800 shadow-[2px_2px_0_0_#1f2937]"
+                    >
+                      💻 Use This PC
+                    </Link>
+                  </>
+                }
+              />
             </div>
           )}
 

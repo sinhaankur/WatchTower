@@ -3,6 +3,7 @@ import { Link /*, useNavigate*/ } from 'react-router-dom';
 import axios from 'axios';
 import apiClient from '@/lib/api';
 import { trackEvent } from '@/lib/analytics';
+import EmptyState from '@/components/EmptyState';
 
 type Project = {
   id: string;
@@ -370,24 +371,23 @@ const Applications = () => {
         {/* Empty state */}
         {!loading && !error && projects.length === 0 && (
           <div className="rounded-xl border border-border bg-card p-6">
-            <div className="text-center py-10 border border-dashed border-border rounded-xl mb-6">
-              <div className="w-12 h-12 rounded-xl bg-red-50 border border-red-200 flex items-center justify-center mx-auto mb-3">
-                <span className="text-xl">📦</span>
-              </div>
-              <p className="text-sm font-semibold text-slate-900">No applications yet</p>
-              <p className="text-xs text-slate-600 mt-1 mb-4">
-                Add a server node first, then use the Setup Wizard to deploy your first app.
-              </p>
-              <div className="flex items-center justify-center gap-3">
-                <Link to="/servers"
-                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg border border-border text-slate-700 hover:bg-slate-100 text-sm transition-colors">
-                  → Add Server First
-                </Link>
-                <Link to="/setup"
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-red-700 hover:bg-red-800 text-white text-sm transition-colors border border-slate-800 shadow-[2px_2px_0_0_#1f2937]">
-                  Setup Wizard →
-                </Link>
-              </div>
+            <div className="border border-dashed border-border rounded-xl mb-6 px-6">
+              <EmptyState
+                title="No applications yet"
+                description="Add a server first, then use the Setup Wizard to deploy your first app."
+                action={
+                  <>
+                    <Link to="/servers"
+                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg border border-border text-slate-700 hover:bg-slate-100 text-sm transition-colors">
+                      → Add Server First
+                    </Link>
+                    <Link to="/setup"
+                      className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-red-700 hover:bg-red-800 text-white text-sm transition-colors border border-slate-800 shadow-[2px_2px_0_0_#1f2937]">
+                      Setup Wizard →
+                    </Link>
+                  </>
+                }
+              />
             </div>
 
             <h2 className="text-sm font-semibold text-slate-900 mb-3">What can I deploy?</h2>
