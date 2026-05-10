@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 144" role="img" aria-label="WatchTower owl keeper">
+  <path d="M36 38 L44 14 L52 40 Z" fill="#8d6438"/>
+  <path d="M92 38 L84 14 L76 40 Z" fill="#8d6438"/>
+  <ellipse cx="64" cy="80" rx="46" ry="50" fill="#b48450"/>
+  <ellipse cx="64" cy="92" rx="30" ry="32" fill="#f3dca5"/>
+  <circle cx="46" cy="62" r="16" fill="#ffffff"/>
+  <circle cx="82" cy="62" r="16" fill="#ffffff"/>
+  <circle cx="46" cy="62" r="9" fill="#1c1c2e"/>
+  <circle cx="82" cy="62" r="9" fill="#1c1c2e"/>
+  <circle cx="48.5" cy="58.5" r="3" fill="#ffffff"/>
+  <circle cx="84.5" cy="58.5" r="3" fill="#ffffff"/>
+  <path d="M64 78 L57 88 L71 88 Z" fill="#d97a26"/>
+  <g stroke="#6b4a2a" stroke-width="3" stroke-linecap="round" fill="none">
+    <path d="M48 130 Q50 138 52 130 M52 130 Q54 138 56 130"/>
+    <path d="M72 130 Q74 138 76 130 M76 130 Q78 138 80 130"/>
+  </g>
+</svg>
