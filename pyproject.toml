@@ -81,3 +81,24 @@ version = {attr = "watchtower.__version__"}
 
 [tool.setuptools.packages.find]
 include = ["watchtower*"]
+
+
+[tool.pytest.ini_options]
+# Scope test discovery to our tests/ tree. Without this, `pytest` from
+# the repo root (e.g. release.sh and other CI helpers) walks into
+# desktop/python-bundle/ — the bundled Python tree built by
+# electron-builder for packaged installs — and tries to collect the
+# vendored sqlalchemy/alembic test suites that live under there. Those
+# modules' files conflict with the same modules in .venv/, producing
+# 22+ collection errors and aborting the run. Pinning testpaths fixes
+# both `pytest` (no arg) and `pytest -q` invocations.
+testpaths = ["tests"]
+norecursedirs = [
+    "desktop/python-bundle",
+    "desktop/dist",
+    "desktop/node_modules",
+    "web/node_modules",
+    "web/dist",
+    ".venv",
+    "node_modules",
+]

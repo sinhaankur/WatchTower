@@ -627,9 +627,32 @@ def _ensure_owner_membership(db: Session, user: User):
 
 
 def _perform_ssh_health_check(node: OrgNode):
-    # For local nodes, check via HTTP instead of SSH
-    if node.host in ("127.0.0.1", "localhost", "::1"):
+    # For local nodes, check via HTTP instead of SSH. The "local" classifier
+    # matches any of:
+    #   - the canonical loopback names (127.0.0.1, localhost, ::1)
+    #   - this machine's own hostname returned by socket.gethostname()
+    #   - any hostname ending in .local (Bonjour / mDNS — what macOS sets
+    #     by default, e.g. "AnkurSinhas-MacBook-Pro.local")
+    # Without the .local case, users who register "this PC as a server"
+    # via the SetupWizard end up with an OrgNode whose host is the mDNS
+    # name, which the SSH path can't actually reach (no sshd by default
+    # on macOS) — so the node sat at OFFLINE forever.
+    host_norm = (node.host or "").strip().lower()
+    import socket as _socket
+    try:
+        own_host = _socket.gethostname().strip().lower()
+    except Exception:
+        own_host = ""
+    is_local = (
+        host_norm in ("127.0.0.1", "localhost", "::1")
+        or (own_host and host_norm == own_host)
+        or host_norm.endswith(".local")
+    )
+    if is_local:
         import urllib.request
+        # Probe the API we're running inside — if the request reached us,
+        # the API is by definition healthy. Hitting /health makes the
+        # check observable in logs and gives us a real round-trip.
         try:
             with urllib.request.urlopen("http://127.0.0.1:8000/health", timeout=5) as resp:
                 if resp.status == 200:
@@ -639,8 +662,14 @@ def _perform_ssh_health_check(node: OrgNode):
                         "memory_usage": None,
                         "disk_usage": None,
                     }
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning(
+                "Local node %s health probe failed (host=%s): %s — "
+                "the API is up (we just answered this request) but the "
+                "loopback probe couldn't reach it. Check WATCHTOWER_API_PORT "
+                "and any local firewall.",
+                node.id, host_norm, exc,
+            )
         return {
             "status": NodeStatus.OFFLINE,
             "cpu_usage": None,
