@@ -738,8 +738,25 @@ async def _run_cmd(
 _LOCALHOST_HOSTS = {"127.0.0.1", "::1", "localhost"}
 
 
+def _own_hostname() -> str:
+    """The machine's own hostname (cached). Used to recognise "this is
+    me" when an OrgNode was registered with a non-loopback name like
+    `MyMachine.local` (the default macOS setup)."""
+    import socket as _socket
+    try:
+        return _socket.gethostname().strip().lower()
+    except Exception:
+        return ""
+
+
 def _is_local_node(node: OrgNode) -> bool:
-    return (node.host or "").strip().lower() in _LOCALHOST_HOSTS
+    host = (node.host or "").strip().lower()
+    if host in _LOCALHOST_HOSTS:
+        return True
+    if host.endswith(".local"):  # mDNS / Bonjour, e.g. MyMac.local
+        return True
+    own = _own_hostname()
+    return bool(own and host == own)
 
 
 async def _rsync_to_node(
