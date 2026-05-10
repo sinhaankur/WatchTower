@@ -33,10 +33,26 @@ apiClient.interceptors.request.use((config) => {
 // first one triggers `window.location.replace` — without this guard the
 // browser console fills with "navigation throttled" warnings and the URL
 // can race with the page unload.
+// Capture the most recent backend X-Request-ID so error UIs can surface
+// it for bug reports — operators can grep server logs by this id end-to-end
+// (see watchtower/log_config.py). Stashed module-locally rather than in a
+// store because every fetch overwrites it, no subscriber pattern needed.
+let lastRequestId: string | null = null;
+
+export function getLastRequestId(): string | null {
+  return lastRequestId;
+}
+
 let redirecting = false;
 apiClient.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    const rid = response?.headers?.['x-request-id'];
+    if (typeof rid === 'string' && rid) lastRequestId = rid;
+    return response;
+  },
   (error) => {
+    const rid = error?.response?.headers?.['x-request-id'];
+    if (typeof rid === 'string' && rid) lastRequestId = rid;
     const status = error?.response?.status;
     if (status === 401) {
       const hadSession = !!localStorage.getItem('authToken');

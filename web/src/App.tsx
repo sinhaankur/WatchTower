@@ -9,6 +9,7 @@ import Dashboard from './pages/Dashboard';
 import Login from './pages/Login';
 import Layout from './components/Layout';
 import ErrorBoundary from './components/ErrorBoundary';
+import RouteErrorBoundary from './components/RouteErrorBoundary';
 import { Toaster } from './lib/toast';
 import './App.css';
 
@@ -99,6 +100,25 @@ function RequireAuth({ children }: { children: ReactElement }) {
   return children;
 }
 
+/**
+ * Wrap a page in:
+ *   - per-route error boundary (failures stay scoped to this page)
+ *   - the auth gate (redirects to /login if no token)
+ *   - the shared sidebar layout (skipped when `bare` is true for full-
+ *     screen pages like the wizard / oauth callback / invite landing)
+ *
+ * Without this, every Route line repeats four nested wrappers and adding
+ * a new page is tedious enough to skip the boundary "just for now".
+ */
+function withChrome(pageName: string, element: ReactElement, opts: { bare?: boolean } = {}): ReactElement {
+  const wrapped = opts.bare ? element : <Layout>{element}</Layout>;
+  return (
+    <RequireAuth>
+      <RouteErrorBoundary pageName={pageName}>{wrapped}</RouteErrorBoundary>
+    </RequireAuth>
+  );
+}
+
 function App() {
   useEffect(() => {
     // Keep a single light visual system across all pages.
@@ -116,27 +136,27 @@ function App() {
             <Route path="/oauth/github/login/callback" element={<GitHubLoginCallback />} />
 
             {/* Pages with shared sidebar layout */}
-            <Route path="/" element={<RequireAuth><Layout><Dashboard /></Layout></RequireAuth>} />
-            <Route path="/projects/:id" element={<RequireAuth><Layout><ProjectDetail /></Layout></RequireAuth>} />
-            <Route path="/servers" element={<RequireAuth><Layout><Servers /></Layout></RequireAuth>} />
-            <Route path="/servers/local" element={<RequireAuth><Layout><LocalNode /></Layout></RequireAuth>} />
-            <Route path="/applications" element={<RequireAuth><Layout><Applications /></Layout></RequireAuth>} />
-            <Route path="/templates" element={<RequireAuth><Layout><Templates /></Layout></RequireAuth>} />
-            <Route path="/databases" element={<RequireAuth><Layout><Databases /></Layout></RequireAuth>} />
-            <Route path="/services" element={<RequireAuth><Layout><Services /></Layout></RequireAuth>} />
-            <Route path="/integrations" element={<RequireAuth><Layout><Integrations /></Layout></RequireAuth>} />
-            <Route path="/host-connect" element={<RequireAuth><Layout><HostConnect /></Layout></RequireAuth>} />
-            <Route path="/team" element={<RequireAuth><Layout><TeamManagement /></Layout></RequireAuth>} />
-            <Route path="/invite/:token" element={<RequireAuth><InviteAccept /></RequireAuth>} />
-            <Route path="/settings" element={<RequireAuth><Layout><Settings /></Layout></RequireAuth>} />
-            <Route path="/audit" element={<RequireAuth><Layout><AuditLog /></Layout></RequireAuth>} />
-            <Route path="/account" element={<RequireAuth><Layout><Account /></Layout></RequireAuth>} />
-            <Route path="/local-containers" element={<RequireAuth><Layout><LocalContainers /></Layout></RequireAuth>} />
+            <Route path="/"                  element={withChrome('Dashboard',        <Dashboard />)} />
+            <Route path="/projects/:id"      element={withChrome('Project',          <ProjectDetail />)} />
+            <Route path="/servers"           element={withChrome('Servers',          <Servers />)} />
+            <Route path="/servers/local"     element={withChrome('Local node',       <LocalNode />)} />
+            <Route path="/applications"      element={withChrome('Applications',     <Applications />)} />
+            <Route path="/templates"         element={withChrome('Templates',        <Templates />)} />
+            <Route path="/databases"         element={withChrome('Databases',        <Databases />)} />
+            <Route path="/services"          element={withChrome('Services',         <Services />)} />
+            <Route path="/integrations"      element={withChrome('Integrations',     <Integrations />)} />
+            <Route path="/host-connect"      element={withChrome('Host Connect',     <HostConnect />)} />
+            <Route path="/team"              element={withChrome('Team',             <TeamManagement />)} />
+            <Route path="/invite/:token"     element={withChrome('Invitation',       <InviteAccept />, { bare: true })} />
+            <Route path="/settings"          element={withChrome('Settings',         <Settings />)} />
+            <Route path="/audit"             element={withChrome('Audit log',        <AuditLog />)} />
+            <Route path="/account"           element={withChrome('Account',          <Account />)} />
+            <Route path="/local-containers"  element={withChrome('Local containers', <LocalContainers />)} />
             {/* Legacy redirect */}
             <Route path="/nodes" element={<Navigate to="/servers" replace />} />
             {/* Full-screen pages (wizard & oauth flow — no sidebar) */}
-            <Route path="/setup" element={<RequireAuth><SetupWizard /></RequireAuth>} />
-            <Route path="/oauth/github/callback" element={<RequireAuth><GitHubOAuthCallback /></RequireAuth>} />
+            <Route path="/setup"                  element={withChrome('Setup wizard',  <SetupWizard />,        { bare: true })} />
+            <Route path="/oauth/github/callback"  element={withChrome('OAuth callback', <GitHubOAuthCallback />, { bare: true })} />
             {/* Catch-all: redirect any unmatched path to home instead of showing a blank page */}
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
