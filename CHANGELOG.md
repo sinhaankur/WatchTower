@@ -9,6 +9,40 @@ Curated, human-friendly history of WatchTower releases. Auto-generated GitHub Re
 
 ---
 
+## 1.14.4 — Major UX pass: error visibility, diagnostics, static-site Run-Locally, mascot, animations
+
+A wide release. The headline is closing the loop on "I tried something and it didn't work — now what?": every page now has a per-route error boundary that surfaces the actual stack and request id, every empty state shows a friendly mascot with a real CTA, and every subsystem has a self-diagnose endpoint behind Settings → Diagnostics.
+
+### Highlights
+
+- **Per-route error boundary** with copy-to-clipboard diagnostics (page, URL, X-Request-ID, stack, component stack). Replaces the generic "Something went wrong" white-screen.
+- **`GET /api/diagnose`** — 10 subsystem checks (DB, Fernet key, API token, GitHub OAuth, Device Flow, SMTP, LLM agent, Redis, alembic head, web/dist) with actionable hints. Renders as red/amber/green dots in Settings → Diagnostics.
+- **Static-site Run-Locally without Podman** — `python -m http.server` fallback when no container runtime is installed. The "I just want to see my Portfolio at a URL" flow finally works.
+- **Auto-skip build for static repos** — `_resolve_build_command` detects "no `package.json` at root" and skips the npm step instead of crashing with ENOENT. Hand-coded HTML / JAMstack pre-built dirs / Hugo / Jekyll all "just deploy".
+- **Tokenized team invitations** — bound to invitee email (security review caught the bearer-credential gap before merge). New `POST /api/invitations/{token}/accept`, `GET /api/invitations/pending`, `DELETE /api/team-members/{id}`. 15 new tests.
+- **Health Check actionable hints** — translates "connection refused / 404 / 5xx / timeout" into one-line "do this" instructions instead of dumping the raw urllib3 traceback.
+- **Slack quick-setup** — provider-specific in-card guide ("how do I get a webhook URL?") plus a Test button that posts a synthetic 🦉 message before saving, so users verify the URL works before waiting for a real deploy.
+- **macOS dev-mode polish** — menu bar leftmost item now reads "WatchTower" (renames `Electron.app` → `WatchTower.app` inside `node_modules` on first launch). Tray icon switched to a monochrome template image so it blends with system icons. Dock icon proportions match the macOS app-icon template.
+- **Local node hostname** — `<machine>.local` (mDNS) and `socket.gethostname()` now correctly classify as "local" so the SetupWizard's "Use this PC as a server" doesn't sit at OFFLINE forever.
+- **Owl mascot + EmptyState** — original drawing (not Totoro), replaces "No projects yet" gray text on Templates / Audit / Applications / Servers with friendly panels.
+- **Micro-animations** — page fade-slide on every route change, skeleton shimmer for loading states, count-up on Dashboard stats, hover-lift on cards. Pure CSS, all `prefers-reduced-motion`-aware. No new runtime dep.
+- **GitHub Pages site additions** — `/how-it-works`, `/pricing`, `/blog` sibling pages alongside the existing landing.
+
+### Fixes
+
+- Packaging: `.dev/` falls back to `~/.watchtower/.dev` for read-only `.app` bundles; `uvicorn[standard]` extras for httptools/uvloop; `Dashboard.tsx` defensive guards on undefined runtime data.
+- Logo: tightened to match macOS dock-icon template (~10% inset) so it doesn't read 10% larger than neighboring app icons.
+- Desktop dev launcher: cross-platform `start-electron.js` shim that picks `--no-sandbox` only on Linux (Mac rejects it) and clears VS Code's leaked `ELECTRON_RUN_AS_NODE=1`. Source-launched dev sessions actually start now.
+- pytest no longer collects vendored test suites from `desktop/python-bundle/` after an electron-builder pack — `testpaths = ["tests"]` pins the discovery scope.
+- DiagnosticsCard handles malformed responses (older backend without the route → SPA fallback HTML masquerading as JSON) without crashing the Settings page.
+- Build-failure hints learn two new patterns: "no package.json → newer versions auto-skip" and "no deployment nodes → use Run Locally".
+
+### What's still parked
+
+- Full Slack OAuth ("Connect to Slack" button + channel picker) — needs a registered Slack app and OAuth flow; the Test-message quick-win above is the bridge until that lands.
+- Code signing (Mac + Windows) — DMGs still ship unsigned; autoUpdater on Mac remains best-effort.
+- Brand migration / org rename — primary repo stays `sinhaankur/WatchTower`; URL-reference cleanup parked pending a separate decision.
+
 ## 1.14.3 — Tray "Open WatchTower" menu had the same Windows focus-stealing bug
 
 Caught while reviewing 1.14.2: the tray icon's right-click context menu has an "Open WatchTower" item that calls `mainWindow.show()` + `.focus()` directly, the same flawed pattern that 1.14.2 fixed for `tray.on('click')` and `app.on('second-instance')`. So even after 1.14.2 a Windows user who reaches for the right-click menu (the more discoverable path on Windows where left-click behavior is less standardized) would still see the same "menu item does nothing" symptom. Now uses `bringWindowToFront(mainWindow)` like everything else.
