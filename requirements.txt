@@ -1,6 +1,12 @@
 # Core
 fastapi==0.115.0
-uvicorn[standard]==0.29.0
+uvicorn==0.29.0
+# Note: `[standard]` extras (uvloop, httptools, watchfiles) gave a small
+# perf win on Linux/Mac but uvloop has no Windows wheels. When the
+# Release workflow's Linux runner builds the win_amd64 Python bundle,
+# pip evaluates the marker against the build host (Linux) instead of
+# the target, tries to install uvloop, and fails. The perf gain isn't
+# worth blocking Windows installer releases.
 pydantic==2.5.0
 pydantic-settings==2.1.0
 python-dotenv==1.0.0
