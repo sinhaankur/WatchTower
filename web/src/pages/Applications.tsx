@@ -86,6 +86,11 @@ function fmtDate(s: string) {
 const Applications = () => {
   // const navigate = useNavigate();
   const [projects, setProjects] = useState<ProjectWithDeployment[]>([]);
+  // Map of project_id → local-preview URL. Populated by a parallel
+  // batch of GET /run-locally calls after projects load. Lets us show
+  // a "Live at http://localhost:XXXX" pill on the card without making
+  // users click into the detail page to discover the URL.
+  const [localRunUrls, setLocalRunUrls] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
@@ -140,7 +145,27 @@ const Applications = () => {
           };
         })
       );
-      setProjects(deduplicateProjects(enriched));
+      const dedup = deduplicateProjects(enriched);
+      setProjects(dedup);
+
+      // Fire-and-forget: probe each project's Run Locally status.
+      // We don't await before showing the list because the URL only
+      // augments the card; absence isn't a failure.
+      void Promise.allSettled(
+        dedup.map((p) =>
+          apiClient
+            .get<{ url?: string | null } | null>(`/projects/${p.id}/run-locally`)
+            .then((r) => {
+              const url = r?.data?.url;
+              if (typeof url === 'string' && url) {
+                setLocalRunUrls((prev) => ({ ...prev, [p.id]: url }));
+              }
+            })
+            .catch(() => {
+              /* not running → no URL to show, expected */
+            }),
+        ),
+      );
     } catch (err) {
       if (axios.isAxiosError(err)) {
         const s = err.response?.status;
@@ -310,6 +335,19 @@ const Applications = () => {
 
                     {/* Right: actions */}
                     <div className="flex items-center gap-2 shrink-0">
+                      {localRunUrls[p.id] && (
+                        <a
+                          href={localRunUrls[p.id]}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title={`Live preview: ${localRunUrls[p.id]} — opens in your browser`}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 text-xs font-medium transition-colors max-w-[260px]"
+                        >
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 anim-pulse-soft shrink-0" />
+                          <span className="font-mono truncate">{localRunUrls[p.id].replace(/^https?:\/\//, '')}</span>
+                          <span className="text-emerald-700">↗</span>
+                        </a>
+                      )}
                       {p.launch_url && /^https?:\/\//i.test(p.launch_url) ? (
                         <a
                           href={p.launch_url}
