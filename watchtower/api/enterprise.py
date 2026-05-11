@@ -649,29 +649,15 @@ def _perform_ssh_health_check(node: OrgNode):
         or host_norm.endswith(".local")
     )
     if is_local:
-        import urllib.request
-        # Probe the API we're running inside — if the request reached us,
-        # the API is by definition healthy. Hitting /health makes the
-        # check observable in logs and gives us a real round-trip.
-        try:
-            with urllib.request.urlopen("http://127.0.0.1:8000/health", timeout=5) as resp:
-                if resp.status == 200:
-                    return {
-                        "status": NodeStatus.HEALTHY,
-                        "cpu_usage": None,
-                        "memory_usage": None,
-                        "disk_usage": None,
-                    }
-        except Exception as exc:
-            logger.warning(
-                "Local node %s health probe failed (host=%s): %s — "
-                "the API is up (we just answered this request) but the "
-                "loopback probe couldn't reach it. Check WATCHTOWER_API_PORT "
-                "and any local firewall.",
-                node.id, host_norm, exc,
-            )
+        # Loopback short-circuit: if the request is currently being served
+        # by us, the API is by definition healthy. The previous code
+        # synchronously called urllib.request.urlopen("http://127.0.0.1:8000/health")
+        # which deadlocked under single-worker uvicorn (the only worker
+        # was busy serving the parent request — the self-call timed out
+        # at 5s and the node was reported OFFLINE forever). Returning
+        # HEALTHY directly is both correct and ~5s faster.
         return {
-            "status": NodeStatus.OFFLINE,
+            "status": NodeStatus.HEALTHY,
             "cpu_usage": None,
             "memory_usage": None,
             "disk_usage": None,
