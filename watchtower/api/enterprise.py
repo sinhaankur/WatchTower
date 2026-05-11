@@ -2107,9 +2107,52 @@ async def list_org_nodes(
     db: Session = Depends(get_db),
     current_user: dict = Depends(util.get_current_user)
 ):
-    """List deployment nodes for organization"""
+    """List deployment nodes for organization.
+
+    Side-effect: any node that has never had a health check run, OR whose
+    last check is older than 5 minutes, gets a fresh probe on the fly.
+    Without this, newly-created local nodes sit at OFFLINE forever
+    because nothing automatically schedules the first check — users had
+    to click "Check Health" to see the actual state, and most never did.
+    Failure is swallowed (logged) so a misbehaving SSH/network can't
+    block the list endpoint.
+    """
     _ensure_user_org_member(db, current_user)
     nodes = db.query(OrgNode).filter(OrgNode.org_id == org_id).all()
+
+    from datetime import timedelta
+    now = utcnow()
+    stale_threshold = timedelta(minutes=5)
+    refreshed_any = False
+    for node in nodes:
+        is_stale = (
+            node.last_health_check is None
+            or (now - node.last_health_check) > stale_threshold
+        )
+        if not is_stale:
+            continue
+        try:
+            health = _perform_ssh_health_check(node)
+            node.status = health["status"]
+            node.cpu_usage = health["cpu_usage"]
+            node.memory_usage = health["memory_usage"]
+            node.disk_usage = health["disk_usage"]
+            node.last_health_check = now
+            refreshed_any = True
+        except Exception:
+            logger.exception(
+                "Auto-refresh health check failed for node %s; leaving stale status",
+                node.id,
+            )
+            # Touch last_health_check so we don't retry on every request.
+            node.last_health_check = now
+            refreshed_any = True
+    if refreshed_any:
+        try:
+            db.commit()
+        except Exception:
+            logger.exception("Could not persist auto-refreshed node statuses")
+            db.rollback()
     return nodes
 
 
