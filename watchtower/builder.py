@@ -1026,9 +1026,22 @@ def _resolve_output_path(db: Session, project: Project, repo_dir: Path) -> Path:
     if project.use_case == UseCaseType.NETLIFY_LIKE:
         cfg = db.query(NetlifeLikeConfig).filter_by(project_id=project.id).first()
         out_dir = cfg.output_dir if cfg else "dist"
-        return repo_dir / out_dir
+        candidate = repo_dir / out_dir
+        # Hand-coded static site path: if there's no build, the repo root
+        # IS the output. The default `dist` won't exist; rsync would
+        # fail with "(l)stat: No such file or directory". Detect this by
+        # checking for an index.html at the root and no build output —
+        # then ship the repo dir itself.
+        if not candidate.is_dir():
+            has_index = (repo_dir / "index.html").is_file()
+            if has_index:
+                return repo_dir
+        return candidate
     if project.use_case == UseCaseType.VERCEL_LIKE:
-        return repo_dir / ".next"
+        candidate = repo_dir / ".next"
+        if not candidate.is_dir() and (repo_dir / "index.html").is_file():
+            return repo_dir
+        return candidate
     # Docker: deploy whole repo
     return repo_dir
 
