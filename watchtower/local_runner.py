@@ -271,14 +271,27 @@ def _stop_existing(project_id: str) -> None:
 
 
 def _project_workspace(project_id: str) -> Path:
-    """The most recent build's workspace lives at BUILD_BASE/<deployment_id>/repo
-    (a symlink, post-1.7.x, into BUILD_BASE/_cache/<key>). We don't have
-    the deployment id at run-time without another query, so the simpler
-    rule: pick the newest dir under BUILD_BASE that has a ``repo`` child.
-    Slight hack but keeps run_locally's signature clean."""
+    """Locate the most recent build workspace for *project_id*.
+
+    Layout history:
+      - Post-1.7: BUILD_BASE/workspaces/<project_id>/repo/  (current)
+      - Legacy:   BUILD_BASE/<deployment_id>/repo/          (old)
+    The current builder pipeline writes under `workspaces/<project_id>/repo`
+    so we look there FIRST. If absent, fall back to the legacy layout —
+    pick the newest dir directly under BUILD_BASE that has a `repo` child.
+
+    Was a real bug: the function only handled the legacy layout, so on a
+    fresh install Run Locally always failed with "No build workspace
+    found" even after a successful deploy.
+    """
+    project_ws = BUILD_BASE / "workspaces" / project_id / "repo"
+    if project_ws.is_dir():
+        return project_ws
+
+    # Legacy fallback: newest top-level dir with a `repo` child.
     candidates = []
     for child in BUILD_BASE.iterdir():
-        if child.name.startswith("_"):
+        if child.name.startswith("_") or child.name in ("workspaces", "caches", "locks"):
             continue
         repo = child / "repo"
         if repo.exists():
@@ -368,9 +381,19 @@ def run_locally(project_id: str, project_name: str, recommended_port: Optional[i
     name = _container_name(project_id)
     host_port = _pick_free_port()
 
-    # Static site without a container runtime → Python http.server fallback.
-    # No build, no podman pull, no image management. Just a URL.
-    if static_output and not containerfile and not have_runtime:
+    # Static site → Python http.server, always.
+    #
+    # Originally this fell through to the Podman+nginx path when a
+    # container runtime was available. That breaks on macOS, where
+    # `podman machine` runs Podman inside a VM and `/tmp` (where the
+    # builder rsyncs workspaces) isn't auto-bind-mounted — `podman run
+    # -v /tmp/…:/usr/share/nginx/html` fails with
+    # "Error: statfs /tmp/…: no such file or directory" even though
+    # the host path is fine. The Python http.server runs on the host
+    # directly, no VM, no bind mounts, works on Mac/Linux/Windows the
+    # same. Tradeoff: no caching headers, no compression, no SPA
+    # fallback. Fine for previewing.
+    if static_output and not containerfile:
         pid = _serve_static_with_python(static_output, host_port)
         status = LocalRunStatus(
             project_id=project_id,
