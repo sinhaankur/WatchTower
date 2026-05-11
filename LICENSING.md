@@ -1,9 +1,17 @@
 # Licensing
 
-WatchTower is **open-core** software. Two licenses apply, and which one
-covers a given file depends on where the file lives in this repository.
+WatchTower is dual-licensed. **You pick the license** based on how you
+intend to use it; the source is the same either way.
 
-## Quick reference
+## Quick reference — three license options
+
+| Use case | License | Cost |
+|---|---|---|
+| **Self-host for your own org's use** (any size, including commercial use inside your business) | Apache 2.0 (root) + Elastic License 2.0 (`pro/`) | Free |
+| **Embed WatchTower in your product, OR resell as a hosted/managed service to third parties, OR remove the public-source-availability obligation** | [**Commercial License**](LICENSE-COMMERCIAL.md) | Paid — see [pricing](https://sinhaankur.github.io/WatchTower/pricing/) |
+| **Open-source contributions, forks, audits, research** | Apache 2.0 (root) + Elastic License 2.0 (`pro/`) | Free |
+
+### Detailed open-source split (the free option)
 
 | Path | License | What it means for you |
 |---|---|---|
@@ -12,6 +20,18 @@ covers a given file depends on where the file lives in this repository.
 
 If a file does not have an explicit license header, the license is determined
 by which directory it sits in.
+
+## When do I need the Commercial License?
+
+Three concrete triggers — if any apply to you, you need a commercial license:
+
+1. **You want to offer WatchTower (or anything built on it including Pro features) as a SaaS / hosted / managed service to third parties.** This is what the ELv2 explicitly forbids for the `pro/` directory.
+2. **You're embedding WatchTower in a product you ship**, where your customer interacts with WatchTower indirectly (you're the responsible party for support/SLA). OEM, reseller, regulated-environment arrangements.
+3. **You need contractual terms** that the default Open Licenses don't provide — a written agreement, defined SLA, warranty/indemnification, removable attribution requirements, etc.
+
+If none of those apply (you're just self-hosting for your own organization), **stay on the free Open Licenses** — that's exactly what they're for.
+
+To start a commercial-license conversation, email **opensource@sinhaankur.dev** with subject "Commercial License Inquiry — [Your Org]". Pricing tiers live at <https://sinhaankur.github.io/WatchTower/pricing/>.
 
 ## Copyright holder
 
@@ -72,15 +92,6 @@ The Apache 2.0 license does **not** grant trademark rights — see
 Section 6 of the Apache License. You may build and distribute your own
 fork, but you must not call it "WatchTower" or imply it is the official
 project.
-
-## Commercial licensing
-
-A separate commercial agreement with The WatchTower Authors supersedes
-the Elastic License for paying customers and may also relicense `pro/`
-content for specific contractual purposes (OEM, reseller, regulated
-environments). To inquire, open a private security advisory or a labelled
-issue at <https://github.com/Node2-io/WatchTowerOps/issues>; a maintainer
-will route the request.
 
 ## Contributing
 

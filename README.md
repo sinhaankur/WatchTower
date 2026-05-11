@@ -1013,10 +1013,12 @@ When adding features, include:
 
 ## License
 
-WatchTower is open-core. Code outside `pro/` is licensed under the
-[Apache License 2.0](LICENSE); code inside `pro/` is licensed under the
-[Elastic License 2.0](pro/LICENSE). See [LICENSING.md](LICENSING.md) for
-the full explanation, what's free vs. Pro, and trademark notes.
+WatchTower is **dual-licensed** — pick the option that matches how you'll use it:
+
+- **Free** (default): Apache 2.0 outside `pro/` + Elastic License 2.0 inside `pro/`. Use it for self-hosting, internal commercial use, forks, audits, and contributions. Free forever.
+- **Commercial License** ([template](LICENSE-COMMERCIAL.md)): paid option for resellers / SaaS hosts / OEM embedders / regulated environments that need a written agreement, defined SLA, or removable attribution. Email **opensource@sinhaankur.dev** with subject "Commercial License Inquiry" to start. Pricing tiers at <https://sinhaankur.github.io/WatchTower/pricing/>.
+
+See [LICENSING.md](LICENSING.md) for the full breakdown of who needs which license, what each grants, and trademark notes.
 
 ## Support
 
