@@ -94,7 +94,9 @@ const Applications = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const [confirmCacheClear, setConfirmCacheClear] = useState<{ id: string; name: string } | null>(null);
   const [deployingId, setDeployingId] = useState<string | null>(null);
+  const [cacheClearingId, setCacheClearingId] = useState<string | null>(null);
   const [msg, setMsg] = useState<{ kind: 'success' | 'error'; text: string } | null>(null);
 
   const showMsg = (kind: 'success' | 'error', text: string) => {
@@ -197,6 +199,26 @@ const Applications = () => {
       showMsg('error', detail);
     } finally {
       setDeployingId(null);
+    }
+  };
+
+  const clearProjectCache = async (id: string) => {
+    setCacheClearingId(id);
+    try {
+      const res = await apiClient.delete<{ freed_bytes?: number; removed_paths?: number }>(
+        `/projects/${id}/cache`,
+      );
+      const freed = res?.data?.freed_bytes ?? 0;
+      const mb = freed > 0 ? (freed / (1024 * 1024)).toFixed(1) : '0';
+      showMsg('success', freed > 0 ? `Cache cleared — freed ${mb} MB.` : 'Cache already clean.');
+    } catch (err) {
+      const detail = axios.isAxiosError(err)
+        ? ((err.response?.data as { detail?: string } | undefined)?.detail ?? 'Could not clear cache.')
+        : 'Could not clear cache.';
+      showMsg('error', detail);
+    } finally {
+      setCacheClearingId(null);
+      setConfirmCacheClear(null);
     }
   };
 
@@ -385,6 +407,14 @@ const Applications = () => {
                         Details
                       </Link>
                       <button
+                        onClick={() => setConfirmCacheClear({ id: p.id, name: p.name })}
+                        disabled={cacheClearingId === p.id}
+                        className="px-2 py-1.5 rounded-lg border border-border text-xs text-slate-500 hover:text-amber-700 hover:border-amber-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        title="Clear this app's build cache on this device"
+                      >
+                        {cacheClearingId === p.id ? '…' : '🧹 Cache'}
+                      </button>
+                      <button
                         onClick={() => setConfirmDelete(p.id)}
                         className="px-2 py-1.5 rounded-lg border border-border text-xs text-slate-400 hover:text-red-600 hover:border-red-300 transition-colors"
                         title="Delete project"
@@ -447,6 +477,38 @@ const Applications = () => {
           </div>
         )}
       </main>
+
+      {/* Cache clear confirmation dialog */}
+      {confirmCacheClear && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl border border-border shadow-xl p-6 max-w-sm w-full">
+            <h2 className="text-base font-semibold text-slate-900">Clear build cache?</h2>
+            <p className="text-sm text-slate-600 mt-1">
+              Removes <span className="font-medium">{confirmCacheClear.name}</span>'s cloned workspace
+              and package-manager caches (npm / pnpm / yarn / bun) on this device. The next deploy will
+              re-clone and re-install from scratch — slower, but recovers from corrupted caches.
+            </p>
+            <p className="text-xs text-slate-500 mt-2">
+              The active local-run container and deployment history are not affected.
+            </p>
+            <div className="flex gap-2 mt-4 justify-end">
+              <button
+                onClick={() => setConfirmCacheClear(null)}
+                className="px-4 py-2 rounded-lg border border-border text-sm text-slate-700 hover:bg-slate-100 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => void clearProjectCache(confirmCacheClear.id)}
+                disabled={cacheClearingId === confirmCacheClear.id}
+                className="px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-sm font-medium transition-colors disabled:opacity-50"
+              >
+                {cacheClearingId === confirmCacheClear.id ? 'Clearing…' : 'Clear cache'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Delete confirmation dialog */}
       {confirmDelete && (

@@ -333,6 +333,34 @@ async def restart_local_run(
     return _serialize_local_run(project, state)
 
 
+@router.delete("/{project_id}/cache")
+async def clear_project_cache(
+    project_id: UUID,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(util.get_current_user),
+):
+    """Remove the project's on-device build workspace + package-manager caches.
+
+    Useful when a build picked up a stale node_modules or a corrupted git
+    clone. Does not touch the active local-run container or deployment
+    history. Returns ``{freed_bytes, removed_paths}``.
+    """
+    project = _load_owned_project(db, project_id, current_user)
+    result = build_runner.clear_project_cache(project.id)
+    audit_log.record_for_user(
+        db, current_user,
+        action="project.cache_clear",
+        entity_type="project",
+        entity_id=project.id,
+        org_id=project.org_id,
+        request=request,
+        extra=result,
+    )
+    db.commit()
+    return result
+
+
 @router.get("/{project_id}/run-locally/logs")
 async def get_local_run_logs(
     project_id: UUID,

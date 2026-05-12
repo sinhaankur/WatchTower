@@ -240,6 +240,46 @@ def _pkg_cache_env(project_id) -> dict[str, str]:
     }
 
 
+def clear_project_cache(project_id) -> dict[str, int]:
+    """Wipe the persistent workspace + package-manager caches for a project.
+
+    Returns ``{"freed_bytes": N, "removed_paths": M}`` so callers can show
+    a useful confirmation. Skips paths that are missing or that we can't
+    remove (a build holding the lock, a stale podman mount, etc.) rather
+    than failing the whole operation — partial cleanup is still useful.
+    """
+    pid = str(project_id)
+    targets = [
+        _WORKSPACES_DIR / pid,
+        _CACHES_DIR / pid,
+        _LOCKS_DIR / f"{pid}.lock",
+    ]
+    freed = 0
+    removed = 0
+    for path in targets:
+        if not path.exists():
+            continue
+        try:
+            if path.is_dir():
+                for sub in path.rglob("*"):
+                    try:
+                        if sub.is_file() or sub.is_symlink():
+                            freed += sub.lstat().st_size
+                    except OSError:
+                        pass
+                shutil.rmtree(path, ignore_errors=True)
+            else:
+                try:
+                    freed += path.lstat().st_size
+                except OSError:
+                    pass
+                path.unlink(missing_ok=True)
+            removed += 1
+        except Exception:
+            logger.exception("clear_project_cache: failed to remove %s", path)
+    return {"freed_bytes": freed, "removed_paths": removed}
+
+
 # ---------------------------------------------------------------------------
 # Internal pipeline
 # ---------------------------------------------------------------------------
