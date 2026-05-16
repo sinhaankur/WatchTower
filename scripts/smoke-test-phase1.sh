@@ -1,16 +1,19 @@
 #!/usr/bin/env bash
-# Smoke-test for Phase 1 of autonomous global-deploy — verifies that a
-# project configured with `run_as_container=True` actually ends up
-# serving its artifact via a Podman container on each attached node.
+# Smoke-test for Phase 1 + Phase 2 of autonomous global-deploy — verifies
+# that a project configured with `run_as_container=True` (and optionally
+# at least one CustomDomain) actually ends up serving its artifact via a
+# Podman container on each attached node, with nginx fronting it on :80
+# at the configured hostname(s).
 #
-# This is the runbook a human follows the first time they enable Phase 1
+# This is the runbook a human follows the first time they enable Phases 1+2
 # on a real project. It can't replace a true integration test (which
 # would need a remote Podman host CI runners don't have), but it
 # automates everything observable from outside the node:
 #
 #   1. Project has run_as_container=true and recommended_port set
 #   2. A deploy trigger reaches LIVE within the timeout
-#   3. Each node's exposed port answers HTTP
+#   3. Each node's raw container port answers HTTP (Phase 1)
+#   4. Each configured CustomDomain answers via nginx on :80 (Phase 2)
 #
 # Usage:
 #   WATCHTOWER_BASE_URL=http://127.0.0.1:8000 \
@@ -167,8 +170,8 @@ if [ "$STATUS" != "live" ]; then
   exit 1
 fi
 
-# ─── 4. HTTP probe each host on the bound port ────────────────────────────────
-head "4. HTTP probe"
+# ─── 4. Phase 1 HTTP probe — raw container port ───────────────────────────────
+head "4. Phase 1 HTTP probe (raw port)"
 if [ ${#PROBE_HOSTS[@]} -eq 0 ]; then
   warn "No hosts to probe. Skipping HTTP check."
 else
@@ -188,10 +191,44 @@ else
   done
 fi
 
+# ─── 5. Phase 2 HTTP probe — nginx-fronted hostname on :80 ────────────────────
+head "5. Phase 2 HTTP probe (nginx + hostname)"
+DOMAINS_JSON=$(API GET "/projects/${PROJECT_ID}/domains" || echo "[]")
+DOMAIN_COUNT=$(echo "$DOMAINS_JSON" | jq 'length')
+if [ "$DOMAIN_COUNT" = "0" ] || [ -z "$DOMAIN_COUNT" ]; then
+  warn "No CustomDomain rows on this project — Phase 2 (nginx) not exercised."
+else
+  pass "Found ${DOMAIN_COUNT} custom domain(s) — testing nginx routing"
+  # We probe with --resolve so DNS isn't required: hit the node's IP on
+  # :80 but tell curl to treat the hostname as resolving there. This
+  # confirms nginx accepted the hostname in server_name and routes to
+  # the upstream container, independent of whether the operator has
+  # pointed DNS yet.
+  while IFS= read -r DOMAIN; do
+    [ -z "$DOMAIN" ] && continue
+    for host in "${PROBE_HOSTS[@]}"; do
+      code=$(curl -sS -m 5 -o /dev/null -w '%{http_code}' \
+        --resolve "${DOMAIN}:80:${host}" \
+        "http://${DOMAIN}/" || echo "000")
+      if [ "$code" = "000" ]; then
+        fail "${DOMAIN} via ${host}:80 did not respond. Is nginx running with the WatchTower config loaded?"
+      elif [ "$code" -ge 200 ] && [ "$code" -lt 500 ]; then
+        pass "${DOMAIN} via ${host}:80 → HTTP ${code} (nginx + container routing OK)"
+      elif [ "$code" = "404" ] || [ "$code" = "502" ]; then
+        # 404 from nginx default-server means server_name didn't match;
+        # 502 means nginx is up but the upstream container isn't responding.
+        fail "${DOMAIN} via ${host}:80 → HTTP ${code} (nginx is up but routing/upstream is wrong)"
+      else
+        warn "${DOMAIN} via ${host}:80 → HTTP ${code}"
+      fi
+    done
+  done < <(echo "$DOMAINS_JSON" | jq -r '.[].domain')
+fi
+
 # ─── Summary ──────────────────────────────────────────────────────────────────
 head "Result"
-echo "  ${GREEN}${PASS_COUNT} pass${NC}, ${YELLOW}${WARN_COUNT} warn${NC}, ${RED}${FAIL_COUNT} fail${NC}"
+echo -e "  ${GREEN}${PASS_COUNT} pass${NC}, ${YELLOW}${WARN_COUNT} warn${NC}, ${RED}${FAIL_COUNT} fail${NC}"
 if [ $FAIL_COUNT -gt 0 ]; then
   exit 1
 fi
-echo -e "${GREEN}Phase 1 smoke test passed.${NC}"
+echo -e "${GREEN}Smoke test passed.${NC}"
