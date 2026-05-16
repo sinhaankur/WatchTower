@@ -8,6 +8,7 @@ from pathlib import Path
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from slowapi.errors import RateLimitExceeded
@@ -281,6 +282,14 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "Accept", "X-Requested-With"],
 )
+
+# ── Response compression ─────────────────────────────────────────────────────
+# Without this, browsers downloaded the raw SPA bundles — the vendor-react
+# chunk is 231 KB raw / 73 KB gzipped, so a cold load fetched ~3× more bytes
+# than necessary. minimum_size=500 skips tiny JSON responses where gzip
+# overhead exceeds the savings; compresslevel=6 is the well-known sweet spot
+# (level 9 costs 2-3x CPU for ~1% better ratio).
+app.add_middleware(GZipMiddleware, minimum_size=500, compresslevel=6)
 
 # ── Request ID + structured logging ──────────────────────────────────────────
 # Adds X-Request-ID to every response (re-using a client-supplied header when
