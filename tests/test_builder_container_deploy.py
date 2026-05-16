@@ -207,7 +207,7 @@ def test_deploy_to_one_node_legacy_path_does_not_invoke_podman(project, node, db
     with patch.object(builder, "_rsync_to_node", side_effect=fake_rsync), \
          patch.object(builder, "_ssh_run", side_effect=fake_ssh):
         ok, err = asyncio.run(
-            builder._deploy_to_one_node(node, project, builder.Path("/tmp/out"), lambda _l: None)
+            builder._deploy_to_one_node(node, project, builder.Path("/tmp/out"), [], lambda _l: None)
         )
 
     assert ok is True
@@ -239,7 +239,7 @@ def test_deploy_to_one_node_container_path_stops_before_rsync(project, node):
     with patch.object(builder, "_rsync_to_node", side_effect=fake_rsync), \
          patch.object(builder, "_ssh_run", side_effect=fake_ssh):
         ok, _err = asyncio.run(
-            builder._deploy_to_one_node(node, project, builder.Path("/tmp/out"), lambda _l: None)
+            builder._deploy_to_one_node(node, project, builder.Path("/tmp/out"), [], lambda _l: None)
         )
 
     assert ok is True
@@ -264,7 +264,7 @@ def test_deploy_to_one_node_container_path_ignores_reload_command(project, node)
     with patch.object(builder, "_rsync_to_node", side_effect=fake_rsync), \
          patch.object(builder, "_ssh_run", side_effect=fake_ssh):
         asyncio.run(
-            builder._deploy_to_one_node(node, project, builder.Path("/tmp/out"), lambda _l: None)
+            builder._deploy_to_one_node(node, project, builder.Path("/tmp/out"), [], lambda _l: None)
         )
 
     assert not any(node.reload_command in c for c in ssh_cmds), (

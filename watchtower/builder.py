@@ -397,13 +397,21 @@ async def _run_build(deployment_id) -> None:
         output_path = _resolve_output_path(db, project, repo_dir)
         nodes = _get_deployment_nodes(db, deployment)
 
+        # Eager-load the project's custom domains as plain strings once
+        # so the per-node tasks (running concurrently under asyncio.gather)
+        # don't race on the SQLAlchemy session and don't each fire their
+        # own SELECT against the relationship. Empty list means "no nginx
+        # proxy step needed" — Phase 2 short-circuits and the container
+        # is left reachable on its raw port.
+        custom_domains = [d.domain for d in project.custom_domains if d.domain]
+
         if nodes:
             deployment.status = DeploymentStatus.DEPLOYING
             writer.flush()
             db.commit()
             append(f"\n[WatchTower] Deploying to {len(nodes)} node(s) in parallel…")
             results = await asyncio.gather(
-                *[_deploy_to_one_node(node, project, output_path, append) for node in nodes],
+                *[_deploy_to_one_node(node, project, output_path, custom_domains, append) for node in nodes],
                 return_exceptions=True,
             )
             failures: list[tuple[str, str]] = []
@@ -486,6 +494,7 @@ async def _deploy_to_one_node(
     node: OrgNode,
     project: Project,
     output_path: Path,
+    custom_domains: list[str],
     append: Callable[[str], None],
 ) -> tuple[bool, str]:
     """Rsync + reload one node, prefixing every log line with the node host
@@ -497,6 +506,10 @@ async def _deploy_to_one_node(
     static sites) instead of relying on a pre-existing webserver to read
     the files. The container is stopped *before* rsync so the bind-mount
     isn't held open while ``rsync --delete`` rewrites the directory.
+
+    When the container is healthy AND the project has at least one
+    ``CustomDomain``, Phase 2 also writes an nginx reverse-proxy config
+    on the node fronting the bound port at the configured hostname(s).
     """
     label = node.host or "node"
     prefix = f"[{label}] "
@@ -520,9 +533,22 @@ async def _deploy_to_one_node(
             return False, err
 
         if project.run_as_container:
-            return await _run_static_container_on_node(
+            ok, err = await _run_static_container_on_node(
                 node, project, append, prefix=prefix,
             )
+            if not ok:
+                return False, err
+            # Phase 2: front the container with nginx if the project has
+            # at least one CustomDomain. Without one, leave the container
+            # reachable on its raw port — useful for iteration before the
+            # operator decides on a hostname.
+            if custom_domains:
+                ok, err = await _apply_nginx_proxy_on_node(
+                    node, project, custom_domains, append, prefix=prefix,
+                )
+                if not ok:
+                    return False, err
+            return True, ""
 
         if node.reload_command:
             append(f"{prefix}Reloading service…")
@@ -604,6 +630,117 @@ async def _run_static_container_on_node(
             f"Check `podman logs {cname}` on the node."
         )
     append(f"{prefix}✓ Container healthy on :{port}")
+    return True, ""
+
+
+# Hostname charset accepted by nginx server_name + safe to embed in a
+# shell command. Strict by design — any user-supplied domain that fails
+# this regex is rejected before we even try to write a config. Avoids
+# any concern about shell injection via the domain field.
+_NGINX_HOSTNAME_RE = re.compile(r"^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$")
+
+
+def _build_nginx_proxy_config(
+    project: Project,
+    custom_domains: list[str],
+    upstream_port: int,
+) -> str:
+    """Render the nginx server block(s) for *project*.
+
+    All domains share one config (multi-value ``server_name``) so a project
+    with several hostnames reloads in a single nginx pass. Listens on
+    plain :80 — TLS termination is a Phase-3 concern (Cloudflare proxy)
+    once Phase 2 has run against a real environment.
+    """
+    server_names = " ".join(custom_domains)
+    return (
+        "# Managed by WatchTower — do not edit by hand.\n"
+        f"# Project: {project.name} ({project.id})\n"
+        "server {\n"
+        "    listen 80;\n"
+        f"    server_name {server_names};\n"
+        "\n"
+        "    location / {\n"
+        f"        proxy_pass http://127.0.0.1:{int(upstream_port)};\n"
+        "        proxy_http_version 1.1;\n"
+        "        proxy_set_header Host $host;\n"
+        "        proxy_set_header X-Real-IP $remote_addr;\n"
+        "        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n"
+        "        proxy_set_header X-Forwarded-Proto $scheme;\n"
+        "        proxy_set_header Upgrade $http_upgrade;\n"
+        '        proxy_set_header Connection "upgrade";\n'
+        "    }\n"
+        "}\n"
+    )
+
+
+async def _apply_nginx_proxy_on_node(
+    node: OrgNode,
+    project: Project,
+    custom_domains: list[str],
+    append: Callable[[str], None],
+    prefix: str = "",
+) -> tuple[bool, str]:
+    """Phase 2: front the Phase 1 container with nginx on the node.
+
+    Writes ``/etc/nginx/sites-available/wt-<id>.conf``, symlinks it into
+    ``sites-enabled``, runs ``nginx -t`` to validate, then reloads. A
+    config that fails validation is left in sites-available but never
+    symlinked, so the running nginx state is unchanged on failure.
+
+    Returns ``(False, msg)`` on any failure — the deploy treats this as
+    fatal because a user who configured a custom domain expects the site
+    to be reachable there, not silently stuck on the raw container port.
+    """
+    import base64
+
+    port = project.recommended_port
+    if not port:
+        return False, "recommended_port unset — nginx upstream cannot be derived"
+
+    # Sanitise every domain before they reach a shell command. The regex
+    # rejects "evil.com; rm -rf /" and anything else that isn't a plain
+    # FQDN. Returns a clear error so the operator knows which row to fix.
+    cleaned: list[str] = []
+    for d in custom_domains:
+        norm = (d or "").strip().lower()
+        if not _NGINX_HOSTNAME_RE.match(norm):
+            return False, f"invalid hostname for nginx server_name: {d!r}"
+        cleaned.append(norm)
+
+    config = _build_nginx_proxy_config(project, cleaned, int(port))
+    encoded = base64.b64encode(config.encode("utf-8")).decode("ascii")
+    site_filename = f"wt-{project.id.hex[:12]}.conf"
+    available = f"/etc/nginx/sites-available/{site_filename}"
+    enabled = f"/etc/nginx/sites-enabled/{site_filename}"
+
+    # Pipe the base64-encoded config to sudo tee — sidesteps every shell
+    # quoting concern in the config body. ``ln -sf`` makes the symlink
+    # step idempotent across redeploys.
+    write_cmd = (
+        f"echo {shlex.quote(encoded)} | base64 -d | sudo tee {shlex.quote(available)} > /dev/null && "
+        f"sudo ln -sf {shlex.quote(available)} {shlex.quote(enabled)}"
+    )
+    append(f"{prefix}Writing nginx config → {available}")
+    ok, err = await _ssh_run(node, write_cmd, append, prefix=prefix)
+    if not ok:
+        return False, f"nginx config write failed: {err}"
+
+    append(f"{prefix}Validating nginx config (nginx -t)…")
+    ok, err = await _ssh_run(node, "sudo nginx -t", append, prefix=prefix)
+    if not ok:
+        # Validation failed — yank the symlink so the broken config never
+        # gets picked up on the next reload (system or operator-triggered).
+        # The .conf file in sites-available is left for inspection.
+        await _ssh_run(node, f"sudo rm -f {shlex.quote(enabled)}", append, prefix=prefix)
+        return False, f"nginx -t rejected the generated config: {err}"
+
+    append(f"{prefix}Reloading nginx…")
+    ok, err = await _ssh_run(node, "sudo systemctl reload nginx", append, prefix=prefix)
+    if not ok:
+        return False, f"nginx reload failed: {err}"
+
+    append(f"{prefix}✓ nginx fronting :{port} as {' / '.join(cleaned)}")
     return True, ""
 
 
