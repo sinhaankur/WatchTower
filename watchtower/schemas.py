@@ -107,6 +107,10 @@ class ProjectBase(BaseModel):
     # Set by the wizard from /api/runtime/recommend-port. Optional so the
     # legacy SSH/rsync flow that doesn't need a port can omit it.
     recommended_port: Optional[int] = None
+    # Phase 1 of autonomous global-deploy: wrap the artifact in a Podman
+    # container on the remote (nginx:alpine for static sites). Off by
+    # default — opt in per project from the UI / API.
+    run_as_container: bool = False
 
 
 class ProjectCreate(ProjectBase):
@@ -119,6 +123,7 @@ class ProjectUpdate(BaseModel):
     build_command: Optional[str] = None
     is_active: Optional[bool] = None
     recommended_port: Optional[int] = None
+    run_as_container: Optional[bool] = None
 
 
 class ProjectResponse(ProjectBase):

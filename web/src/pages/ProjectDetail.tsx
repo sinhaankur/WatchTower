@@ -24,6 +24,8 @@ type Project = {
   repo_url: string;
   repo_branch: string;
   build_command: string | null;
+  recommended_port: number | null;
+  run_as_container: boolean;
   created_at: string;
 };
 
@@ -436,6 +438,8 @@ function OverviewTab({ project }: { project: Project }) {
 
       <BuildCommandCard project={project} />
 
+      <RunAsContainerCard project={project} />
+
       <div className="rounded-xl border border-border bg-card overflow-hidden">
         <div className="px-5 py-4 border-b border-border bg-muted/30">
           <h2 className="text-sm font-semibold">GitHub Webhook URL</h2>
@@ -553,6 +557,85 @@ function BuildCommandCard({ project }: { project: Project }) {
             </div>
           </>
         )}
+      </div>
+    </div>
+  );
+}
+
+// ── RunAsContainerCard ────────────────────────────────────────────────────────
+// Toggle for Project.run_as_container — Phase 1 of autonomous global-deploy.
+// When on, deploys wrap the artifact in a Podman container on the remote
+// (nginx:alpine for static sites) instead of relying on a pre-existing
+// webserver to read the rsync'd files. Off by default to keep existing
+// projects on the legacy rsync+reload path.
+
+function RunAsContainerCard({ project }: { project: Project }) {
+  const [enabled, setEnabled] = useState<boolean>(project.run_as_container);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // A container needs a host port to bind. We block the toggle (rather
+  // than silently failing on the next deploy) so the operator fixes the
+  // root cause — go set a port on the project first.
+  const portMissing = !project.recommended_port;
+
+  const toggle = async () => {
+    const next = !enabled;
+    setBusy(true);
+    setError(null);
+    try {
+      const resp = await apiClient.put(`/projects/${project.id}`, {
+        run_as_container: next,
+      });
+      setEnabled(Boolean(resp.data?.run_as_container));
+    } catch (err) {
+      setError(extractDetail(err, 'Failed to update setting'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="rounded-xl border border-border bg-card overflow-hidden">
+      <div className="px-5 py-4 border-b border-border bg-muted/30 flex items-center justify-between">
+        <h2 className="text-sm font-semibold">Run as Container</h2>
+        <span className="text-[10px] uppercase tracking-wide font-semibold text-amber-700 bg-amber-100 rounded px-2 py-0.5">
+          Phase 1
+        </span>
+      </div>
+      <div className="px-5 py-4 flex flex-col gap-3">
+        <p className="text-xs text-muted-foreground">
+          {enabled
+            ? 'Deploys wrap the artifact in a Podman container on the remote node (nginx:alpine for static sites). The container is health-probed before the deploy is marked Live.'
+            : 'Deploys rsync files to the remote and rely on a pre-existing webserver (nginx/systemd) to serve them. Toggle on to have WatchTower run the artifact in a container automatically.'}
+        </p>
+        {enabled && (
+          <p className="text-xs text-muted-foreground">
+            Host port: <code className="bg-muted rounded px-1.5 py-0.5 font-mono">{project.recommended_port ?? '—'}</code> → container :80
+          </p>
+        )}
+        {portMissing && !enabled && (
+          <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-2">
+            Set a host port on this project before enabling container mode — the container needs a port to bind.
+          </p>
+        )}
+        {error && <p className="text-xs text-red-600">{error}</p>}
+        <div className="flex items-center gap-3">
+          <button
+            onClick={toggle}
+            disabled={busy || (!enabled && portMissing)}
+            className={`text-xs px-3 py-1.5 rounded transition-colors disabled:opacity-50 ${
+              enabled
+                ? 'border border-border hover:bg-muted'
+                : 'bg-blue-600 text-white hover:bg-blue-700'
+            }`}
+          >
+            {busy ? 'Saving…' : enabled ? 'Disable' : 'Enable'}
+          </button>
+          <span className="text-xs text-muted-foreground">
+            {enabled ? 'Enabled' : 'Disabled'}
+          </span>
+        </div>
       </div>
     </div>
   );

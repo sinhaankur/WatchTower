@@ -225,6 +225,12 @@ class Project(Base):
     # re-validated at bind time, so a port that's free at create time
     # but taken at deploy time falls through to a fresh pick.
     recommended_port = Column(Integer, nullable=True)
+    # Phase 1 of autonomous global-deploy: when True, deploys wrap the
+    # build artifact in a Podman container on the remote node (nginx:alpine
+    # for static sites) instead of relying on a pre-existing webserver to
+    # serve the rsync'd files. Default False keeps existing projects on
+    # the legacy rsync+reload_command path until they opt in.
+    run_as_container = Column(Boolean, default=False, nullable=False)
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=_utcnow)
     updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)

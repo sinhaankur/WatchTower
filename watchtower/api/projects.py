@@ -87,6 +87,7 @@ async def create_project(
             build_command=project_data.build_command,
             webhook_secret=webhook_secret,
             recommended_port=project_data.recommended_port,
+            run_as_container=project_data.run_as_container,
             org_id=org.id,
             owner_id=user_id
         )
@@ -186,6 +187,12 @@ async def update_project(
     if project_data.is_active is not None and project_data.is_active != project.is_active:
         changes["is_active"] = {"from": project.is_active, "to": project_data.is_active}
         project.is_active = project_data.is_active
+    if project_data.recommended_port is not None and project_data.recommended_port != project.recommended_port:
+        changes["recommended_port"] = {"from": project.recommended_port, "to": project_data.recommended_port}
+        project.recommended_port = project_data.recommended_port
+    if project_data.run_as_container is not None and project_data.run_as_container != project.run_as_container:
+        changes["run_as_container"] = {"from": project.run_as_container, "to": project_data.run_as_container}
+        project.run_as_container = project_data.run_as_container
 
     if changes:
         audit_log.record_for_user(

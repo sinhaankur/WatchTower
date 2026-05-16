@@ -403,7 +403,7 @@ async def _run_build(deployment_id) -> None:
             db.commit()
             append(f"\n[WatchTower] Deploying to {len(nodes)} node(s) in parallel…")
             results = await asyncio.gather(
-                *[_deploy_to_one_node(node, output_path, append) for node in nodes],
+                *[_deploy_to_one_node(node, project, output_path, append) for node in nodes],
                 return_exceptions=True,
             )
             failures: list[tuple[str, str]] = []
@@ -484,19 +484,46 @@ async def _run_build(deployment_id) -> None:
 
 async def _deploy_to_one_node(
     node: OrgNode,
+    project: Project,
     output_path: Path,
     append: Callable[[str], None],
 ) -> tuple[bool, str]:
     """Rsync + reload one node, prefixing every log line with the node host
     so parallel deploys produce readable interleaved output. Returns
     ``(ok, error)`` — never raises.
+
+    When ``project.run_as_container`` is True the rsync'd artifact is
+    wrapped in a Podman container on the node (Phase 1: nginx:alpine for
+    static sites) instead of relying on a pre-existing webserver to read
+    the files. The container is stopped *before* rsync so the bind-mount
+    isn't held open while ``rsync --delete`` rewrites the directory.
     """
     label = node.host or "node"
     prefix = f"[{label}] "
     try:
+        if project.run_as_container:
+            # Stop the existing container (if any) so rsync --delete can
+            # safely rewrite the bind-mounted directory without fighting
+            # an open file. The `|| true` is intentional — on the very
+            # first deploy the container doesn't exist yet, and that's
+            # not an error.
+            cname = _container_name(project)
+            await _ssh_run(
+                node,
+                f"podman stop {shlex.quote(cname)} 2>/dev/null || true",
+                append,
+                prefix=prefix,
+            )
+
         ok, err = await _rsync_to_node(node, output_path, append, prefix=prefix)
         if not ok:
             return False, err
+
+        if project.run_as_container:
+            return await _run_static_container_on_node(
+                node, project, append, prefix=prefix,
+            )
+
         if node.reload_command:
             append(f"{prefix}Reloading service…")
             ok, err = await _ssh_run(node, node.reload_command, append, prefix=prefix)
@@ -508,6 +535,76 @@ async def _deploy_to_one_node(
         return True, ""
     except Exception as exc:
         return False, str(exc)
+
+
+def _container_name(project: Project) -> str:
+    """Deterministic container name from a project — stable across
+    deploys so each new deploy can stop+rm the old one by name. Lowercase
+    + UUID hex prefix keeps it within Podman's name-charset rules and
+    avoids collisions when one node hosts multiple projects."""
+    return f"wt-{project.id.hex[:12]}"
+
+
+async def _run_static_container_on_node(
+    node: OrgNode,
+    project: Project,
+    append: Callable[[str], None],
+    prefix: str = "",
+) -> tuple[bool, str]:
+    """Start an nginx:alpine container on *node* serving the artifact
+    that was just rsync'd to ``node.remote_path``. Health-probes the
+    bound port before returning success.
+
+    Returns ``(ok, error_or_empty)``. Never raises.
+    """
+    port = project.recommended_port
+    if not port:
+        msg = (
+            "run_as_container=True but project.recommended_port is unset — "
+            "container needs a host port to bind. Set it in the project's "
+            "settings and redeploy."
+        )
+        append(f"{prefix}✗ {msg}")
+        return False, msg
+
+    cname = _container_name(project)
+    remote_path = node.remote_path.rstrip("/")
+    # `:ro,z` keeps SELinux-enforcing hosts (Fedora/RHEL) happy — the `z`
+    # relabels the bind source so the container can read it. On systems
+    # without SELinux it's a no-op. `--restart=always` covers Podman
+    # daemon restarts; full reboot survival is a Phase-4 concern.
+    image = os.getenv("WATCHTOWER_STATIC_RUNTIME_IMAGE", "docker.io/nginx:alpine")
+    run_cmd = (
+        f"podman rm -f {shlex.quote(cname)} 2>/dev/null; "
+        f"podman run -d --name {shlex.quote(cname)} "
+        f"-p {int(port)}:80 "
+        f"-v {shlex.quote(remote_path)}:/usr/share/nginx/html:ro,z "
+        f"--restart=always "
+        f"{shlex.quote(image)}"
+    )
+    append(f"{prefix}Starting container {cname} on :{port} …")
+    ok, err = await _ssh_run(node, run_cmd, append, prefix=prefix)
+    if not ok:
+        return False, f"podman run failed: {err}"
+
+    # Probe the bound port — gives nginx a moment to come up and turns
+    # "container exited on launch" into an obvious deploy failure rather
+    # than a silently-broken site.
+    probe = (
+        f"for i in 1 2 3 4 5; do "
+        f"  curl -fsS -m 2 http://127.0.0.1:{int(port)}/ -o /dev/null && exit 0; "
+        f"  sleep 1; "
+        f"done; exit 1"
+    )
+    append(f"{prefix}Probing http://127.0.0.1:{port}/ …")
+    ok, err = await _ssh_run(node, probe, append, prefix=prefix)
+    if not ok:
+        return False, (
+            f"container started but health probe failed on port {port}. "
+            f"Check `podman logs {cname}` on the node."
+        )
+    append(f"{prefix}✓ Container healthy on :{port}")
+    return True, ""
 
 
 # ---------------------------------------------------------------------------
