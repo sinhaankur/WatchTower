@@ -1,19 +1,21 @@
 #!/usr/bin/env bash
-# Smoke-test for Phase 1 + Phase 2 of autonomous global-deploy — verifies
+# Smoke-test for Phases 1+2+3 of autonomous global-deploy — verifies
 # that a project configured with `run_as_container=True` (and optionally
 # at least one CustomDomain) actually ends up serving its artifact via a
 # Podman container on each attached node, with nginx fronting it on :80
-# at the configured hostname(s).
+# at the configured hostname(s), and (Phase 3) the Cloudflare A record
+# refreshed to point at the node IP.
 #
-# This is the runbook a human follows the first time they enable Phases 1+2
-# on a real project. It can't replace a true integration test (which
-# would need a remote Podman host CI runners don't have), but it
-# automates everything observable from outside the node:
+# This is the runbook a human follows the first time they enable
+# Phases 1+2+3 on a real project. It can't replace a true integration
+# test (which would need a remote Podman host CI runners don't have),
+# but it automates everything observable from outside the node:
 #
 #   1. Project has run_as_container=true and recommended_port set
 #   2. A deploy trigger reaches LIVE within the timeout
 #   3. Each node's raw container port answers HTTP (Phase 1)
 #   4. Each configured CustomDomain answers via nginx on :80 (Phase 2)
+#   5. Each managed domain's Cloudflare record was refreshed (Phase 3)
 #
 # Usage:
 #   WATCHTOWER_BASE_URL=http://127.0.0.1:8000 \
@@ -223,6 +225,43 @@ else
       fi
     done
   done < <(echo "$DOMAINS_JSON" | jq -r '.[].domain')
+fi
+
+# ─── 6. Phase 3 — Cloudflare A record refreshed on deploy ─────────────────────
+head "6. Phase 3 DNS sync (Cloudflare managed records)"
+# Re-fetch the domains JSON — the deploy that just succeeded should
+# have refreshed cloudflare_synced_at for every domain with a
+# cloudflare_credential_id set. We capture "managed" domains (those
+# the operator has linked to a Cloudflare credential) and assert each
+# one's synced_at is recent.
+DOMAINS_JSON=$(API GET "/projects/${PROJECT_ID}/domains" || echo "[]")
+MANAGED_COUNT=$(echo "$DOMAINS_JSON" | jq '[.[] | select(.cloudflare_credential_id != null)] | length')
+if [ "$MANAGED_COUNT" = "0" ] || [ -z "$MANAGED_COUNT" ]; then
+  warn "No Cloudflare-managed domains — Phase 3 not exercised. Link a credential in the Domains tab to enable."
+else
+  pass "Found ${MANAGED_COUNT} Cloudflare-managed domain(s)"
+  # 5 minutes back from now — anything older than that is from a
+  # previous deploy, not this one. (date +%s outputs seconds since
+  # epoch; this works on both GNU and BSD date.)
+  CUTOFF=$(( $(date +%s) - 300 ))
+  while IFS= read -r LINE; do
+    [ -z "$LINE" ] && continue
+    DOMAIN=$(echo "$LINE" | jq -r '.domain')
+    SYNCED_AT=$(echo "$LINE" | jq -r '.cloudflare_synced_at // empty')
+    TARGET_IP=$(echo "$LINE" | jq -r '.cloudflare_target_ip // empty')
+    if [ -z "$SYNCED_AT" ]; then
+      fail "${DOMAIN}: cloudflare_synced_at is null — DNS sync didn't run"
+      continue
+    fi
+    # Compare ISO timestamp → epoch. Falls back to perl/python if neither
+    # GNU nor BSD date is friendly to this format.
+    SYNCED_EPOCH=$(python3 -c "import datetime,sys; print(int(datetime.datetime.fromisoformat(sys.argv[1].rstrip('Z').split('.')[0]).timestamp()))" "$SYNCED_AT" 2>/dev/null || echo 0)
+    if [ "$SYNCED_EPOCH" -ge "$CUTOFF" ]; then
+      pass "${DOMAIN}: DNS synced at ${SYNCED_AT} → ${TARGET_IP}"
+    else
+      fail "${DOMAIN}: synced_at ${SYNCED_AT} is older than 5 min — this deploy didn't refresh DNS"
+    fi
+  done < <(echo "$DOMAINS_JSON" | jq -c '.[] | select(.cloudflare_credential_id != null)')
 fi
 
 # ─── Summary ──────────────────────────────────────────────────────────────────

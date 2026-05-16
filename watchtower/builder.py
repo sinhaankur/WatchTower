@@ -438,6 +438,15 @@ async def _run_build(deployment_id) -> None:
         build.completed_at = utcnow()
         deployment.status = DeploymentStatus.LIVE
         deployment.completed_at = utcnow()
+
+        # Phase 3: refresh Cloudflare A records for any managed domains.
+        # Runs *after* the deploy is conceptually live so a Cloudflare
+        # outage doesn't roll back a perfectly working deploy. Updates
+        # to the CustomDomain rows + the deployment.status flip commit
+        # together so the transaction is consistent.
+        if nodes:
+            await _sync_dns_for_project(db, project, nodes, append)
+
         db.commit()
 
         await _send_notifications(db, project, deployment, success=True)
@@ -742,6 +751,130 @@ async def _apply_nginx_proxy_on_node(
 
     append(f"{prefix}✓ nginx fronting :{port} as {' / '.join(cleaned)}")
     return True, ""
+
+
+def _pick_dns_target_node(nodes: list[OrgNode]) -> Optional[OrgNode]:
+    """Single-IP DNS target for managed records.
+
+    Prefers a node explicitly marked ``is_primary=True``. Falls back to
+    the first node otherwise — that matches how the deploy ordering
+    presents nodes to the operator. Multi-node round-robin DNS is
+    Phase 4 (autonomous mode) territory; here we accept that managed
+    DNS points at one node and the operator can use Cloudflare's LB
+    features manually if they need more.
+    """
+    if not nodes:
+        return None
+    for n in nodes:
+        if getattr(n, "is_primary", False):
+            return n
+    return nodes[0]
+
+
+async def _sync_dns_for_project(
+    db: Session,
+    project: Project,
+    nodes: list[OrgNode],
+    append: Callable[[str], None],
+) -> None:
+    """Phase 3: refresh Cloudflare A records for every CustomDomain on
+    *project* that has a ``cloudflare_credential_id`` set.
+
+    This is best-effort by design: the deploy is already conceptually
+    live by the time we get here, so a Cloudflare 5xx or a missing zone
+    is logged as a warning but doesn't fail the deploy. The CustomDomain
+    rows that succeed are stamped with the new zone_id / record_id /
+    target_ip / synced_at; failures leave the row's prior state alone.
+
+    Domains without a Cloudflare credential are silently skipped — the
+    operator hasn't opted those into managed DNS.
+    """
+    # Lazy-imported because the cloudflare_dns module pulls in `requests`,
+    # which we'd rather not load at builder-module import time in non-CF
+    # deploys (every microsecond of cold-import time multiplies across
+    # the worker pool).
+    from watchtower import cloudflare_dns
+    from watchtower.api import util
+    from watchtower.database import CloudflareCredential
+
+    target = _pick_dns_target_node(nodes)
+    if not target:
+        return  # already handled by the caller's no-nodes branch
+
+    domains = [
+        d for d in project.custom_domains
+        if d.cloudflare_credential_id and d.domain
+    ]
+    if not domains:
+        return  # operator hasn't enabled managed DNS on any domain
+
+    target_ip = (target.host or "").strip()
+    if not target_ip:
+        append("[WatchTower] ⚠ DNS sync skipped — deploy target has no host IP")
+        return
+
+    append(f"\n[WatchTower] Syncing Cloudflare DNS → {target_ip}")
+    for domain in domains:
+        cred = (
+            db.query(CloudflareCredential)
+            .filter(CloudflareCredential.id == domain.cloudflare_credential_id)
+            .first()
+        )
+        if not cred:
+            append(
+                f"[WatchTower] ⚠ {domain.domain}: credential row missing "
+                f"({domain.cloudflare_credential_id}); skipping"
+            )
+            continue
+
+        token = util.decrypt_secret(cred.api_token_encrypted)
+        if not token:
+            append(
+                f"[WatchTower] ⚠ {domain.domain}: stored Cloudflare token could not "
+                "be decrypted (WATCHTOWER_SECRET_KEY may have rotated); skipping"
+            )
+            continue
+
+        # Skip the Cloudflare round-trip when the record is already
+        # pointing where we'd put it — saves a billed API call per
+        # deploy when the node IP hasn't moved.
+        if (
+            domain.cloudflare_record_id
+            and domain.cloudflare_target_ip == target_ip
+        ):
+            append(f"[WatchTower]   {domain.domain} already → {target_ip} (skip)")
+            continue
+
+        try:
+            result = cloudflare_dns.sync_a_record(
+                token,
+                domain.domain,
+                target_ip,
+                existing_zone_id=domain.cloudflare_zone_id,
+                existing_record_id=domain.cloudflare_record_id,
+                # Phase 3 keeps Cloudflare proxy off (grey cloud) to
+                # match the existing manual-sync UX. A per-domain
+                # proxied toggle can come later.
+                proxied=False,
+            )
+        except cloudflare_dns.CloudflareDnsError as exc:
+            append(
+                f"[WatchTower] ⚠ {domain.domain}: Cloudflare sync failed "
+                f"({exc.status}): {exc.detail}. Retry from the Domains tab."
+            )
+            continue
+        except Exception as exc:  # pragma: no cover - defensive
+            append(
+                f"[WatchTower] ⚠ {domain.domain}: unexpected DNS sync error: {exc}"
+            )
+            logger.exception("Cloudflare DNS sync failed for %s", domain.domain)
+            continue
+
+        domain.cloudflare_zone_id = result.zone_id
+        domain.cloudflare_record_id = result.record_id
+        domain.cloudflare_target_ip = target_ip
+        domain.cloudflare_synced_at = utcnow()
+        append(f"[WatchTower]   ✓ {domain.domain} → {target_ip}")
 
 
 # ---------------------------------------------------------------------------
