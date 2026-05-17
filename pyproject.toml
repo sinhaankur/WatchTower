@@ -72,6 +72,17 @@ Source = "https://github.com/Node2-io/WatchTowerOps"
 watchtower = "watchtower.cli:main"
 watchtower-deploy = "watchtower.deploy_server:main"
 watchtower-package = "watchtower.package_builder:main"
+watchtower-mcp = "watchtower.mcp_server:main"
+
+# Optional dependency sets. `mcp` pulls in a newer starlette/pydantic
+# than the core API tolerates, so it's gated behind an extra — users
+# who want the MCP server install with `pip install
+# watchtower-podman[mcp]`. The default install stays compatible with
+# the rest of the stack.
+[project.optional-dependencies]
+mcp = [
+  "mcp>=1.0,<2.0",
+]
 
 [tool.setuptools]
 include-package-data = true
