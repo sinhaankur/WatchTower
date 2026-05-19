@@ -28,7 +28,7 @@ FROM python:3.12-slim-bookworm
 
 LABEL org.opencontainers.image.title="WatchTower" \
     org.opencontainers.image.description="WatchTower deployment control plane with Podman and App Center workflows" \
-    org.opencontainers.image.source="https://github.com/Node2-io/WatchTowerOps"
+    org.opencontainers.image.source="https://github.com/sinhaankur/WatchTower"
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1

@@ -28,7 +28,7 @@ usage() {
 Scan GitHub repository readability.
 
 Required:
-  --repo <owner/name>       Example: Node2-io/WatchTowerOps
+  --repo <owner/name>       Example: sinhaankur/WatchTower
 
 Optional:
   --token <token>           GitHub token with repo read access

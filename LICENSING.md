@@ -107,6 +107,6 @@ for the full workflow.
 
 ## Questions
 
-- General licensing questions → open an issue at <https://github.com/Node2-io/WatchTowerOps/issues>
-- Security disclosures → use [GitHub Security Advisories](https://github.com/Node2-io/WatchTowerOps/security/advisories/new)
+- General licensing questions → open an issue at <https://github.com/sinhaankur/WatchTower/issues>
+- Security disclosures → use [GitHub Security Advisories](https://github.com/sinhaankur/WatchTower/security/advisories/new)
 - Commercial inquiries → open a labelled issue (a maintainer will follow up privately)
