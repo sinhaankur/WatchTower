@@ -1026,6 +1026,141 @@ function CloudflareSection() {
   );
 }
 
+function McpSection() {
+  // Pre-fill the JSON with the operator's actual token from localStorage —
+  // same source the rest of the SPA uses. Falls back to a placeholder so
+  // the snippet is still copy-able and clearly marked as "fill this in"
+  // for users who reach this card while signed out (rare; RequireAuth
+  // wraps the route, but be defensive).
+  const storedToken = typeof window !== 'undefined'
+    ? window.localStorage.getItem('authToken')
+    : null;
+  const apiBaseUrl = typeof window !== 'undefined'
+    ? window.location.origin
+    : 'http://localhost:8000';
+
+  const [readonly, setReadonly] = useState(false);
+  const [revealToken, setRevealToken] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  // Build the Claude Desktop / Cursor MCP config block. Keep it stable
+  // across re-renders so the textarea height doesn't jitter when the
+  // user toggles the readonly switch.
+  const tokenForJson = revealToken && storedToken ? storedToken : '<your-watchtower-api-token>';
+  const env: Record<string, string> = {
+    WATCHTOWER_API_BASE_URL: apiBaseUrl,
+    WATCHTOWER_API_TOKEN: tokenForJson,
+  };
+  if (readonly) env.WATCHTOWER_AGENT_READONLY = 'true';
+
+  const configJson = JSON.stringify(
+    {
+      mcpServers: {
+        watchtower: {
+          command: 'watchtower-mcp',
+          env,
+        },
+      },
+    },
+    null,
+    2,
+  );
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(configJson);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // Older browsers / non-secure contexts can't write the clipboard
+      // silently; select-all the textarea instead so the user can ⌘C.
+      const el = document.getElementById('mcp-config-json') as HTMLTextAreaElement | null;
+      el?.select();
+    }
+  };
+
+  return (
+    <section className="rounded-xl border border-border bg-card overflow-hidden">
+      <header className="px-5 py-4 border-b border-border bg-muted/30 flex items-center justify-between gap-4">
+        <div>
+          <h2 className="text-sm font-semibold text-slate-900">Connect Claude Desktop / Cursor</h2>
+          <p className="text-xs text-slate-600 mt-0.5">
+            Drive WatchTower from your AI chat client via the Model Context Protocol — list projects, trigger deploys, manage domains, sync DNS, without opening this dashboard.
+          </p>
+        </div>
+        <span className="text-[10px] uppercase tracking-wide font-semibold text-purple-700 bg-purple-100 rounded px-2 py-0.5 shrink-0">
+          MCP
+        </span>
+      </header>
+
+      <div className="px-5 py-4 flex flex-col gap-4 text-sm">
+        <ol className="text-xs text-slate-700 space-y-1 list-decimal list-inside">
+          <li>
+            Install the MCP extra: <code className="bg-slate-100 rounded px-1.5 py-0.5 font-mono text-[11px]">pip install watchtower-podman[mcp]</code>
+          </li>
+          <li>
+            Paste the JSON below into your client's MCP config file:
+            <ul className="list-disc list-inside ml-4 mt-1 text-slate-600">
+              <li><span className="font-mono text-[11px]">~/Library/Application Support/Claude/claude_desktop_config.json</span> (macOS)</li>
+              <li><span className="font-mono text-[11px]">%APPDATA%\Claude\claude_desktop_config.json</span> (Windows)</li>
+              <li>Cursor: Settings → MCP servers</li>
+            </ul>
+          </li>
+          <li>Restart your client. The 12 WatchTower tools appear in the MCP panel.</li>
+        </ol>
+
+        <div className="flex flex-wrap items-center gap-4 text-xs">
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={readonly}
+              onChange={(e) => setReadonly(e.target.checked)}
+              className="h-3.5 w-3.5"
+            />
+            Read-only mode (hides trigger_deployment, toggles, DNS sync)
+          </label>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={revealToken}
+              onChange={(e) => setRevealToken(e.target.checked)}
+              className="h-3.5 w-3.5"
+              disabled={!storedToken}
+            />
+            Inline my real token
+            {!storedToken && (
+              <span className="text-slate-500">(no session token found — sign in first)</span>
+            )}
+          </label>
+        </div>
+
+        <div className="relative">
+          <textarea
+            id="mcp-config-json"
+            readOnly
+            value={configJson}
+            rows={Math.min(14, configJson.split('\n').length)}
+            className="w-full font-mono text-[11px] leading-snug bg-slate-50 border border-border rounded-md px-3 py-2 resize-none focus:outline-none focus:ring-1 focus:ring-blue-500"
+            onClick={(e) => (e.target as HTMLTextAreaElement).select()}
+          />
+          <button
+            onClick={copy}
+            className="absolute top-2 right-2 text-xs px-2.5 py-1 rounded border border-border bg-white hover:bg-slate-50 transition-colors"
+          >
+            {copied ? '✓ Copied' : 'Copy'}
+          </button>
+        </div>
+
+        {revealToken && storedToken && (
+          <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-2">
+            ⚠ Your real API token is now visible in the JSON above. Anyone with this token can deploy as you — treat it like a password and don't share screenshots.
+          </p>
+        )}
+      </div>
+    </section>
+  );
+}
+
 const Integrations = () => {
   const [data, setData] = useState<IntegrationsPayload | null>(null);
   const [installCmds, setInstallCmds] = useState<InstallCommands | null>(null);
@@ -1336,6 +1471,10 @@ const Integrations = () => {
             checks. Phase 1 covers Cloudflare; Phase 2/3/4 use these
             tokens for DNS / Load Balancer / Tunnel automation. */}
         <CloudflareSection />
+
+        {/* AI-chat control plane — sits next to Cloudflare because it's
+            credential-based like the other integrations above. */}
+        <McpSection />
 
         {/* How they work together */}
         <section className="rounded-xl border border-blue-200 bg-blue-50 p-5">
