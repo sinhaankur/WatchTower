@@ -1026,6 +1026,255 @@ function CloudflareSection() {
   );
 }
 
+// ─── Cloud-provider credentials (Phase 5 step 1) ─────────────────────────────
+
+type CloudProviderCredential = {
+  id: string;
+  provider: 'digitalocean' | 'hetzner';
+  label: string | null;
+  account_email: string | null;
+  last_verified_at: string | null;
+  created_at: string;
+};
+
+const PROVIDER_META = {
+  digitalocean: {
+    name: 'DigitalOcean',
+    color: 'bg-sky-600 hover:bg-sky-700',
+    tokenHint: 'Create at cloud.digitalocean.com → API → Personal Access Tokens. Phase 5 needs at least droplet:read,write and ssh_key:read,write scopes.',
+    placeholder: 'dop_v1_…',
+    docsUrl: 'https://cloud.digitalocean.com/account/api/tokens',
+  },
+  hetzner: {
+    name: 'Hetzner Cloud',
+    color: 'bg-red-600 hover:bg-red-700',
+    tokenHint: 'Create at console.hetzner.cloud → Security → API tokens. Pick Read & Write — Phase 5 needs to create servers and SSH keys.',
+    placeholder: '01ABCD…',
+    docsUrl: 'https://console.hetzner.cloud/',
+  },
+} as const;
+
+function CloudProviderSection() {
+  const [creds, setCreds] = useState<CloudProviderCredential[] | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [provider, setProvider] = useState<'digitalocean' | 'hetzner'>('digitalocean');
+  const [token, setToken] = useState('');
+  const [label, setLabel] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const resp = await apiClient.get<CloudProviderCredential[]>('/integrations/cloud-providers');
+      setCreds(resp.data);
+    } catch {
+      setCreds([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { void load(); }, [load]);
+
+  const submit = async () => {
+    setError('');
+    setSubmitting(true);
+    try {
+      await apiClient.post('/integrations/cloud-providers', {
+        provider,
+        api_token: token.trim(),
+        label: label.trim() || null,
+      });
+      setToken('');
+      setLabel('');
+      setShowForm(false);
+      void load();
+    } catch (e) {
+      const detail = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      setError(detail || 'Failed to save token');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const remove = async (id: string) => {
+    if (!confirm('Remove this provider connection? Auto-provisioning will stop working until you reconnect.')) return;
+    try {
+      await apiClient.delete(`/integrations/cloud-providers/${id}`);
+      void load();
+    } catch (e) {
+      const detail = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      setError(detail || 'Failed to delete');
+    }
+  };
+
+  const reverify = async (id: string) => {
+    try {
+      await apiClient.post(`/integrations/cloud-providers/${id}/verify`);
+      void load();
+    } catch (e) {
+      const detail = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      setError(detail || 'Re-verification failed');
+    }
+  };
+
+  const meta = PROVIDER_META[provider];
+
+  return (
+    <section className="rounded-xl border border-slate-200 bg-white">
+      <header className="px-5 py-4 border-b border-slate-100 flex items-center justify-between gap-3">
+        <div>
+          <h2 className="text-sm font-semibold text-slate-900">Cloud providers</h2>
+          <p className="text-xs text-slate-600 mt-0.5">
+            Connect DigitalOcean or Hetzner to auto-provision fresh deploy nodes — WatchTower creates the VM, installs Podman + nginx, and registers it as an OrgNode.
+          </p>
+        </div>
+        <span className="text-[10px] uppercase tracking-wide font-semibold text-purple-700 bg-purple-100 rounded px-2 py-0.5 shrink-0">
+          Phase 5
+        </span>
+      </header>
+
+      <div className="p-5 space-y-4">
+        {error && (
+          <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+            {error}
+          </div>
+        )}
+
+        {!showForm && (
+          <button
+            type="button"
+            onClick={() => { setShowForm(true); setError(''); }}
+            className="px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-medium"
+          >
+            + Connect a cloud provider
+          </button>
+        )}
+
+        {showForm && (
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 space-y-3">
+            <div>
+              <label className="block text-xs font-medium text-slate-700 mb-1">Provider</label>
+              <div className="flex gap-2">
+                {(['digitalocean', 'hetzner'] as const).map((p) => (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => setProvider(p)}
+                    className={`px-3 py-1.5 rounded-md text-xs font-medium border ${
+                      provider === p
+                        ? 'bg-slate-900 text-white border-slate-900'
+                        : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
+                    }`}
+                  >
+                    {PROVIDER_META[p].name}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-700 mb-1">API token</label>
+              <input
+                type="password"
+                value={token}
+                onChange={(e) => setToken(e.target.value)}
+                placeholder={meta.placeholder}
+                autoComplete="off"
+                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:border-slate-600 focus:ring-1 focus:ring-slate-600 outline-none font-mono"
+              />
+              <p className="text-[11px] text-slate-500 mt-1">
+                {meta.tokenHint}{' '}
+                <a
+                  href={meta.docsUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-slate-700 hover:underline"
+                >
+                  Open console ↗
+                </a>
+              </p>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-700 mb-1">Label (optional)</label>
+              <input
+                type="text"
+                value={label}
+                onChange={(e) => setLabel(e.target.value)}
+                placeholder={provider === 'digitalocean' ? 'Personal DO' : 'Homelab Hetzner project'}
+                maxLength={80}
+                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:border-slate-600 focus:ring-1 focus:ring-slate-600 outline-none"
+              />
+            </div>
+            <div className="flex gap-2 justify-end">
+              <button
+                type="button"
+                onClick={() => { setShowForm(false); setToken(''); setLabel(''); setError(''); }}
+                className="px-3 py-1.5 rounded-md border border-slate-300 text-xs text-slate-700 hover:bg-slate-100"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => void submit()}
+                disabled={submitting || token.trim().length < 10}
+                className={`px-3 py-1.5 rounded-md ${meta.color} disabled:opacity-50 text-white text-xs font-medium`}
+              >
+                {submitting ? 'Verifying…' : 'Verify & save'}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {loading ? (
+          <p className="text-xs text-slate-500">Loading…</p>
+        ) : creds && creds.length > 0 ? (
+          <ul className="divide-y divide-slate-100 border border-slate-200 rounded-lg overflow-hidden">
+            {creds.map((c) => (
+              <li key={c.id} className="px-4 py-3 flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-slate-900 truncate">
+                    {c.label || PROVIDER_META[c.provider].name}
+                  </p>
+                  <p className="text-[11px] text-slate-500 truncate">
+                    <span className="inline-block bg-slate-100 rounded px-1.5 py-0.5 mr-1 font-mono text-[10px]">
+                      {PROVIDER_META[c.provider].name}
+                    </span>
+                    {c.account_email && <>{c.account_email} · </>}
+                    {c.last_verified_at
+                      ? <>verified {new Date(c.last_verified_at).toLocaleString()}</>
+                      : 'unverified'}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => void reverify(c.id)}
+                    className="text-[11px] text-slate-600 hover:text-slate-900 underline underline-offset-2"
+                  >
+                    Re-verify
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void remove(c.id)}
+                    className="text-[11px] text-red-600 hover:text-red-700 underline underline-offset-2"
+                  >
+                    Remove
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-xs text-slate-500">No cloud providers connected yet.</p>
+        )}
+      </div>
+    </section>
+  );
+}
+
+
 function McpSection() {
   // Pre-fill the JSON with the operator's actual token from localStorage —
   // same source the rest of the SPA uses. Falls back to a placeholder so
@@ -1471,6 +1720,11 @@ const Integrations = () => {
             checks. Phase 1 covers Cloudflare; Phase 2/3/4 use these
             tokens for DNS / Load Balancer / Tunnel automation. */}
         <CloudflareSection />
+
+        {/* Phase 5: cloud provider credentials for auto-provisioning.
+            Sits alongside Cloudflare since it's the same "give us an
+            API token, we'll manage external infra" shape. */}
+        <CloudProviderSection />
 
         {/* AI-chat control plane — sits next to Cloudflare because it's
             credential-based like the other integrations above. */}

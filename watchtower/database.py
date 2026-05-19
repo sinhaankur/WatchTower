@@ -675,6 +675,36 @@ class CloudflareCredential(Base):
     created_by = relationship("User")
 
 
+class CloudProviderCredential(Base):
+    """Phase 5: an org-scoped API token for an IaaS provider (DigitalOcean
+    or Hetzner today). The auto-provisioning flow decrypts this at
+    use-time to call the provider's REST API, create a VM, and register
+    it as an OrgNode.
+
+    Stored encrypted via ``encrypt_secret``. ``account_email`` is captured
+    on the verify call so the UI can show "connected as foo@bar.com"
+    without decrypting the token on every list.
+
+    Provider is a String, not an Enum, so a third provider lands without
+    a schema migration; the API layer validates against ``SUPPORTED_PROVIDERS``.
+    """
+    __tablename__ = "cloud_provider_credentials"
+
+    id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    org_id = Column(Uuid(as_uuid=True), ForeignKey("organizations.id"), nullable=False, index=True)
+    provider = Column(String, nullable=False)  # 'digitalocean' | 'hetzner'
+    label = Column(String, nullable=True)
+    api_token_encrypted = Column(Text, nullable=False)
+    account_email = Column(String, nullable=True)
+    last_verified_at = Column(DateTime, nullable=True)
+    created_by_user_id = Column(Uuid(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    created_at = Column(DateTime, default=_utcnow, nullable=False)
+    updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow, nullable=False)
+
+    organization = relationship("Organization", backref="cloud_provider_credentials")
+    created_by = relationship("User")
+
+
 class NotificationWebhook(Base):
     """Discord / Slack webhook for deployment notifications per project."""
     __tablename__ = "notification_webhooks"

@@ -22,6 +22,7 @@ from . import (
     agent,
     audit,
     builds,
+    cloud_providers,
     cloudflare,
     deployments,
     edition,
@@ -437,6 +438,7 @@ app.include_router(audit.router)
 app.include_router(me.router)
 app.include_router(templates.router)
 app.include_router(cloudflare.router)
+app.include_router(cloud_providers.router)
 app.include_router(edition.router)
 app.include_router(local_runs.router)
 from watchtower.api import diagnose  # noqa: E402
