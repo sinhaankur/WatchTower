@@ -512,12 +512,25 @@ class OrgNode(Base):
     is_primary = Column(Boolean, default=False)  # Primary node for deployments
     created_by_user_id = Column(Uuid(as_uuid=True), ForeignKey("users.id"), nullable=True)
     updated_by_user_id = Column(Uuid(as_uuid=True), ForeignKey("users.id"), nullable=True)
-    
+
+    # Phase 5: provider tracking for auto-provisioned nodes. NULL on
+    # manually-registered nodes (the pre-Phase-5 path). When set, the
+    # delete-node endpoint can also tear down the underlying VM.
+    provider = Column(String, nullable=True)                # 'digitalocean' | 'hetzner'
+    provider_resource_id = Column(String, nullable=True)    # droplet id / Hetzner server id
+    provider_credential_id = Column(
+        Uuid(as_uuid=True),
+        ForeignKey("cloud_provider_credentials.id"),
+        nullable=True,
+    )
+    provisioned_at = Column(DateTime, nullable=True)
+
     created_at = Column(DateTime, default=_utcnow)
     updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
 
     organization = relationship("Organization", backref="nodes")
     networks = relationship("NodeNetwork", secondary="node_network_members", back_populates="nodes")
+    provider_credential = relationship("CloudProviderCredential")
 
 
 class NodeNetwork(Base):
@@ -672,6 +685,51 @@ class CloudflareCredential(Base):
     updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow, nullable=False)
 
     organization = relationship("Organization", backref="cloudflare_credentials")
+    created_by = relationship("User")
+
+
+class ProvisioningJob(Base):
+    """Phase 5 step 2: a record of an in-flight or completed VM
+    provisioning attempt against an external cloud provider.
+
+    State machine (status column):
+      queued → creating_vm → waiting_for_ready → installing_stack →
+        verifying → registered
+      … with 'failed' / 'cancelled' as terminals from any step.
+
+    Why a table (not just in-memory like autonomous-mode probe state):
+      - Provisioning can take 2-5 minutes. The UI polls — restarting
+        the API mid-provision must not lose progress.
+      - The cleanup path (delete the VM if registration failed) needs
+        provider_resource_id to survive a crash. In-memory loses it.
+      - Operator wants a history: "what did I provision when, did it
+        succeed." That's a real audit need, not transient state.
+    """
+    __tablename__ = "provisioning_jobs"
+
+    id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    org_id = Column(Uuid(as_uuid=True), ForeignKey("organizations.id"), nullable=False, index=True)
+    provider_credential_id = Column(
+        Uuid(as_uuid=True),
+        ForeignKey("cloud_provider_credentials.id"),
+        nullable=False,
+    )
+    provider = Column(String, nullable=False)  # denormalised from credential so a deleted cred doesn't orphan history
+    region = Column(String, nullable=False)
+    size = Column(String, nullable=False)
+    name = Column(String, nullable=False)
+    status = Column(String, nullable=False, default="queued", index=True)
+    error = Column(Text, nullable=True)
+    provider_resource_id = Column(String, nullable=True)
+    public_ipv4 = Column(String, nullable=True)
+    node_id = Column(Uuid(as_uuid=True), ForeignKey("org_nodes.id"), nullable=True)
+    created_by_user_id = Column(Uuid(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    created_at = Column(DateTime, default=_utcnow, nullable=False)
+    updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow, nullable=False)
+
+    organization = relationship("Organization", backref="provisioning_jobs")
+    provider_credential = relationship("CloudProviderCredential")
+    node = relationship("OrgNode")
     created_by = relationship("User")
 
 

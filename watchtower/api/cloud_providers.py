@@ -22,9 +22,10 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 
 from watchtower import cloud_providers as providers
+from watchtower import provisioning as provisioning_orchestrator
 from watchtower.api import audit as audit_log
 from watchtower.api import util
-from watchtower.database import CloudProviderCredential, get_db
+from watchtower.database import CloudProviderCredential, ProvisioningJob, get_db
 
 
 logger = logging.getLogger(__name__)
@@ -62,6 +63,43 @@ class VerifyResponse(BaseModel):
     ok: bool
     account_email: Optional[str] = None
     error: Optional[str] = None
+
+
+class RegionItem(BaseModel):
+    id: str
+    name: str
+
+
+class SizeItem(BaseModel):
+    id: str
+    vcpus: int
+    memory_gb: float
+    monthly_usd: Optional[float] = None
+
+
+class ProvisionRequest(BaseModel):
+    credential_id: UUID = Field(..., description="Which saved provider credential to use.")
+    name: str = Field(..., min_length=1, max_length=63, description="Hostname-safe name for the VM.")
+    region: str = Field(..., min_length=1, description="Provider-native region id (e.g., 'nyc3' for DO).")
+    size: str = Field(..., min_length=1, description="Provider-native size/server-type id.")
+
+
+class ProvisioningJobResponse(BaseModel):
+    id: UUID
+    org_id: UUID
+    provider: str
+    region: str
+    size: str
+    name: str
+    status: str
+    error: Optional[str]
+    provider_resource_id: Optional[str]
+    public_ipv4: Optional[str]
+    node_id: Optional[UUID]
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ── Helpers ─────────────────────────────────────────────────────────────────
@@ -202,6 +240,148 @@ async def reverify(
             cred.account_email = result.account_email
         db.commit()
     return VerifyResponse(ok=result.ok, account_email=result.account_email, error=result.error)
+
+
+@router.get("/{cred_id}/regions", response_model=List[RegionItem])
+async def list_regions(
+    cred_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(util.get_current_user),
+):
+    """Surface the provider's list of regions, scoped to this credential.
+    Lets the UI populate the region dropdown without having to know the
+    provider's id scheme."""
+    cred = _load_owned_credential(db, cred_id, current_user)
+    token = util.decrypt_secret(cred.api_token_encrypted)
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Could not decrypt stored token.",
+        )
+    try:
+        regions = providers.get_provider(cred.provider).list_regions(token)
+    except providers.ProviderError as exc:
+        raise HTTPException(status_code=exc.status, detail=exc.detail) from exc
+    return [RegionItem(id=r.id, name=r.name) for r in regions]
+
+
+@router.get("/{cred_id}/sizes", response_model=List[SizeItem])
+async def list_sizes(
+    cred_id: UUID,
+    region: str,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(util.get_current_user),
+):
+    cred = _load_owned_credential(db, cred_id, current_user)
+    token = util.decrypt_secret(cred.api_token_encrypted)
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Could not decrypt stored token.",
+        )
+    try:
+        sizes = providers.get_provider(cred.provider).list_sizes(token, region)
+    except providers.ProviderError as exc:
+        raise HTTPException(status_code=exc.status, detail=exc.detail) from exc
+    return [
+        SizeItem(id=s.id, vcpus=s.vcpus, memory_gb=s.memory_gb, monthly_usd=s.monthly_usd)
+        for s in sizes
+    ]
+
+
+@router.post("/provision", response_model=ProvisioningJobResponse, status_code=status.HTTP_202_ACCEPTED)
+async def provision_node(
+    payload: ProvisionRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(util.get_current_user),
+):
+    """Phase 5 step 2: kick off an auto-provision job. Returns 202 with
+    the new ProvisioningJob — the UI polls ``GET /provisioning-jobs/{id}``
+    until it reaches a terminal state (registered or failed). The actual
+    VM creation, prep-script run, and node registration happens in an
+    asyncio task spawned from this handler."""
+    user, org = _resolve_org(db, current_user)
+    cred = _load_owned_credential(db, payload.credential_id, current_user)
+
+    # Sanity-check the name early so a hostname like "my server" with a
+    # space doesn't propagate down to the SSH-and-bind-mount layer where
+    # the failure mode is way less obvious.
+    name = payload.name.strip()
+    if not name.replace("-", "").replace("_", "").isalnum():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Name must be alphanumeric (with hyphens/underscores allowed).",
+        )
+
+    job = ProvisioningJob(
+        org_id=org.id,
+        provider_credential_id=cred.id,
+        provider=cred.provider,
+        region=payload.region.strip(),
+        size=payload.size.strip(),
+        name=name,
+        status="queued",
+        created_by_user_id=user.id,
+    )
+    db.add(job)
+    db.flush()
+    audit_log.record_for_user(
+        db, current_user,
+        action="cloud_provider.node.provision",
+        entity_type="provisioning_job",
+        entity_id=job.id,
+        org_id=org.id,
+        request=request,
+        extra={
+            "provider": cred.provider,
+            "region": job.region,
+            "size": job.size,
+            "name": job.name,
+        },
+    )
+    db.commit()
+    db.refresh(job)
+
+    # Spawn the background worker. Fire-and-forget on the request loop.
+    provisioning_orchestrator.enqueue(job)
+    return job
+
+
+@router.get("/provisioning-jobs/{job_id}", response_model=ProvisioningJobResponse)
+async def get_provisioning_job(
+    job_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(util.get_current_user),
+):
+    """UI polls this every second or so. Org-scoped — no leaking jobs
+    across orgs."""
+    _user, org = _resolve_org(db, current_user)
+    job = (
+        db.query(ProvisioningJob)
+        .filter(ProvisioningJob.id == job_id, ProvisioningJob.org_id == org.id)
+        .first()
+    )
+    if not job:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Provisioning job not found.")
+    return job
+
+
+@router.get("/provisioning-jobs", response_model=List[ProvisioningJobResponse])
+async def list_provisioning_jobs(
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(util.get_current_user),
+):
+    """Recent provision history for the caller's org, newest first."""
+    _user, org = _resolve_org(db, current_user)
+    rows = (
+        db.query(ProvisioningJob)
+        .filter(ProvisioningJob.org_id == org.id)
+        .order_by(ProvisioningJob.created_at.desc())
+        .limit(50)
+        .all()
+    )
+    return rows
 
 
 @router.delete("/{cred_id}", status_code=status.HTTP_204_NO_CONTENT)
