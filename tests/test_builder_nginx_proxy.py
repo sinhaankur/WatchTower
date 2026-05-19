@@ -292,6 +292,184 @@ def test_deploy_to_one_node_skips_nginx_when_no_domains(project, node):
     assert not any("systemctl reload nginx" in c for c in cmds)
 
 
+# ---------------------------------------------------------------------------
+# TLS (Let's Encrypt via certbot --nginx)
+# ---------------------------------------------------------------------------
+
+
+def test_tls_is_attempted_after_nginx_reload(project, node, monkeypatch):
+    """Default-on: after the http-only nginx config is loaded, the
+    deploy should run certbot --nginx for each domain. This pins that
+    TLS is *attempted* — not whether it succeeds, since CI can't reach
+    real Let's Encrypt."""
+    monkeypatch.delenv("WATCHTOWER_TLS_DISABLE", raising=False)
+    monkeypatch.setenv("WATCHTOWER_LETSENCRYPT_EMAIL", "ops@example.com")
+
+    issued: list[str] = []
+
+    async def fake_ssh(_n, command, _append, prefix=""):
+        issued.append(command)
+        return True, ""
+
+    with patch.object(builder, "_ssh_run", side_effect=fake_ssh):
+        ok, _err = asyncio.run(_apply_nginx_proxy_on_node(
+            node, project, ["site.example.com"], lambda _l: None,
+        ))
+
+    assert ok is True
+    certbot_calls = [c for c in issued if "certbot" in c]
+    assert len(certbot_calls) == 1, f"expected one certbot call, got: {certbot_calls}"
+    cmd = certbot_calls[0]
+    # The whole point of --redirect is to also add the HTTP→HTTPS
+    # redirect block. Without it the site would serve HTTP and HTTPS
+    # side-by-side and the autonomous-mode probe (HTTP) would
+    # misleadingly stay green.
+    assert "--redirect" in cmd
+    assert "--non-interactive" in cmd
+    assert "--agree-tos" in cmd
+    assert "ops@example.com" in cmd
+    assert "site.example.com" in cmd
+
+
+def test_tls_skipped_when_disabled_via_env(project, node, monkeypatch):
+    """Operator escape hatch. Useful when fronting nginx with Cloudflare
+    proxy (orange-cloud) — TLS terminates at Cloudflare, no need for
+    Let's Encrypt on the origin."""
+    monkeypatch.setenv("WATCHTOWER_TLS_DISABLE", "true")
+    monkeypatch.setenv("WATCHTOWER_LETSENCRYPT_EMAIL", "ops@example.com")
+
+    issued: list[str] = []
+
+    async def fake_ssh(_n, command, _append, prefix=""):
+        issued.append(command)
+        return True, ""
+
+    with patch.object(builder, "_ssh_run", side_effect=fake_ssh):
+        asyncio.run(_apply_nginx_proxy_on_node(
+            node, project, ["site.example.com"], lambda _l: None,
+        ))
+
+    assert not any("certbot" in c for c in issued), (
+        f"TLS opt-out failed — certbot ran anyway: {issued}"
+    )
+
+
+def test_tls_skipped_when_no_email_resolvable(project, node, monkeypatch):
+    """No env email + no project owner email → skip with a clear log
+    line so the operator knows TLS didn't run and how to fix it."""
+    monkeypatch.delenv("WATCHTOWER_TLS_DISABLE", raising=False)
+    monkeypatch.delenv("WATCHTOWER_LETSENCRYPT_EMAIL", raising=False)
+    # The fixture's project has no .owner relationship populated.
+
+    captured: list[str] = []
+
+    async def fake_ssh(_n, command, append, prefix=""):
+        return True, ""
+
+    with patch.object(builder, "_ssh_run", side_effect=fake_ssh):
+        asyncio.run(_apply_nginx_proxy_on_node(
+            node, project, ["site.example.com"], captured.append,
+        ))
+
+    # The skip message must point the operator at the env var.
+    assert any("WATCHTOWER_LETSENCRYPT_EMAIL" in line for line in captured), (
+        f"Expected a skip message naming the env var; got: {captured}"
+    )
+
+
+def test_tls_certbot_failure_does_not_fail_deploy(project, node, monkeypatch):
+    """Most common failure: DNS not yet propagated when certbot runs.
+    The HTTP-01 challenge fails. The deploy MUST still succeed (the
+    container is already reachable; HTTP works; HTTPS is just delayed
+    until the next deploy after DNS propagates)."""
+    monkeypatch.setenv("WATCHTOWER_LETSENCRYPT_EMAIL", "ops@example.com")
+
+    captured: list[str] = []
+
+    async def fake_ssh(_n, command, _append, prefix=""):
+        if "certbot" in command:
+            return False, "Detail: DNS problem: NXDOMAIN looking up A for site.example.com"
+        return True, ""
+
+    with patch.object(builder, "_ssh_run", side_effect=fake_ssh):
+        ok, err = asyncio.run(_apply_nginx_proxy_on_node(
+            node, project, ["site.example.com"], captured.append,
+        ))
+
+    assert ok is True, f"certbot failure must not fail the deploy. err={err}"
+    assert err == ""
+    # And the log must tell the operator what happened + how to fix.
+    assert any("DNS" in line or "doesn't point" in line for line in captured), (
+        f"Expected an actionable failure message; got: {captured}"
+    )
+
+
+def test_tls_runs_per_domain_independently(project, node, monkeypatch):
+    """Multi-domain projects: one domain's DNS being unpropagated must
+    not block TLS issuance for the others."""
+    monkeypatch.setenv("WATCHTOWER_LETSENCRYPT_EMAIL", "ops@example.com")
+
+    certbot_attempts: list[str] = []
+
+    async def fake_ssh(_n, command, _append, prefix=""):
+        if "certbot" in command:
+            certbot_attempts.append(command)
+            # First domain fails (DNS), second succeeds.
+            if "good.example.com" in command:
+                return True, ""
+            return False, "DNS NXDOMAIN"
+        return True, ""
+
+    with patch.object(builder, "_ssh_run", side_effect=fake_ssh):
+        asyncio.run(_apply_nginx_proxy_on_node(
+            node, project, ["bad.example.com", "good.example.com"], lambda _l: None,
+        ))
+
+    # Both domains had certbot attempted — failure on bad didn't
+    # short-circuit good.
+    assert len(certbot_attempts) == 2
+    assert any("bad.example.com" in c for c in certbot_attempts)
+    assert any("good.example.com" in c for c in certbot_attempts)
+
+
+# ---------------------------------------------------------------------------
+# Cert-email resolver
+# ---------------------------------------------------------------------------
+
+
+# Use plain stubs for the resolver tests because SQLAlchemy guards
+# relationship-attribute assignment on managed Project rows — we'd
+# need a real User row to satisfy the back-population. Faster + clearer
+# to test the resolver directly against the contract it actually needs:
+# something with an .owner that may have an .email.
+
+class _StubOwner:
+    def __init__(self, email): self.email = email
+
+
+class _StubProject:
+    def __init__(self, owner=None): self.owner = owner
+
+
+def test_resolve_letsencrypt_email_prefers_env(monkeypatch):
+    monkeypatch.setenv("WATCHTOWER_LETSENCRYPT_EMAIL", "from-env@example.com")
+    # Even with an owner email present, env wins (operator's explicit override).
+    p = _StubProject(owner=_StubOwner("owner@example.com"))
+    assert builder._resolve_letsencrypt_email(p) == "from-env@example.com"
+
+
+def test_resolve_letsencrypt_email_falls_back_to_owner(monkeypatch):
+    monkeypatch.delenv("WATCHTOWER_LETSENCRYPT_EMAIL", raising=False)
+    p = _StubProject(owner=_StubOwner("owner@example.com"))
+    assert builder._resolve_letsencrypt_email(p) == "owner@example.com"
+
+
+def test_resolve_letsencrypt_email_returns_none_when_unset(monkeypatch):
+    monkeypatch.delenv("WATCHTOWER_LETSENCRYPT_EMAIL", raising=False)
+    p = _StubProject(owner=None)
+    assert builder._resolve_letsencrypt_email(p) is None
+
+
 def test_deploy_to_one_node_runs_nginx_when_domains_present(project, node):
     """With CustomDomain rows, the deploy must reach the nginx step
     after the container is healthy."""

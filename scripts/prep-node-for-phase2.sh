@@ -67,7 +67,8 @@ warn() { echo -e "${YELLOW}-->${NC} $*"; }
 step "Installing packages (podman, nginx, rsync, curl, jq)…"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
-apt-get install -y -qq podman nginx rsync curl jq ca-certificates
+apt-get install -y -qq podman nginx rsync curl jq ca-certificates \
+  certbot python3-certbot-nginx
 
 # Verify Podman actually works post-install. The apt package on some
 # minimal images installs but fails on first run with a missing
@@ -120,6 +121,12 @@ deploy ALL=(root) NOPASSWD: /usr/bin/tee /etc/nginx/sites-available/wt-*.conf
 deploy ALL=(root) NOPASSWD: /bin/ln -sf /etc/nginx/sites-available/wt-*.conf /etc/nginx/sites-enabled/wt-*.conf
 deploy ALL=(root) NOPASSWD: /bin/rm -f /etc/nginx/sites-enabled/wt-*.conf
 deploy ALL=(root) NOPASSWD: /usr/bin/rm -f /etc/nginx/sites-enabled/wt-*.conf
+
+# Phase 2 TLS: certbot acquires + renews Let's Encrypt certs. The
+# binary itself enforces what it will and won't do (only touches
+# /etc/letsencrypt and /etc/nginx); bare-binary NOPASSWD is the
+# standard recipe per the certbot docs.
+deploy ALL=(root) NOPASSWD: /usr/bin/certbot
 EOF
 chmod 0440 "$SUDOERS"
 # Validate before exiting — a broken sudoers locks everyone out of sudo.

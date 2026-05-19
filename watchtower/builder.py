@@ -750,7 +750,87 @@ async def _apply_nginx_proxy_on_node(
         return False, f"nginx reload failed: {err}"
 
     append(f"{prefix}✓ nginx fronting :{port} as {' / '.join(cleaned)}")
+
+    # ── TLS acquisition via Let's Encrypt (best-effort) ─────────────────
+    # Default-on; skip when WATCHTOWER_TLS_DISABLE=true. Failure here is
+    # NOT a deploy failure — the site is already reachable on HTTP, and
+    # the most common cause (DNS not yet propagated to the new node) is
+    # operator-time-dependent, not a code issue. Log loudly, move on,
+    # let the operator re-deploy once DNS lands.
+    if os.getenv("WATCHTOWER_TLS_DISABLE", "false").lower() != "true":
+        await _acquire_tls_certs_on_node(node, project, cleaned, append, prefix=prefix)
+
     return True, ""
+
+
+def _resolve_letsencrypt_email(project: Project) -> Optional[str]:
+    """Cert-owner email for Let's Encrypt. Priority:
+      1. WATCHTOWER_LETSENCRYPT_EMAIL env (operator-set, applies to all
+         deploys on this WatchTower install)
+      2. The project owner's User.email (per-project fallback)
+      3. None → cert acquisition skipped with a clear warning
+
+    No new DB column needed for v1 — env var + owner email covers every
+    single-operator install and most team installs.
+    """
+    env_email = os.getenv("WATCHTOWER_LETSENCRYPT_EMAIL", "").strip()
+    if env_email:
+        return env_email
+    owner = getattr(project, "owner", None)
+    if owner and getattr(owner, "email", None):
+        return owner.email
+    return None
+
+
+async def _acquire_tls_certs_on_node(
+    node: OrgNode,
+    project: Project,
+    domains: list[str],
+    append: Callable[[str], None],
+    prefix: str = "",
+) -> None:
+    """Run ``certbot --nginx`` for each domain to get a Let's Encrypt
+    cert and rewrite the nginx config to add ``listen 443 ssl`` plus an
+    HTTP→HTTPS redirect. Certbot's nginx plugin handles the config
+    rewrite + reload itself.
+
+    Best-effort by design — see caller's docstring. Each domain is
+    attempted independently so one DNS-unpropagated hostname doesn't
+    block TLS on the others. Renewal is handled by the certbot systemd
+    timer that the certbot package ships with on Ubuntu (the cron is
+    automatic; no extra wiring needed).
+    """
+    email = _resolve_letsencrypt_email(project)
+    if not email:
+        append(
+            f"{prefix}⚠ TLS skipped — set WATCHTOWER_LETSENCRYPT_EMAIL env or "
+            "give the project owner an email. Site stays HTTP-only."
+        )
+        return
+
+    for domain in domains:
+        # --non-interactive + --agree-tos + --email is required for
+        # unattended issuance. --redirect adds the http→https redirect
+        # block (otherwise port 80 stays serving content alongside :443,
+        # which the autonomous-mode probe currently tests).
+        cmd = (
+            f"sudo certbot --nginx --non-interactive --agree-tos "
+            f"--email {shlex.quote(email)} --redirect "
+            f"-d {shlex.quote(domain)}"
+        )
+        append(f"{prefix}Acquiring Let's Encrypt cert for {domain} …")
+        ok, err = await _ssh_run(node, cmd, append, prefix=prefix)
+        if ok:
+            append(f"{prefix}✓ TLS active for {domain}")
+        else:
+            # Most common cause: DNS hasn't propagated yet so the
+            # HTTP-01 challenge fails. Surface that explicitly so the
+            # operator doesn't go on a goose chase.
+            append(
+                f"{prefix}⚠ certbot failed for {domain} — site still HTTP-only. "
+                f"Most common cause: DNS for {domain} doesn't point at this node yet. "
+                f"Wait for DNS, then re-deploy. Error tail: {err[-300:] if err else '(none)'}"
+            )
 
 
 def _pick_dns_target_node(nodes: list[OrgNode]) -> Optional[OrgNode]:
