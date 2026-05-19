@@ -227,6 +227,58 @@ READ_TOOL_SCHEMAS: list[dict[str, Any]] = [
             "additionalProperties": False,
         },
     },
+    {
+        "name": "list_cloud_provider_regions",
+        "description": (
+            "List the regions/datacenters available under a saved cloud provider "
+            "credential (DigitalOcean or Hetzner). Call this before provision_node "
+            "so you can pick a valid region id."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {"credential_id": {"type": "string"}},
+            "required": ["credential_id"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "list_cloud_provider_sizes",
+        "description": (
+            "List the VM sizes offered in the given region for a saved cloud "
+            "provider credential. Returns id, vcpus, memory_gb, and monthly_usd "
+            "(when the provider reports it) sorted cheapest-first."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "credential_id": {"type": "string"},
+                "region": {"type": "string"},
+            },
+            "required": ["credential_id", "region"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "get_provisioning_job",
+        "description": (
+            "Poll the status of an in-flight or completed provision job. Returns "
+            "the current state-machine status, any error, the assigned public IP "
+            "once the VM is ready, and node_id once registered."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {"job_id": {"type": "string"}},
+            "required": ["job_id"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "list_provisioning_jobs",
+        "description": (
+            "List recent provision jobs for the caller's organization, newest first."
+        ),
+        "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
+    },
 ]
 
 WRITE_TOOL_SCHEMAS: list[dict[str, Any]] = [
@@ -315,6 +367,26 @@ WRITE_TOOL_SCHEMAS: list[dict[str, Any]] = [
                 "proxied": {"type": "boolean", "default": False, "description": "Cloudflare orange-cloud proxy. Phase 3 defaults to false."},
             },
             "required": ["project_id", "domain_id", "credential_id", "target_ip"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "provision_node",
+        "description": (
+            "Phase 5: create a fresh VM on DigitalOcean or Hetzner using a saved "
+            "credential, install Podman+nginx, and register it as a deploy node. "
+            "Returns the ProvisioningJob — poll with get_provisioning_job until "
+            "status='registered' (success) or 'failed'."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "credential_id": {"type": "string", "description": "From list_cloud_provider_credentials."},
+                "name": {"type": "string", "description": "Hostname-safe name (alphanumeric + hyphen/underscore)."},
+                "region": {"type": "string", "description": "From list_cloud_provider_regions."},
+                "size": {"type": "string", "description": "From list_cloud_provider_sizes."},
+            },
+            "required": ["credential_id", "name", "region", "size"],
             "additionalProperties": False,
         },
     },
@@ -424,6 +496,36 @@ def _tool_get_autonomous_status(client: ApiClient, args: dict[str, Any]) -> str:
     return _ok(client.get(f"/api/projects/{args['project_id']}/autonomous-status"))
 
 
+def _tool_list_cloud_provider_regions(client: ApiClient, args: dict[str, Any]) -> str:
+    return _ok(client.get(f"/api/integrations/cloud-providers/{args['credential_id']}/regions"))
+
+
+def _tool_list_cloud_provider_sizes(client: ApiClient, args: dict[str, Any]) -> str:
+    import urllib.parse
+    region = urllib.parse.quote(args["region"], safe="")
+    return _ok(client.get(f"/api/integrations/cloud-providers/{args['credential_id']}/sizes?region={region}"))
+
+
+def _tool_get_provisioning_job(client: ApiClient, args: dict[str, Any]) -> str:
+    return _ok(client.get(f"/api/integrations/cloud-providers/provisioning-jobs/{args['job_id']}"))
+
+
+def _tool_list_provisioning_jobs(client: ApiClient, args: dict[str, Any]) -> str:
+    return _ok(client.get("/api/integrations/cloud-providers/provisioning-jobs"))
+
+
+def _tool_provision_node(client: ApiClient, args: dict[str, Any]) -> str:
+    return _ok(client.post(
+        "/api/integrations/cloud-providers/provision",
+        json_body={
+            "credential_id": args["credential_id"],
+            "name": args["name"],
+            "region": args["region"],
+            "size": args["size"],
+        },
+    ))
+
+
 def _tool_add_custom_domain(client: ApiClient, args: dict[str, Any]) -> str:
     return _ok(client.post(
         f"/api/projects/{args['project_id']}/domains",
@@ -452,11 +554,16 @@ TOOL_DISPATCH: dict[str, Callable[[ApiClient, dict[str, Any]], str]] = {
     "list_domains": _tool_list_domains,
     "list_cloudflare_credentials": _tool_list_cloudflare_credentials,
     "get_autonomous_status": _tool_get_autonomous_status,
+    "list_cloud_provider_regions": _tool_list_cloud_provider_regions,
+    "list_cloud_provider_sizes": _tool_list_cloud_provider_sizes,
+    "get_provisioning_job": _tool_get_provisioning_job,
+    "list_provisioning_jobs": _tool_list_provisioning_jobs,
     "trigger_deployment": _tool_trigger_deployment,
     "set_run_as_container": _tool_set_run_as_container,
     "add_custom_domain": _tool_add_custom_domain,
     "sync_domain_dns": _tool_sync_domain_dns,
     "set_autonomous_mode": _tool_set_autonomous_mode,
+    "provision_node": _tool_provision_node,
 }
 
 

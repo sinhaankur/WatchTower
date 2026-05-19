@@ -195,6 +195,84 @@ def test_get_autonomous_status_is_a_read_tool(monkeypatch):
     client.get.assert_called_once_with("/api/projects/p1/autonomous-status")
 
 
+def test_list_cloud_provider_regions_dispatches(monkeypatch):
+    """Regions listing is read-only — must be available in readonly mode
+    so an operator can ask Claude 'what regions can I deploy to?' without
+    granting write access."""
+    monkeypatch.setenv("WATCHTOWER_AGENT_READONLY", "true")
+    names = {t["name"] for t in list_tool_schemas()}
+    assert "list_cloud_provider_regions" in names
+
+    client = MagicMock()
+    client.get.return_value = [{"id": "nyc3", "name": "New York 3"}]
+    dispatch_tool(client, "list_cloud_provider_regions", {"credential_id": "cred-1"})
+    client.get.assert_called_once_with("/api/integrations/cloud-providers/cred-1/regions")
+
+
+def test_list_cloud_provider_sizes_url_encodes_region(monkeypatch):
+    monkeypatch.setenv("WATCHTOWER_AGENT_READONLY", "true")
+    client = MagicMock()
+    client.get.return_value = []
+    dispatch_tool(client, "list_cloud_provider_sizes", {
+        "credential_id": "cred-1",
+        "region": "weird region/with slash",  # adversarial — verify quoting
+    })
+    called_path = client.get.call_args.args[0]
+    # The region MUST be URL-encoded — a raw '/' would route to a
+    # different endpoint and silently return wrong results.
+    assert "weird%20region%2Fwith%20slash" in called_path
+    assert called_path.startswith("/api/integrations/cloud-providers/cred-1/sizes?region=")
+
+
+def test_provision_node_posts_full_payload():
+    """Write-only tool: assemble the exact JSON shape the API expects."""
+    client = MagicMock()
+    client.post.return_value = {"id": "job-1", "status": "queued"}
+    dispatch_tool(client, "provision_node", {
+        "credential_id": "cred-1",
+        "name": "my-node",
+        "region": "nyc3",
+        "size": "s-1vcpu-1gb",
+    })
+    client.post.assert_called_once_with(
+        "/api/integrations/cloud-providers/provision",
+        json_body={
+            "credential_id": "cred-1",
+            "name": "my-node",
+            "region": "nyc3",
+            "size": "s-1vcpu-1gb",
+        },
+    )
+
+
+def test_provision_node_is_blocked_in_readonly_mode(monkeypatch):
+    """Sanity: provisioning a VM is a write — must not be reachable when
+    WATCHTOWER_AGENT_READONLY=true (defence-in-depth, since the schema
+    is also stripped from list_tools)."""
+    monkeypatch.setenv("WATCHTOWER_AGENT_READONLY", "true")
+    names = {t["name"] for t in list_tool_schemas()}
+    assert "provision_node" not in names
+
+    client = MagicMock()
+    result = json.loads(dispatch_tool(client, "provision_node", {
+        "credential_id": "c", "name": "n", "region": "r", "size": "s",
+    }))
+    assert "error" in result
+    client.post.assert_not_called()
+
+
+def test_get_provisioning_job_is_a_read_tool(monkeypatch):
+    monkeypatch.setenv("WATCHTOWER_AGENT_READONLY", "true")
+    names = {t["name"] for t in list_tool_schemas()}
+    assert "get_provisioning_job" in names
+    assert "list_provisioning_jobs" in names
+
+    client = MagicMock()
+    client.get.return_value = {"id": "j", "status": "registered"}
+    dispatch_tool(client, "get_provisioning_job", {"job_id": "j"})
+    client.get.assert_called_once_with("/api/integrations/cloud-providers/provisioning-jobs/j")
+
+
 def test_sync_domain_dns_assembles_cloudflare_payload():
     client = MagicMock()
     client.post.return_value = {"domain": "x.example.com", "cloudflare_target_ip": "1.2.3.4"}

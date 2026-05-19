@@ -7,6 +7,7 @@ import EmptyState from '@/components/EmptyState';
 import { Label } from '@/components/ui/label';
 import { StatusPill, nodeStatusTone } from '@/components/ui/status-pill';
 import { useMe } from '@/hooks/queries';
+import { ProvisionNodeWizard } from '@/components/ProvisionNodeWizard';
 
 type OrgNode = {
   id: string;
@@ -69,6 +70,7 @@ const Servers = () => {
   const [addingNode, setAddingNode] = useState(false);
   const [offlineMode, setOffline]   = useState(false);
   const [showForm, setShowForm]     = useState(false);
+  const [showProvision, setShowProvision] = useState(false);
   const [search, setSearch]         = useState('');
   const [filterStatus, setFilter]   = useState<string>('all');
 
@@ -210,12 +212,22 @@ const Servers = () => {
               Sign in to add servers
             </Link>
           ) : (
-            <button
-              onClick={() => setShowForm((v) => !v)}
-              className="px-4 py-1.5 rounded-lg bg-red-700 hover:bg-red-800 text-white text-sm font-medium transition-colors border border-slate-800 shadow-[2px_2px_0_0_#1f2937]"
-            >
-              {showForm ? 'Cancel' : '+ Add Server'}
-            </button>
+            <>
+              <button
+                onClick={() => { setShowProvision((v) => !v); setShowForm(false); }}
+                className="px-4 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-sm font-medium transition-colors border border-slate-800 shadow-[2px_2px_0_0_#1f2937]"
+                title="Auto-provision a fresh VM on DigitalOcean or Hetzner"
+              >
+                {showProvision ? 'Cancel' : '✨ Provision Server'}
+              </button>
+              <button
+                onClick={() => { setShowForm((v) => !v); setShowProvision(false); }}
+                className="px-4 py-1.5 rounded-lg bg-red-700 hover:bg-red-800 text-white text-sm font-medium transition-colors border border-slate-800 shadow-[2px_2px_0_0_#1f2937]"
+                title="Manually register an existing server you've already set up"
+              >
+                {showForm ? 'Cancel' : '+ Add Server'}
+              </button>
+            </>
           )}
         </div>
       </header>
@@ -251,6 +263,20 @@ const Servers = () => {
           }`}>
             {actionMsg.text}
           </div>
+        )}
+
+        {/* Provision wizard — Phase 5: auto-create a fresh VM on DO / Hetzner */}
+        {showProvision && (
+          <ProvisionNodeWizard
+            onClose={() => setShowProvision(false)}
+            onRegistered={() => {
+              // Don't tear down the wizard — let the user see the success
+              // state; just refresh the node list so the new entry appears
+              // below.
+              if (orgId) void refreshNodes(orgId);
+              showMsg('success', 'New server provisioned and registered.');
+            }}
+          />
         )}
 
         {/* Add server form */}
