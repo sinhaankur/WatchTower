@@ -2686,3 +2686,86 @@ async def backup_status(
         "ready_for_backup": secret_key_exists or db_file_exists,
         "can_export": _user_can_manage_org_secrets(db, current_user),
     }
+
+
+# ── System resource metrics ───────────────────────────────────────────────────
+
+def _read_proc_meminfo() -> dict[str, int]:
+    """Parse /proc/meminfo into a kB dict. Linux only."""
+    result: dict[str, int] = {}
+    try:
+        with open("/proc/meminfo") as f:
+            for line in f:
+                parts = line.split()
+                if len(parts) >= 2:
+                    key = parts[0].rstrip(":")
+                    result[key] = int(parts[1])
+    except OSError:
+        pass
+    return result
+
+
+def _process_rss_kb() -> int:
+    """Return this process's RSS in kB via /proc/self/status (Linux) or 0."""
+    try:
+        with open("/proc/self/status") as f:
+            for line in f:
+                if line.startswith("VmRSS:"):
+                    return int(line.split()[1])
+    except OSError:
+        pass
+    # macOS / Windows fallback via resource module (returns bytes)
+    try:
+        import resource as _resource
+        usage = _resource.getrusage(_resource.RUSAGE_SELF)
+        rss = usage.ru_maxrss
+        # macOS reports bytes; Linux reports kB (but we're in the fallback here)
+        import platform
+        if platform.system() == "Darwin":
+            return rss // 1024
+        return rss
+    except Exception:
+        return 0
+
+
+@router.get("/metrics/system")
+async def system_metrics(_current_user: dict = Depends(util.get_current_user)):
+    """Live RAM and process memory usage for the host running the API."""
+    mi = _read_proc_meminfo()
+
+    total_kb = mi.get("MemTotal", 0)
+    available_kb = mi.get("MemAvailable", 0)
+    free_kb = mi.get("MemFree", 0)
+    buffers_kb = mi.get("Buffers", 0)
+    cached_kb = mi.get("Cached", 0) + mi.get("SReclaimable", 0) - mi.get("Shmem", 0)
+    used_kb = total_kb - available_kb
+    swap_total_kb = mi.get("SwapTotal", 0)
+    swap_free_kb = mi.get("SwapFree", 0)
+    swap_used_kb = swap_total_kb - swap_free_kb
+
+    process_rss_kb = _process_rss_kb()
+
+    def kb_to_mb(kb: int) -> float:
+        return round(kb / 1024, 1)
+
+    return {
+        "ram": {
+            "total_mb": kb_to_mb(total_kb),
+            "used_mb": kb_to_mb(used_kb),
+            "available_mb": kb_to_mb(available_kb),
+            "free_mb": kb_to_mb(free_kb),
+            "buffers_mb": kb_to_mb(buffers_kb),
+            "cached_mb": kb_to_mb(max(0, cached_kb)),
+            "percent_used": round(used_kb / total_kb * 100, 1) if total_kb else 0,
+        },
+        "swap": {
+            "total_mb": kb_to_mb(swap_total_kb),
+            "used_mb": kb_to_mb(swap_used_kb),
+            "free_mb": kb_to_mb(swap_free_kb),
+            "percent_used": round(swap_used_kb / swap_total_kb * 100, 1) if swap_total_kb else 0,
+        },
+        "process": {
+            "rss_mb": kb_to_mb(process_rss_kb),
+            "label": "WatchTower API",
+        },
+    }

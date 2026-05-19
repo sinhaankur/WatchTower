@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import apiClient from '@/lib/api';
 import useCountUp from '@/hooks/useCountUp';
+import SystemResourceMonitor from '@/components/SystemResourceMonitor';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type LocalProject = {
@@ -616,6 +617,9 @@ const Dashboard = () => {
             </div>
           )}
         </div>
+
+        {/* System memory */}
+        <SystemResourceMonitor />
 
         {/* Getting started */}
         <div className="rounded-xl border border-border bg-card p-5">
