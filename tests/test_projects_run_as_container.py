@@ -73,3 +73,37 @@ def test_update_with_same_value_writes_no_audit_row(client: TestClient, db_sessi
         .all()
     )
     assert rows == []
+
+
+def test_autonomous_mode_requires_run_as_container(client: TestClient):
+    """Phase 4 is gated on Phase 1. Trying to enable autonomous_mode on
+    a project where run_as_container=False must 400 with an actionable
+    message — the alternative is a silent no-op, since the tick can't
+    probe a container that doesn't exist."""
+    proj = _create(client, "auto-no-container", run_as_container=False)
+    r = client.put(f"/api/projects/{proj['id']}", json={"autonomous_mode": True})
+    assert r.status_code == 400
+    assert "run_as_container" in r.json()["detail"]
+
+
+def test_autonomous_mode_toggle_succeeds_when_container_enabled(client: TestClient):
+    """Happy path: with run_as_container already on, the autonomous_mode
+    toggle round-trips."""
+    proj = _create(client, "auto-with-container", run_as_container=True, recommended_port=8090)
+    r = client.put(f"/api/projects/{proj['id']}", json={"autonomous_mode": True})
+    assert r.status_code == 200, r.text
+    assert r.json()["autonomous_mode"] is True
+
+
+def test_autonomous_status_endpoint_returns_shape(client: TestClient):
+    """The status endpoint is the operator's window into the live tick
+    state. Pin the response shape — the UI's AutonomousModeCard depends
+    on these fields."""
+    proj = _create(client, "auto-status", run_as_container=True, recommended_port=8091)
+    r = client.get(f"/api/projects/{proj['id']}/autonomous-status")
+    assert r.status_code == 200
+    body = r.json()
+    assert set(body.keys()) >= {"enabled", "run_as_container", "entries"}
+    # Fresh project, autonomous off → no entries yet.
+    assert body["enabled"] is False
+    assert body["entries"] == []

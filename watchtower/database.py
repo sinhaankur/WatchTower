@@ -231,6 +231,12 @@ class Project(Base):
     # serve the rsync'd files. Default False keeps existing projects on
     # the legacy rsync+reload_command path until they opt in.
     run_as_container = Column(Boolean, default=False, nullable=False)
+    # Phase 4: when True, the API process probes this project's container
+    # every WATCHTOWER_AUTONOMOUS_INTERVAL_SECS, restarts it on transient
+    # failure, and rolls back to the previous LIVE deployment if restarts
+    # don't recover. No-op without run_as_container — the probe needs the
+    # canonical bound port to be present.
+    autonomous_mode = Column(Boolean, default=False, nullable=False)
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=_utcnow)
     updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)

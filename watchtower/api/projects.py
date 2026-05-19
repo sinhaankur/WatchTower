@@ -88,6 +88,7 @@ async def create_project(
             webhook_secret=webhook_secret,
             recommended_port=project_data.recommended_port,
             run_as_container=project_data.run_as_container,
+            autonomous_mode=project_data.autonomous_mode,
             org_id=org.id,
             owner_id=user_id
         )
@@ -138,14 +139,43 @@ async def get_project(
         Project.id == project_id,
         Project.owner_id == user_id
     ).first()
-    
+
     if not project:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Project not found"
         )
-    
+
     return project
+
+
+@router.get("/{project_id}/autonomous-status")
+async def get_autonomous_status(
+    project_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(util.get_current_user),
+):
+    """Phase 4: live view of the autonomous-mode probe state for this
+    project. The state lives in-memory in the API process — restarting
+    the API resets the counters (which is intentional; see autonomous.py).
+    Returns ``{enabled, entries: [...]}``; entries is empty when the
+    tick hasn't run for this project yet, or autonomous mode is off.
+    """
+    user_id = util.canonical_user_id(db, current_user)
+    project = db.query(Project).filter(
+        Project.id == project_id,
+        Project.owner_id == user_id,
+    ).first()
+    if not project:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
+    from watchtower import autonomous
+    all_state = autonomous.snapshot_state()
+    entries = [e for e in all_state if e["project_id"] == str(project.id)]
+    return {
+        "enabled": bool(project.autonomous_mode),
+        "run_as_container": bool(project.run_as_container),
+        "entries": entries,
+    }
 
 
 @router.put("/{project_id}", response_model=schemas.ProjectResponse)
@@ -193,6 +223,21 @@ async def update_project(
     if project_data.run_as_container is not None and project_data.run_as_container != project.run_as_container:
         changes["run_as_container"] = {"from": project.run_as_container, "to": project_data.run_as_container}
         project.run_as_container = project_data.run_as_container
+    if project_data.autonomous_mode is not None and project_data.autonomous_mode != project.autonomous_mode:
+        # Phase 4 is gated on Phase 1 — enabling without run_as_container would
+        # be a silent no-op (the tick would find no container to probe). Fail
+        # the request explicitly so the operator fixes the root cause.
+        if project_data.autonomous_mode and not (
+            project_data.run_as_container
+            if project_data.run_as_container is not None
+            else project.run_as_container
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="autonomous_mode requires run_as_container=True — enable that first.",
+            )
+        changes["autonomous_mode"] = {"from": project.autonomous_mode, "to": project_data.autonomous_mode}
+        project.autonomous_mode = project_data.autonomous_mode
 
     if changes:
         audit_log.record_for_user(

@@ -246,7 +246,25 @@ async def lifespan(_app: FastAPI):
             "Any request with any Bearer token is accepted. "
             "Do NOT expose this server outside localhost."
         )
+    # Phase 4: autonomous-mode probe scheduler. Opt-in per-project; the
+    # tick is cheap when no project has the flag set (a single SQL query
+    # returning zero rows). WATCHTOWER_AUTONOMOUS_DISABLE=true lets a
+    # test harness or a debugger session skip the scheduler entirely.
+    if os.getenv("WATCHTOWER_AUTONOMOUS_DISABLE", "false").lower() != "true":
+        try:
+            from watchtower.autonomous import start_scheduler, stop_scheduler
+            start_scheduler()
+        except Exception:
+            logger.exception("autonomous: scheduler failed to start — continuing without it")
+            stop_scheduler = None  # type: ignore[assignment]
+    else:
+        stop_scheduler = None  # type: ignore[assignment]
     yield
+    if stop_scheduler is not None:
+        try:
+            stop_scheduler()
+        except Exception:
+            logger.exception("autonomous: scheduler failed to stop cleanly")
     logger.info("Shutting down WatchTower API")
 
 

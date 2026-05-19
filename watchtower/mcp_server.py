@@ -213,6 +213,20 @@ READ_TOOL_SCHEMAS: list[dict[str, Any]] = [
         "description": "List Cloudflare credentials configured for the caller's organization. Returns the credential_id you'll need for sync_domain_dns.",
         "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
     },
+    {
+        "name": "get_autonomous_status",
+        "description": (
+            "Inspect the live in-memory probe state for a project — consecutive "
+            "failures per (project, node) pair, last probe time, quarantine status. "
+            "Use after enabling autonomous mode to confirm the tick is running."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {"project_id": {"type": "string"}},
+            "required": ["project_id"],
+            "additionalProperties": False,
+        },
+    },
 ]
 
 WRITE_TOOL_SCHEMAS: list[dict[str, Any]] = [
@@ -238,6 +252,24 @@ WRITE_TOOL_SCHEMAS: list[dict[str, Any]] = [
             "Toggle Phase 1 of autonomous deploy — when enabled, future deploys wrap "
             "the artifact in a Podman container on the remote (nginx:alpine for static "
             "sites). Requires the project to have a recommended_port set."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "project_id": {"type": "string"},
+                "enabled": {"type": "boolean"},
+            },
+            "required": ["project_id", "enabled"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "set_autonomous_mode",
+        "description": (
+            "Toggle Phase 4 — when enabled, the WatchTower API probes the project's "
+            "container every minute, restarts on transient failure, and auto-rolls "
+            "back to the previous LIVE deployment after 3 consecutive probe failures. "
+            "Requires run_as_container=True; the API rejects the toggle otherwise."
         ),
         "inputSchema": {
             "type": "object",
@@ -381,6 +413,17 @@ def _tool_set_run_as_container(client: ApiClient, args: dict[str, Any]) -> str:
     ))
 
 
+def _tool_set_autonomous_mode(client: ApiClient, args: dict[str, Any]) -> str:
+    return _ok(client.put(
+        f"/api/projects/{args['project_id']}",
+        json_body={"autonomous_mode": bool(args["enabled"])},
+    ))
+
+
+def _tool_get_autonomous_status(client: ApiClient, args: dict[str, Any]) -> str:
+    return _ok(client.get(f"/api/projects/{args['project_id']}/autonomous-status"))
+
+
 def _tool_add_custom_domain(client: ApiClient, args: dict[str, Any]) -> str:
     return _ok(client.post(
         f"/api/projects/{args['project_id']}/domains",
@@ -408,10 +451,12 @@ TOOL_DISPATCH: dict[str, Callable[[ApiClient, dict[str, Any]], str]] = {
     "list_nodes": _tool_list_nodes,
     "list_domains": _tool_list_domains,
     "list_cloudflare_credentials": _tool_list_cloudflare_credentials,
+    "get_autonomous_status": _tool_get_autonomous_status,
     "trigger_deployment": _tool_trigger_deployment,
     "set_run_as_container": _tool_set_run_as_container,
     "add_custom_domain": _tool_add_custom_domain,
     "sync_domain_dns": _tool_sync_domain_dns,
+    "set_autonomous_mode": _tool_set_autonomous_mode,
 }
 
 

@@ -111,6 +111,11 @@ class ProjectBase(BaseModel):
     # container on the remote (nginx:alpine for static sites). Off by
     # default — opt in per project from the UI / API.
     run_as_container: bool = False
+    # Phase 4: when on, the API background scheduler probes this
+    # project's container every minute, restarts it on transient
+    # failure, and auto-rolls back to the previous LIVE deployment on
+    # repeated failure. Requires run_as_container.
+    autonomous_mode: bool = False
 
 
 class ProjectCreate(ProjectBase):
@@ -124,6 +129,7 @@ class ProjectUpdate(BaseModel):
     is_active: Optional[bool] = None
     recommended_port: Optional[int] = None
     run_as_container: Optional[bool] = None
+    autonomous_mode: Optional[bool] = None
 
 
 class ProjectResponse(ProjectBase):

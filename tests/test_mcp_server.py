@@ -169,6 +169,32 @@ def test_add_custom_domain_posts_to_domains_endpoint():
     )
 
 
+def test_set_autonomous_mode_puts_boolean():
+    """Phase 4 toggle dispatches the same shape as set_run_as_container.
+    The API enforces the cross-field rule (requires run_as_container) so
+    the MCP layer can stay dumb here."""
+    client = MagicMock()
+    client.put.return_value = {"id": "p1", "autonomous_mode": True}
+    dispatch_tool(client, "set_autonomous_mode", {"project_id": "p1", "enabled": True})
+    client.put.assert_called_once_with(
+        "/api/projects/p1",
+        json_body={"autonomous_mode": True},
+    )
+
+
+def test_get_autonomous_status_is_a_read_tool(monkeypatch):
+    """Inspecting the probe state must work even in readonly mode —
+    that's the operator's only window into what the tick is doing."""
+    monkeypatch.setenv("WATCHTOWER_AGENT_READONLY", "true")
+    names = {t["name"] for t in list_tool_schemas()}
+    assert "get_autonomous_status" in names
+
+    client = MagicMock()
+    client.get.return_value = {"enabled": True, "entries": []}
+    dispatch_tool(client, "get_autonomous_status", {"project_id": "p1"})
+    client.get.assert_called_once_with("/api/projects/p1/autonomous-status")
+
+
 def test_sync_domain_dns_assembles_cloudflare_payload():
     client = MagicMock()
     client.post.return_value = {"domain": "x.example.com", "cloudflare_target_ip": "1.2.3.4"}

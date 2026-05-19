@@ -26,6 +26,7 @@ type Project = {
   build_command: string | null;
   recommended_port: number | null;
   run_as_container: boolean;
+  autonomous_mode: boolean;
   created_at: string;
 };
 
@@ -440,6 +441,8 @@ function OverviewTab({ project }: { project: Project }) {
 
       <RunAsContainerCard project={project} />
 
+      <AutonomousModeCard project={project} />
+
       <div className="rounded-xl border border-border bg-card overflow-hidden">
         <div className="px-5 py-4 border-b border-border bg-muted/30">
           <h2 className="text-sm font-semibold">GitHub Webhook URL</h2>
@@ -624,6 +627,165 @@ function RunAsContainerCard({ project }: { project: Project }) {
           <button
             onClick={toggle}
             disabled={busy || (!enabled && portMissing)}
+            className={`text-xs px-3 py-1.5 rounded transition-colors disabled:opacity-50 ${
+              enabled
+                ? 'border border-border hover:bg-muted'
+                : 'bg-blue-600 text-white hover:bg-blue-700'
+            }`}
+          >
+            {busy ? 'Saving…' : enabled ? 'Disable' : 'Enable'}
+          </button>
+          <span className="text-xs text-muted-foreground">
+            {enabled ? 'Enabled' : 'Disabled'}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── AutonomousModeCard ────────────────────────────────────────────────────────
+// Phase 4 toggle. Gated on run_as_container — autonomous mode probes the
+// Phase 1 container, and without one there's nothing to probe. We block
+// the enable button rather than letting the API 400 us back so the
+// failure mode shows up before the click, not after.
+
+type AutonomousStatusEntry = {
+  project_id: string;
+  node_id: string;
+  consecutive_failures: number;
+  last_probe_at: number;
+  last_action_at: number;
+  quarantined: boolean;
+  quarantined_until: number | null;
+};
+
+type AutonomousStatusResponse = {
+  enabled: boolean;
+  run_as_container: boolean;
+  entries: AutonomousStatusEntry[];
+};
+
+function AutonomousModeCard({ project }: { project: Project }) {
+  const [enabled, setEnabled] = useState<boolean>(project.autonomous_mode);
+  const [status, setStatus] = useState<AutonomousStatusResponse | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Phase 4 only makes sense on top of Phase 1.
+  const containerOff = !project.run_as_container;
+
+  const loadStatus = async () => {
+    try {
+      const resp = await apiClient.get<AutonomousStatusResponse>(
+        `/projects/${project.id}/autonomous-status`,
+      );
+      setStatus(resp.data);
+    } catch {
+      setStatus(null);
+    }
+  };
+
+  useEffect(() => {
+    if (!enabled) return;
+    // Poll every 10s while the user has the card open — gives near-live
+    // feedback when autonomous mode is doing something. Tab away and
+    // the polling pauses (browser throttles setTimeout/setInterval on
+    // hidden tabs), so it's not aggressive in practice.
+    void loadStatus();
+    const handle = window.setInterval(() => { void loadStatus(); }, 10_000);
+    return () => window.clearInterval(handle);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [enabled, project.id]);
+
+  const toggle = async () => {
+    const next = !enabled;
+    setBusy(true);
+    setError(null);
+    try {
+      const resp = await apiClient.put(`/projects/${project.id}`, {
+        autonomous_mode: next,
+      });
+      setEnabled(Boolean(resp.data?.autonomous_mode));
+    } catch (err) {
+      setError(extractDetail(err, 'Failed to update setting'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // Surface the worst-state entry (highest failure count, or quarantined)
+  // as the headline. Per-node detail lives below.
+  const headline = (() => {
+    if (!enabled) return null;
+    if (!status || status.entries.length === 0) {
+      return { tone: 'idle', text: 'No probe data yet — first tick lands within a minute of enabling.' };
+    }
+    const quarantined = status.entries.find((e) => e.quarantined);
+    if (quarantined) return { tone: 'rollback', text: 'Auto-rollback fired — project quarantined while the new build deploys.' };
+    const worst = status.entries.reduce((acc, e) =>
+      e.consecutive_failures > acc.consecutive_failures ? e : acc, status.entries[0]);
+    if (worst.consecutive_failures >= 2) return { tone: 'restarting', text: `Probe failed ${worst.consecutive_failures}× — container restart issued.` };
+    if (worst.consecutive_failures === 1) return { tone: 'flaky', text: 'Probe failed once — tolerating as transient.' };
+    return { tone: 'healthy', text: 'Healthy. Last probe succeeded.' };
+  })();
+
+  const toneClass: Record<string, string> = {
+    idle:       'text-slate-700 bg-slate-100 border-slate-200',
+    healthy:    'text-emerald-700 bg-emerald-50 border-emerald-200',
+    flaky:      'text-amber-700 bg-amber-50 border-amber-200',
+    restarting: 'text-orange-700 bg-orange-50 border-orange-200',
+    rollback:   'text-red-700 bg-red-50 border-red-200',
+  };
+
+  return (
+    <div className="rounded-xl border border-border bg-card overflow-hidden">
+      <div className="px-5 py-4 border-b border-border bg-muted/30 flex items-center justify-between">
+        <h2 className="text-sm font-semibold">Autonomous Mode</h2>
+        <span className="text-[10px] uppercase tracking-wide font-semibold text-purple-700 bg-purple-100 rounded px-2 py-0.5">
+          Phase 4
+        </span>
+      </div>
+      <div className="px-5 py-4 flex flex-col gap-3">
+        <p className="text-xs text-muted-foreground">
+          {enabled
+            ? 'WatchTower probes your container every minute. On a single failure: logs only. On 2 in a row: restarts the container. On 3 in a row: auto-rolls back to the previous LIVE deployment and quarantines the project for 15 minutes.'
+            : 'Off. Your deploy stays LIVE until you manually intervene. Enable to have WatchTower watch the container and recover on its own.'}
+        </p>
+
+        {containerOff && !enabled && (
+          <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-2">
+            Enable “Run as Container” first — autonomous mode probes the Phase 1 container, and there isn't one yet.
+          </p>
+        )}
+
+        {enabled && headline && (
+          <div className={`text-xs rounded px-3 py-2 border ${toneClass[headline.tone]}`}>
+            {headline.text}
+          </div>
+        )}
+
+        {enabled && status && status.entries.length > 0 && (
+          <details className="text-xs">
+            <summary className="cursor-pointer text-slate-600 hover:text-slate-900">Per-node detail ({status.entries.length})</summary>
+            <ul className="mt-2 space-y-1 font-mono text-[11px]">
+              {status.entries.map((e) => (
+                <li key={`${e.project_id}:${e.node_id}`} className="flex gap-4">
+                  <span className="text-slate-500">node {e.node_id.slice(0, 8)}</span>
+                  <span>fails: {e.consecutive_failures}</span>
+                  {e.quarantined && <span className="text-red-600">quarantined</span>}
+                </li>
+              ))}
+            </ul>
+          </details>
+        )}
+
+        {error && <p className="text-xs text-red-600">{error}</p>}
+
+        <div className="flex items-center gap-3">
+          <button
+            onClick={toggle}
+            disabled={busy || (!enabled && containerOff)}
             className={`text-xs px-3 py-1.5 rounded transition-colors disabled:opacity-50 ${
               enabled
                 ? 'border border-border hover:bg-muted'
