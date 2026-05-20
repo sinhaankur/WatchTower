@@ -63,6 +63,25 @@ That's it. `run.sh` will:
 
 > **Requirements:** Python 3.8+, Node.js 18+, npm. Podman optional (only needed for container auto-update mode).
 
+### Browser mode
+
+If the desktop `.app` won't launch on macOS — usually because the build is ad-hoc-signed (no Apple Developer ID) and recent macOS versions silently kill ad-hoc Electron helpers — run WatchTower in browser mode instead. Same UI, same features, no Electron wrapper:
+
+```bash
+# Option 1 — dev clone
+git clone https://github.com/sinhaankur/WatchTower.git
+cd WatchTower
+./run.sh browser
+
+# Option 2 — pipx (no clone needed)
+pipx install watchtower-podman
+watchtower-deploy serve --host 127.0.0.1 --port 8000
+```
+
+Then open <http://127.0.0.1:8000> in any browser.
+
+The desktop `.app`'s launch-failure dialog detects the Gatekeeper kill specifically and shows a "Use Browser Mode" button that links here. When a Stable release ships with a real Developer ID signature, that warning goes away — end-users downloading a signed DMG from GitHub Releases won't see it.
+
 ### Run With Docker
 
 Use the single-node app compose file for a production-like local run:

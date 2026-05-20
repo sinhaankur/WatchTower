@@ -2359,14 +2359,58 @@ async function showLaunchFailureDialog(error, backendLogPath) {
   const distIndex = path.join(resolvedWebDist, 'index.html');
   const distExists = fs.existsSync(distIndex);
 
+  // Detect the macOS Gatekeeper / unsigned-helper kill scenario.
+  //
+  // When macOS refuses to launch an ad-hoc-signed Electron helper, the
+  // main Electron process exits cleanly with code 0 and Python never
+  // gets forked at all — so the backend log stays at zero bytes even
+  // though Electron itself reports "Backend exited before responding"
+  // via the startBackend timeout. codesign --verify still reports
+  // "valid on disk" because the static signature is fine; macOS just
+  // refuses to USE it at runtime on recent OS versions without a real
+  // Developer ID cert.
+  //
+  // This is fundamentally unfixable from inside the app — the only
+  // real solution is a signed release. The actionable workaround is
+  // browser mode: spawn the backend yourself via run.sh or pipx and
+  // open http://localhost:8000 in a browser. The dialog surfaces
+  // exactly that instead of the misleading "try reinstalling" copy.
+  const isMac = process.platform === 'darwin';
+  let gatekeeperKill = false;
+  if (isMac && backendLogPath) {
+    try {
+      const st = fs.statSync(backendLogPath);
+      // Empty log == python never wrote anything == python never ran
+      // == helper was killed before fork. The 100-byte threshold leaves
+      // room for the Electron-side header line that always lands first.
+      gatekeeperKill = st.size < 100;
+    } catch {
+      // Log doesn't even exist — also a strong gatekeeper signal,
+      // since Electron writes the header before any spawn.
+      gatekeeperKill = true;
+    }
+  }
+
   // Plain-English failure dialog. Old copy talked about ImportError /
   // ModuleNotFoundError / PEP 668 — developer jargon that scared end
   // users away. New copy assumes the user just wants the app to work
   // and surfaces "Reinstall" as the primary action since the bundled
   // Python in 1.11+ means a fresh install is almost always the fix.
   const userMessage = "WatchTower didn't start correctly.";
-  let detail =
-    "We couldn't get the app's backend running. The most reliable fix is to reinstall the latest version — it bundles everything WatchTower needs in one self-contained download.";
+  let detail = gatekeeperKill
+    ? (
+        "macOS is blocking WatchTower's helper processes (the .app is signed " +
+        "ad-hoc, not with an Apple Developer ID, and recent macOS versions " +
+        "kill ad-hoc helpers silently at fork time). This isn't fixable from " +
+        "inside the app.\n\n" +
+        "Workaround — browser mode: clone the repo and run `./run.sh browser` " +
+        "(or `pipx install watchtower-podman && watchtower-deploy serve`). " +
+        "Open http://127.0.0.1:8000 in your browser. Same UI, same features, " +
+        "no Electron wrapper.\n\n" +
+        "When a signed Stable release ships from a real Developer ID, this " +
+        "warning will go away."
+      )
+    : "We couldn't get the app's backend running. The most reliable fix is to reinstall the latest version — it bundles everything WatchTower needs in one self-contained download.";
 
   if (!distExists) {
     detail += app.isPackaged
@@ -2390,15 +2434,24 @@ async function showLaunchFailureDialog(error, backendLogPath) {
     return;
   }
 
-  const isMac = process.platform === 'darwin';
-
+  // isMac was declared above for the gatekeeperKill detection — reuse it.
   // Reinstall is now the primary action — bundled Python in 1.11+ means
   // a fresh download fixes essentially every "backend won't start"
   // failure mode (broken venv, missing dep, deleted pipx). The
   // help/quit buttons stay for users who want to inspect manually.
-  const buttons = isMac
-    ? ['Reinstall WatchTower', 'View Log', 'Quit']
-    : ['View Log', 'Get Help', 'Quit'];
+  //
+  // Mac with detected Gatekeeper kill: reinstalling won't help — the
+  // unsigned .app will be killed again. Surface "Use Browser Mode"
+  // as the primary action and "Reinstall" as the secondary (in case
+  // we mis-detected and a fresh DMG does help).
+  let buttons;
+  if (isMac && gatekeeperKill) {
+    buttons = ['Use Browser Mode', 'View Log', 'Reinstall Anyway', 'Quit'];
+  } else if (isMac) {
+    buttons = ['Reinstall WatchTower', 'View Log', 'Quit'];
+  } else {
+    buttons = ['View Log', 'Get Help', 'Quit'];
+  }
 
   const response = await dialog.showMessageBox({
     type: 'warning',
@@ -2410,6 +2463,41 @@ async function showLaunchFailureDialog(error, backendLogPath) {
     cancelId: buttons.length - 1,
     noLink: true,
   });
+
+  if (isMac && gatekeeperKill) {
+    // Mac+Gatekeeper buttons: [Use Browser Mode, View Log, Reinstall Anyway, Quit]
+    if (response.response === 0) {
+      // Open the README anchor that walks the user through running
+      // `./run.sh browser` or `pipx install watchtower-podman` so they
+      // get the same UI in their browser without fighting Gatekeeper.
+      // Also try opening localhost:8000 in case they already have a
+      // backend running (e.g. from a dev clone).
+      shell.openExternal('http://127.0.0.1:8000').catch(() => {});
+      setTimeout(() => {
+        shell.openExternal('https://github.com/sinhaankur/WatchTower#browser-mode');
+      }, 250);
+      return;
+    }
+    if (response.response === 1 && backendLogPath) {
+      try { shell.openPath(backendLogPath); } catch {}
+      return;
+    }
+    if (response.response === 2) {
+      // "Reinstall Anyway" — same flow as the non-Gatekeeper Mac path.
+      try {
+        const latest = await fetchLatestReleaseTag();
+        if (latest) {
+          await applyMacUpdate(latest, null);
+          return;
+        }
+      } catch (err) {
+        console.warn('[WatchTower] Reinstall failed:', err.message);
+      }
+      shell.openExternal('https://github.com/sinhaankur/WatchTower/releases/latest');
+      return;
+    }
+    return; // Quit
+  }
 
   if (isMac) {
     // Mac buttons: [Reinstall WatchTower, View Log, Quit]
