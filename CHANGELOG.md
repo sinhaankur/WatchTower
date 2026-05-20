@@ -52,8 +52,8 @@ Largest single release since 1.0. Turns WatchTower from a deploy dashboard into 
 
 ### Branding
 
-- Every in-source user-facing URL points at `github.com/sinhaankur/WatchTower`. `Node2-io/WatchTowerOps` references removed from 35+ files (Pro upgrade banner, OAuth help links, electron-updater publish target, electron release-page URLs, README badges, docs, Dockerfile, CHANGELOG). Decision per memory: Node2.io stays dormant until product launch; sinhaankur is canonical until then.
-- **electron-updater feed pointed at sinhaankur** (was Node2-io, where v1.14.4 had 3 failed CI runs with zero artifacts uploaded — the actual cause of "Mac update failing" reports for users on 1.14.4).
+- Every in-source user-facing URL points at `github.com/sinhaankur/WatchTower`. Stale GitHub references removed from 35+ files (Pro upgrade banner, OAuth help links, electron-updater publish target, electron release-page URLs, README badges, docs, Dockerfile). All releases, auto-update traffic, and CI now route exclusively through `sinhaankur/WatchTower`.
+- **electron-updater feed pointed at sinhaankur.** The previous target (now retired) had 3 failed CI runs at v1.14.4 with zero artifacts uploaded — the actual cause of "Mac update failing" reports for users on 1.14.4.
 
 ### Database
 
