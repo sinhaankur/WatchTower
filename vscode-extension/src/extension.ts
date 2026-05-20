@@ -256,11 +256,14 @@ async function updateStatusBar(secrets: vscode.SecretStorage): Promise<void> {
     const storedToken = await secrets.get("watchtower.apiToken");
     const client = createClient(storedToken);
     await client.runtimeStatus();
-    statusBarItem.text = "$(watchtower-icon) WatchTower $(check)";
+    // Use VS Code's built-in `rocket` codicon — we don't ship a custom
+    // `watchtower-icon` ID (the previous string rendered as fallback
+    // text on most themes).
+    statusBarItem.text = "$(rocket) WatchTower $(check)";
     statusBarItem.tooltip = "WatchTower is online — click to open web UI";
     statusBarItem.backgroundColor = undefined;
   } catch {
-    statusBarItem.text = "$(watchtower-icon) WatchTower $(warning)";
+    statusBarItem.text = "$(rocket) WatchTower $(warning)";
     statusBarItem.tooltip = "Cannot reach WatchTower API — check your apiUrl setting";
     statusBarItem.backgroundColor = new vscode.ThemeColor("statusBarItem.warningBackground");
   }

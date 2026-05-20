@@ -68,13 +68,45 @@ All commands are available via the command palette:
 | `watchtower.apiUrl` | `http://localhost:8000` | Base URL of your WatchTower API server. Use the LAN/WAN address if you're connecting to a remote/self-hosted instance. |
 | `watchtower.apiToken` | *(stored in keychain)* | Don't set this directly — use `WatchTower: Set API Token` instead, which stores it in the OS-native secret store. |
 | `watchtower.pollIntervalSeconds` | `30` | How often the sidebar refreshes project status. Lower = more responsive, more API calls. |
-| `watchtower.openWebUiOnDeploy` | `false` | If true, automatically open the web UI after triggering a deploy so you can watch the build there. |
+| `watchtower.openBrowserOnDeploy` | `false` | If true, automatically open the web UI in your browser after triggering a deploy so you can watch the build there. |
 
 ## Requirements
 
 - **VS Code 1.80 or newer.** The extension is intentionally compatible with older VS Code versions to support users on long-term-support distros and older corporate installs.
 - **A running WatchTower API server** (see Quick start step 2). The extension is purely a client; it does not run a backend itself.
 - **Network access** between VS Code and the API server. For remote WatchTower hosts, you can use VS Code's built-in **Remote — SSH** to forward the port, or expose the API directly.
+
+## Prefer chat? Try the MCP server instead
+
+If you'd rather drive WatchTower from **Claude Desktop**, **Cursor**, or any
+MCP-aware client instead of (or alongside) this extension, install the
+`watchtower-mcp` console script:
+
+```bash
+pip install watchtower-podman[mcp]
+```
+
+Then add this to your Claude Desktop config (`~/Library/Application Support/Claude/claude_desktop_config.json` on macOS):
+
+```json
+{
+  "mcpServers": {
+    "watchtower": {
+      "command": "watchtower-mcp",
+      "env": {
+        "WATCHTOWER_API_BASE_URL": "http://localhost:8000",
+        "WATCHTOWER_API_TOKEN": "<your token>"
+      }
+    }
+  }
+}
+```
+
+The MCP server exposes the same tools this extension uses
+(`list_projects`, `trigger_deployment`, `view_build_logs`, …) plus
+the autonomous-deploy controls (`set_run_as_container`,
+`provision_node`, `sync_domain_dns`). Set `WATCHTOWER_AGENT_READONLY=true`
+to give the chat client query-only access.
 
 ## Privacy and security
 

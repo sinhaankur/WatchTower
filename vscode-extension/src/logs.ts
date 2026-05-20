@@ -30,7 +30,7 @@ export async function streamDeploymentLogs(
 
   let lastLogLength = 0;
   let done = false;
-  const maxPolls = 120; // 2 minutes at 1-second intervals
+  const maxPolls = 120; // 4 minutes at 2-second intervals (see sleep(2000) below)
   let polls = 0;
 
   while (!done && polls < maxPolls) {
