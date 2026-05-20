@@ -9,6 +9,66 @@ Curated, human-friendly history of WatchTower releases. Auto-generated GitHub Re
 
 ---
 
+## 1.15.0 — Autonomous global-deploy (Phases 1–5) + MCP server + Workspace add-on + unified UX
+
+Largest single release since 1.0. Turns WatchTower from a deploy dashboard into a full autonomous control plane: an app can go from "files on my laptop" to "globally reachable, TLS-secured, container-restarted-on-failure, DNS-pinned" through one toggle.
+
+### Autonomous global-deploy (5 phases)
+
+- **Phase 1 — Container deploys to remote.** New `Project.run_as_container` toggle. When on, deploys wrap the build artifact in a Podman container on the node (nginx:alpine for static sites) instead of relying on a pre-existing webserver. SSH health-probe before marking the deploy Live. Off by default — existing projects keep the rsync+reload path unchanged.
+- **Phase 2 — Nginx reverse proxy.** After the container is healthy, if the project has any `CustomDomain` rows, write `/etc/nginx/sites-available/wt-<id>.conf` fronting the bound port, `nginx -t` validate, symlink, `sudo systemctl reload nginx`. Failure rolls back the symlink so a broken config never gets picked up. **TLS via Let's Encrypt** auto-issues a cert per domain via `certbot --nginx` (default-on; opt out with `WATCHTOWER_TLS_DISABLE=true`). Per-domain attempts are independent — one unpropagated DNS hostname doesn't block TLS on the others.
+- **Phase 3 — Cloudflare DNS sync.** After deploy reaches LIVE, refresh A records for every `CustomDomain` linked to a saved Cloudflare credential. Skips the round-trip when the IP hasn't moved. Per-domain failures are independent; CF outage doesn't roll back the deploy.
+- **Phase 4 — Autonomous mode (per-project opt-in).** Background scheduler probes each opted-in project's container every minute. Failure ladder: 1 fail = log, 2 fails = `podman restart`, 3 fails = auto-rollback to previous LIVE + 15-min quarantine. State is in-memory by design (API restart correctly resets, since restart is itself the resolution the ladder was climbing toward).
+- **Phase 5 — Auto-provision fresh nodes.** Save a **DigitalOcean** or **Hetzner** API token under Integrations → Cloud providers. Wizard in Servers picks region + size (sorted cheapest first, with monthly cost inline). WatchTower creates the VM, installs Podman + nginx + Let's Encrypt prereqs via `scripts/prep-node-for-phase2.sh`, registers it as an OrgNode. Cleanup-on-failure deletes the VM on any post-create error so users aren't billed for orphans.
+
+### MCP server — drive WatchTower from Claude Desktop / Cursor
+
+- **New `watchtower-mcp` console script.** `pip install watchtower-podman[mcp]` and Claude Desktop / Cursor can list projects, trigger deploys, view build logs, toggle autonomous mode, provision new nodes, sync DNS — 19 tools total.
+- **Thin HTTP client over `/api`** — same auth, audit, RBAC, Pro gating the SPA and VS Code extension use. No new privilege escalation path.
+- **Read/write split via `WATCHTOWER_AGENT_READONLY=true`** — gives chat clients query-only access. Defense-in-depth: filter at list_tools AND re-check at dispatch.
+- **One-click "Connect Claude Desktop" card** on the Integrations page generates the JSON snippet pre-filled with your token; opt-in toggles for read-only and "inline my real token (warning)".
+
+### Google Workspace add-on (Gmail sidebar)
+
+- **NEW** `workspace-addon/` subproject (Apps Script). Sidebar in Gmail (and any Workspace host) shows your project list + Deploy buttons. Email contextual trigger auto-detects `owner/repo` references in the subject and links you straight to the matching project. Configure card paste-and-verify. 5-minute install via `clasp create + clasp push`. Token storage via `PropertiesService.getUserProperties()` — Google encrypts at rest.
+
+### UX / UI sweep
+
+- **Unified loading vocabulary.** `<Skeleton.Line | Card | Row | Stat />` for "data shape known, awaiting fetch" cases. `<Spinner size={12|16|24|32}>` for transient operations (OAuth round-trip, button submission). Replaces 13 different inconsistent patterns (raw "Loading…" text, `⌛` emoji animate-spin, blank divs, ad-hoc border-tricks).
+- **First-paint inline skeleton.** `web/index.html` ships a CSS-only WatchTower-branded boot panel that paints immediately and gets replaced by React on first mount. Closes the 200–400ms blank-white gap on hard refresh.
+- **Electron splash refresh.** Cream `#fbf6ea` → slate-50 `#f8fafc` (matches the web app). Monospace red status → slate-700 sans-serif. Dropped the staccato 5-step fake-progress animation in favour of an honest indeterminate shimmer until real `__setStatus` lands.
+- **Live system RAM visualization** on the Dashboard via new `GET /api/runtime/metrics/system`.
+
+### VS Code extension polish
+
+- `$(rocket)` codicon replaces the unregistered `$(watchtower-icon)` in the status bar.
+- README + comments synced with code (setting names, polling interval).
+- New "Prefer chat? Try the MCP server" section pointing users at `watchtower-mcp` as an alternative client.
+
+### Phase 1 + 2 helpers
+
+- `scripts/prep-node-for-phase2.sh` — one-time root-run setup for a fresh Ubuntu host (installs podman + nginx + certbot + rsync, creates a `deploy` user with narrow passwordless sudo limited to nginx + certbot).
+- `scripts/smoke-test-phase1.sh` — runnable verification covering Phases 1+2+3 against any WatchTower install.
+
+### Branding
+
+- Every in-source user-facing URL points at `github.com/sinhaankur/WatchTower`. `Node2-io/WatchTowerOps` references removed from 35+ files (Pro upgrade banner, OAuth help links, electron-updater publish target, electron release-page URLs, README badges, docs, Dockerfile, CHANGELOG). Decision per memory: Node2.io stays dormant until product launch; sinhaankur is canonical until then.
+- **electron-updater feed pointed at sinhaankur** (was Node2-io, where v1.14.4 had 3 failed CI runs with zero artifacts uploaded — the actual cause of "Mac update failing" reports for users on 1.14.4).
+
+### Database
+
+- Five new migrations: `run_as_container`, `autonomous_mode`, `cloud_provider_credentials`, `provisioning_jobs + org_node provider columns`. All additive + nullable — existing data survives.
+
+### Performance
+
+- `GZipMiddleware` added. vendor-react chunk: 231 KB → 73 KB on the wire (68% reduction per cold load). Applies to every JS/CSS asset and JSON response ≥ 500 bytes.
+
+### Tests
+
+- 280 → 377 (+97 across the release cycle). Zero regressions.
+
+---
+
 ## 1.14.4 — Major UX pass: error visibility, diagnostics, static-site Run-Locally, mascot, animations
 
 A wide release. The headline is closing the loop on "I tried something and it didn't work — now what?": every page now has a per-route error boundary that surfaces the actual stack and request id, every empty state shows a friendly mascot with a real CTA, and every subsystem has a self-diagnose endpoint behind Settings → Diagnostics.
