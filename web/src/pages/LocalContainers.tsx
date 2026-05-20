@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import apiClient from '@/lib/api';
 import { toast } from '@/lib/toast';
+import { Skeleton } from '@/components/Skeleton';
 
 /**
  * /local-containers — cross-project view of every WatchTower-managed
@@ -121,8 +122,10 @@ export default function LocalContainers() {
       )}
 
       {items === null ? (
-        <div className="rounded-xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-500">
-          Loading…
+        <div className="rounded-xl border border-slate-200 bg-white overflow-hidden" aria-busy="true">
+          <Skeleton.Row />
+          <Skeleton.Row />
+          <Skeleton.Row />
         </div>
       ) : items.length === 0 ? (
         <div className="rounded-xl border border-slate-200 bg-white p-8 text-center">

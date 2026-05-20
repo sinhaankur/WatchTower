@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import apiClient from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import BrandLogo from '@/components/BrandLogo';
+import { Spinner } from '@/components/Spinner';
 
 type CallbackStatus = 'loading' | 'success' | 'error';
 
@@ -76,8 +77,10 @@ const GitHubLoginCallback = () => {
         </div>
         {status === 'loading' && (
           <>
-            <div className="text-4xl mb-4 animate-spin inline-block">⌛</div>
-            <h1 className="text-base font-semibold mb-1">Signing you in...</h1>
+            <div className="mb-4 inline-flex items-center justify-center">
+              <Spinner size={32} label="Signing in" />
+            </div>
+            <h1 className="text-base font-semibold mb-1">Signing you in…</h1>
             <p className="text-sm text-slate-600">Completing GitHub authentication.</p>
           </>
         )}

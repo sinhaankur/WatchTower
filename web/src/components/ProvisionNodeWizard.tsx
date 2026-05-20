@@ -12,6 +12,7 @@
  */
 import { useEffect, useState } from 'react';
 import { apiClient } from '@/lib/api';
+import { Skeleton } from '@/components/Skeleton';
 
 type CloudProviderCredential = {
   id: string;
@@ -278,7 +279,7 @@ export function ProvisionNodeWizard({ onClose, onRegistered }: Props) {
       <div>
         <label className="block text-xs font-medium text-slate-700 mb-1">Cloud provider credential</label>
         {loadingCreds ? (
-          <p className="text-xs text-slate-500">Loading…</p>
+          <Skeleton.Line className="h-9 w-full" />
         ) : creds && creds.length === 0 ? (
           <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-2">
             No credentials saved yet. Go to Integrations → Cloud providers to add one.
@@ -304,7 +305,7 @@ export function ProvisionNodeWizard({ onClose, onRegistered }: Props) {
         <div>
           <label className="block text-xs font-medium text-slate-700 mb-1">Region</label>
           {loadingRegions ? (
-            <p className="text-xs text-slate-500">Loading regions…</p>
+            <Skeleton.Line className="h-9 w-full" />
           ) : (
             <select
               value={region}
@@ -327,7 +328,7 @@ export function ProvisionNodeWizard({ onClose, onRegistered }: Props) {
             Size <span className="text-slate-500">— sorted cheapest first</span>
           </label>
           {loadingSizes ? (
-            <p className="text-xs text-slate-500">Loading sizes…</p>
+            <Skeleton.Line className="h-9 w-full" />
           ) : (
             <select
               value={size}

@@ -8,9 +8,49 @@
     <link rel="apple-touch-icon" sizes="152x152" href="/apple-touch-icon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Wt - Unified Deployment Platform</title>
+    <style>
+      /* Pre-React boot panel — shown until React mounts and replaces
+         everything inside #root. Inline so there's no extra request and
+         no FOUC between the HTML landing and the first React frame.
+         Honours prefers-reduced-motion (skip shimmer keyframes).        */
+      html, body { margin: 0; padding: 0; }
+      body { background: #f8fafc; font-family: system-ui, -apple-system, 'DM Sans', sans-serif; }
+      #wt-boot {
+        position: fixed; inset: 0;
+        display: flex; flex-direction: column;
+        align-items: center; justify-content: center;
+        gap: 18px;
+        color: #475569;
+      }
+      #wt-boot svg { width: 72px; height: 72px; filter: drop-shadow(0 8px 24px rgba(15,23,42,0.08)); }
+      #wt-boot .label { font-size: 13px; font-weight: 600; color: #334155; letter-spacing: 0.2px; }
+      #wt-boot .track {
+        width: 200px; height: 4px;
+        border-radius: 2px;
+        background: linear-gradient(90deg, #e2e8f0 0%, #cbd5e1 50%, #e2e8f0 100%);
+        background-size: 200% 100%;
+        animation: wt-boot-shimmer 1.4s linear infinite;
+      }
+      @keyframes wt-boot-shimmer {
+        0%   { background-position: 100% 0; }
+        100% { background-position: -100% 0; }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        #wt-boot .track { animation: none; background-position: 0 0; }
+      }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div id="wt-boot" aria-label="Loading WatchTower">
+        <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="WatchTower">
+          <rect x="2" y="2" width="60" height="60" rx="11" fill="#fde68a" stroke="#0f172a" stroke-width="3"/>
+          <text x="32" y="40" text-anchor="middle" font-family="DM Sans, Arial, sans-serif" font-size="22" font-weight="800" fill="#b91c1c">Wt</text>
+        </svg>
+        <div class="label">Loading WatchTower…</div>
+        <div class="track" aria-hidden="true"></div>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

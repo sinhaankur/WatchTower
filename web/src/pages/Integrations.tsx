@@ -6,6 +6,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import apiClient from '@/lib/api';
+import { Skeleton } from '@/components/Skeleton';
 
 // ─── types ────────────────────────────────────────────────────────────────────
 
@@ -982,7 +983,10 @@ function CloudflareSection() {
         )}
 
         {loading ? (
-          <p className="text-xs text-slate-500">Loading…</p>
+          <div className="flex flex-col gap-2" aria-busy="true">
+            <Skeleton.Line className="h-3.5 w-1/2" />
+            <Skeleton.Line className="h-3.5 w-1/3" />
+          </div>
         ) : creds && creds.length > 0 ? (
           <ul className="divide-y divide-slate-100 border border-slate-200 rounded-lg overflow-hidden">
             {creds.map((c) => (
@@ -1228,7 +1232,10 @@ function CloudProviderSection() {
         )}
 
         {loading ? (
-          <p className="text-xs text-slate-500">Loading…</p>
+          <div className="flex flex-col gap-2" aria-busy="true">
+            <Skeleton.Line className="h-3.5 w-1/2" />
+            <Skeleton.Line className="h-3.5 w-1/3" />
+          </div>
         ) : creds && creds.length > 0 ? (
           <ul className="divide-y divide-slate-100 border border-slate-200 rounded-lg overflow-hidden">
             {creds.map((c) => (

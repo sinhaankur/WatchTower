@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useRef, useState } from 'react';
 import { useParams, Link /*, useNavigate*/ } from 'react-router-dom';
 import apiClient from '@/lib/api';
+import { Skeleton } from '@/components/Skeleton';
 import {
   useProjects,
   useProjectRelations,
@@ -116,7 +117,14 @@ export default function ProjectDetail() {
       .finally(() => setLoading(false));
   }, [id]);
 
-  if (loading) return <div className="flex items-center justify-center h-64 text-muted-foreground">Loading…</div>;
+  if (loading) return (
+    <div className="flex-1 p-6 flex flex-col gap-4 max-w-3xl w-full">
+      <Skeleton.Line className="h-7 w-64" />
+      <Skeleton.Line className="h-4 w-96" />
+      <Skeleton.Card className="mt-4" />
+      <Skeleton.Card />
+    </div>
+  );
   if (error || !project) return (
     <div className="max-w-xl mx-auto mt-16 text-center">
       <p className="text-red-600 font-medium">{error ?? 'Project not found'}</p>
@@ -904,7 +912,13 @@ function DeploymentsTab({ projectId }: { projectId: string }) {
     }
   }
 
-  if (loading) return <p className="text-sm text-muted-foreground">Loading…</p>;
+  if (loading) return (
+    <div className="flex flex-col gap-2" aria-busy="true">
+      <Skeleton.Line className="h-4 w-3/4" />
+      <Skeleton.Line className="h-4 w-2/3" />
+      <Skeleton.Line className="h-4 w-1/2" />
+    </div>
+  );
   if (!deployments.length) return <p className="text-sm text-muted-foreground">No deployments yet.</p>;
 
   return (
@@ -1344,7 +1358,13 @@ function EnvVarsTab({ projectId }: { projectId: string }) {
     }
   }
 
-  if (loading) return <p className="text-sm text-muted-foreground">Loading…</p>;
+  if (loading) return (
+    <div className="flex flex-col gap-2" aria-busy="true">
+      <Skeleton.Line className="h-4 w-3/4" />
+      <Skeleton.Line className="h-4 w-2/3" />
+      <Skeleton.Line className="h-4 w-1/2" />
+    </div>
+  );
 
   return (
     <div className="max-w-3xl flex flex-col gap-6">
@@ -1494,7 +1514,13 @@ function WebhooksTab({ projectId }: { projectId: string }) {
     }
   }
 
-  if (loading) return <p className="text-sm text-muted-foreground">Loading…</p>;
+  if (loading) return (
+    <div className="flex flex-col gap-2" aria-busy="true">
+      <Skeleton.Line className="h-4 w-3/4" />
+      <Skeleton.Line className="h-4 w-2/3" />
+      <Skeleton.Line className="h-4 w-1/2" />
+    </div>
+  );
 
   return (
     <div className="max-w-3xl flex flex-col gap-6">
@@ -1684,7 +1710,13 @@ function RelatedTab({ projectId }: { projectId: string }) {
   const saving = addMutation.isPending;
   const running = runMutation.isPending;
 
-  if (loading) return <p className="text-sm text-muted-foreground">Loading…</p>;
+  if (loading) return (
+    <div className="flex flex-col gap-2" aria-busy="true">
+      <Skeleton.Line className="h-4 w-3/4" />
+      <Skeleton.Line className="h-4 w-2/3" />
+      <Skeleton.Line className="h-4 w-1/2" />
+    </div>
+  );
 
   return (
     <div className="max-w-3xl flex flex-col gap-6">
@@ -1940,7 +1972,9 @@ function DomainsTab({ projectId }: { projectId: string }) {
           <h2 className="text-sm font-semibold text-slate-900">Domains</h2>
         </header>
         {!domains ? (
-          <p className="px-4 py-3 text-xs text-slate-500">Loading…</p>
+          <div className="px-4 py-3">
+            <Skeleton.Line className="h-3 w-32" />
+          </div>
         ) : domains.length === 0 ? (
           <p className="px-4 py-3 text-xs text-slate-500">No domains yet. Add one above.</p>
         ) : (

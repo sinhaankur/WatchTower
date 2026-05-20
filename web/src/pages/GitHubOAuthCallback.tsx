@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import apiClient from '@/lib/api';
 import { Button } from '@/components/ui/button';
+import { Spinner } from '@/components/Spinner';
 
 const GitHubOAuthCallback = () => {
   const [searchParams] = useSearchParams();
@@ -51,7 +52,9 @@ const GitHubOAuthCallback = () => {
 
         {status === 'loading' && (
           <>
-            <div className="text-4xl mb-4 animate-spin inline-block">⌛</div>
+            <div className="mb-4 inline-flex items-center justify-center">
+              <Spinner size={32} label="Connecting GitHub" />
+            </div>
             <h1 className="text-base font-semibold mb-1">Connecting GitHub…</h1>
             <p className="text-sm text-slate-600">Completing your GitHub authorization. Please wait.</p>
           </>

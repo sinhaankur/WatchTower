@@ -4,6 +4,7 @@ import apiClient from '@/lib/api';
 import { trackEvent } from '@/lib/analytics';
 import { Button } from '@/components/ui/button';
 import BrandLogo from '@/components/BrandLogo';
+import { Spinner } from '@/components/Spinner';
 
 type AuthStatus = {
   oauth?: {
@@ -653,8 +654,8 @@ const Login = () => {
                   >
                     {loading ? (
                         <span className="inline-flex items-center gap-2">
-                        <span className="inline-block w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-                        Connecting to GitHub…
+                          <Spinner size={16} label="Connecting" />
+                          Connecting to GitHub…
                         </span>
                     ) : (
                         <span className="inline-flex items-center gap-2">
@@ -759,7 +760,12 @@ const Login = () => {
                     variant="outline"
                     className="w-full mt-2 rounded-lg text-slate-700"
                   >
-                    {loading ? 'Verifying…' : 'Sign in with API token'}
+                    {loading ? (
+                      <span className="inline-flex items-center gap-2 justify-center">
+                        <Spinner size={12} label="Verifying" />
+                        Verifying…
+                      </span>
+                    ) : 'Sign in with API token'}
                   </Button>
                   <details className="mt-1.5 text-[11px] text-slate-500">
                     <summary className="cursor-pointer hover:text-slate-700">What is this?</summary>

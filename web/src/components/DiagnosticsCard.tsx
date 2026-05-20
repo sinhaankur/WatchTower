@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import apiClient from '@/lib/api';
+import { Skeleton } from '@/components/Skeleton';
 
 type CheckStatus = 'ok' | 'warn' | 'fail';
 
@@ -151,7 +152,14 @@ export function DiagnosticsCard() {
       )}
 
       {loading && !report && (
-        <p className="text-xs text-slate-500">Running checks…</p>
+        <ul className="space-y-2" aria-busy="true">
+          {[0, 1, 2, 3, 4].map((i) => (
+            <li key={i} className="flex items-center gap-2.5 py-1">
+              <Skeleton.Line className="h-3 w-3 rounded-full shrink-0" />
+              <Skeleton.Line className="h-3.5 flex-1 max-w-72" />
+            </li>
+          ))}
+        </ul>
       )}
 
       {report && Array.isArray(report.checks) && (
