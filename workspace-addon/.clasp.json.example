@@ -1,0 +1,5 @@
+{
+  "_comment": "Copy this to .clasp.json (gitignored) and replace scriptId with the ID of YOUR Apps Script project. See workspace-addon/README.md for the full create-and-push flow.",
+  "scriptId": "PASTE_YOUR_SCRIPT_ID_HERE",
+  "rootDir": "."
+}
