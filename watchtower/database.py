@@ -212,6 +212,13 @@ class Project(Base):
     source_type = Column(String, default=ProjectSourceType.GITHUB.value)
     local_folder_path = Column(String, nullable=True)
     launch_url = Column(String, nullable=True)
+    # Public-facing URL where this project is published to end users —
+    # GitHub Pages site, custom domain, Vercel preview, etc. Separate
+    # from `launch_url` (which points at the local dev/preview server)
+    # because the user often wants to surface BOTH: "click to preview
+    # locally" and "share the live site." Stored as the raw URL string
+    # without any liveness probing.
+    live_url = Column(String, nullable=True)
     repo_url = Column(String)
     repo_branch = Column(String, default="main")
     # User-provided override for the install/build pipeline. When NULL the
@@ -777,6 +784,234 @@ class NotificationWebhook(Base):
     created_at = Column(DateTime, default=_utcnow)
 
     project = relationship("Project", backref="notification_webhooks")
+
+
+class ManagedDatabaseStatus(str, enum.Enum):
+    """Lifecycle states for a WatchTower-managed database pod.
+
+    `creating`/`deleting` are transient — the API sets them while the
+    podman command runs and clears them on completion. `failed` means
+    the last lifecycle action errored; the operator can retry from the
+    UI. The pod may still exist in podman with stale data — failure
+    paths try to clean up but never trust that they succeeded.
+    """
+    CREATING = "creating"
+    RUNNING = "running"
+    STOPPED = "stopped"
+    FAILED = "failed"
+    DELETING = "deleting"
+
+
+class ManagedDatabase(Base):
+    """A WatchTower-managed database instance running in a Podman pod.
+
+    Phase v0: single-node only (the host running this API instance).
+    Phase v1 will add a Replica row + primary/standby roles for HA.
+
+    The pod contains a single container today (the database). The pod
+    abstraction exists so v1 can sidecar `pg_exporter` / `pgbackrest`
+    in the same network namespace without changing the data model.
+    """
+    __tablename__ = "managed_databases"
+
+    id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    org_id = Column(Uuid(as_uuid=True), ForeignKey("organizations.id"), nullable=True, index=True)
+
+    # User-facing identity
+    name = Column(String, nullable=False, index=True)        # e.g. "blog-prod"
+    engine = Column(String, nullable=False, default="postgres")  # only "postgres" in v0
+    version = Column(String, nullable=False, default="16")    # postgres major version
+
+    # Pod / container plumbing (set when create() runs podman)
+    image = Column(String, nullable=False)                   # full image ref incl. tag
+    pod_name = Column(String, nullable=False, unique=True)   # podman pod name
+    container_name = Column(String, nullable=False, unique=True)
+    volume_name = Column(String, nullable=False)             # podman named volume
+
+    # Connection
+    host = Column(String, nullable=False, default="127.0.0.1")
+    port = Column(Integer, nullable=False)
+    database_name = Column(String, nullable=False, default="appdb")
+    username = Column(String, nullable=False, default="watchtower")
+    # Fernet-encrypted password. Surfaced once on create; the operator
+    # can request a reveal later via an explicit endpoint (audit-logged).
+    password_encrypted = Column(Text, nullable=False)
+
+    # State
+    status = Column(Enum(ManagedDatabaseStatus), default=ManagedDatabaseStatus.CREATING, nullable=False)
+    status_message = Column(String, nullable=True)
+    last_status_at = Column(DateTime, nullable=True)
+
+    # Audit-light columns (full audit lives in audit_events)
+    created_by_user_id = Column(Uuid(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    created_at = Column(DateTime, default=_utcnow)
+    updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
+
+    organization = relationship("Organization", backref="managed_databases")
+    replicas = relationship(
+        "ManagedDatabaseReplica",
+        back_populates="primary",
+        cascade="all, delete-orphan",
+    )
+    backups = relationship(
+        "ManagedDatabaseBackup",
+        back_populates="database",
+        cascade="all, delete-orphan",
+    )
+
+
+class ReplicaRole(str, enum.Enum):
+    """Where the replica sits in the cluster.
+
+    * STANDBY  — streaming WAL from the primary, read-only.
+    * PROMOTED — was a standby, was promoted via `pg_promote()`. Now
+                 accepting writes. The original ManagedDatabase row is
+                 the *old* primary (now stale / stopped); the PROMOTED
+                 replica is the *new* primary. Apps should switch
+                 connection strings.
+
+    There is intentionally no `PRIMARY` role here — the primary is the
+    parent ManagedDatabase row itself. This keeps the data model linear
+    and avoids two rows simultaneously claiming primary-ness.
+    """
+    STANDBY = "standby"
+    PROMOTED = "promoted"
+
+
+class ReplicaStatus(str, enum.Enum):
+    INITIALIZING = "initializing"   # pg_basebackup running
+    STREAMING = "streaming"         # healthy WAL streaming
+    FAILED = "failed"
+    PROMOTED = "promoted"           # post-failover (mirrors role for fast filtering)
+
+
+class ManagedDatabaseReplica(Base):
+    """A standby (or promoted-ex-standby) for a ManagedDatabase primary.
+
+    v1 limitation: single-PC only. The replica pod runs on the same host
+    as the primary, with `--network host` so the standby connects to
+    the primary at `127.0.0.1:<primary_port>`. v2 will add a `node_id`
+    FK so standbys can run on remote PCs reachable via Tailscale.
+    """
+    __tablename__ = "managed_database_replicas"
+
+    id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    primary_db_id = Column(
+        Uuid(as_uuid=True),
+        ForeignKey("managed_databases.id"),
+        nullable=False,
+        index=True,
+    )
+
+    # Pod / container plumbing for the replica itself
+    name = Column(String, nullable=False, index=True)
+    pod_name = Column(String, nullable=False, unique=True)
+    container_name = Column(String, nullable=False, unique=True)
+    volume_name = Column(String, nullable=False)
+    host = Column(String, nullable=False, default="127.0.0.1")
+    port = Column(Integer, nullable=False)
+
+    # Replication slot name on the primary. Tracking this lets us drop
+    # the slot on `remove replica` so the primary doesn't accumulate
+    # orphaned slots that pin WAL indefinitely.
+    replication_slot_name = Column(String, nullable=False)
+
+    role = Column(Enum(ReplicaRole), default=ReplicaRole.STANDBY, nullable=False)
+    status = Column(Enum(ReplicaStatus), default=ReplicaStatus.INITIALIZING, nullable=False)
+    status_message = Column(String, nullable=True)
+    last_status_at = Column(DateTime, nullable=True)
+
+    # Last observed replay lag, populated by an explicit refresh (not
+    # by every list call — querying both DBs on every list would be
+    # expensive). NULL means "never measured."
+    last_lag_seconds = Column(Integer, nullable=True)
+    last_health_check = Column(DateTime, nullable=True)
+
+    created_by_user_id = Column(Uuid(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    created_at = Column(DateTime, default=_utcnow)
+    updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
+
+    primary = relationship("ManagedDatabase", back_populates="replicas")
+
+
+class BackupStatus(str, enum.Enum):
+    RUNNING = "running"     # pg_dump in progress
+    READY = "ready"         # file on disk, restorable
+    FAILED = "failed"       # pg_dump exited non-zero — see status_message
+
+
+class ManagedDatabaseBackup(Base):
+    """An on-demand snapshot of a managed database, taken via pg_dump.
+
+    v0 scope: file lives on the host disk under ``$WATCHTOWER_DATA_DIR/
+    managed_db_backups/<db_id>/<timestamp>.dump``. v1 will add scheduled
+    backups + off-host storage targets (S3, remote-PC over Tailscale).
+
+    We store metadata in the DB and the dump itself on disk because the
+    dumps are arbitrarily large (gigabytes for real DBs) and reading
+    them back through ORM/JSON is not a workflow anyone wants.
+    """
+    __tablename__ = "managed_database_backups"
+
+    id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    primary_db_id = Column(
+        Uuid(as_uuid=True),
+        ForeignKey("managed_databases.id"),
+        nullable=False,
+        index=True,
+    )
+    # User-facing label. Free-form; the timestamp goes in `created_at`.
+    label = Column(String, nullable=True)
+    # Absolute host path to the dump file. Computed at create time so
+    # we can serve / delete without re-deriving from the timestamp.
+    file_path = Column(String, nullable=False)
+    size_bytes = Column(Integer, nullable=True)
+    # pg_dump format. v0 always emits "custom" (-Fc) so restores can be
+    # done with pg_restore. Stored so v1's multi-engine support can
+    # mix in "sqldump" (MySQL) or "bson" (Mongo).
+    format = Column(String, nullable=False, default="pgcustom")
+
+    status = Column(Enum(BackupStatus), default=BackupStatus.RUNNING, nullable=False)
+    status_message = Column(String, nullable=True)
+    completed_at = Column(DateTime, nullable=True)
+
+    created_by_user_id = Column(Uuid(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    created_at = Column(DateTime, default=_utcnow)
+
+    database = relationship("ManagedDatabase", back_populates="backups")
+
+
+class ExternalDatabase(Base):
+    """A user-supplied connection to a database WatchTower does NOT manage.
+
+    Counterpart to ManagedDatabase. WatchTower stores the connection
+    metadata (host, port, db_name, user, encrypted password) so apps
+    deployed via WatchTower can reference it by name, but the lifecycle
+    (starting / stopping / upgrading / backups) is the user's problem.
+
+    This is the bring-your-own option for users who already run a
+    Postgres on RDS / Supabase / their NAS / a different PC.
+    """
+    __tablename__ = "external_databases"
+
+    id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    org_id = Column(Uuid(as_uuid=True), ForeignKey("organizations.id"), nullable=True, index=True)
+
+    name = Column(String, nullable=False, index=True)
+    engine = Column(String, nullable=False)   # matches ManagedDatabase engine ids
+    host = Column(String, nullable=False)
+    port = Column(Integer, nullable=False)
+    database_name = Column(String, nullable=False, default="")
+    username = Column(String, nullable=False, default="")
+    password_encrypted = Column(Text, nullable=False, default="")
+    use_tls = Column(Boolean, default=True, nullable=False)
+    notes = Column(String, nullable=True)
+
+    created_by_user_id = Column(Uuid(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    created_at = Column(DateTime, default=_utcnow)
+    updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
+
+    organization = relationship("Organization", backref="external_databases")
 
 
 # Dependency for getting DB session

@@ -28,10 +28,13 @@ from . import (
     edition,
     enterprise,
     envvars,
+    external_db,
     local_runs,
+    managed_db,
     me,
     notifications,
     projects,
+    remote_access,
     runtime,
     setup,
     templates,
@@ -441,6 +444,9 @@ app.include_router(cloudflare.router)
 app.include_router(cloud_providers.router)
 app.include_router(edition.router)
 app.include_router(local_runs.router)
+app.include_router(remote_access.router)
+app.include_router(managed_db.router)
+app.include_router(external_db.router)
 from watchtower.api import diagnose  # noqa: E402
 app.include_router(diagnose.router)
 

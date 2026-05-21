@@ -34,6 +34,8 @@ const AuditLog             = lazy(() => import('./pages/AuditLog'));
 const Account              = lazy(() => import('./pages/Account'));
 const LocalContainers      = lazy(() => import('./pages/LocalContainers'));
 const HostConnect          = lazy(() => import('./pages/HostConnect'));
+const RemoteAccess         = lazy(() => import('./pages/RemoteAccess'));
+const ManagedDatabases     = lazy(() => import('./pages/ManagedDatabases'));
 const GitHubOAuthCallback  = lazy(() => import('./pages/GitHubOAuthCallback'));
 const GitHubLoginCallback  = lazy(() => import('./pages/GitHubLoginCallback'));
 
@@ -151,6 +153,8 @@ function App() {
             <Route path="/services"          element={withChrome('Services',         <Services />)} />
             <Route path="/integrations"      element={withChrome('Integrations',     <Integrations />)} />
             <Route path="/host-connect"      element={withChrome('Host Connect',     <HostConnect />)} />
+            <Route path="/remote-access"     element={withChrome('Remote Access',    <RemoteAccess />)} />
+            <Route path="/managed-databases" element={withChrome('Managed Databases', <ManagedDatabases />)} />
             <Route path="/team"              element={withChrome('Team',             <TeamManagement />)} />
             <Route path="/invite/:token"     element={withChrome('Invitation',       <InviteAccept />, { bare: true })} />
             <Route path="/settings"          element={withChrome('Settings',         <Settings />)} />

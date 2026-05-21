@@ -130,6 +130,8 @@ class ProjectUpdate(BaseModel):
     recommended_port: Optional[int] = None
     run_as_container: Optional[bool] = None
     autonomous_mode: Optional[bool] = None
+    # Empty string explicitly clears the URL (back to NULL).
+    live_url: Optional[str] = None
 
 
 class ProjectResponse(ProjectBase):

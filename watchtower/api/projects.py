@@ -223,6 +223,20 @@ async def update_project(
     if project_data.run_as_container is not None and project_data.run_as_container != project.run_as_container:
         changes["run_as_container"] = {"from": project.run_as_container, "to": project_data.run_as_container}
         project.run_as_container = project_data.run_as_container
+    if project_data.live_url is not None and project_data.live_url != (project.live_url or ""):
+        # Normalise: blank/whitespace becomes NULL so the column doesn't
+        # accumulate empty strings that the UI then has to interpret.
+        # Light validation only — we don't probe the URL. The whole point
+        # is to let the user point at GH Pages / custom domains we can't
+        # always reach from the server-side environment.
+        new_url = (project_data.live_url or "").strip() or None
+        if new_url and not new_url.lower().startswith(("http://", "https://")):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="live_url must start with http:// or https://",
+            )
+        changes["live_url"] = {"from": project.live_url, "to": new_url}
+        project.live_url = new_url
     if project_data.autonomous_mode is not None and project_data.autonomous_mode != project.autonomous_mode:
         # Phase 4 is gated on Phase 1 — enabling without run_as_container would
         # be a silent no-op (the tick would find no container to probe). Fail

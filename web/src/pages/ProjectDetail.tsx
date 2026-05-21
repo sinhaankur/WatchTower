@@ -28,6 +28,7 @@ type Project = {
   recommended_port: number | null;
   run_as_container: boolean;
   autonomous_mode: boolean;
+  live_url: string | null;
   created_at: string;
 };
 
@@ -447,6 +448,8 @@ function OverviewTab({ project }: { project: Project }) {
 
       <BuildCommandCard project={project} />
 
+      <LiveUrlCard project={project} />
+
       <RunAsContainerCard project={project} />
 
       <AutonomousModeCard project={project} />
@@ -464,6 +467,119 @@ function OverviewTab({ project }: { project: Project }) {
             Copy
           </button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ── LiveUrlCard ───────────────────────────────────────────────────────────────
+// Public-facing site URL. GitHub Pages, custom domain, Vercel preview —
+// anywhere the user has published this project for end users. Distinct
+// from `launch_url` (local preview). Stored as-is; no server-side probe.
+
+function LiveUrlCard({ project }: { project: Project }) {
+  const [saved, setSaved] = useState<string | null>(project.live_url);
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState<string>(project.live_url ?? '');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const placeholder = 'https://username.github.io/repo-name/';
+
+  const startEdit = () => {
+    setDraft(saved ?? '');
+    setError(null);
+    setEditing(true);
+  };
+
+  const save = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const trimmed = draft.trim();
+      const resp = await apiClient.put(`/projects/${project.id}`, {
+        live_url: trimmed,
+      });
+      const next: string | null = resp.data?.live_url ?? null;
+      setSaved(next && next.length > 0 ? next : null);
+      setEditing(false);
+    } catch (err) {
+      setError(extractDetail(err, 'Failed to save live URL'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="rounded-xl border border-border bg-card overflow-hidden">
+      <div className="px-5 py-4 border-b border-border bg-muted/30 flex items-center justify-between">
+        <h2 className="text-sm font-semibold">Live site URL</h2>
+        {!editing && (
+          <button
+            onClick={startEdit}
+            className="text-xs px-3 py-1 rounded border border-border hover:bg-muted transition-colors"
+          >
+            {saved ? 'Edit' : 'Set'}
+          </button>
+        )}
+      </div>
+      <div className="px-5 py-4 flex flex-col gap-3">
+        {!editing && (
+          <>
+            {saved ? (
+              <div className="flex items-center gap-2">
+                <code className="flex-1 text-xs bg-muted rounded px-3 py-2 break-all font-mono">
+                  {saved}
+                </code>
+                <a
+                  href={saved}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-xs px-3 py-2 rounded border border-border hover:bg-muted transition-colors"
+                >
+                  Open ↗
+                </a>
+              </div>
+            ) : (
+              <code className="text-xs bg-muted rounded px-3 py-2 break-all font-mono text-muted-foreground">
+                Not set — paste your GitHub Pages / custom domain URL here.
+              </code>
+            )}
+            <p className="text-xs text-muted-foreground">
+              Where the public live site lives — GitHub Pages, Vercel preview, custom domain. Separate from local preview.
+            </p>
+          </>
+        )}
+        {editing && (
+          <>
+            <input
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              placeholder={placeholder}
+              className="w-full text-sm font-mono px-3 py-2 rounded border border-border bg-white focus:outline-none focus:border-blue-500"
+            />
+            <p className="text-xs text-muted-foreground">
+              Leave blank to clear. Must start with http:// or https://.
+            </p>
+            {error && <p className="text-xs text-red-600">{error}</p>}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={save}
+                disabled={busy}
+                className="text-xs px-3 py-1.5 rounded bg-red-700 hover:bg-red-800 text-white border border-slate-800 shadow-[2px_2px_0_0_#1f2937] disabled:opacity-50"
+              >
+                {busy ? 'Saving…' : 'Save'}
+              </button>
+              <button
+                onClick={() => { setEditing(false); setError(null); }}
+                disabled={busy}
+                className="text-xs px-3 py-1.5 rounded border border-border hover:bg-muted transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

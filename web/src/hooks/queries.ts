@@ -29,6 +29,16 @@ export const queryKeys = {
   activeDeployments: ['deployments', 'active-count'] as const,
   edition: ['edition'] as const,
   audit: (params: AuditQueryParams) => ['audit', params] as const,
+  remoteAccessProviders: ['remote-access', 'providers'] as const,
+  remoteAccessDefaultPort: ['remote-access', 'default-port'] as const,
+  managedDatabases: ['managed-databases'] as const,
+  managedDatabase: (id: string) => ['managed-databases', id] as const,
+  managedDbRuntime: ['managed-databases', 'runtime'] as const,
+  managedDbEngines: ['managed-databases', 'engines'] as const,
+  managedDbReplicas: (id: string) => ['managed-databases', id, 'replicas'] as const,
+  managedDbBackups: (id: string) => ['managed-databases', id, 'backups'] as const,
+  managedDbBackupUsage: (id: string) => ['managed-databases', id, 'backups', 'usage'] as const,
+  externalDatabases: ['external-databases'] as const,
 } as const;
 
 // ── Edition / license tier ───────────────────────────────────────────────────
@@ -337,5 +347,398 @@ export function useUpdateCheck(opts?: { autoCheck?: boolean; force?: boolean }) 
     // Backend caches for 1h; UI cache for 30 min so a fresh tab gets a recheck-ish.
     staleTime: 30 * 60 * 1000,
     retry: false,
+  });
+}
+
+// ── Remote Access ────────────────────────────────────────────────────────────
+// Each provider (Tailscale today; Cloudflare Tunnel / SSH later) reports
+// installed / ready / sharing state independently. Detection is cheap
+// server-side but does shell out, so we don't refetch on window focus.
+
+export type RemoteAccessProvider = {
+  id: string;
+  name: string;
+  installed: boolean;
+  ready: boolean;
+  sharing: boolean;
+  url: string | null;
+  detail: string | null;
+  hint: string | null;
+  install_url: string | null;
+};
+
+export function useRemoteAccessProviders() {
+  return useQuery<RemoteAccessProvider[]>({
+    queryKey: queryKeys.remoteAccessProviders,
+    queryFn: async () =>
+      (await apiClient.get<RemoteAccessProvider[]>('/remote-access/providers')).data,
+    staleTime: 10_000,
+    refetchOnWindowFocus: false,
+  });
+}
+
+export function useRemoteAccessDefaultPort() {
+  return useQuery<{ port: number }>({
+    queryKey: queryKeys.remoteAccessDefaultPort,
+    queryFn: async () =>
+      (await apiClient.get<{ port: number }>('/remote-access/default-port')).data,
+    staleTime: 60 * 60 * 1000,
+  });
+}
+
+export function useEnableRemoteAccess(providerId: string) {
+  const qc = useQueryClient();
+  return useMutation<RemoteAccessProvider, unknown, { port: number }>({
+    mutationFn: async ({ port }) =>
+      (await apiClient.post<RemoteAccessProvider>(
+        `/remote-access/providers/${providerId}/enable`,
+        { port },
+      )).data,
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.remoteAccessProviders });
+    },
+  });
+}
+
+export function useDisableRemoteAccess(providerId: string) {
+  const qc = useQueryClient();
+  return useMutation<RemoteAccessProvider, unknown, void>({
+    mutationFn: async () =>
+      (await apiClient.post<RemoteAccessProvider>(
+        `/remote-access/providers/${providerId}/disable`,
+      )).data,
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.remoteAccessProviders });
+    },
+  });
+}
+
+// ── Managed databases ────────────────────────────────────────────────────────
+// WatchTower-owned Postgres pods running in Podman on this host.
+
+export type ManagedDatabase = {
+  id: string;
+  name: string;
+  engine: string;
+  version: string;
+  status: 'creating' | 'running' | 'stopped' | 'failed' | 'deleting';
+  status_message: string | null;
+  host: string;
+  port: number;
+  database_name: string;
+  username: string;
+  pod_name: string;
+  container_name: string;
+  image: string;
+  created_at: string | null;
+  updated_at: string | null;
+};
+
+export type ManagedDatabaseCreateInput = {
+  name: string;
+  engine?: string;
+  version?: string;
+  database_name?: string;
+  username?: string;
+};
+
+export type ManagedDatabaseCreateResponse = ManagedDatabase & {
+  password: string;
+  connection_string: string;
+};
+
+export function useManagedDbRuntime() {
+  return useQuery<{ available: boolean }>({
+    queryKey: queryKeys.managedDbRuntime,
+    queryFn: async () =>
+      (await apiClient.get<{ available: boolean }>('/managed-databases/runtime')).data,
+    staleTime: 60 * 1000,
+  });
+}
+
+export type ManagedDbEngine = {
+  id: string;
+  name: string;
+  versions: string[];
+  default_db_name: string;
+  default_user: string;
+};
+
+export function useManagedDbEngines() {
+  return useQuery<ManagedDbEngine[]>({
+    queryKey: queryKeys.managedDbEngines,
+    queryFn: async () =>
+      (await apiClient.get<ManagedDbEngine[]>('/managed-databases/engines')).data,
+    staleTime: 60 * 60 * 1000,
+  });
+}
+
+export function useManagedDatabases() {
+  return useQuery<ManagedDatabase[]>({
+    queryKey: queryKeys.managedDatabases,
+    queryFn: async () =>
+      (await apiClient.get<ManagedDatabase[]>('/managed-databases')).data,
+    staleTime: 5_000,
+  });
+}
+
+export function useCreateManagedDatabase() {
+  const qc = useQueryClient();
+  return useMutation<ManagedDatabaseCreateResponse, unknown, ManagedDatabaseCreateInput>({
+    mutationFn: async (input) =>
+      (await apiClient.post<ManagedDatabaseCreateResponse>('/managed-databases', input)).data,
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.managedDatabases });
+    },
+  });
+}
+
+export function useStartManagedDatabase() {
+  const qc = useQueryClient();
+  return useMutation<ManagedDatabase, unknown, string>({
+    mutationFn: async (id) =>
+      (await apiClient.post<ManagedDatabase>(`/managed-databases/${id}/start`)).data,
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.managedDatabases });
+    },
+  });
+}
+
+export function useStopManagedDatabase() {
+  const qc = useQueryClient();
+  return useMutation<ManagedDatabase, unknown, string>({
+    mutationFn: async (id) =>
+      (await apiClient.post<ManagedDatabase>(`/managed-databases/${id}/stop`)).data,
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.managedDatabases });
+    },
+  });
+}
+
+export function useDeleteManagedDatabase() {
+  const qc = useQueryClient();
+  return useMutation<void, unknown, { id: string; purge: boolean }>({
+    mutationFn: async ({ id, purge }) => {
+      await apiClient.delete(`/managed-databases/${id}${purge ? '?purge=true' : ''}`);
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.managedDatabases });
+    },
+  });
+}
+
+export function useRevealManagedDatabase() {
+  return useMutation<{ password: string; connection_string: string }, unknown, string>({
+    mutationFn: async (id) =>
+      (await apiClient.get<{ password: string; connection_string: string }>(
+        `/managed-databases/${id}/credentials`,
+      )).data,
+  });
+}
+
+// ── Replicas (HA v1: Postgres streaming replication) ─────────────────────────
+
+export type ManagedDbReplica = {
+  id: string;
+  primary_db_id: string;
+  name: string;
+  role: 'standby' | 'promoted';
+  status: 'initializing' | 'streaming' | 'failed' | 'promoted';
+  status_message: string | null;
+  host: string;
+  port: number;
+  pod_name: string;
+  container_name: string;
+  replication_slot_name: string;
+  last_lag_seconds: number | null;
+  last_health_check: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+};
+
+export function useManagedDbReplicas(primaryId: string, enabled: boolean = true) {
+  return useQuery<ManagedDbReplica[]>({
+    queryKey: queryKeys.managedDbReplicas(primaryId),
+    queryFn: async () =>
+      (await apiClient.get<ManagedDbReplica[]>(`/managed-databases/${primaryId}/replicas`)).data,
+    enabled,
+    staleTime: 5_000,
+  });
+}
+
+export function useAddReplica(primaryId: string) {
+  const qc = useQueryClient();
+  return useMutation<ManagedDbReplica, unknown, { name?: string }>({
+    mutationFn: async (input) =>
+      (await apiClient.post<ManagedDbReplica>(
+        `/managed-databases/${primaryId}/replicas`,
+        input,
+      )).data,
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.managedDbReplicas(primaryId) });
+      // Promotion shifts the primary's state; refresh that list too.
+      void qc.invalidateQueries({ queryKey: queryKeys.managedDatabases });
+    },
+  });
+}
+
+export function usePromoteReplica(primaryId: string) {
+  const qc = useQueryClient();
+  return useMutation<ManagedDbReplica, unknown, string>({
+    mutationFn: async (replicaId) =>
+      (await apiClient.post<ManagedDbReplica>(
+        `/managed-databases/${primaryId}/replicas/${replicaId}/promote`,
+      )).data,
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.managedDbReplicas(primaryId) });
+      void qc.invalidateQueries({ queryKey: queryKeys.managedDatabases });
+    },
+  });
+}
+
+export function useRemoveReplica(primaryId: string) {
+  const qc = useQueryClient();
+  return useMutation<void, unknown, string>({
+    mutationFn: async (replicaId) => {
+      await apiClient.delete(`/managed-databases/${primaryId}/replicas/${replicaId}`);
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.managedDbReplicas(primaryId) });
+    },
+  });
+}
+
+// ── Backups (v0: on-demand pg_dump, local disk) ──────────────────────────────
+
+export type ManagedDbBackup = {
+  id: string;
+  primary_db_id: string;
+  label: string | null;
+  file_path: string;
+  size_bytes: number | null;
+  format: string;
+  status: 'running' | 'ready' | 'failed';
+  status_message: string | null;
+  completed_at: string | null;
+  created_at: string | null;
+};
+
+export function useManagedDbBackups(primaryId: string, enabled: boolean = true) {
+  return useQuery<ManagedDbBackup[]>({
+    queryKey: queryKeys.managedDbBackups(primaryId),
+    queryFn: async () =>
+      (await apiClient.get<ManagedDbBackup[]>(`/managed-databases/${primaryId}/backups`)).data,
+    enabled,
+    staleTime: 10_000,
+  });
+}
+
+export function useManagedDbBackupUsage(primaryId: string, enabled: boolean = true) {
+  return useQuery<{ used_bytes: number; free_bytes: number }>({
+    queryKey: queryKeys.managedDbBackupUsage(primaryId),
+    queryFn: async () =>
+      (await apiClient.get<{ used_bytes: number; free_bytes: number }>(
+        `/managed-databases/${primaryId}/backups/usage`,
+      )).data,
+    enabled,
+    staleTime: 30_000,
+  });
+}
+
+export function useCreateBackup(primaryId: string) {
+  const qc = useQueryClient();
+  return useMutation<ManagedDbBackup, unknown, { label?: string }>({
+    mutationFn: async (input) =>
+      (await apiClient.post<ManagedDbBackup>(
+        `/managed-databases/${primaryId}/backups`,
+        input,
+      )).data,
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.managedDbBackups(primaryId) });
+      void qc.invalidateQueries({ queryKey: queryKeys.managedDbBackupUsage(primaryId) });
+    },
+  });
+}
+
+export function useDeleteBackup(primaryId: string) {
+  const qc = useQueryClient();
+  return useMutation<void, unknown, string>({
+    mutationFn: async (backupId) => {
+      await apiClient.delete(`/managed-databases/${primaryId}/backups/${backupId}`);
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.managedDbBackups(primaryId) });
+      void qc.invalidateQueries({ queryKey: queryKeys.managedDbBackupUsage(primaryId) });
+    },
+  });
+}
+
+// ── External databases (bring-your-own connection) ───────────────────────────
+
+export type ExternalDatabase = {
+  id: string;
+  name: string;
+  engine: string;
+  host: string;
+  port: number;
+  database_name: string;
+  username: string;
+  use_tls: boolean;
+  notes: string | null;
+  has_password: boolean;
+  created_at: string | null;
+  updated_at: string | null;
+};
+
+export type ExternalDatabaseCreateInput = {
+  name: string;
+  engine: string;
+  host: string;
+  port: number;
+  database_name?: string;
+  username?: string;
+  password?: string;
+  use_tls?: boolean;
+  notes?: string;
+};
+
+export function useExternalDatabases() {
+  return useQuery<ExternalDatabase[]>({
+    queryKey: queryKeys.externalDatabases,
+    queryFn: async () =>
+      (await apiClient.get<ExternalDatabase[]>('/external-databases')).data,
+    staleTime: 10_000,
+  });
+}
+
+export function useCreateExternalDatabase() {
+  const qc = useQueryClient();
+  return useMutation<ExternalDatabase, unknown, ExternalDatabaseCreateInput>({
+    mutationFn: async (input) =>
+      (await apiClient.post<ExternalDatabase>('/external-databases', input)).data,
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.externalDatabases });
+    },
+  });
+}
+
+export function useDeleteExternalDatabase() {
+  const qc = useQueryClient();
+  return useMutation<void, unknown, string>({
+    mutationFn: async (id) => {
+      await apiClient.delete(`/external-databases/${id}`);
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.externalDatabases });
+    },
+  });
+}
+
+export function useRevealExternalDatabase() {
+  return useMutation<{ password: string; connection_string: string }, unknown, string>({
+    mutationFn: async (id) =>
+      (await apiClient.get<{ password: string; connection_string: string }>(
+        `/external-databases/${id}/credentials`,
+      )).data,
   });
 }
