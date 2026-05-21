@@ -24,11 +24,21 @@ jobs:
           cache: 'pip'
           cache-dependency-path: pyproject.toml
 
-      - name: Build distributions
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install build
-          python -m build
+      - name: Set up Node (for SPA build that ends up in the wheel)
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: 'npm'
+          cache-dependency-path: 'web/package-lock.json'
+
+      - name: Build distributions (stages alembic/ + web/dist/ into the package)
+        # Calls scripts/build-wheel.sh which copies the migrations and
+        # SPA bundle into the package root before `python -m build`, and
+        # verifies the resulting wheel actually contains them. Without
+        # this step the wheel ships with neither — a regression that
+        # bit every PyPI install through 1.16.0 (see
+        # .claude/memory/pypi_wheel_packaging_gap.md).
+        run: ./scripts/build-wheel.sh
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4

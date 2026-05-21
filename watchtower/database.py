@@ -253,6 +253,11 @@ class Project(Base):
     deployments = relationship("Deployment", back_populates="project", cascade="all, delete-orphan")
     custom_domains = relationship("CustomDomain", back_populates="project", cascade="all, delete-orphan")
     env_variables = relationship("EnvironmentVariable", back_populates="project", cascade="all, delete-orphan")
+    database_links = relationship(
+        "ProjectDatabaseLink",
+        back_populates="project",
+        cascade="all, delete-orphan",
+    )
 
 
 class Deployment(Base):
@@ -1014,6 +1019,74 @@ class ExternalDatabase(Base):
     organization = relationship("Organization", backref="external_databases")
 
 
+class ProjectDatabaseLink(Base):
+    """Bind a project to a database (managed OR external) for env-var injection.
+
+    The deploy pipeline (builder.py) reads these on every build, resolves
+    each link to a connection string, and exposes the result to the app
+    container as an environment variable. Typical pattern: link a
+    Postgres + name the env var ``DATABASE_URL`` and the app picks it up
+    automatically (Django/Rails/Next.js/Sequelize/SQLAlchemy all read
+    that by convention).
+
+    Exactly ONE of ``managed_database_id`` and ``external_database_id``
+    must be set per row — enforced application-side in the router since
+    SQLite doesn't support partial unique constraints cleanly across
+    backends.
+
+    Multiple links per project are allowed (e.g. a primary Postgres
+    plus a Redis cache). Each has its own ``env_var_name`` so apps can
+    receive ``DATABASE_URL`` + ``REDIS_URL`` from the same flow.
+    """
+    __tablename__ = "project_database_links"
+    __table_args__ = (
+        # Same project can't have two links with the same env var name —
+        # second one would silently overwrite the first in the deploy env.
+        UniqueConstraint("project_id", "env_var_name",
+                         name="uq_project_db_links_project_env_var"),
+    )
+
+    id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    project_id = Column(
+        Uuid(as_uuid=True),
+        ForeignKey("projects.id"),
+        nullable=False,
+        index=True,
+    )
+    managed_database_id = Column(
+        Uuid(as_uuid=True),
+        ForeignKey("managed_databases.id"),
+        nullable=True,
+    )
+    external_database_id = Column(
+        Uuid(as_uuid=True),
+        ForeignKey("external_databases.id"),
+        nullable=True,
+    )
+
+    # The env var the connection string will be injected as. Defaults to
+    # the conventional DATABASE_URL; the operator can override for
+    # multi-DB setups (REDIS_URL, MONGODB_URI, etc.).
+    env_var_name = Column(String, nullable=False, default="DATABASE_URL")
+
+    # Lets the operator pause injection without unlinking — useful when
+    # debugging a deploy that's misbehaving due to env-var collision.
+    is_active = Column(Boolean, default=True, nullable=False)
+
+    # Free-text. Surfaced in the UI next to the link so operators can
+    # explain why this binding exists ("prod replica for analytics",
+    # "session cache for the Rails app").
+    notes = Column(String, nullable=True)
+
+    created_by_user_id = Column(Uuid(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    created_at = Column(DateTime, default=_utcnow)
+    updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
+
+    project = relationship("Project", back_populates="database_links")
+    managed_database = relationship("ManagedDatabase", backref="project_links")
+    external_database = relationship("ExternalDatabase", backref="project_links")
+
+
 # Dependency for getting DB session
 def get_db():
     db = SessionLocal()
@@ -1140,7 +1213,14 @@ def _alembic_config():
     if env_override:
         candidates.append(Path(env_override))
     pkg_dir = Path(__file__).parent
-    candidates.append(pkg_dir / "alembic")  # bundled-into-package layout
+    # Wheel-bundled layout: scripts/build-wheel.sh stages alembic/ into
+    # watchtower/_alembic/ (underscore-prefixed to avoid being treated as
+    # an importable Python subpackage by setuptools' package-finder).
+    # This MUST come before the legacy `pkg_dir / "alembic"` check —
+    # 1.16.0 wheels shipped with _alembic but pre-1.16.1 dev clones may
+    # have a stale `alembic/` symlink under the package root.
+    candidates.append(pkg_dir / "_alembic")
+    candidates.append(pkg_dir / "alembic")  # legacy bundled-into-package layout
     candidates.append(pkg_dir.parent / "alembic")  # dev-clone layout
 
     for alembic_dir in candidates:

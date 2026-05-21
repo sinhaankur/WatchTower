@@ -33,6 +33,7 @@ from . import (
     managed_db,
     me,
     notifications,
+    project_db_links,
     projects,
     remote_access,
     runtime,
@@ -447,6 +448,7 @@ app.include_router(local_runs.router)
 app.include_router(remote_access.router)
 app.include_router(managed_db.router)
 app.include_router(external_db.router)
+app.include_router(project_db_links.router)
 from watchtower.api import diagnose  # noqa: E402
 app.include_router(diagnose.router)
 
@@ -461,10 +463,34 @@ app.include_router(diagnose.router)
 # directory and we fall through to the JSON health response. That's
 # the right behaviour for headless server installs; the desktop
 # launcher overrides via env so the AppImage serves the real SPA.
-_WEB_DIST = Path(
-    os.getenv("WATCHTOWER_WEB_DIST")
-    or (Path(__file__).resolve().parents[2] / "web" / "dist")
-)
+def _resolve_web_dist() -> Path:
+    """Resolve the SPA bundle directory.
+
+    Resolution order (first existing path wins):
+      1. ``WATCHTOWER_WEB_DIST`` env override — desktop launcher / tests.
+      2. ``<package>/_web_dist/`` — wheel-bundled layout populated by
+         scripts/build-wheel.sh. This was the load-bearing missing piece
+         in 1.16.0 — without it, `pip install watchtower-podman` served
+         a 61-byte JSON fallback on `/` because no SPA was on disk.
+      3. ``<repo_root>/web/dist/`` — dev clone with `pip install -e .`,
+         the SPA built locally via `npm --prefix web run build`.
+
+    Returning the first candidate (rather than the first existing) so
+    the env override + the static-mount check still operate on a
+    predictable path; the actual `.is_dir()` check happens at the
+    call site.
+    """
+    env_override = os.getenv("WATCHTOWER_WEB_DIST")
+    if env_override:
+        return Path(env_override)
+    pkg_dir = Path(__file__).parent
+    bundled = pkg_dir.parent / "_web_dist"
+    if bundled.is_dir():
+        return bundled
+    return Path(__file__).resolve().parents[2] / "web" / "dist"
+
+
+_WEB_DIST = _resolve_web_dist()
 
 if _WEB_DIST.is_dir():
     # Static assets (JS/CSS/images) served under /assets

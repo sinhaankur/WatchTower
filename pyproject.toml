@@ -91,7 +91,28 @@ include-package-data = true
 version = {attr = "watchtower.__version__"}
 
 [tool.setuptools.packages.find]
+# Match watchtower + any subpackage, but exclude the two underscore-prefixed
+# data dirs that scripts/build-wheel.sh stages right before wheel build
+# (alembic migrations and the React SPA bundle). They ARE shipped via
+# package-data below — we just don't want them treated as importable
+# Python subpackages, which would clash with the real `alembic` PyPI
+# package and pollute `dir(watchtower)`.
 include = ["watchtower*"]
+exclude = ["watchtower._alembic*", "watchtower._web_dist*"]
+
+[tool.setuptools.package-data]
+# Populated only at wheel-build time by scripts/build-wheel.sh, which
+# copies the repo-root `alembic/` and `web/dist/` into
+# `watchtower/_alembic/` and `watchtower/_web_dist/`. The dev clone
+# doesn't have these on disk; the loader falls back to the dev-clone
+# paths for editable installs. See watchtower/database.py:_alembic_config
+# and watchtower/api/__init__.py:_resolve_web_dist for the resolver order.
+#
+# Why this matters: pre-1.16.1 wheels shipped without the alembic dir
+# AND without web/dist, so `pip install watchtower-podman` crashed at
+# startup with RuntimeError + then served a 61-byte JSON fallback on /.
+# Documented in .claude/memory/pypi_wheel_packaging_gap.md.
+watchtower = ["_alembic/**/*", "_web_dist/**/*"]
 
 
 [tool.pytest.ini_options]

@@ -39,6 +39,7 @@ export const queryKeys = {
   managedDbBackups: (id: string) => ['managed-databases', id, 'backups'] as const,
   managedDbBackupUsage: (id: string) => ['managed-databases', id, 'backups', 'usage'] as const,
   externalDatabases: ['external-databases'] as const,
+  projectDatabases: (projectId: string) => ['projects', projectId, 'databases'] as const,
 } as const;
 
 // ── Edition / license tier ───────────────────────────────────────────────────
@@ -740,5 +741,87 @@ export function useRevealExternalDatabase() {
       (await apiClient.get<{ password: string; connection_string: string }>(
         `/external-databases/${id}/credentials`,
       )).data,
+  });
+}
+
+// ── Project ↔ Database links ────────────────────────────────────────────────
+// Each link binds a project to a managed-or-external DB + names the
+// env var the connection string is injected as at deploy time.
+
+export type ProjectDatabaseLink = {
+  id: string;
+  project_id: string;
+  managed_database_id: string | null;
+  external_database_id: string | null;
+  database_name: string;
+  database_engine: string;
+  database_kind: 'managed' | 'external' | '?';
+  env_var_name: string;
+  is_active: boolean;
+  notes: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+};
+
+export type CreateLinkInput = {
+  managed_database_id?: string;
+  external_database_id?: string;
+  env_var_name?: string;
+  notes?: string;
+};
+
+export function useProjectDatabases(projectId: string | undefined) {
+  return useQuery<ProjectDatabaseLink[]>({
+    queryKey: projectId ? queryKeys.projectDatabases(projectId) : ['projects', 'disabled', 'databases'],
+    queryFn: async () =>
+      (await apiClient.get<ProjectDatabaseLink[]>(
+        `/projects/${projectId}/databases`,
+      )).data,
+    enabled: !!projectId,
+    staleTime: 10_000,
+  });
+}
+
+export function useCreateProjectDatabaseLink(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation<ProjectDatabaseLink, unknown, CreateLinkInput>({
+    mutationFn: async (input) =>
+      (await apiClient.post<ProjectDatabaseLink>(
+        `/projects/${projectId}/databases`,
+        input,
+      )).data,
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.projectDatabases(projectId) });
+    },
+  });
+}
+
+export function useUpdateProjectDatabaseLink(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation<
+    ProjectDatabaseLink,
+    unknown,
+    { linkId: string; env_var_name?: string; is_active?: boolean; notes?: string }
+  >({
+    mutationFn: async ({ linkId, ...patch }) =>
+      (await apiClient.patch<ProjectDatabaseLink>(
+        `/projects/${projectId}/databases/${linkId}`,
+        patch,
+      )).data,
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.projectDatabases(projectId) });
+    },
+  });
+}
+
+export function useDeleteProjectDatabaseLink(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation<void, unknown, string>({
+    mutationFn: async (linkId) => {
+      await apiClient.delete(`/projects/${projectId}/databases/${linkId}`);
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.projectDatabases(projectId) });
+    },
   });
 }

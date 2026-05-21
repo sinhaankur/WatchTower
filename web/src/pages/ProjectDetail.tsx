@@ -4,6 +4,15 @@ import apiClient from '@/lib/api';
 import { Skeleton } from '@/components/Skeleton';
 import { GithubPagesDiagram } from '@/components/SectionDiagrams';
 import {
+  type CreateLinkInput,
+  useCreateProjectDatabaseLink,
+  useDeleteProjectDatabaseLink,
+  useExternalDatabases,
+  useManagedDatabases,
+  useProjectDatabases,
+  useUpdateProjectDatabaseLink,
+} from '@/hooks/queries';
+import {
   useProjects,
   useProjectRelations,
   useAddRelation,
@@ -451,6 +460,8 @@ function OverviewTab({ project }: { project: Project }) {
 
       <LiveUrlCard project={project} />
 
+      <DatabaseLinksCard project={project} />
+
       <RunAsContainerCard project={project} />
 
       <AutonomousModeCard project={project} />
@@ -468,6 +479,218 @@ function OverviewTab({ project }: { project: Project }) {
             Copy
           </button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ── DatabaseLinksCard ─────────────────────────────────────────────────────────
+// Bind this project to one or more managed/external databases. The
+// builder reads ProjectDatabaseLink rows at deploy time and injects
+// each link's connection string as an env var (default DATABASE_URL).
+// Decouples the DB from the project's static EnvironmentVariable rows
+// so a password rotation on the DB picks up automatically without the
+// operator having to re-paste the connection string.
+
+function DatabaseLinksCard({ project }: { project: { id: string } }) {
+  const { data: links, isLoading } = useProjectDatabases(project.id);
+  const { data: managedDbs } = useManagedDatabases();
+  const { data: externalDbs } = useExternalDatabases();
+  const create = useCreateProjectDatabaseLink(project.id);
+  const remove = useDeleteProjectDatabaseLink(project.id);
+  const update = useUpdateProjectDatabaseLink(project.id);
+
+  const [picker, setPicker] = useState<string>('');  // "managed:<id>" or "external:<id>"
+  const [envVarName, setEnvVarName] = useState('DATABASE_URL');
+  const [error, setError] = useState<string | null>(null);
+
+  const onAdd = () => {
+    if (!picker) {
+      setError('Pick a database first.');
+      return;
+    }
+    const [kind, id] = picker.split(':');
+    const body: CreateLinkInput = { env_var_name: envVarName.trim() || 'DATABASE_URL' };
+    if (kind === 'managed') body.managed_database_id = id;
+    else if (kind === 'external') body.external_database_id = id;
+
+    setError(null);
+    create.mutate(body, {
+      onSuccess: () => {
+        setPicker('');
+        setEnvVarName('DATABASE_URL');
+      },
+      onError: (err) => {
+        const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+        setError(typeof detail === 'string' ? detail : 'Failed to link database.');
+      },
+    });
+  };
+
+  const totalDbs = (managedDbs?.length ?? 0) + (externalDbs?.length ?? 0);
+
+  return (
+    <div className="rounded-xl border border-border bg-card overflow-hidden">
+      <div className="px-5 py-4 border-b border-border bg-muted/30 flex items-center justify-between">
+        <div>
+          <h2 className="text-sm font-semibold">Databases</h2>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Linked DBs are injected as env vars on every deploy.
+          </p>
+        </div>
+      </div>
+
+      <div className="px-5 py-4 flex flex-col gap-3">
+        {isLoading && <p className="text-xs text-muted-foreground">Loading…</p>}
+
+        {!isLoading && links && links.length === 0 && (
+          <p className="text-xs text-muted-foreground italic">
+            No databases linked. Pick one below and we'll inject its connection string as the named env var on every deploy.
+          </p>
+        )}
+
+        {links && links.length > 0 && (
+          <div className="flex flex-col gap-2">
+            {links.map((link) => (
+              <ProjectDbLinkRow
+                key={link.id}
+                link={link}
+                onRemove={() => remove.mutate(link.id)}
+                onToggleActive={() =>
+                  update.mutate({ linkId: link.id, is_active: !link.is_active })
+                }
+                disabled={remove.isPending || update.isPending}
+              />
+            ))}
+          </div>
+        )}
+
+        {totalDbs === 0 ? (
+          <div className="rounded-md border border-dashed border-border bg-muted/40 px-3 py-3 text-xs text-muted-foreground">
+            No databases yet. Visit{' '}
+            <Link to="/managed-databases" className="text-red-700 underline">
+              Databases
+            </Link>{' '}
+            to create a managed Postgres or connect an external database, then return here to link it.
+          </div>
+        ) : (
+          <div className="border-t border-border pt-3 flex flex-col gap-2">
+            <p className="text-xs font-semibold text-slate-700">Link a database</p>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <select
+                value={picker}
+                onChange={(e) => setPicker(e.target.value)}
+                className="flex-1 text-sm px-3 py-2 rounded border border-border bg-white focus:outline-none focus:border-blue-500"
+              >
+                <option value="">— Choose database —</option>
+                {(managedDbs ?? []).length > 0 && (
+                  <optgroup label="Managed">
+                    {managedDbs!.map((d) => (
+                      <option key={`m-${d.id}`} value={`managed:${d.id}`}>
+                        {d.name} ({d.engine} {d.version}) — {d.host}:{d.port}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+                {(externalDbs ?? []).length > 0 && (
+                  <optgroup label="External">
+                    {externalDbs!.map((d) => (
+                      <option key={`e-${d.id}`} value={`external:${d.id}`}>
+                        {d.name} ({d.engine}) — {d.host}:{d.port}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+              </select>
+              <input
+                value={envVarName}
+                onChange={(e) => setEnvVarName(e.target.value)}
+                placeholder="DATABASE_URL"
+                className="w-full sm:w-44 text-sm font-mono px-3 py-2 rounded border border-border bg-white focus:outline-none focus:border-blue-500"
+                aria-label="Env var name"
+              />
+              <button
+                onClick={onAdd}
+                disabled={create.isPending || !picker}
+                className="px-4 py-2 rounded bg-red-700 hover:bg-red-800 text-white text-xs font-medium border border-slate-800 shadow-[2px_2px_0_0_#1f2937] disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+              >
+                {create.isPending ? 'Linking…' : 'Link'}
+              </button>
+            </div>
+            {error && (
+              <p className="text-xs text-red-600 break-all">{error}</p>
+            )}
+            <p className="text-[11px] text-muted-foreground">
+              The env var is injected fresh on every deploy — password rotations on the DB are picked up automatically.
+            </p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ProjectDbLinkRow({
+  link,
+  onRemove,
+  onToggleActive,
+  disabled,
+}: {
+  link: {
+    id: string;
+    database_name: string;
+    database_engine: string;
+    database_kind: string;
+    env_var_name: string;
+    is_active: boolean;
+    notes: string | null;
+  };
+  onRemove: () => void;
+  onToggleActive: () => void;
+  disabled: boolean;
+}) {
+  return (
+    <div className="rounded-lg border border-border bg-white px-3 py-2 flex items-center justify-between gap-2 flex-wrap">
+      <div className="min-w-0 flex items-center gap-2 flex-wrap">
+        <code className="text-xs font-mono font-semibold text-slate-900 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded">
+          ${link.env_var_name}
+        </code>
+        <span className="text-xs text-slate-500">→</span>
+        <span className="text-xs font-semibold text-slate-800 truncate">
+          {link.database_name}
+        </span>
+        <span className="text-[11px] px-1.5 py-0.5 rounded-full border font-medium bg-slate-100 text-slate-600 border-slate-200">
+          {link.database_engine}
+        </span>
+        <span className={`text-[11px] px-1.5 py-0.5 rounded-full border font-medium ${
+          link.database_kind === 'managed'
+            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+            : 'bg-violet-50 text-violet-700 border-violet-200'
+        }`}>
+          {link.database_kind}
+        </span>
+        {!link.is_active && (
+          <span className="text-[11px] px-1.5 py-0.5 rounded-full border font-medium bg-amber-50 text-amber-800 border-amber-200">
+            paused
+          </span>
+        )}
+      </div>
+      <div className="flex items-center gap-1">
+        <button
+          onClick={onToggleActive}
+          disabled={disabled}
+          className="px-2 py-1 rounded-md border border-border text-[11px] text-slate-700 hover:bg-slate-100 transition-colors disabled:opacity-50"
+          title={link.is_active ? 'Pause injection (does not unlink)' : 'Resume injection'}
+        >
+          {link.is_active ? 'Pause' : 'Resume'}
+        </button>
+        <button
+          onClick={onRemove}
+          disabled={disabled}
+          className="px-2 py-1 rounded-md border border-red-200 text-[11px] text-red-700 hover:bg-red-50 transition-colors disabled:opacity-50"
+        >
+          Unlink
+        </button>
       </div>
     </div>
   );

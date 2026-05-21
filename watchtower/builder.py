@@ -368,11 +368,35 @@ async def _run_build(deployment_id) -> None:
 
         # ── Step 2: Resolve env vars ───────────────────────────────────────
         env_vars = _load_env_vars(db, project)
+        # Auto-injected DB connection strings from ProjectDatabaseLink
+        # rows (managed pods + external connections). Resolved fresh on
+        # every build, so password rotation on the underlying DB picks
+        # up immediately on the next deploy — no stale-secret bug class.
+        # Explicit user env vars WIN on conflict so an operator can
+        # override the auto-injected value (e.g. point at a staging
+        # replica during a one-off deploy).
+        try:
+            from watchtower.api.project_db_links import resolve_env_vars_for_project
+            linked_db_env = resolve_env_vars_for_project(db, project.id)
+        except Exception:
+            # Don't fail the build on a link-resolver error — log and
+            # carry on with whatever env vars the user already has.
+            logger.exception(
+                "Failed to resolve linked-DB env vars for project %s — proceeding without them.",
+                project.id,
+            )
+            linked_db_env = {}
+        if linked_db_env:
+            append(
+                f"[WatchTower] Injecting {len(linked_db_env)} linked-DB env var(s): "
+                f"{', '.join(sorted(linked_db_env.keys()))}"
+            )
+
         # Inject per-project package-manager caches. User env vars win on
         # collision so an operator who really wants $NPM_CONFIG_CACHE
         # pointed elsewhere can still override.
         cache_env = _pkg_cache_env(project.id)
-        merged_env = {**cache_env, **env_vars}
+        merged_env = {**cache_env, **linked_db_env, **env_vars}
 
         # ── Step 3: Run build command ──────────────────────────────────────
         # Re-resolve now that we can inspect the cloned repo. If the user

@@ -158,7 +158,34 @@ else
 fi
 
 # ──────────────────────────────────────────────────────────────────────────
-HEAD "4. Forbidden user-facing strings"
+HEAD "4. PyPI wheel ships migrations + SPA bundle"
+# 1.16.0 shipped a wheel that contained neither alembic/ nor web/dist/,
+# so every `pip install watchtower-podman` crashed at startup with
+# RuntimeError: Could not find alembic/env.py, and `/` returned a
+# 61-byte JSON fallback instead of the SPA. The desktop DMG masked it
+# because Electron ships its own source tree. scripts/build-wheel.sh
+# now stages both into watchtower/_alembic/ and watchtower/_web_dist/
+# before `python -m build`; this check builds a wheel and verifies the
+# critical files land inside it before letting the release ship.
+#
+# Skip with SKIP_WHEEL=1 if iterating on something unrelated (e.g.,
+# desktop pack), but the resulting release is NOT stable-bar.
+
+if [ -n "${SKIP_WHEEL:-}" ]; then
+  WARN "SKIP_WHEEL set — PyPI wheel verification skipped (NOT a stable release)"
+else
+  WHEEL_LOG=$(mktemp)
+  if "$REPO_ROOT/scripts/build-wheel.sh" >"$WHEEL_LOG" 2>&1; then
+    PASS "Wheel build succeeded with alembic/ + web/dist/ staged in package"
+  else
+    FAIL "Wheel build failed — see $WHEEL_LOG"
+    tail -30 "$WHEEL_LOG"
+  fi
+  rm -f "$WHEEL_LOG"
+fi
+
+# ──────────────────────────────────────────────────────────────────────────
+HEAD "5. Forbidden user-facing strings"
 # RELEASE_QUALITY.md specifies plain English in user-facing dialogs. These
 # strings would mean a developer-jargon error message slipped into the
 # Electron failure paths.
