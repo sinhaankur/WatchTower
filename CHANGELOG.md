@@ -9,6 +9,70 @@ Curated, human-friendly history of WatchTower releases. Auto-generated GitHub Re
 
 ---
 
+## 1.16.0 — Self-host pillar: managed databases, HA, backups, Tailscale remote access
+
+Continues the "PC → website + database + backup" appliance vision. WatchTower now manages real databases (not just static-site projects), exposes itself over Tailscale without CLI fumbling, replicates Postgres across pods for hot-standby HA, and snapshots data on demand. Every new section opens with an inline SVG flow diagram so non-technical users understand what's actually happening behind each button before they click.
+
+### Managed databases (`/managed-databases`)
+
+- **Two-tab page**: **Managed** (WatchTower owns a Podman pod) and **External** (bring-your-own connection metadata for RDS, Supabase, a NAS, another PC).
+- **Five engines** with whitelisted versions: PostgreSQL (14/15/16/17), MySQL (8.0/8.4), MariaDB (10.11/11.4), MongoDB (6/7/8), Redis (7.2/7.4). Image refs are assembled server-side from fixed templates — user input never reaches a shell.
+- **Per-engine env-var factories** so each container starts with the right canonical setup (`POSTGRES_*`, `MYSQL_*`, `MARIADB_*`, `MONGO_INITDB_*`, `REDIS_PASSWORD`). Data dirs resolved per engine (`/var/lib/postgresql/data`, `/var/lib/mysql`, `/data/db`, `/data`).
+- **Credentials flow**: passwords are server-generated, Fernet-encrypted at rest, shown once on create, and revealable via an audited `/credentials` endpoint that writes a `managed_db.credentials.view` audit event.
+- **Lifecycle**: create / start / stop / delete (+ optional volume purge). Stale podman state is reconciled by a list-time `pod inspect` so a manually-killed container surfaces as `stopped`, not `running`.
+
+### HA v1 — Postgres streaming replication (single-PC)
+
+- **Add a standby in one click** under a Postgres database's Replicas section. The flow: reconfigure primary for replication (`wal_level=replica`, `max_wal_senders`, slots) → restart primary → create replication user + slot → update `pg_hba.conf` → run `pg_basebackup -R` into a fresh volume → start the standby pod.
+- **Manual failover** via `pg_promote()` with crude split-brain fencing (old primary's container is stopped post-promotion). UI surfaces the new primary's host:port so apps know where to switch.
+- **Replication slots tracked** on the model so deleting a replica drops its slot on the primary — no orphaned slots pinning WAL indefinitely.
+- **Scope honestly bounded**: Postgres only (other engines' replication models are different enough to deserve their own modules), single-PC only (remote-node placement via SSH+Tailscale is v2), manual failover only (auto failover with witness quorum is v3 — two-node auto-failover invites split-brain).
+
+### Backup v0
+
+- **On-demand `pg_dump`** in a transient container against the running primary. Custom format (`-Fc`) so a future restore can use `pg_restore` with parallelism + selective restore.
+- **Local-disk storage** under `~/.watchtower/managed_db_backups/<db_id>/<timestamp>.dump`.
+- **Disk-usage panel** shows total per-DB backup size + free-space on the volume before you click "Backup now."
+- **Not in v0** (called out explicitly): restore (lands in v1 with required dry-run preview), scheduled backups (v1), off-host storage like S3/remote-PC (v1), non-Postgres engines (v1).
+
+### Remote Access (`/remote-access`)
+
+- **One-click Tailscale exposure**. WatchTower detects the `tailscale` CLI, reports installed/signed-in/sharing state, and on click runs `tailscale serve --bg <port>`. Copy the `*.ts.net` URL and you're reachable from any tailnet device — phone, laptop, another server.
+- **Provider-abstracted backend**. `TailscaleProvider` is the first concrete provider; Cloudflare Tunnel and SSH reverse tunnels plug in as additional cards later without UI changes.
+- **No emoji-banner UI**. Inline SVG flow diagram at the top of the page explains what gets exposed where, animated with CSS-only `stroke-dashoffset` (respects `prefers-reduced-motion`).
+
+### Project live URL (GitHub Pages, custom domain)
+
+- **New `live_url` field** on every project — distinct from `launch_url` (local preview server). Edit card on the project page with an Open button. Validated to start with `http://` or `https://`; no server-side liveness probe (the whole point is to point at GH Pages / external domains we can't always reach from the deploy host).
+
+### Inline section diagrams
+
+- **Six small SVG components** in `web/src/components/SectionDiagrams.tsx` — one per new section: Remote Access, Managed DB, External DB, Replication, Backup, GitHub Pages live URL. Boxes + animated dashed connectors. No PNG assets, no framer-motion runtime; lazy-loaded chunk at 9 kB / 2.9 kB gzipped.
+- Visual grammar matches the rest of the app: 14px rounded rects, slate-300 borders, brand palette accents per node type.
+- `aria-label` per diagram + one-line caption so screen-reader users get the same context.
+
+### Database migrations
+
+- Five new Alembic migrations land additively:
+  - `d8f4a91c3e57` — `managed_databases` table
+  - `e1a738c4f96d` — `external_databases` table
+  - `f3c5b27e8a04` — `projects.live_url` column
+  - `a9c47d5e2b18` — `managed_database_replicas` table
+  - `c3f8e519a72b` — `managed_database_backups` table
+- All existing data survives; head chain extends cleanly from `b1a937e5c2f4`.
+
+### Tests
+
+- 393 → 457 (+64). Five new test files exercise the wiring + auth + audit + error handling. Subprocess + filesystem are mocked, so real podman / pg_basebackup / pg_dump / tailscale CLI are NOT exercised by CI — manual verification on a real machine with Podman installed is the gate before tagging stable.
+
+### Honest scope notes
+
+- **v1 deliberately ships single-PC HA.** Remote-node placement (the "Primary on PC #1, standby on PC #2 over Tailscale" story) requires cross-host podman execution + Tailscale-routed replication and is v2.
+- **Backup is on-demand only** — no scheduler, no remote storage, no restore. Reach v1 for those.
+- **Non-Postgres replication + backup** is v2. The data model (ManagedDatabaseReplica, ManagedDatabaseBackup) already supports it; the runtime helpers are Postgres-specific by intent.
+
+---
+
 ## 1.15.0 — Autonomous global-deploy (Phases 1–5) + MCP server + Workspace add-on + unified UX
 
 Largest single release since 1.0. Turns WatchTower from a deploy dashboard into a full autonomous control plane: an app can go from "files on my laptop" to "globally reachable, TLS-secured, container-restarted-on-failure, DNS-pinned" through one toggle.
