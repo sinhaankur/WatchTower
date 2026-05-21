@@ -12,6 +12,7 @@
  */
 
 import { useEffect, useState } from 'react';
+import { RemoteAccessDiagram } from '@/components/SectionDiagrams';
 import {
   type RemoteAccessProvider,
   useDisableRemoteAccess,
@@ -47,6 +48,7 @@ export default function RemoteAccess() {
       </header>
 
       <main className="px-4 sm:px-6 lg:px-8 py-6 max-w-2xl mx-auto space-y-5 fade-in-up">
+        <RemoteAccessDiagram />
         <div className="rounded-xl border border-blue-100 bg-blue-50 px-5 py-4 text-xs text-blue-800 space-y-1">
           <p className="font-semibold">How this works</p>
           <p>

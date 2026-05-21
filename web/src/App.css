@@ -62,6 +62,17 @@
   50%      { opacity: 0.7; transform: scale(0.92); }
 }
 
+/* Flow lines for section diagrams — animates stroke-dashoffset so a
+   dashed SVG path looks like data is flowing along it. Apply to <path>
+   or <line> elements; `stroke-dasharray` must be set on the element
+   itself (Tailwind class or attribute) since `@apply` only handles
+   utility classes, not SVG presentation attrs. */
+@keyframes anim-flow {
+  to { stroke-dashoffset: -16; }
+}
+.anim-flow        { animation: anim-flow 1.6s linear infinite; }
+.anim-flow-slow   { animation: anim-flow 3s linear infinite; }
+
 .anim-fade-in        { animation: anim-fade-in 200ms ease-out both; }
 .anim-fade-in-up     { animation: anim-fade-in-up 250ms cubic-bezier(0.16, 1, 0.3, 1) both; }
 .anim-scale-in       { animation: anim-scale-in 200ms cubic-bezier(0.16, 1, 0.3, 1) both; }
@@ -114,6 +125,8 @@ button:not(:disabled):active,
   .anim-scale-in,
   .anim-pulse-soft,
   .anim-skeleton,
+  .anim-flow,
+  .anim-flow-slow,
   .anim-stagger > * {
     animation: none !important;
     transition: none !important;

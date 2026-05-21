@@ -12,6 +12,12 @@
 
 import { useState } from 'react';
 import {
+  BackupDiagram,
+  ExternalDbDiagram,
+  ManagedDbDiagram,
+  ReplicationDiagram,
+} from '@/components/SectionDiagrams';
+import {
   type ExternalDatabase,
   type ManagedDatabase,
   type ManagedDatabaseCreateResponse,
@@ -177,6 +183,7 @@ function ManagedTabContent({
 }) {
   return (
     <>
+      <ManagedDbDiagram />
       {runtime && !runtime.available && (
         <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900">
           No container runtime found on this host.{' '}
@@ -227,6 +234,7 @@ function ExternalTabContent({
 }) {
   return (
     <>
+      <ExternalDbDiagram />
       {isLoading && (
         <div className="rounded-xl border border-border bg-card p-6 text-sm text-slate-600">
           Loading external connections…
@@ -747,6 +755,7 @@ function ReplicasSection({ primaryDb }: { primaryDb: ManagedDatabase }) {
 
       {open && (
         <div className="mt-3 space-y-3">
+          <ReplicationDiagram />
           <div className="flex items-center justify-between">
             <p className="text-[11px] text-slate-500">
               Postgres streaming replication. Standbys run as separate pods on this PC and stream WAL from the primary.
@@ -977,6 +986,7 @@ function BackupsSection({ primaryDb }: { primaryDb: ManagedDatabase }) {
 
       {open && (
         <div className="mt-3 space-y-3">
+          <BackupDiagram />
           <div className="flex items-start justify-between gap-3 flex-wrap">
             <p className="text-[11px] text-slate-500 max-w-md">
               On-demand <code className="font-mono">pg_dump</code> snapshots stored under{' '}

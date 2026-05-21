@@ -2,6 +2,7 @@ import { Fragment, useEffect, useRef, useState } from 'react';
 import { useParams, Link /*, useNavigate*/ } from 'react-router-dom';
 import apiClient from '@/lib/api';
 import { Skeleton } from '@/components/Skeleton';
+import { GithubPagesDiagram } from '@/components/SectionDiagrams';
 import {
   useProjects,
   useProjectRelations,
@@ -483,6 +484,10 @@ function LiveUrlCard({ project }: { project: Project }) {
   const [draft, setDraft] = useState<string>(project.live_url ?? '');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Only show the explainer diagram when the user opens the editor or
+  // hasn't set a URL yet — once a URL is saved, the diagram is just
+  // noise on every page load.
+  const showDiagram = editing || !saved;
 
   const placeholder = 'https://username.github.io/repo-name/';
 
@@ -524,6 +529,7 @@ function LiveUrlCard({ project }: { project: Project }) {
         )}
       </div>
       <div className="px-5 py-4 flex flex-col gap-3">
+        {showDiagram && <GithubPagesDiagram />}
         {!editing && (
           <>
             {saved ? (
