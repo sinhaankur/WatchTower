@@ -10,7 +10,7 @@
  * and external-DB-connection tabs slot in without restructuring.
  */
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   BackupDiagram,
   ExternalDbDiagram,
@@ -18,13 +18,16 @@ import {
   ReplicationDiagram,
 } from '@/components/SectionDiagrams';
 import {
+  type BackupSchedule,
   type ExternalDatabase,
   type ManagedDatabase,
   type ManagedDatabaseCreateResponse,
   type ManagedDbBackup,
   type ManagedDbReplica,
   useAddReplica,
+  useBackupSchedule,
   useCreateBackup,
+  useUpdateBackupSchedule,
   useCreateExternalDatabase,
   useCreateManagedDatabase,
   useDeleteBackup,
@@ -955,6 +958,7 @@ function BackupsSection({ primaryDb }: { primaryDb: ManagedDatabase }) {
   const [open, setOpen] = useState(false);
   const { data: backups, isLoading } = useManagedDbBackups(primaryDb.id, open);
   const { data: usage } = useManagedDbBackupUsage(primaryDb.id, open);
+  const { data: schedule } = useBackupSchedule(primaryDb.id, open);
   const create = useCreateBackup(primaryDb.id);
   const [label, setLabel] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -988,11 +992,12 @@ function BackupsSection({ primaryDb }: { primaryDb: ManagedDatabase }) {
       {open && (
         <div className="mt-3 space-y-3">
           <BackupDiagram />
+          <ScheduleControls primaryDb={primaryDb} schedule={schedule} />
           <div className="flex items-start justify-between gap-3 flex-wrap">
             <p className="text-[11px] text-slate-500 max-w-md">
               On-demand <code className="font-mono">pg_dump</code> snapshots stored under{' '}
-              <code className="font-mono">~/.watchtower/managed_db_backups/</code>. Custom-format
-              so a future Restore feature can use <code className="font-mono">pg_restore</code>.
+              <code className="font-mono">~/.watchtower/managed_db_backups/</code>.
+              Schedule above for automatic recurring backups.
             </p>
             {usage && (
               <p className="text-[11px] text-slate-500 whitespace-nowrap">
@@ -1165,6 +1170,186 @@ function BackupRow({
           isPending={restore.isPending}
         />
       )}
+    </div>
+  );
+}
+
+// Scheduled-backups control. Cron string in UTC, with a preset
+// dropdown for common cases ("Hourly", "Daily 3am UTC", "Weekly Sun
+// 3am UTC") + a raw-cron escape hatch. Retention cap stops a
+// misconfigured schedule from filling the disk.
+
+const CRON_PRESETS: { label: string; cron: string; describe: string }[] = [
+  { label: 'Hourly', cron: '0 * * * *', describe: 'Every hour at :00' },
+  { label: 'Every 6 hours', cron: '0 */6 * * *', describe: '00:00, 06:00, 12:00, 18:00 UTC' },
+  { label: 'Daily 3am UTC', cron: '0 3 * * *', describe: 'Every day at 03:00 UTC' },
+  { label: 'Daily 0am UTC', cron: '0 0 * * *', describe: 'Every day at midnight UTC' },
+  { label: 'Weekly Sun 3am UTC', cron: '0 3 * * 0', describe: 'Every Sunday at 03:00 UTC' },
+];
+
+function formatNextRun(iso: string | null): string {
+  if (!iso) return '—';
+  try {
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return iso;
+    const diffMs = d.getTime() - Date.now();
+    const absMin = Math.round(Math.abs(diffMs) / 60_000);
+    const when = d.toLocaleString();
+    if (diffMs < 0) return `${when} (overdue)`;
+    if (absMin < 60) return `${when} (in ${absMin} min)`;
+    const hrs = Math.round(absMin / 60);
+    if (hrs < 24) return `${when} (in ${hrs} h)`;
+    const days = Math.round(hrs / 24);
+    return `${when} (in ${days} d)`;
+  } catch {
+    return iso;
+  }
+}
+
+function ScheduleControls({
+  primaryDb,
+  schedule,
+}: {
+  primaryDb: ManagedDatabase;
+  schedule: BackupSchedule | undefined;
+}) {
+  const update = useUpdateBackupSchedule(primaryDb.id);
+  const currentCron = schedule?.schedule_cron ?? '';
+  const currentPreset = CRON_PRESETS.find((p) => p.cron === currentCron)?.cron ?? (currentCron ? 'custom' : '');
+
+  const [selectedPreset, setSelectedPreset] = useState<string>(currentPreset);
+  const [customCron, setCustomCron] = useState<string>(currentPreset === 'custom' ? currentCron : '');
+  const [retention, setRetention] = useState<number>(schedule?.schedule_retention_count ?? 7);
+  const [error, setError] = useState<string | null>(null);
+  const [savedFlash, setSavedFlash] = useState<boolean>(false);
+
+  // Sync local state when schedule arrives / changes.
+  useEffect(() => {
+    if (!schedule) return;
+    const cur = schedule.schedule_cron ?? '';
+    const preset = CRON_PRESETS.find((p) => p.cron === cur)?.cron ?? (cur ? 'custom' : '');
+    setSelectedPreset(preset);
+    setCustomCron(preset === 'custom' ? cur : '');
+    setRetention(schedule.schedule_retention_count);
+  }, [schedule]);
+
+  const isCustom = selectedPreset === 'custom';
+  const effectiveCron = isCustom ? customCron.trim() : selectedPreset;
+
+  const save = () => {
+    setError(null);
+    setSavedFlash(false);
+    update.mutate(
+      {
+        cron: effectiveCron || null,  // empty/null clears the schedule
+        retention_count: retention,
+      },
+      {
+        onSuccess: () => {
+          setSavedFlash(true);
+          window.setTimeout(() => setSavedFlash(false), 2000);
+        },
+        onError: (err) => {
+          const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+          setError(typeof detail === 'string' ? detail : 'Failed to save schedule.');
+        },
+      },
+    );
+  };
+
+  const clear = () => {
+    setError(null);
+    setSavedFlash(false);
+    update.mutate(
+      { cron: null },
+      {
+        onSuccess: () => {
+          setSelectedPreset('');
+          setCustomCron('');
+          setSavedFlash(true);
+          window.setTimeout(() => setSavedFlash(false), 2000);
+        },
+      },
+    );
+  };
+
+  return (
+    <div className="rounded-lg border border-indigo-200 bg-indigo-50/60 px-3 py-2.5 space-y-2">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <div className="text-[11px] font-semibold text-indigo-900">
+          Schedule {schedule?.schedule_cron ? '· active' : '· off'}
+        </div>
+        {schedule?.next_run_at && (
+          <div className="text-[11px] text-indigo-700">
+            Next: <span className="font-mono">{formatNextRun(schedule.next_run_at)}</span>
+          </div>
+        )}
+      </div>
+
+      <div className="flex flex-col sm:flex-row gap-2">
+        <select
+          value={selectedPreset}
+          onChange={(e) => setSelectedPreset(e.target.value)}
+          className="flex-1 rounded-md border border-indigo-300 bg-white px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-300"
+        >
+          <option value="">— Off (no schedule) —</option>
+          {CRON_PRESETS.map((p) => (
+            <option key={p.cron} value={p.cron}>
+              {p.label} ({p.describe})
+            </option>
+          ))}
+          <option value="custom">Custom cron expression…</option>
+        </select>
+
+        {isCustom && (
+          <input
+            value={customCron}
+            onChange={(e) => setCustomCron(e.target.value)}
+            placeholder="0 3 * * *"
+            className="flex-1 rounded-md border border-indigo-300 bg-white px-2 py-1 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-indigo-300"
+            aria-label="Custom cron expression"
+          />
+        )}
+
+        <div className="flex items-center gap-1 whitespace-nowrap">
+          <label className="text-[11px] text-indigo-900">Keep</label>
+          <input
+            type="number"
+            min={1}
+            max={1000}
+            value={retention}
+            onChange={(e) => setRetention(Math.max(1, Math.min(1000, Number(e.target.value) || 1)))}
+            className="w-14 rounded-md border border-indigo-300 bg-white px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-300"
+          />
+        </div>
+
+        <button
+          onClick={save}
+          disabled={update.isPending || (isCustom && !customCron.trim() && !schedule?.schedule_cron)}
+          className="px-3 py-1 rounded-md bg-indigo-700 hover:bg-indigo-800 text-white text-[11px] font-medium disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+        >
+          {update.isPending ? 'Saving…' : 'Save schedule'}
+        </button>
+        {schedule?.schedule_cron && (
+          <button
+            onClick={clear}
+            disabled={update.isPending}
+            className="px-2 py-1 rounded-md border border-indigo-300 bg-white text-[11px] text-indigo-800 hover:bg-indigo-100 disabled:opacity-50"
+          >
+            Clear
+          </button>
+        )}
+      </div>
+
+      {error && (
+        <p className="text-[11px] text-red-700 break-all">{error}</p>
+      )}
+      {savedFlash && (
+        <p className="text-[11px] text-emerald-700">Saved.</p>
+      )}
+      <p className="text-[11px] text-indigo-800">
+        All times UTC. Manual backups are never auto-deleted. Older scheduled backups beyond the keep count are pruned after each successful run.
+      </p>
     </div>
   );
 }

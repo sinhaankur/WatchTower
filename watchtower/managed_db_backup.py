@@ -61,12 +61,17 @@ def _backups_root() -> Path:
 def backup_path(db_id: str, label: Optional[str] = None) -> Path:
     """Compute the absolute file path for a new backup.
 
-    Label, if provided, becomes a slug suffix. Falls back to a UTC
-    timestamp so concurrent backups don't clobber each other.
+    Filename: ``YYYYMMDDTHHMMSS_microsec-<label?>.dump``. Microsecond
+    precision so two backups taken within the same second (rapid
+    "Backup now" clicks; the scheduler firing alongside an on-demand
+    backup) never collide — without microseconds the second write
+    silently overwrote the first dump file and the older row's
+    file_path then pointed at the newer dump's bytes.
     """
     db_dir = _backups_root() / db_id
     db_dir.mkdir(parents=True, exist_ok=True)
-    ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    # `%f` is microseconds (6 digits). Stays sortable as a string.
+    ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S_%f")
     slug = ""
     if label:
         cleaned = "".join(c for c in label if c.isalnum() or c in "-_")

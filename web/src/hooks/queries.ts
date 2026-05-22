@@ -38,6 +38,7 @@ export const queryKeys = {
   managedDbReplicas: (id: string) => ['managed-databases', id, 'replicas'] as const,
   managedDbBackups: (id: string) => ['managed-databases', id, 'backups'] as const,
   managedDbBackupUsage: (id: string) => ['managed-databases', id, 'backups', 'usage'] as const,
+  managedDbSchedule: (id: string) => ['managed-databases', id, 'schedule'] as const,
   externalDatabases: ['external-databases'] as const,
   projectDatabases: (projectId: string) => ['projects', projectId, 'databases'] as const,
 } as const;
@@ -688,6 +689,47 @@ export type RestoreBackupResponse = {
     size_bytes: number | null;
   };
 };
+
+// ── Scheduled backups ────────────────────────────────────────────────────────
+
+export type BackupSchedule = {
+  id: string;
+  name: string;
+  schedule_cron: string | null;
+  schedule_retention_count: number;
+  last_scheduled_backup_at: string | null;
+  next_run_at: string | null;
+};
+
+export function useBackupSchedule(primaryId: string, enabled: boolean = true) {
+  return useQuery<BackupSchedule>({
+    queryKey: queryKeys.managedDbSchedule(primaryId),
+    queryFn: async () =>
+      (await apiClient.get<BackupSchedule>(`/managed-databases/${primaryId}/schedule`)).data,
+    enabled,
+    staleTime: 30_000,
+  });
+}
+
+export function useUpdateBackupSchedule(primaryId: string) {
+  const qc = useQueryClient();
+  return useMutation<
+    BackupSchedule,
+    unknown,
+    { cron?: string | null; retention_count?: number }
+  >({
+    mutationFn: async (patch) =>
+      (await apiClient.patch<BackupSchedule>(
+        `/managed-databases/${primaryId}/schedule`,
+        patch,
+      )).data,
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.managedDbSchedule(primaryId) });
+      // The schedule might have produced new backups already — refresh.
+      void qc.invalidateQueries({ queryKey: queryKeys.managedDbBackups(primaryId) });
+    },
+  });
+}
 
 export function useRestoreBackup(primaryId: string) {
   const qc = useQueryClient();

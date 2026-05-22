@@ -26,6 +26,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from watchtower import managed_db_backup as backup
+from watchtower import managed_db_backup_scheduler as backup_scheduler
 from watchtower import managed_db_replication as replication
 from watchtower import managed_db_runtime as runtime
 from watchtower.api import audit as audit_log
@@ -590,6 +591,12 @@ async def delete_database(
         row.status_message = str(exc)[:500]
         db.commit()
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+    # Drop any cron schedule for this DB before the row goes — otherwise
+    # the scheduler would keep trying to back up a DB that no longer exists
+    # (it would eventually self-clean on next fire via the "row missing"
+    # branch, but unregistering up front is cleaner + faster).
+    backup_scheduler.unregister_schedule(str(row.id))
 
     audit_log.record_for_user(
         db, current_user,
@@ -1290,6 +1297,138 @@ async def delete_backup(
     db.delete(row)
     db.commit()
     return {"ok": True, "id": str(backup_id)}
+
+
+# ── Schedule (v1.1: cron-driven scheduled backups) ──────────────────────────
+
+
+class UpdateScheduleRequest(BaseModel):
+    """PATCH body. `cron=None` clears the schedule entirely; `cron=""`
+    is treated the same. Retention is bounded so a misconfigured value
+    can't make us keep zero (which would make scheduled backups
+    immediately self-delete after each run) or thousands (disk DoS)."""
+    cron: Optional[str] = Field(
+        default=None,
+        max_length=128,
+        description="5-field cron string (UTC), or null/empty to clear the schedule.",
+    )
+    retention_count: Optional[int] = Field(
+        default=None,
+        ge=1, le=1000,
+        description="How many scheduled backups to keep on disk before pruning.",
+    )
+
+
+class ScheduleResponse(BaseModel):
+    id: str
+    name: str
+    schedule_cron: Optional[str] = None
+    schedule_retention_count: int
+    last_scheduled_backup_at: Optional[str] = None
+    next_run_at: Optional[str] = None
+
+
+def _serialize_schedule(row: ManagedDatabase) -> ScheduleResponse:
+    nxt = backup_scheduler.next_run_time(str(row.id))
+    return ScheduleResponse(
+        id=str(row.id),
+        name=row.name,
+        schedule_cron=row.schedule_cron,
+        schedule_retention_count=int(row.schedule_retention_count or 7),
+        last_scheduled_backup_at=row.last_scheduled_backup_at.isoformat() if row.last_scheduled_backup_at else None,
+        next_run_at=nxt.isoformat() if nxt else None,
+    )
+
+
+@router.get("/{db_id}/schedule", response_model=ScheduleResponse)
+async def get_schedule(
+    db_id: UUID,
+    db: Session = Depends(get_db),
+    _current_user: dict = Depends(util.get_current_user),
+) -> ScheduleResponse:
+    row = _get_or_404(db, db_id)
+    return _serialize_schedule(row)
+
+
+@router.patch("/{db_id}/schedule", response_model=ScheduleResponse)
+async def update_schedule(
+    db_id: UUID,
+    body: UpdateScheduleRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(util.get_current_user),
+) -> ScheduleResponse:
+    """Set or clear a cron schedule for this database's backups.
+
+    The cron string is in UTC (no per-user timezone in v1 — keeps the
+    UI honest about when the backup actually fires). Common presets
+    the UI surfaces: ``0 * * * *`` (hourly), ``0 3 * * *`` (3am UTC
+    daily), ``0 3 * * 0`` (3am UTC every Sunday).
+
+    Setting cron to null/empty CLEARS the schedule and unregisters
+    the APScheduler job. The DB itself is not modified, only its
+    schedule.
+    """
+    row = _get_or_404(db, db_id)
+
+    if row.engine != "postgres":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"Scheduled backups are Postgres only in v1 "
+                f"(this database is {row.engine})."
+            ),
+        )
+
+    updates: dict = {}
+    cron_changed = False
+    if "cron" in body.model_fields_set:
+        new_cron = (body.cron or "").strip() or None
+        if new_cron is not None:
+            try:
+                backup_scheduler.parse_cron_or_raise(new_cron)
+            except ValueError as exc:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=str(exc),
+                ) from exc
+        if new_cron != row.schedule_cron:
+            row.schedule_cron = new_cron
+            updates["schedule_cron"] = new_cron
+            cron_changed = True
+
+    if body.retention_count is not None and body.retention_count != row.schedule_retention_count:
+        row.schedule_retention_count = body.retention_count
+        updates["retention_count"] = body.retention_count
+
+    if updates:
+        audit_log.record_for_user(
+            db, current_user,
+            action="managed_db.backup.schedule.update",
+            entity_type="managed_database",
+            entity_id=row.id,
+            org_id=row.org_id,
+            request=request,
+            extra={"name": row.name, "updated_fields": list(updates.keys())},
+        )
+    db.commit()
+
+    # Sync the live scheduler with the new state. Doing this after commit
+    # so a successfully-saved schedule survives a scheduler hiccup.
+    if cron_changed:
+        if row.schedule_cron:
+            try:
+                backup_scheduler.register_schedule(str(row.id), row.schedule_cron)
+            except Exception:  # noqa: BLE001
+                logger.exception(
+                    "Saved schedule but failed to register cron job for %s — "
+                    "it will pick up on the next process restart.",
+                    row.id,
+                )
+        else:
+            backup_scheduler.unregister_schedule(str(row.id))
+
+    return _serialize_schedule(row)
 
 
 @router.get("/{db_id}/backups/usage")

@@ -264,12 +264,34 @@ async def lifespan(_app: FastAPI):
             stop_scheduler = None  # type: ignore[assignment]
     else:
         stop_scheduler = None  # type: ignore[assignment]
+
+    # Backup scheduler — separate APScheduler instance so disabling
+    # autonomous mode doesn't also disable backups (and vice versa).
+    # Reads ManagedDatabase.schedule_cron rows on startup + registers
+    # one cron job per scheduled database. No-op when no rows have a
+    # schedule. WATCHTOWER_BACKUP_SCHEDULER_DISABLE=true skips entirely.
+    try:
+        from watchtower.managed_db_backup_scheduler import (
+            start_scheduler as start_backup_scheduler,
+            stop_scheduler as stop_backup_scheduler,
+        )
+        start_backup_scheduler()
+    except Exception:
+        logger.exception("backup-scheduler: failed to start — continuing without it")
+        stop_backup_scheduler = None  # type: ignore[assignment]
+
     yield
+
     if stop_scheduler is not None:
         try:
             stop_scheduler()
         except Exception:
             logger.exception("autonomous: scheduler failed to stop cleanly")
+    if stop_backup_scheduler is not None:
+        try:
+            stop_backup_scheduler()
+        except Exception:
+            logger.exception("backup-scheduler: failed to stop cleanly")
     logger.info("Shutting down WatchTower API")
 
 

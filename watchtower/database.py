@@ -847,6 +847,16 @@ class ManagedDatabase(Base):
     status_message = Column(String, nullable=True)
     last_status_at = Column(DateTime, nullable=True)
 
+    # Scheduled backups (v1.1 — companion to on-demand pg_dump in
+    # ManagedDatabaseBackup). `schedule_cron` is a standard 5-field cron
+    # string ("min hour dom month dow"); NULL means no schedule.
+    # `schedule_retention_count` caps the number of scheduled backups
+    # kept on disk — older ones get pruned after each successful run.
+    # Manual (on-demand) backups are NEVER pruned by the scheduler.
+    schedule_cron = Column(String, nullable=True)
+    schedule_retention_count = Column(Integer, default=7, nullable=False)
+    last_scheduled_backup_at = Column(DateTime, nullable=True)
+
     # Audit-light columns (full audit lives in audit_events)
     created_by_user_id = Column(Uuid(as_uuid=True), ForeignKey("users.id"), nullable=True)
     created_at = Column(DateTime, default=_utcnow)
@@ -979,6 +989,11 @@ class ManagedDatabaseBackup(Base):
     status = Column(Enum(BackupStatus), default=BackupStatus.RUNNING, nullable=False)
     status_message = Column(String, nullable=True)
     completed_at = Column(DateTime, nullable=True)
+
+    # Distinguishes scheduler-created backups from on-demand ones. The
+    # retention prune only deletes is_scheduled=True rows so the operator's
+    # manually-clicked snapshots stick around indefinitely.
+    is_scheduled = Column(Boolean, default=False, nullable=False)
 
     created_by_user_id = Column(Uuid(as_uuid=True), ForeignKey("users.id"), nullable=True)
     created_at = Column(DateTime, default=_utcnow)
