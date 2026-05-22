@@ -91,29 +91,55 @@ def test_create_backup_without_label(client, primary_db, fake_pg_dump):
     assert r.json()["label"] is None
 
 
-def test_create_backup_rejects_redis(client, fake_podman, fake_pg_dump):
-    """Redis backups (BGSAVE + RDB copy) are a different shape than
-    dump-tool-based engines; they're explicitly deferred to a later
-    release. The endpoint should reject Redis with a clear message
-    while still accepting postgres/mysql/mariadb/mongodb.
-    """
+def test_create_backup_works_for_redis(client, fake_podman, fake_pg_dump):
+    """Redis backups land via `redis-cli --rdb` in a transient
+    container. The dump file is a binary RDB snapshot. v1 ships
+    backup-only — restore is the qualitatively-different "stop pod,
+    replace /data/dump.rdb, restart" recipe, currently manual."""
     cr = client.post(
         "/api/managed-databases",
         json={"name": "cache", "engine": "redis", "version": "7.4"},
     )
     r = client.post(
         f"/api/managed-databases/{cr.json()['id']}/backups",
+        json={"label": "before-flush"},
+    )
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["format"] == "rdb"
+    assert body["status"] == "ready"
+
+
+def test_redis_restore_rejected_with_manual_recipe(client, fake_podman, fake_pg_dump):
+    """Restoring a Redis backup must return a clear actionable error
+    pointing at the manual recipe — not crash, not silently corrupt
+    data, not pretend it worked. The error names the exact file path
+    + steps so the operator can do it themselves."""
+    cr = client.post(
+        "/api/managed-databases",
+        json={"name": "cache2", "engine": "redis", "version": "7.4"},
+    )
+    db_id = cr.json()["id"]
+
+    bk = client.post(
+        f"/api/managed-databases/{db_id}/backups",
         json={},
     )
+    assert bk.status_code == 200
+    backup_id = bk.json()["id"]
+
+    # Try to restore — must return 400 with the manual-recipe message.
+    r = client.post(
+        f"/api/managed-databases/{db_id}/backups/{backup_id}/restore",
+        json={"confirm_db_name": "cache2"},
+    )
     assert r.status_code == 400
-    body = r.json()
-    assert "redis" in body["detail"].lower()
-    # The error should also name the engines that ARE supported, so
-    # the operator knows their options.
-    detail_lower = body["detail"].lower()
-    assert "postgres" in detail_lower
-    assert "mysql" in detail_lower
-    assert "mongodb" in detail_lower
+    detail = r.json()["detail"].lower()
+    assert "redis" in detail or "support" in detail
+    # The error should also mention the manual recipe so the operator
+    # knows what to do next.
+    assert "dump.rdb" in r.json()["detail"]
+    assert "restart" in r.json()["detail"].lower()
 
 
 def test_create_backup_works_for_mysql(client, fake_podman, fake_pg_dump):

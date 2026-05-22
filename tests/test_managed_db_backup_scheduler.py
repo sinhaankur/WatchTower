@@ -152,7 +152,13 @@ def test_patch_schedule_retention_bounds(client, primary_db):
     assert r.status_code == 422   # above le=1000
 
 
-def test_patch_schedule_rejects_non_postgres(client, fake_podman):
+def test_patch_schedule_accepts_redis_now_that_backup_supports_it(
+    client, fake_podman,
+):
+    """Phase 3 added Redis backup support. The schedule endpoint
+    accepts any engine in `ENGINE_DUMP_FORMAT`, so Redis should now
+    be schedulable — even though Redis RESTORE is still manual.
+    """
     cr = client.post(
         "/api/managed-databases",
         json={"name": "cache-sched", "engine": "redis", "version": "7.4"},
@@ -161,8 +167,8 @@ def test_patch_schedule_rejects_non_postgres(client, fake_podman):
         f"/api/managed-databases/{cr.json()['id']}/schedule",
         json={"cron": "0 3 * * *"},
     )
-    assert r.status_code == 400
-    assert "postgres" in r.json()["detail"].lower()
+    assert r.status_code == 200, r.text
+    assert r.json()["schedule_cron"] == "0 3 * * *"
 
 
 def test_patch_schedule_writes_audit(client, primary_db, db_session):
@@ -238,23 +244,30 @@ def test_tick_skips_unknown_db_gracefully(fake_podman, fake_pg_dump):
     # without raising.
 
 
-def test_tick_skips_non_postgres(client, fake_podman, fake_pg_dump):
-    """v1 scheduled backups are Postgres only; a redis schedule
-    shouldn't actually execute even if somehow set."""
+def test_tick_runs_for_redis_now_that_backup_supports_it(
+    client, fake_podman, fake_pg_dump,
+):
+    """Phase 3 added Redis backup. A scheduled Redis tick should
+    now actually run rather than skipping. The fake_pg_dump fixture
+    intercepts run_backup so we don't invoke real redis-cli."""
     cr = client.post(
         "/api/managed-databases",
         json={"name": "redis-sched", "engine": "redis", "version": "7.4"},
     )
-    # Tick the scheduler against the redis row — should no-op.
     scheduler._run_scheduled_backup(cr.json()["id"])
-    # No new backup row should appear.
-    from watchtower.database import ManagedDatabaseBackup, SessionLocal
+
+    from watchtower.database import (
+        BackupStatus, ManagedDatabaseBackup, SessionLocal,
+    )
     from uuid import UUID
     with SessionLocal() as db:
         rows = db.query(ManagedDatabaseBackup).filter(
             ManagedDatabaseBackup.primary_db_id == UUID(cr.json()["id"])
         ).all()
-        assert rows == []
+        assert len(rows) == 1
+        assert rows[0].status == BackupStatus.READY
+        assert rows[0].format == "rdb"
+        assert rows[0].is_scheduled is True
 
 
 # ── Retention prune ──────────────────────────────────────────────────────────

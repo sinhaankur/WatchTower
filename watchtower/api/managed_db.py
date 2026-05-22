@@ -1380,12 +1380,20 @@ async def restore_backup(
     if not backup_row:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Backup not found")
 
-    if primary.engine not in backup.ENGINE_DUMP_FORMAT:
+    if primary.engine not in backup.ENGINE_RESTORE_SUPPORTED:
+        # Backup may have worked (Redis can take an .rdb snapshot) but
+        # in-place restore for Redis means stopping the pod, replacing
+        # /data/dump.rdb in the volume, and restarting — a heavier
+        # surgery than the dump-tool engines need. Point the operator
+        # at the manual recipe instead of silently doing the wrong
+        # thing. v2 will automate this.
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=(
                 f"Restore doesn't yet support engine '{primary.engine}'. "
-                f"Supported: {', '.join(sorted(backup.ENGINE_DUMP_FORMAT))}."
+                f"Supported: {', '.join(sorted(backup.ENGINE_RESTORE_SUPPORTED))}. "
+                f"For Redis: stop the pod, replace /data/dump.rdb in the "
+                f"Podman volume with the backup file, restart the pod."
             ),
         )
 
