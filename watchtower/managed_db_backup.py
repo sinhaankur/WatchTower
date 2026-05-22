@@ -143,6 +143,86 @@ def run_pg_dump(spec: BackupSpec) -> int:
         ) from exc
 
 
+@dataclass
+class RestoreSpec:
+    """Inputs for a restore-in-place against a running managed database.
+
+    The backup file must already be on the host at ``host_dump_path``.
+    The transient pg_restore container mounts its parent directory at
+    ``/backup`` and reads the file from there — same pattern as pg_dump,
+    same SELinux-on-Linux quirks (none on macOS).
+    """
+    image: str               # SAME image family/version as the target DB
+    primary_host: str        # 127.0.0.1 in v0 (host network)
+    primary_port: int
+    db_name: str
+    db_user: str
+    db_password: str
+    host_dump_path: Path     # absolute host path to the .dump file
+
+
+def run_pg_restore(spec: RestoreSpec) -> None:
+    """Restore a pg_dump custom-format backup into the running primary.
+
+    Strategy: ``pg_restore --clean --if-exists`` against the *existing*
+    database, instead of DROP DATABASE + CREATE + restore. Why:
+
+      * Dropping the database requires terminating every connection to
+        it first, which means racing the app + breaking active queries.
+        Operators don't expect "restore my data" to also tear down
+        every open session.
+      * ``--clean --if-exists`` drops each object inside the DB before
+        recreating it, so the end state is equivalent to "fresh DB
+        loaded from the dump." The downside: extension state and
+        objects not in the dump (manually-created views, custom roles)
+        also get dropped — but that's true of any restore.
+      * No need for the DB to be stopped/restarted, so the connection
+        URL stays valid for the apps using it.
+
+    Runs as a transient ``--rm`` container using the SAME image as the
+    target DB so the pg_restore version matches the server version
+    exactly (a mismatch is the #1 cause of confusing "could not
+    restore" errors).
+    """
+    bin_ = runtime._podman_path()
+    if not bin_:
+        raise BackupError("No container runtime found.")
+
+    if not spec.host_dump_path.is_file():
+        raise BackupError(
+            f"Backup file no longer exists on disk: {spec.host_dump_path}"
+        )
+
+    host_dir = str(spec.host_dump_path.parent)
+    in_filename = spec.host_dump_path.name
+
+    rc, out, err = runtime._run(
+        [bin_, "run", "--rm",
+         "--network", "host",
+         "-e", f"PGPASSWORD={spec.db_password}",
+         "-v", f"{host_dir}:/backup:ro",
+         spec.image,
+         "pg_restore",
+         "-h", spec.primary_host,
+         "-p", str(spec.primary_port),
+         "-U", spec.db_user,
+         "-d", spec.db_name,
+         "--clean",          # drop existing objects before recreating
+         "--if-exists",      # don't error on already-absent objects
+         "--no-owner",       # restore objects as the connecting user, not the dumper
+         "--no-privileges",  # skip GRANT/REVOKE — connecting user has full access
+         "-v",               # verbose so failures surface in stderr
+         f"/backup/{in_filename}"],
+        timeout=3600.0,  # 1h for large restores
+    )
+    if rc != 0:
+        # pg_restore prints actionable detail (e.g. "could not connect:
+        # FATAL: password authentication failed"); preserve verbatim.
+        raise BackupError(
+            f"pg_restore failed: {err.strip() or out.strip() or 'unknown error'}"
+        )
+
+
 def delete_backup_file(file_path: str) -> None:
     """Unlink the dump from disk. Best-effort — a missing file is fine
     (the DB row gets removed regardless)."""

@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import logging
 import secrets
+from pathlib import Path
 from typing import Optional
 from uuid import UUID
 
@@ -1104,6 +1105,158 @@ async def create_backup(
     )
     db.commit()
     return _serialize_backup(row)
+
+
+class RestoreBackupRequest(BaseModel):
+    """Restoring a backup replaces the live data in place. The
+    name-typing confirmation makes the destructive UX explicit — same
+    pattern GitHub / Stripe / AWS use for "type the resource name to
+    confirm deletion."
+    """
+    confirm_db_name: str = Field(
+        ...,
+        description="Must match the target database's name exactly. Prevents misclicks.",
+    )
+
+
+@router.post("/{db_id}/backups/{backup_id}/restore")
+async def restore_backup(
+    db_id: UUID,
+    backup_id: UUID,
+    body: RestoreBackupRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(util.get_current_user),
+) -> dict:
+    """Restore a backup into the live database, replacing its current contents.
+
+    DESTRUCTIVE. Runs pg_restore --clean --if-exists which drops every
+    object in the target database and re-creates it from the backup
+    dump. Active connections are NOT terminated (--clean drops at the
+    object level, not the database level), but in-flight queries
+    against affected tables will fail.
+
+    Requires:
+      * ``confirm_db_name`` matches the target DB's name. Mid-air
+        renames between page-load and click are caught here too.
+      * Target DB must be RUNNING. Restoring into a stopped pod would
+        succeed silently (the pod would start on a half-populated
+        volume next time) — fail fast instead.
+      * Backup row must be in READY status. RUNNING / FAILED backups
+        are not restorable.
+
+    We intentionally do NOT take an auto-backup-before-restore. The
+    operator is encouraged to click "Backup now" first if they want a
+    rollback point; making that automatic would mask the destructive
+    nature of the operation.
+    """
+    _ensure_runtime()
+    primary = _get_or_404(db, db_id)
+    backup_row = db.query(ManagedDatabaseBackup).filter(
+        ManagedDatabaseBackup.id == util.to_uuid(backup_id),
+        ManagedDatabaseBackup.primary_db_id == primary.id,
+    ).first()
+    if not backup_row:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Backup not found")
+
+    if primary.engine != "postgres":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"v1 restore is Postgres only (this database is {primary.engine})."
+            ),
+        )
+
+    if primary.status != ManagedDatabaseStatus.RUNNING:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"Target database must be RUNNING to restore "
+                f"(currently {primary.status.value}). Start it and retry."
+            ),
+        )
+
+    if backup_row.status != BackupStatus.READY:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"Backup is in '{backup_row.status.value if hasattr(backup_row.status, 'value') else backup_row.status}' "
+                f"state — only READY backups can be restored."
+            ),
+        )
+
+    if body.confirm_db_name != primary.name:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"confirm_db_name must match the database name exactly. "
+                f"Expected '{primary.name}', got '{body.confirm_db_name}'."
+            ),
+        )
+
+    password = util.decrypt_secret(primary.password_encrypted)
+    spec = backup.RestoreSpec(
+        image=primary.image,
+        primary_host="127.0.0.1",
+        primary_port=primary.port,
+        db_name=primary.database_name,
+        db_user=primary.username,
+        db_password=password,
+        host_dump_path=Path(backup_row.file_path),
+    )
+
+    try:
+        backup.run_pg_restore(spec)
+    except backup.BackupError as exc:
+        # The restore failed — the DB might be in a partial state (some
+        # objects dropped before pg_restore errored out). Audit the
+        # failure so the operator knows when it happened. Don't try to
+        # auto-recover; the user knows what to do (run pg_restore
+        # manually with --verbose, or restore an earlier backup).
+        audit_log.record_for_user(
+            db, current_user,
+            action="managed_db.backup.restore.failed",
+            entity_type="managed_database_backup",
+            entity_id=backup_row.id,
+            org_id=primary.org_id,
+            request=request,
+            extra={
+                "primary_name": primary.name,
+                "backup_label": backup_row.label,
+                "error": str(exc)[:500],
+            },
+        )
+        db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+
+    audit_log.record_for_user(
+        db, current_user,
+        action="managed_db.backup.restore",
+        entity_type="managed_database_backup",
+        entity_id=backup_row.id,
+        org_id=primary.org_id,
+        request=request,
+        extra={
+            "primary_name": primary.name,
+            "primary_db_id": str(primary.id),
+            "backup_label": backup_row.label,
+            "backup_size_bytes": backup_row.size_bytes,
+        },
+    )
+    db.commit()
+    return {
+        "ok": True,
+        "id": str(backup_id),
+        "database_name": primary.name,
+        "restored_from": {
+            "label": backup_row.label,
+            "created_at": backup_row.created_at.isoformat() if backup_row.created_at else None,
+            "size_bytes": backup_row.size_bytes,
+        },
+    }
 
 
 @router.delete("/{db_id}/backups/{backup_id}")

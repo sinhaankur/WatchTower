@@ -28,6 +28,7 @@ import {
   useCreateExternalDatabase,
   useCreateManagedDatabase,
   useDeleteBackup,
+  useRestoreBackup,
   useDeleteExternalDatabase,
   useDeleteManagedDatabase,
   useExternalDatabases,
@@ -1054,8 +1055,16 @@ function BackupRow({
   backup: ManagedDbBackup;
 }) {
   const del = useDeleteBackup(primaryDb.id);
-  const [confirm, setConfirm] = useState(false);
+  const restore = useRestoreBackup(primaryDb.id);
+  const [confirm, setConfirm] = useState<'delete' | 'restore' | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [restoreSuccess, setRestoreSuccess] = useState<string | null>(null);
+
+  const busy = del.isPending || restore.isPending;
+  const handleErr = (err: unknown, fallback: string) => {
+    const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+    setError(typeof detail === 'string' ? detail : fallback);
+  };
 
   return (
     <div className="rounded-lg border border-border bg-white px-3 py-2 text-xs">
@@ -1072,13 +1081,33 @@ function BackupRow({
             {formatBytes(backup.size_bytes)}
           </span>
         </div>
-        <button
-          onClick={() => setConfirm(true)}
-          disabled={del.isPending}
-          className="px-2 py-1 rounded-md border border-red-200 text-[11px] text-red-700 hover:bg-red-50 transition-colors disabled:opacity-50"
-        >
-          Delete
-        </button>
+        <div className="flex items-center gap-1">
+          {backup.status === 'ready' && (
+            <button
+              onClick={() => {
+                setError(null);
+                setRestoreSuccess(null);
+                setConfirm('restore');
+              }}
+              disabled={busy || primaryDb.status !== 'running'}
+              className="px-2 py-1 rounded-md border border-amber-300 bg-amber-50 text-[11px] text-amber-900 hover:bg-amber-100 transition-colors disabled:opacity-50"
+              title={primaryDb.status !== 'running' ? 'Target DB must be running' : 'Restore this backup, replacing live data'}
+            >
+              Restore
+            </button>
+          )}
+          <button
+            onClick={() => {
+              setError(null);
+              setRestoreSuccess(null);
+              setConfirm('delete');
+            }}
+            disabled={busy}
+            className="px-2 py-1 rounded-md border border-red-200 text-[11px] text-red-700 hover:bg-red-50 transition-colors disabled:opacity-50"
+          >
+            Delete
+          </button>
+        </div>
       </div>
       {backup.status_message && (
         <p className="text-[11px] text-red-600 mt-1 break-all">{backup.status_message}</p>
@@ -1086,34 +1115,113 @@ function BackupRow({
       {error && (
         <p className="text-[11px] text-red-600 mt-1 break-all">{error}</p>
       )}
-      {confirm && (
+      {restoreSuccess && (
+        <p className="text-[11px] text-emerald-700 mt-1">{restoreSuccess}</p>
+      )}
+      {confirm === 'delete' && (
         <div className="mt-2 rounded-md border border-red-200 bg-red-50 px-2 py-1.5 flex items-center gap-2 flex-wrap">
           <p className="text-[11px] text-red-900 flex-1 min-w-0">Delete this backup file?</p>
           <button
             onClick={() => {
               setError(null);
               del.mutate(backup.id, {
-                onSuccess: () => setConfirm(false),
-                onError: (err) => {
-                  const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
-                  setError(typeof detail === 'string' ? detail : 'Failed to delete backup.');
-                },
+                onSuccess: () => setConfirm(null),
+                onError: (err) => handleErr(err, 'Failed to delete backup.'),
               });
             }}
-            disabled={del.isPending}
+            disabled={busy}
             className="px-2 py-1 rounded-md bg-red-700 hover:bg-red-800 text-white text-[11px] font-medium disabled:opacity-50"
           >
             {del.isPending ? 'Deleting…' : 'Confirm'}
           </button>
           <button
-            onClick={() => setConfirm(false)}
-            disabled={del.isPending}
+            onClick={() => setConfirm(null)}
+            disabled={busy}
             className="px-2 py-1 rounded-md border border-red-300 bg-white text-[11px] text-red-800 disabled:opacity-50"
           >
             Cancel
           </button>
         </div>
       )}
+      {confirm === 'restore' && (
+        <RestoreConfirm
+          primaryDb={primaryDb}
+          onCancel={() => setConfirm(null)}
+          onConfirm={(confirmDbName) => {
+            setError(null);
+            restore.mutate(
+              { backupId: backup.id, confirmDbName },
+              {
+                onSuccess: (data) => {
+                  setConfirm(null);
+                  setRestoreSuccess(
+                    `Restored ${data.database_name} from ${data.restored_from.label ?? 'this backup'}.`
+                  );
+                },
+                onError: (err) => handleErr(err, 'Failed to restore backup.'),
+              },
+            );
+          }}
+          isPending={restore.isPending}
+        />
+      )}
+    </div>
+  );
+}
+
+// Restore is destructive — every object in the live DB is dropped and
+// recreated from the backup. The confirmation requires typing the DB
+// name exactly, same UX pattern GitHub/AWS/Stripe use for "delete
+// repo / drop bucket / etc."
+function RestoreConfirm({
+  primaryDb,
+  onCancel,
+  onConfirm,
+  isPending,
+}: {
+  primaryDb: ManagedDatabase;
+  onCancel: () => void;
+  onConfirm: (confirmDbName: string) => void;
+  isPending: boolean;
+}) {
+  const [typed, setTyped] = useState('');
+  const matches = typed.trim() === primaryDb.name;
+  return (
+    <div className="mt-2 rounded-md border border-amber-300 bg-amber-50 px-2 py-2 space-y-2">
+      <p className="text-[11px] text-amber-900">
+        <span className="font-semibold">Destructive:</span> this drops every object in{' '}
+        <span className="font-mono">{primaryDb.name}</span> and recreates it from the backup.
+        Active queries against affected tables will fail. Consider clicking{' '}
+        <span className="font-semibold">Backup now</span> first if you want a rollback point.
+      </p>
+      <div className="flex items-center gap-2 flex-wrap">
+        <p className="text-[11px] text-amber-900 whitespace-nowrap">
+          Type <span className="font-mono font-semibold">{primaryDb.name}</span> to confirm:
+        </p>
+        <input
+          value={typed}
+          onChange={(e) => setTyped(e.target.value)}
+          placeholder={primaryDb.name}
+          className="flex-1 min-w-[140px] rounded-md border border-amber-300 bg-white px-2 py-1 text-[11px] font-mono focus:outline-none focus:ring-2 focus:ring-amber-300"
+          autoFocus
+        />
+      </div>
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => onConfirm(typed.trim())}
+          disabled={!matches || isPending}
+          className="px-2 py-1 rounded-md bg-amber-700 hover:bg-amber-800 text-white text-[11px] font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {isPending ? 'Restoring…' : 'Restore now'}
+        </button>
+        <button
+          onClick={onCancel}
+          disabled={isPending}
+          className="px-2 py-1 rounded-md border border-amber-400 bg-white text-[11px] text-amber-900 disabled:opacity-50"
+        >
+          Cancel
+        </button>
+      </div>
     </div>
   );
 }

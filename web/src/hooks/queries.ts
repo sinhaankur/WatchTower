@@ -674,6 +674,42 @@ export function useDeleteBackup(primaryId: string) {
   });
 }
 
+// Restore-in-place: replaces every object in the live DB with the
+// contents of the backup. The backend requires `confirm_db_name` to
+// match the target's name exactly — same UX pattern as deleting a
+// GitHub repo or AWS bucket.
+export type RestoreBackupResponse = {
+  ok: boolean;
+  id: string;
+  database_name: string;
+  restored_from: {
+    label: string | null;
+    created_at: string | null;
+    size_bytes: number | null;
+  };
+};
+
+export function useRestoreBackup(primaryId: string) {
+  const qc = useQueryClient();
+  return useMutation<
+    RestoreBackupResponse,
+    unknown,
+    { backupId: string; confirmDbName: string }
+  >({
+    mutationFn: async ({ backupId, confirmDbName }) =>
+      (await apiClient.post<RestoreBackupResponse>(
+        `/managed-databases/${primaryId}/backups/${backupId}/restore`,
+        { confirm_db_name: confirmDbName },
+      )).data,
+    onSuccess: () => {
+      // The DB row itself doesn't change but its state HAS — flush
+      // any cached view so consumers (e.g. project pages with linked
+      // DBs) pick up "restored at" timestamps if we surface them later.
+      void qc.invalidateQueries({ queryKey: queryKeys.managedDatabases });
+    },
+  });
+}
+
 // ── External databases (bring-your-own connection) ───────────────────────────
 
 export type ExternalDatabase = {
