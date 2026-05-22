@@ -543,3 +543,217 @@ def test_restore_fails_when_dump_file_missing(
     )
     assert r.status_code == 400
     assert "no longer exists" in r.json()["detail"].lower()
+
+
+# ── Restore to NEW database (Phase 2 — v1.1) ─────────────────────────────────
+#
+# Same backup endpoint, mode='new'. Creates a fresh pod alongside the
+# original. The fake_podman + fake_pg_restore fixtures already cover
+# the runtime side; we add a fake_wait_for_ready stub since the real
+# probe would poll a non-existent psql for 30s.
+
+
+@pytest.fixture
+def fake_wait_for_ready(monkeypatch):
+    """Stub the post-spin-up readiness probe so it returns immediately
+    without trying to exec psql / mysql / mongosh against a non-running
+    container. Real-machine smoke testing still exercises the real
+    polling loop."""
+    from watchtower import managed_db_runtime as _runtime
+    monkeypatch.setattr(_runtime, "wait_for_db_ready", lambda **kw: None)
+    return monkeypatch
+
+
+def test_restore_to_new_happy_path(
+    client, primary_db, fake_pg_dump, fake_pg_restore, fake_wait_for_ready, db_session,
+):
+    cr = client.post(
+        f"/api/managed-databases/{primary_db['id']}/backups",
+        json={"label": "pre-migration"},
+    )
+    bid = cr.json()["id"]
+
+    r = client.post(
+        f"/api/managed-databases/{primary_db['id']}/backups/{bid}/restore",
+        json={"mode": "new", "new_name": "restored-copy"},
+    )
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["ok"] is True
+    assert body["mode"] == "new"
+    assert body["source_db_name"] == primary_db["name"]
+    assert body["new_db_name"] == "restored-copy"
+    assert body["new_db_id"]   # uuid
+    assert body["new_db_port"] > 0
+    assert body["restored_from"]["label"] == "pre-migration"
+
+    # The new DB row should exist + be RUNNING.
+    from uuid import UUID
+    from watchtower.database import ManagedDatabase, ManagedDatabaseStatus
+    new_row = db_session.query(ManagedDatabase).filter(
+        ManagedDatabase.id == UUID(body["new_db_id"])
+    ).first()
+    assert new_row is not None
+    assert new_row.name == "restored-copy"
+    assert new_row.engine == primary_db["engine"]
+    assert new_row.status == ManagedDatabaseStatus.RUNNING
+    # Restore receipt: pg_restore got called against the NEW DB's port,
+    # not the original's.
+    assert len(fake_pg_restore) == 1
+    assert fake_pg_restore[0].primary_port == new_row.port
+    # And the original is untouched.
+    assert primary_db["port"] != new_row.port
+
+
+def test_restore_to_new_requires_name(
+    client, primary_db, fake_pg_dump, fake_pg_restore, fake_wait_for_ready,
+):
+    cr = client.post(f"/api/managed-databases/{primary_db['id']}/backups", json={})
+    bid = cr.json()["id"]
+    r = client.post(
+        f"/api/managed-databases/{primary_db['id']}/backups/{bid}/restore",
+        json={"mode": "new"},  # no new_name
+    )
+    assert r.status_code == 400
+    assert "new_name" in r.json()["detail"].lower()
+
+
+def test_restore_to_new_rejects_same_name_as_source(
+    client, primary_db, fake_pg_dump, fake_pg_restore, fake_wait_for_ready,
+):
+    cr = client.post(f"/api/managed-databases/{primary_db['id']}/backups", json={})
+    bid = cr.json()["id"]
+    r = client.post(
+        f"/api/managed-databases/{primary_db['id']}/backups/{bid}/restore",
+        json={"mode": "new", "new_name": primary_db["name"]},
+    )
+    assert r.status_code == 400
+    assert "differ" in r.json()["detail"].lower()
+
+
+def test_restore_to_new_rejects_unsafe_name(
+    client, primary_db, fake_pg_dump, fake_pg_restore, fake_wait_for_ready,
+):
+    cr = client.post(f"/api/managed-databases/{primary_db['id']}/backups", json={})
+    bid = cr.json()["id"]
+    r = client.post(
+        f"/api/managed-databases/{primary_db['id']}/backups/{bid}/restore",
+        json={"mode": "new", "new_name": "bad name; rm -rf /"},
+    )
+    assert r.status_code == 422
+
+
+def test_restore_to_new_rejects_duplicate_name(
+    client, primary_db, fake_pg_dump, fake_pg_restore, fake_wait_for_ready, fake_podman,
+):
+    # Create another DB so we have a duplicate name to collide with.
+    client.post("/api/managed-databases", json={"name": "already-exists"})
+
+    cr = client.post(f"/api/managed-databases/{primary_db['id']}/backups", json={})
+    bid = cr.json()["id"]
+    r = client.post(
+        f"/api/managed-databases/{primary_db['id']}/backups/{bid}/restore",
+        json={"mode": "new", "new_name": "already-exists"},
+    )
+    assert r.status_code == 409
+
+
+def test_restore_to_new_cleans_up_when_pod_never_becomes_ready(
+    client, primary_db, fake_pg_dump, fake_pg_restore, monkeypatch, db_session,
+):
+    """If the new pod spins up but the engine never accepts queries
+    within the timeout, the half-built target must be cleaned up so
+    the operator doesn't have a stuck CREATING row."""
+    from watchtower import managed_db_runtime as _runtime
+    def never_ready(**kw):
+        raise _runtime.ManagedDbRuntimeError("timed out after 30s")
+    monkeypatch.setattr(_runtime, "wait_for_db_ready", never_ready)
+
+    cr = client.post(f"/api/managed-databases/{primary_db['id']}/backups", json={})
+    bid = cr.json()["id"]
+    r = client.post(
+        f"/api/managed-databases/{primary_db['id']}/backups/{bid}/restore",
+        json={"mode": "new", "new_name": "never-ready"},
+    )
+    assert r.status_code == 400
+    assert "didn't become ready" in r.json()["detail"].lower()
+
+    # No row should be left behind in CREATING state.
+    from watchtower.database import ManagedDatabase
+    leftover = (
+        db_session.query(ManagedDatabase)
+        .filter(ManagedDatabase.name == "never-ready")
+        .first()
+    )
+    assert leftover is None
+
+
+def test_restore_to_new_keeps_original_untouched(
+    client, primary_db, fake_pg_dump, fake_pg_restore, fake_wait_for_ready, db_session,
+):
+    """The whole point of restore-to-new is non-destructive — the
+    original DB row's state, port, and password must be the same
+    after the restore."""
+    from uuid import UUID
+    from watchtower.database import ManagedDatabase
+
+    before = db_session.query(ManagedDatabase).filter(
+        ManagedDatabase.id == UUID(primary_db["id"])
+    ).first()
+    before_port = before.port
+    before_password_enc = before.password_encrypted
+
+    cr = client.post(f"/api/managed-databases/{primary_db['id']}/backups", json={})
+    bid = cr.json()["id"]
+    client.post(
+        f"/api/managed-databases/{primary_db['id']}/backups/{bid}/restore",
+        json={"mode": "new", "new_name": "side-by-side"},
+    )
+
+    db_session.expire_all()
+    after = db_session.query(ManagedDatabase).filter(
+        ManagedDatabase.id == UUID(primary_db["id"])
+    ).first()
+    assert after.port == before_port
+    assert after.password_encrypted == before_password_enc
+
+
+def test_restore_to_new_audits_separately_from_in_place(
+    client, primary_db, fake_pg_dump, fake_pg_restore, fake_wait_for_ready, db_session,
+):
+    from watchtower.database import AuditEvent
+
+    cr = client.post(f"/api/managed-databases/{primary_db['id']}/backups", json={})
+    bid = cr.json()["id"]
+    client.post(
+        f"/api/managed-databases/{primary_db['id']}/backups/{bid}/restore",
+        json={"mode": "new", "new_name": "audit-new-copy"},
+    )
+
+    events = (
+        db_session.query(AuditEvent)
+        .filter(AuditEvent.action == "managed_db.backup.restore_to_new")
+        .all()
+    )
+    assert len(events) == 1
+    # The same action MUST NOT also appear as managed_db.backup.restore —
+    # operators querying the audit log should see the two modes as
+    # distinct verbs.
+    in_place = (
+        db_session.query(AuditEvent)
+        .filter(AuditEvent.action == "managed_db.backup.restore")
+        .all()
+    )
+    assert in_place == []
+
+
+def test_restore_rejects_invalid_mode(
+    client, primary_db, fake_pg_dump, fake_pg_restore, fake_wait_for_ready,
+):
+    cr = client.post(f"/api/managed-databases/{primary_db['id']}/backups", json={})
+    bid = cr.json()["id"]
+    r = client.post(
+        f"/api/managed-databases/{primary_db['id']}/backups/{bid}/restore",
+        json={"mode": "yolo"},
+    )
+    assert r.status_code == 422

@@ -1152,16 +1152,24 @@ function BackupRow({
         <RestoreConfirm
           primaryDb={primaryDb}
           onCancel={() => setConfirm(null)}
-          onConfirm={(confirmDbName) => {
+          onConfirm={(payload) => {
             setError(null);
             restore.mutate(
-              { backupId: backup.id, confirmDbName },
+              payload.mode === 'new'
+                ? { mode: 'new', backupId: backup.id, newName: payload.newName }
+                : { mode: 'in-place', backupId: backup.id, confirmDbName: payload.confirmDbName },
               {
                 onSuccess: (data) => {
                   setConfirm(null);
-                  setRestoreSuccess(
-                    `Restored ${data.database_name} from ${data.restored_from.label ?? 'this backup'}.`
-                  );
+                  if (data.mode === 'new') {
+                    setRestoreSuccess(
+                      `Created ${data.new_db_name} from ${data.restored_from.label ?? 'this backup'} — running on port ${data.new_db_port}.`
+                    );
+                  } else {
+                    setRestoreSuccess(
+                      `Restored ${data.database_name} from ${data.restored_from.label ?? 'this backup'}.`
+                    );
+                  }
                 },
                 onError: (err) => handleErr(err, 'Failed to restore backup.'),
               },
@@ -1358,6 +1366,10 @@ function ScheduleControls({
 // recreated from the backup. The confirmation requires typing the DB
 // name exactly, same UX pattern GitHub/AWS/Stripe use for "delete
 // repo / drop bucket / etc."
+type RestoreConfirmPayload =
+  | { mode: 'in-place'; confirmDbName: string; newName?: never }
+  | { mode: 'new'; newName: string; confirmDbName?: never };
+
 function RestoreConfirm({
   primaryDb,
   onCancel,
@@ -1366,38 +1378,107 @@ function RestoreConfirm({
 }: {
   primaryDb: ManagedDatabase;
   onCancel: () => void;
-  onConfirm: (confirmDbName: string) => void;
+  onConfirm: (payload: RestoreConfirmPayload) => void;
   isPending: boolean;
 }) {
+  // Default to "in-place" since it's the lightweight choice (no extra
+  // pod, no doubled disk usage). The user opts into "new" deliberately.
+  const [mode, setMode] = useState<'in-place' | 'new'>('in-place');
   const [typed, setTyped] = useState('');
+  const [newName, setNewName] = useState(`${primaryDb.name}-restored`);
+
   const matches = typed.trim() === primaryDb.name;
+  const newNameClean = newName.trim();
+  const newNameValid = /^[A-Za-z0-9_-]+$/.test(newNameClean) && newNameClean !== primaryDb.name;
+  const canSubmit = mode === 'in-place' ? matches : newNameValid;
+
   return (
     <div className="mt-2 rounded-md border border-amber-300 bg-amber-50 px-2 py-2 space-y-2">
-      <p className="text-[11px] text-amber-900">
-        <span className="font-semibold">Destructive:</span> this drops every object in{' '}
-        <span className="font-mono">{primaryDb.name}</span> and recreates it from the backup.
-        Active queries against affected tables will fail. Consider clicking{' '}
-        <span className="font-semibold">Backup now</span> first if you want a rollback point.
-      </p>
-      <div className="flex items-center gap-2 flex-wrap">
-        <p className="text-[11px] text-amber-900 whitespace-nowrap">
-          Type <span className="font-mono font-semibold">{primaryDb.name}</span> to confirm:
-        </p>
-        <input
-          value={typed}
-          onChange={(e) => setTyped(e.target.value)}
-          placeholder={primaryDb.name}
-          className="flex-1 min-w-[140px] rounded-md border border-amber-300 bg-white px-2 py-1 text-[11px] font-mono focus:outline-none focus:ring-2 focus:ring-amber-300"
-          autoFocus
-        />
+      {/* Mode picker */}
+      <div className="flex items-center gap-3 text-[11px]">
+        <label className="flex items-center gap-1.5 cursor-pointer">
+          <input
+            type="radio"
+            name={`restore-mode-${primaryDb.id}`}
+            value="in-place"
+            checked={mode === 'in-place'}
+            onChange={() => setMode('in-place')}
+          />
+          <span className="text-amber-900">In place (replace live data)</span>
+        </label>
+        <label className="flex items-center gap-1.5 cursor-pointer">
+          <input
+            type="radio"
+            name={`restore-mode-${primaryDb.id}`}
+            value="new"
+            checked={mode === 'new'}
+            onChange={() => setMode('new')}
+          />
+          <span className="text-amber-900">To a new database (keeps original)</span>
+        </label>
       </div>
+
+      {mode === 'in-place' && (
+        <>
+          <p className="text-[11px] text-amber-900">
+            <span className="font-semibold">Destructive:</span> drops every object in{' '}
+            <span className="font-mono">{primaryDb.name}</span> and recreates it from the backup.
+            Click <span className="font-semibold">Backup now</span> first if you want a rollback point.
+          </p>
+          <div className="flex items-center gap-2 flex-wrap">
+            <p className="text-[11px] text-amber-900 whitespace-nowrap">
+              Type <span className="font-mono font-semibold">{primaryDb.name}</span> to confirm:
+            </p>
+            <input
+              value={typed}
+              onChange={(e) => setTyped(e.target.value)}
+              placeholder={primaryDb.name}
+              className="flex-1 min-w-[140px] rounded-md border border-amber-300 bg-white px-2 py-1 text-[11px] font-mono focus:outline-none focus:ring-2 focus:ring-amber-300"
+              autoFocus
+            />
+          </div>
+        </>
+      )}
+
+      {mode === 'new' && (
+        <>
+          <p className="text-[11px] text-amber-900">
+            Creates a fresh pod alongside <span className="font-mono">{primaryDb.name}</span> and restores into it.
+            Nothing existing is touched. <span className="font-semibold">Runs 2× resources</span> until you delete one.
+          </p>
+          <div className="flex items-center gap-2 flex-wrap">
+            <p className="text-[11px] text-amber-900 whitespace-nowrap">New database name:</p>
+            <input
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              placeholder={`${primaryDb.name}-restored`}
+              className="flex-1 min-w-[140px] rounded-md border border-amber-300 bg-white px-2 py-1 text-[11px] font-mono focus:outline-none focus:ring-2 focus:ring-amber-300"
+              autoFocus
+            />
+          </div>
+          {!newNameValid && newNameClean !== '' && (
+            <p className="text-[11px] text-red-700">
+              Must contain only letters/numbers/dashes/underscores, and differ from the source name.
+            </p>
+          )}
+        </>
+      )}
+
       <div className="flex items-center gap-2">
         <button
-          onClick={() => onConfirm(typed.trim())}
-          disabled={!matches || isPending}
+          onClick={() =>
+            onConfirm(
+              mode === 'in-place'
+                ? { mode: 'in-place', confirmDbName: typed.trim() }
+                : { mode: 'new', newName: newNameClean },
+            )
+          }
+          disabled={!canSubmit || isPending}
           className="px-2 py-1 rounded-md bg-amber-700 hover:bg-amber-800 text-white text-[11px] font-medium disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {isPending ? 'Restoring…' : 'Restore now'}
+          {isPending
+            ? mode === 'new' ? 'Creating + restoring…' : 'Restoring…'
+            : mode === 'new' ? 'Create + restore' : 'Restore now'}
         </button>
         <button
           onClick={onCancel}

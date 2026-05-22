@@ -675,20 +675,32 @@ export function useDeleteBackup(primaryId: string) {
   });
 }
 
-// Restore-in-place: replaces every object in the live DB with the
-// contents of the backup. The backend requires `confirm_db_name` to
-// match the target's name exactly — same UX pattern as deleting a
-// GitHub repo or AWS bucket.
+// Two restore modes:
+//   - "in-place": replaces every object in the live DB with the
+//     contents of the backup. Destructive. Requires confirm_db_name
+//     to match the target's name exactly.
+//   - "new": creates a brand-new managed DB alongside the original,
+//     restores into it. Safer (nothing existing is destroyed) but
+//     runs 2× pods until the operator deletes one. Requires new_name.
 export type RestoreBackupResponse = {
   ok: boolean;
+  mode?: 'in-place' | 'new';
   id: string;
-  database_name: string;
+  database_name?: string;       // in-place
+  source_db_name?: string;      // new
+  new_db_id?: string;           // new
+  new_db_name?: string;         // new
+  new_db_port?: number;         // new
   restored_from: {
     label: string | null;
     created_at: string | null;
     size_bytes: number | null;
   };
 };
+
+export type RestoreBackupInput =
+  | { mode?: 'in-place'; backupId: string; confirmDbName: string; newName?: never }
+  | { mode: 'new'; backupId: string; newName: string; confirmDbName?: never };
 
 // ── Scheduled backups ────────────────────────────────────────────────────────
 
@@ -733,20 +745,21 @@ export function useUpdateBackupSchedule(primaryId: string) {
 
 export function useRestoreBackup(primaryId: string) {
   const qc = useQueryClient();
-  return useMutation<
-    RestoreBackupResponse,
-    unknown,
-    { backupId: string; confirmDbName: string }
-  >({
-    mutationFn: async ({ backupId, confirmDbName }) =>
-      (await apiClient.post<RestoreBackupResponse>(
-        `/managed-databases/${primaryId}/backups/${backupId}/restore`,
-        { confirm_db_name: confirmDbName },
-      )).data,
+  return useMutation<RestoreBackupResponse, unknown, RestoreBackupInput>({
+    mutationFn: async (input) => {
+      const body: Record<string, unknown> =
+        input.mode === 'new'
+          ? { mode: 'new', new_name: input.newName }
+          : { mode: 'in-place', confirm_db_name: input.confirmDbName };
+      return (await apiClient.post<RestoreBackupResponse>(
+        `/managed-databases/${primaryId}/backups/${input.backupId}/restore`,
+        body,
+      )).data;
+    },
     onSuccess: () => {
-      // The DB row itself doesn't change but its state HAS — flush
-      // any cached view so consumers (e.g. project pages with linked
-      // DBs) pick up "restored at" timestamps if we surface them later.
+      // restore-to-new creates a new DB row, so refresh the list.
+      // restore-in-place doesn't change the list shape but DB state
+      // may differ (last_status_at etc.) — invalidate either way.
       void qc.invalidateQueries({ queryKey: queryKeys.managedDatabases });
     },
   });

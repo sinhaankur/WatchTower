@@ -241,6 +241,66 @@ def delete_pod(db_id: str, *, keep_volume: bool = False) -> None:
         _run([bin_, "volume", "rm", "-f", volume_name(db_id)], timeout=10.0)
 
 
+def wait_for_db_ready(
+    container: str, engine: str, db_user: str, db_password: str,
+    db_name: str, *, timeout_s: int = 30,
+) -> None:
+    """Poll a newly-started managed DB until it accepts auth-ed queries.
+
+    Used by the restore-to-new flow: spin up a fresh pod, then wait
+    here until the engine is accepting connections before running the
+    restore. Without this the restore races the engine's init and
+    fails with "could not connect: Connection refused" because the
+    container is running but the server inside it hasn't bound the
+    port yet.
+
+    Per-engine probes:
+      * **postgres**: `psql -c "SELECT 1"` against the user's DB
+      * **mysql/mariadb**: `mysql -e "SELECT 1"` (auth via MYSQL_PWD)
+      * **mongodb**: `mongosh --eval "db.runCommand({ping:1})"` against
+        the admin DB (where the root user lives in our setup)
+
+    Times out cleanly after `timeout_s` and raises `ManagedDbRuntimeError`
+    with the last probe's stderr so the API can surface the failure.
+    """
+    import time as _time
+    bin_ = _podman_path()
+    if not bin_:
+        raise ManagedDbRuntimeError("No container runtime found.")
+
+    deadline = _time.time() + timeout_s
+    last_err = ""
+    while _time.time() < deadline:
+        if engine == "postgres":
+            cmd = [bin_, "exec", "-e", f"PGPASSWORD={db_password}",
+                   container, "psql", "-U", db_user, "-d", db_name,
+                   "-tA", "-c", "SELECT 1"]
+        elif engine in ("mysql", "mariadb"):
+            client = "mariadb" if engine == "mariadb" else "mysql"
+            cmd = [bin_, "exec", "-e", f"MYSQL_PWD={db_password}",
+                   container, client, "-u", db_user, "-h", "127.0.0.1",
+                   "--protocol=TCP", db_name, "-e", "SELECT 1"]
+        elif engine == "mongodb":
+            cmd = [bin_, "exec", container,
+                   "mongosh", "-u", db_user, "-p", db_password,
+                   "--authenticationDatabase", "admin",
+                   "--quiet", "--eval", "db.runCommand({ping:1}).ok"]
+        else:
+            raise ManagedDbRuntimeError(
+                f"wait_for_db_ready: engine '{engine}' not supported"
+            )
+        rc, _out, err = _run(cmd, timeout=5.0)
+        if rc == 0:
+            return
+        last_err = err
+        _time.sleep(1.0)
+
+    raise ManagedDbRuntimeError(
+        f"Database '{container}' did not become ready within {timeout_s}s. "
+        f"Last probe error: {last_err.strip() or '(none)'}"
+    )
+
+
 def pod_running(db_id: str) -> bool:
     """True iff the pod currently has at least one running container."""
     bin_ = _podman_path()

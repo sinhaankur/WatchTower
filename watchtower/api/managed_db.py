@@ -355,6 +355,195 @@ def _resolve_org_id(db_session: Session, current_user: dict):
         return None
 
 
+def _restore_to_new(
+    db: Session,
+    request: Request,
+    current_user: dict,
+    primary: ManagedDatabase,
+    backup_row: ManagedDatabaseBackup,
+    body,  # RestoreBackupRequest (avoid forward-ref to keep function above its use)
+):
+    """Restore a backup into a brand-new managed database.
+
+    Resource shape: spins up a fresh Podman pod with a NEW volume,
+    waits for the engine to be ready, then runs the restore. The
+    original primary is untouched. Operators get a side-by-side
+    comparison for free — at the cost of running 2× pods until they
+    decide which to keep.
+
+    Why this is its own function and not a generic "create + restore"
+    composition: the restore is a one-shot operation tied to a
+    specific backup; running it through the generic create endpoint
+    would mean a brand-new password (and the operator might want the
+    SAME password as the original DB so apps with cached connection
+    strings still work). We give the new DB a fresh password — the
+    operator can choose to re-link any project DB associations.
+    """
+    new_name = (body.new_name or "").strip()
+    if not new_name:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="new_name is required when mode='new'.",
+        )
+    if not all(c.isalnum() or c in "-_" for c in new_name):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="new_name must contain only letters, numbers, dashes, underscores.",
+        )
+    if new_name == primary.name:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="new_name must differ from the source database's name.",
+        )
+    if db.query(ManagedDatabase).filter(ManagedDatabase.name == new_name).first():
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"A managed database named '{new_name}' already exists.",
+        )
+
+    # Mirror engine/version/image so dump-tool versions match — same
+    # rule that applies to scheduled and on-demand backups.
+    engine_spec = _ENGINES.get(primary.engine)
+    if engine_spec is None:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Source database engine '{primary.engine}' is not in the engine catalogue.",
+        )
+
+    new_password = secrets.token_urlsafe(24)
+    new_db = ManagedDatabase(
+        org_id=primary.org_id,
+        name=new_name,
+        engine=primary.engine,
+        version=primary.version,
+        image=primary.image,
+        pod_name="",
+        container_name="",
+        volume_name="",
+        host="127.0.0.1",
+        port=runtime.pick_free_port(),
+        database_name=primary.database_name,
+        username=primary.username,
+        password_encrypted=util.encrypt_secret(new_password),
+        status=ManagedDatabaseStatus.CREATING,
+    )
+    db.add(new_db)
+    db.flush()
+    new_db.pod_name = runtime.pod_name(str(new_db.id))
+    new_db.container_name = runtime.container_name(str(new_db.id))
+    new_db.volume_name = runtime.volume_name(str(new_db.id))
+
+    # Spin up the empty pod. Same shape as the create-DB endpoint.
+    env = engine_spec.env_factory(primary.database_name, primary.username, new_password)
+    create_spec = runtime.CreateSpec(
+        db_id=str(new_db.id),
+        image=primary.image,
+        host_port=new_db.port,
+        container_port=engine_spec.container_port,
+        env=env,
+    )
+    try:
+        runtime.create_pod(create_spec)
+    except runtime.ManagedDbRuntimeError as exc:
+        new_db.status = ManagedDatabaseStatus.FAILED
+        new_db.status_message = f"Failed to spin up restore target pod: {exc}"[:500]
+        db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+
+    # Wait for the new pod to be reachable before running the restore.
+    # Without this the restore races the engine's init and fails with
+    # "connection refused" because the port isn't bound yet.
+    try:
+        runtime.wait_for_db_ready(
+            container=new_db.container_name,
+            engine=new_db.engine,
+            db_user=new_db.username,
+            db_password=new_password,
+            db_name=new_db.database_name,
+            timeout_s=30,
+        )
+    except runtime.ManagedDbRuntimeError as exc:
+        # Pod started but engine isn't accepting connections. Tear down
+        # the half-built target so the operator doesn't have a stuck
+        # CREATING row to clean up manually.
+        try:
+            runtime.delete_pod(str(new_db.id), keep_volume=False)
+        except Exception:  # noqa: BLE001
+            logger.exception("Cleanup of failed restore target %s also failed", new_db.id)
+        db.delete(new_db)
+        db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"New database pod didn't become ready: {exc}",
+        ) from exc
+
+    # Run the restore against the new pod. Reuses the engine-aware
+    # dispatcher — exactly the same restore logic as in-place; the
+    # new DB is just empty, so the --clean / DROP IF EXISTS commands
+    # in the dump are no-ops.
+    spec = backup.RestoreSpec(
+        engine=new_db.engine,
+        image=new_db.image,
+        primary_host="127.0.0.1",
+        primary_port=new_db.port,
+        db_name=new_db.database_name,
+        db_user=new_db.username,
+        db_password=new_password,
+        host_dump_path=Path(backup_row.file_path),
+    )
+    try:
+        backup.run_restore(spec)
+    except backup.BackupError as exc:
+        # Restore failed but the new pod is alive and well. Leave it
+        # so the operator can investigate (logs, manual pg_restore,
+        # etc.) before deciding to delete.
+        new_db.status = ManagedDatabaseStatus.FAILED
+        new_db.status_message = f"Pod created, restore failed: {exc}"[:500]
+        db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Pod {new_db.name} was created and is running, but the restore failed: {exc}",
+        ) from exc
+
+    new_db.status = ManagedDatabaseStatus.RUNNING
+    new_db.status_message = None
+
+    audit_log.record_for_user(
+        db, current_user,
+        action="managed_db.backup.restore_to_new",
+        entity_type="managed_database_backup",
+        entity_id=backup_row.id,
+        org_id=primary.org_id,
+        request=request,
+        extra={
+            "source_db_id": str(primary.id),
+            "source_db_name": primary.name,
+            "new_db_id": str(new_db.id),
+            "new_db_name": new_db.name,
+            "backup_label": backup_row.label,
+        },
+    )
+    db.commit()
+
+    return {
+        "ok": True,
+        "mode": "new",
+        "id": str(backup_row.id),
+        "source_db_name": primary.name,
+        "new_db_id": str(new_db.id),
+        "new_db_name": new_db.name,
+        "new_db_port": new_db.port,
+        "restored_from": {
+            "label": backup_row.label,
+            "created_at": backup_row.created_at.isoformat() if backup_row.created_at else None,
+            "size_bytes": backup_row.size_bytes,
+        },
+    }
+
+
 def _refresh_runtime_status(row: ManagedDatabase, db_session: Session) -> None:
     """Sync the row's status with what podman actually reports.
 
@@ -1120,14 +1309,34 @@ async def create_backup(
 
 
 class RestoreBackupRequest(BaseModel):
-    """Restoring a backup replaces the live data in place. The
-    name-typing confirmation makes the destructive UX explicit — same
-    pattern GitHub / Stripe / AWS use for "type the resource name to
-    confirm deletion."
+    """Two modes:
+
+    * **in-place** (default — same shape as v1): replaces the live DB's
+      data. Destructive. Requires ``confirm_db_name`` to match the
+      target's name exactly.
+    * **new**: creates a NEW managed database, spins up a fresh pod
+      alongside the original, and restores the backup into it. Safer
+      because nothing existing is touched, but **costs 2× resources**
+      (two pods, two volumes) until the operator deletes one. Requires
+      ``new_name`` — the name of the new database to create.
+
+    In-place stays the default because the resource-cost trade-off
+    matters under the user's "keep WatchTower lightweight" constraint.
+    Operators who want to compare before-and-after opt into "new"
+    deliberately.
     """
-    confirm_db_name: str = Field(
-        ...,
-        description="Must match the target database's name exactly. Prevents misclicks.",
+    mode: str = Field(
+        default="in-place",
+        description='"in-place" (destructive, replaces live data) or "new" (creates a new DB).',
+    )
+    confirm_db_name: Optional[str] = Field(
+        default=None,
+        description="Required when mode='in-place'. Must match the target DB's name exactly.",
+    )
+    new_name: Optional[str] = Field(
+        default=None,
+        max_length=64,
+        description="Required when mode='new'. Name for the freshly-created database.",
     )
 
 
@@ -1198,6 +1407,23 @@ async def restore_backup(
             ),
         )
 
+    if body.mode not in ("in-place", "new"):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="mode must be 'in-place' or 'new'.",
+        )
+
+    # ── Restore-to-new database ─────────────────────────────────────
+    # Spins up a NEW pod alongside the original, restores into it,
+    # leaves the original untouched. Operator gets a side-by-side
+    # comparison for free.
+    if body.mode == "new":
+        return _restore_to_new(
+            db=db, request=request, current_user=current_user,
+            primary=primary, backup_row=backup_row, body=body,
+        )
+
+    # ── Restore-in-place (the v1 path) ──────────────────────────────
     if body.confirm_db_name != primary.name:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
