@@ -4,6 +4,7 @@ import axios from 'axios';
 import apiClient from '@/lib/api';
 import useCountUp from '@/hooks/useCountUp';
 import SystemResourceMonitor from '@/components/SystemResourceMonitor';
+import { SystemDiagram } from '@/components/SectionDiagrams';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type LocalProject = {
@@ -344,6 +345,14 @@ const Dashboard = () => {
       <main className="px-4 sm:px-6 lg:px-8 py-6 space-y-6 max-w-6xl mx-auto w-full fade-in-up">
         {notice && <NoticeBanner notice={notice} />}
 
+        {/* What-is-WatchTower illustration. Dismiss-once: the user
+            sees it on first login (and after explicitly showing it
+            from a help link later), then it goes away so the dashboard
+            stays focused on their projects. localStorage key bumps
+            with the version so a redesigned illustration on a future
+            release surfaces itself again. */}
+        <SystemOverviewBanner />
+
         {/* Hero / onboarding banner */}
         <section className="wt-panel p-5 bg-gradient-to-br from-white to-amber-50">
           <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
@@ -647,5 +656,61 @@ const Dashboard = () => {
     </div>
   );
 };
+
+// ── SystemOverviewBanner ─────────────────────────────────────────────────────
+// Shows the SystemDiagram on first dashboard visit. Operator can
+// dismiss; the dismissal is remembered in localStorage (versioned, so
+// a future redesign surfaces itself again without us having to chase
+// down stale keys). A small "Show" link in the chrome would let users
+// re-open it later — for v1 the diagram is also accessible via the
+// docs site, so we keep the in-app surface minimal.
+const SYSTEM_OVERVIEW_KEY = 'watchtower:dashboard-system-overview-dismissed-v1';
+
+function SystemOverviewBanner() {
+  // Default to NOT dismissed on first ever visit; respect operator's
+  // prior dismissal across sessions. SSR-safe (won't crash if window
+  // is undefined — defensive even though this app is SPA-only).
+  const initialDismissed = (() => {
+    try {
+      return typeof window !== 'undefined' &&
+        window.localStorage.getItem(SYSTEM_OVERVIEW_KEY) === '1';
+    } catch {
+      return false;
+    }
+  })();
+  const [dismissed, setDismissed] = useState<boolean>(initialDismissed);
+
+  if (dismissed) return null;
+
+  const dismiss = () => {
+    try {
+      window.localStorage.setItem(SYSTEM_OVERVIEW_KEY, '1');
+    } catch {
+      /* localStorage disabled — accept "shows next session" */
+    }
+    setDismissed(true);
+  };
+
+  return (
+    <section className="wt-panel p-4 sm:p-5 relative">
+      <button
+        onClick={dismiss}
+        aria-label="Dismiss overview"
+        className="absolute top-2 right-2 w-7 h-7 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors flex items-center justify-center text-base leading-none"
+      >
+        ×
+      </button>
+      <div className="mb-2">
+        <p className="text-[11px] uppercase tracking-[0.18em] text-red-700 font-semibold">
+          How WatchTower fits together
+        </p>
+        <p className="text-xs text-slate-600 mt-1">
+          One PC, lightweight, GitHub-authenticated. Below is the whole picture in one view.
+        </p>
+      </div>
+      <SystemDiagram />
+    </section>
+  );
+}
 
 export default Dashboard;

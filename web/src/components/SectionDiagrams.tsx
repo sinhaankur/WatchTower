@@ -153,6 +153,15 @@ const IconDevice = (
   </svg>
 );
 
+const IconContainer = (
+  <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#475569" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+    <rect x={2} y={6} width={20} height={12} rx={1} />
+    <line x1={7} y1={10} x2={7.01} y2={10} />
+    <line x1={11} y1={10} x2={11.01} y2={10} />
+    <line x1={15} y1={10} x2={15.01} y2={10} />
+  </svg>
+);
+
 const IconDatabase = (
   <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#0f766e" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
     <ellipse cx={12} cy={5} rx={9} ry={3} />
@@ -347,6 +356,89 @@ export function BackupDiagram() {
         <text x={50} y={20} textAnchor="middle" fontSize="9" fill="#64748b" style={{ fontFamily: 'inherit' }}>~/.watchtower/</text>
         <text x={50} y={32} textAnchor="middle" fontSize="9" fill="#64748b" style={{ fontFamily: 'inherit' }}>managed_db_backups/</text>
       </g>
+    </DiagramFrame>
+  );
+}
+
+// ── System overview (Dashboard hero) ─────────────────────────────────────────
+// Top-to-bottom narrative: GitHub provides identity + code → WatchTower
+// runs on Your PC and hosts the three pillars (Apps / Databases /
+// Backups) → output flows to private devices via Tailscale AND to
+// public visitors via GitHub Pages / custom domain.
+//
+// Wider than the section diagrams (700×320 viewBox) because this one
+// summarises the whole product in a single illustration. Still inline
+// SVG, no PNG asset, no animation library — just the same CSS
+// stroke-dashoffset trick the other diagrams use.
+
+export function SystemDiagram() {
+  return (
+    <DiagramFrame
+      ariaLabel="WatchTower system overview: GitHub provides identity and code; WatchTower runs on your PC with apps, databases, and backups; output reaches your other devices via Tailscale and public visitors via GitHub Pages."
+      viewBox="0 0 700 320"
+      caption="One PC, three pillars (apps + databases + backups), private reach via Tailscale, public reach via GitHub Pages."
+    >
+      {/* ── Layer 1: GitHub at the top ────────────────────────────── */}
+      <Node x={285} y={10} w={130} icon={IconGithub}
+            label="GitHub" sub="OAuth + repos + Pages" variant="default" />
+
+      {/* Arrow from GitHub down into the PC ─────────────────────── */}
+      <FlowLine x1={350} y1={56} x2={350} y2={84} />
+
+      {/* ── Layer 2: "Your PC" container with the three pillars ─── */}
+      {/* Big surrounding card */}
+      <g>
+        <rect
+          x={40} y={88} width={620} height={150} rx={14} ry={14}
+          fill="#fef2f2" stroke="#fca5a5" strokeWidth={1.5}
+        />
+        <text x={50} y={104} fontSize="10" fontWeight="700"
+              fill="#7f1d1d" letterSpacing="1"
+              style={{ fontFamily: 'inherit' }}>
+          YOUR PC · WATCHTOWER
+        </text>
+
+        {/* Three pillar boxes inside the PC */}
+        <Node x={70}  y={120} w={180} h={48} icon={IconContainer}
+              label="Apps" sub="Podman containers" variant="success" />
+        <Node x={260} y={120} w={180} h={48} icon={IconDatabase}
+              label="Databases" sub="postgres / mysql / mongo / redis" variant="success" />
+        <Node x={450} y={120} w={190} h={48} icon={IconFile}
+              label="Backups" sub="pg_dump / mysqldump / mongo" variant="success" />
+
+        {/* Small WatchTower core badge bottom-centred */}
+        <g transform="translate(290, 188)">
+          <rect x={0} y={0} width={120} height={36} rx={8}
+                fill="#ffffff" stroke="#b91c1c" strokeWidth={1.5} />
+          <g transform="translate(8, 10)">{IconWatchTower}</g>
+          <text x={30} y={16} fontSize="11" fontWeight="600" fill="#7f1d1d"
+                style={{ fontFamily: 'inherit' }}>WatchTower</text>
+          <text x={30} y={28} fontSize="9" fill="#94181c"
+                style={{ fontFamily: 'inherit' }}>FastAPI control plane</text>
+        </g>
+
+        {/* Lines connecting each pillar down to WatchTower badge */}
+        <line x1={160} y1={168} x2={310} y2={188}
+              stroke="#fca5a5" strokeWidth={1} strokeDasharray="3 3" />
+        <line x1={350} y1={168} x2={350} y2={188}
+              stroke="#fca5a5" strokeWidth={1} strokeDasharray="3 3" />
+        <line x1={545} y1={168} x2={390} y2={188}
+              stroke="#fca5a5" strokeWidth={1} strokeDasharray="3 3" />
+      </g>
+
+      {/* Arrows out of the PC down to the two destination groups */}
+      <FlowLine x1={170} y1={244} x2={170} y2={272} label="Tailscale" />
+      <FlowLine x1={530} y1={244} x2={530} y2={272} label="public web" />
+
+      {/* ── Layer 3: Outputs ──────────────────────────────────────── */}
+      {/* Left: private devices reached via Tailscale */}
+      <Node x={40}  y={274} w={260} h={40} icon={IconDevice}
+            label="Your other devices" sub="phone, laptop, other PCs (private)"
+            variant="default" />
+      {/* Right: public visitors via GitHub Pages / custom domain */}
+      <Node x={400} y={274} w={260} h={40} icon={IconGlobe}
+            label="Public visitors" sub="GitHub Pages or custom domain"
+            variant="default" />
     </DiagramFrame>
   );
 }
