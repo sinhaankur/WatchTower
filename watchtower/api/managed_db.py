@@ -1033,12 +1033,16 @@ async def create_backup(
     _ensure_runtime()
     primary = _get_or_404(db, db_id)
 
-    if primary.engine != "postgres":
+    if primary.engine not in backup.ENGINE_DUMP_FORMAT:
+        # v1 supports postgres/mysql/mariadb/mongodb. Redis backups
+        # use BGSAVE+copy-RDB rather than a dump tool, so they live in
+        # a follow-up.
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=(
-                f"v0 backups are Postgres only (this database is {primary.engine}). "
-                f"MySQL / Mongo / Redis dumps land in v1."
+                f"Backups don't yet support engine '{primary.engine}'. "
+                f"Supported: {', '.join(sorted(backup.ENGINE_DUMP_FORMAT))}. "
+                f"Redis support is planned for a later release."
             ),
         )
 
@@ -1065,7 +1069,7 @@ async def create_backup(
         primary_db_id=primary.id,
         label=body.label,
         file_path=str(dump_path),
-        format="pgcustom",
+        format=backup.ENGINE_DUMP_FORMAT[primary.engine],
         status=BackupStatus.RUNNING,
     )
     db.add(row)
@@ -1073,6 +1077,7 @@ async def create_backup(
 
     password = util.decrypt_secret(primary.password_encrypted)
     spec = backup.BackupSpec(
+        engine=primary.engine,
         image=primary.image,
         primary_host="127.0.0.1",
         primary_port=primary.port,
@@ -1082,7 +1087,7 @@ async def create_backup(
         host_dump_path=dump_path,
     )
     try:
-        size = backup.run_pg_dump(spec)
+        size = backup.run_backup(spec)
     except backup.BackupError as exc:
         row.status = BackupStatus.FAILED
         row.status_message = str(exc)[:500]
@@ -1166,11 +1171,12 @@ async def restore_backup(
     if not backup_row:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Backup not found")
 
-    if primary.engine != "postgres":
+    if primary.engine not in backup.ENGINE_DUMP_FORMAT:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=(
-                f"v1 restore is Postgres only (this database is {primary.engine})."
+                f"Restore doesn't yet support engine '{primary.engine}'. "
+                f"Supported: {', '.join(sorted(backup.ENGINE_DUMP_FORMAT))}."
             ),
         )
 
@@ -1203,6 +1209,7 @@ async def restore_backup(
 
     password = util.decrypt_secret(primary.password_encrypted)
     spec = backup.RestoreSpec(
+        engine=primary.engine,
         image=primary.image,
         primary_host="127.0.0.1",
         primary_port=primary.port,
@@ -1213,7 +1220,7 @@ async def restore_backup(
     )
 
     try:
-        backup.run_pg_restore(spec)
+        backup.run_restore(spec)
     except backup.BackupError as exc:
         # The restore failed — the DB might be in a partial state (some
         # objects dropped before pg_restore errored out). Audit the
@@ -1371,12 +1378,12 @@ async def update_schedule(
     """
     row = _get_or_404(db, db_id)
 
-    if row.engine != "postgres":
+    if row.engine not in backup.ENGINE_DUMP_FORMAT:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=(
-                f"Scheduled backups are Postgres only in v1 "
-                f"(this database is {row.engine})."
+                f"Scheduled backups don't yet support engine '{row.engine}'. "
+                f"Supported: {', '.join(sorted(backup.ENGINE_DUMP_FORMAT))}."
             ),
         )
 

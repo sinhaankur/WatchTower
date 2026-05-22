@@ -85,26 +85,57 @@ def backup_path(db_id: str, label: Optional[str] = None) -> Path:
 
 @dataclass
 class BackupSpec:
-    image: str               # SAME image as the primary — pg_dump version must match server
-    primary_host: str        # 127.0.0.1 in v0 (host network)
-    primary_port: int
-    db_name: str
-    db_user: str
-    db_password: str
-    host_dump_path: Path     # absolute path on the host where the dump file lands
+    """Inputs for a backup of ANY supported engine.
+
+    Routed by `engine` to the right tool — pg_dump for Postgres,
+    mysqldump for MySQL/MariaDB, mongodump for MongoDB. Per-engine
+    semantics:
+
+      * **postgres**: pg_dump -Fc custom format. Restores with
+        pg_restore --clean --if-exists.
+      * **mysql / mariadb**: mysqldump --single-transaction --quick
+        --routines --triggers. Restores by piping the .sql back into
+        `mysql`.
+      * **mongodb**: mongodump --archive=… (binary archive that
+        mongorestore understands).
+      * **redis**: NOT YET — RDB save+copy lives in a follow-up.
+        Caller should reject before this is invoked.
+    """
+    # `engine` defaults to "postgres" so existing call sites (scheduler,
+    # tests) that were written before the multi-engine refactor keep
+    # working. Callers should set it explicitly when invoking for
+    # MySQL/MariaDB/MongoDB.
+    engine: str = "postgres"
+    image: str = ""          # SAME image as the primary so dump tool versions match server
+    primary_host: str = "127.0.0.1"
+    primary_port: int = 5432
+    db_name: str = ""
+    db_user: str = ""
+    db_password: str = ""
+    host_dump_path: Path = Path()
 
 
-def run_pg_dump(spec: BackupSpec) -> int:
-    """Run pg_dump in a one-shot container; return the resulting file's size.
+# Format suffix per engine — used by callers (router + UI) to label the
+# `format` column. Keeps the data model + restore-side dispatch in sync.
+ENGINE_DUMP_FORMAT = {
+    "postgres": "pgcustom",
+    "mysql": "mysql",
+    "mariadb": "mariadb",
+    "mongodb": "mongo",
+}
 
-    Approach:
-      * Mount the *parent directory* of the target dump file from the
-        host into the container at /backup. Mounting the file itself
-        would race-create the file on Linux Podman; mounting the
-        directory and writing inside it is robust.
-      * Container exits when pg_dump exits. `--rm` deletes it.
-      * Set `PGPASSWORD` via env (and *only* via env — passing it on
-        the command line would leak to `ps`).
+
+def run_backup(spec: BackupSpec) -> int:
+    """Run an engine-appropriate dump in a one-shot container.
+
+    Returns the resulting file's size on disk. Mounts the dump file's
+    PARENT directory into the container (not the file itself) — file
+    bind-mounts race-create on Linux Podman; directory mounts are
+    reliable everywhere.
+
+    `PGPASSWORD` / `MYSQL_PWD` / mongo URI passwords are passed via
+    env vars only — never on the command line — so they don't leak
+    to host-side `ps`.
     """
     bin_ = runtime._podman_path()
     if not bin_:
@@ -114,58 +145,184 @@ def run_pg_dump(spec: BackupSpec) -> int:
     host_dir = str(spec.host_dump_path.parent)
     out_filename = spec.host_dump_path.name
 
-    rc, out, err = runtime._run(
-        [bin_, "run", "--rm",
-         "--network", "host",
-         "-e", f"PGPASSWORD={spec.db_password}",
-         "-v", f"{host_dir}:/backup",
-         spec.image,
-         "pg_dump",
-         "-h", spec.primary_host,
-         "-p", str(spec.primary_port),
-         "-U", spec.db_user,
-         "-d", spec.db_name,
-         "-Fc",                       # custom format
-         "-f", f"/backup/{out_filename}"],
-        timeout=3600.0,  # 1h — backups of large DBs take time
-    )
+    if spec.engine == "postgres":
+        cmd = [bin_, "run", "--rm",
+               "--network", "host",
+               "-e", f"PGPASSWORD={spec.db_password}",
+               "-v", f"{host_dir}:/backup",
+               spec.image,
+               "pg_dump",
+               "-h", spec.primary_host,
+               "-p", str(spec.primary_port),
+               "-U", spec.db_user,
+               "-d", spec.db_name,
+               "-Fc",                                       # custom format
+               "-f", f"/backup/{out_filename}"]
+    elif spec.engine in ("mysql", "mariadb"):
+        # `--single-transaction` gives a consistent snapshot without
+        # locking InnoDB tables for the dump duration. `--quick` avoids
+        # buffering huge tables in memory inside the container.
+        # `--routines --triggers --events` makes sure stored procs,
+        # triggers, and scheduled events come along.
+        # The mysqldump output goes to stdout; we use sh -c so the
+        # shell redirect runs inside the container, not in the host shell.
+        dump_tool = "mariadb-dump" if spec.engine == "mariadb" else "mysqldump"
+        cmd = [bin_, "run", "--rm",
+               "--network", "host",
+               "-e", f"MYSQL_PWD={spec.db_password}",
+               "-v", f"{host_dir}:/backup",
+               spec.image,
+               "sh", "-c",
+               # `--protocol=TCP` forces TCP even when the host is
+               # 127.0.0.1; otherwise mysql client tries a local socket
+               # inside the container that doesn't exist.
+               f"{dump_tool} -h {spec.primary_host} -P {spec.primary_port} "
+               f"--protocol=TCP -u {spec.db_user} "
+               f"--single-transaction --quick --routines --triggers --events "
+               f"{spec.db_name} > /backup/{out_filename}"]
+    elif spec.engine == "mongodb":
+        # mongodump produces a self-contained archive (--archive) that
+        # mongorestore reads as a stream — no temp directory dance.
+        # Auth lives in the connection URI; we use admin DB for auth
+        # because the official image creates the root user there.
+        uri = (
+            f"mongodb://{spec.db_user}:{spec.db_password}@"
+            f"{spec.primary_host}:{spec.primary_port}/?authSource=admin"
+        )
+        cmd = [bin_, "run", "--rm",
+               "--network", "host",
+               "-v", f"{host_dir}:/backup",
+               spec.image,
+               "sh", "-c",
+               f"mongodump --uri='{uri}' --db={spec.db_name} "
+               f"--archive=/backup/{out_filename}"]
+    else:
+        raise BackupError(
+            f"v1 backups don't yet support engine '{spec.engine}'. "
+            f"Supported: postgres, mysql, mariadb, mongodb."
+        )
+
+    rc, out, err = runtime._run(cmd, timeout=3600.0)
     if rc != 0:
         # Clean up the partial file so a follow-up backup with the same
-        # timestamp doesn't think the half-baked dump is real.
+        # timestamp prefix doesn't pick up the half-baked one.
         try:
             spec.host_dump_path.unlink(missing_ok=True)
         except OSError:
             pass
         raise BackupError(
-            f"pg_dump failed: {err.strip() or out.strip() or 'unknown error'}"
+            f"{spec.engine} backup failed: {err.strip() or out.strip() or 'unknown error'}"
         )
 
     try:
         return spec.host_dump_path.stat().st_size
     except OSError as exc:
         raise BackupError(
-            f"pg_dump completed but dump file is unreadable: {exc}"
+            f"backup completed but dump file is unreadable: {exc}"
         ) from exc
+
+
+# Back-compat shim — the scheduler + tests call this name. Keeping the
+# original signature so nothing else has to change.
+def run_pg_dump(spec: BackupSpec) -> int:
+    return run_backup(spec)
 
 
 @dataclass
 class RestoreSpec:
     """Inputs for a restore-in-place against a running managed database.
 
-    The backup file must already be on the host at ``host_dump_path``.
-    The transient pg_restore container mounts its parent directory at
-    ``/backup`` and reads the file from there — same pattern as pg_dump,
-    same SELinux-on-Linux quirks (none on macOS).
+    Same engine routing as BackupSpec: postgres/mysql/mariadb/mongodb.
+    The backup file must already be on the host at ``host_dump_path``;
+    the transient restore container mounts its parent directory at
+    ``/backup`` read-only.
     """
-    image: str               # SAME image family/version as the target DB
-    primary_host: str        # 127.0.0.1 in v0 (host network)
-    primary_port: int
-    db_name: str
-    db_user: str
-    db_password: str
-    host_dump_path: Path     # absolute host path to the .dump file
+    engine: str = "postgres"
+    image: str = ""
+    primary_host: str = "127.0.0.1"
+    primary_port: int = 5432
+    db_name: str = ""
+    db_user: str = ""
+    db_password: str = ""
+    host_dump_path: Path = Path()
 
 
+def run_restore(spec: RestoreSpec) -> None:
+    """Engine-aware restore-in-place. See ``run_pg_restore`` for the
+    Postgres-specific notes; the same "replace objects without
+    stopping the pod" goal applies across engines.
+    """
+    bin_ = runtime._podman_path()
+    if not bin_:
+        raise BackupError("No container runtime found.")
+    if not spec.host_dump_path.is_file():
+        raise BackupError(
+            f"Backup file no longer exists on disk: {spec.host_dump_path}"
+        )
+
+    host_dir = str(spec.host_dump_path.parent)
+    in_filename = spec.host_dump_path.name
+
+    if spec.engine == "postgres":
+        cmd = [bin_, "run", "--rm",
+               "--network", "host",
+               "-e", f"PGPASSWORD={spec.db_password}",
+               "-v", f"{host_dir}:/backup:ro",
+               spec.image,
+               "pg_restore",
+               "-h", spec.primary_host,
+               "-p", str(spec.primary_port),
+               "-U", spec.db_user,
+               "-d", spec.db_name,
+               "--clean", "--if-exists",
+               "--no-owner", "--no-privileges",
+               "-v",
+               f"/backup/{in_filename}"]
+    elif spec.engine in ("mysql", "mariadb"):
+        # Pipe the .sql back into the mysql client. mysqldump's output
+        # is `DROP TABLE IF EXISTS` + `CREATE TABLE` per object, so the
+        # restore replaces each table without dropping the database
+        # itself — symmetric with the Postgres --clean --if-exists path.
+        client_tool = "mariadb" if spec.engine == "mariadb" else "mysql"
+        cmd = [bin_, "run", "--rm",
+               "--network", "host",
+               "-e", f"MYSQL_PWD={spec.db_password}",
+               "-v", f"{host_dir}:/backup:ro",
+               spec.image,
+               "sh", "-c",
+               f"{client_tool} -h {spec.primary_host} -P {spec.primary_port} "
+               f"--protocol=TCP -u {spec.db_user} "
+               f"{spec.db_name} < /backup/{in_filename}"]
+    elif spec.engine == "mongodb":
+        # `--drop` drops each collection before restoring — same
+        # "replace, don't merge" semantics as the others.
+        uri = (
+            f"mongodb://{spec.db_user}:{spec.db_password}@"
+            f"{spec.primary_host}:{spec.primary_port}/?authSource=admin"
+        )
+        cmd = [bin_, "run", "--rm",
+               "--network", "host",
+               "-v", f"{host_dir}:/backup:ro",
+               spec.image,
+               "sh", "-c",
+               f"mongorestore --uri='{uri}' --nsInclude='{spec.db_name}.*' "
+               f"--drop --archive=/backup/{in_filename}"]
+    else:
+        raise BackupError(
+            f"v1 restores don't yet support engine '{spec.engine}'. "
+            f"Supported: postgres, mysql, mariadb, mongodb."
+        )
+
+    rc, out, err = runtime._run(cmd, timeout=3600.0)
+    if rc != 0:
+        raise BackupError(
+            f"{spec.engine} restore failed: "
+            f"{err.strip() or out.strip() or 'unknown error'}"
+        )
+
+
+# Back-compat shim — kept so test_managed_db_backup.py's monkeypatch
+# target name stays stable.
 def run_pg_restore(spec: RestoreSpec) -> None:
     """Restore a pg_dump custom-format backup into the running primary.
 

@@ -235,10 +235,10 @@ def _run_scheduled_backup(db_id: str) -> None:
             unregister_schedule(db_id)
             return
 
-        if mdb.engine != "postgres":
+        from watchtower import managed_db_backup as _backup_mod
+        if mdb.engine not in _backup_mod.ENGINE_DUMP_FORMAT:
             logger.warning(
-                "Backup scheduler: db %s is %s (not postgres) — skipping. "
-                "Multi-engine backups land in a later release.",
+                "Backup scheduler: db %s engine %r not supported (yet) — skipping.",
                 db_id, mdb.engine,
             )
             return
@@ -275,7 +275,7 @@ def _run_scheduled_backup(db_id: str) -> None:
             primary_db_id=mdb.id,
             label=f"scheduled-{utcnow().strftime('%Y%m%dT%H%M%SZ')}",
             file_path=str(dump_path),
-            format="pgcustom",
+            format=backup.ENGINE_DUMP_FORMAT.get(mdb.engine, "pgcustom"),
             status=BackupStatus.RUNNING,
             is_scheduled=True,
         )
@@ -285,6 +285,7 @@ def _run_scheduled_backup(db_id: str) -> None:
         try:
             password = decrypt_secret(mdb.password_encrypted)
             spec = backup.BackupSpec(
+                engine=mdb.engine,
                 image=mdb.image,
                 primary_host="127.0.0.1",
                 primary_port=mdb.port,
@@ -293,12 +294,12 @@ def _run_scheduled_backup(db_id: str) -> None:
                 db_password=password,
                 host_dump_path=dump_path,
             )
-            size = backup.run_pg_dump(spec)
+            size = backup.run_backup(spec)
         except Exception as exc:  # noqa: BLE001
             row.status = BackupStatus.FAILED
             row.status_message = str(exc)[:500]
             db.commit()
-            logger.exception("Backup scheduler: pg_dump failed for db %s", db_id)
+            logger.exception("Backup scheduler: backup failed for db %s", db_id)
             return
 
         row.status = BackupStatus.READY

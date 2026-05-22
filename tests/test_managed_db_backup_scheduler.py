@@ -45,6 +45,9 @@ def fake_pg_dump(monkeypatch, tmp_path):
         spec.host_dump_path.parent.mkdir(parents=True, exist_ok=True)
         spec.host_dump_path.write_bytes(b"FAKEDUMP" * 64)
         return spec.host_dump_path.stat().st_size
+    # Multi-engine refactor moved the entry point to run_backup; the
+    # scheduler tick calls that one now. Patch both names for safety.
+    monkeypatch.setattr(backup, "run_backup", stub)
     monkeypatch.setattr(backup, "run_pg_dump", stub)
     return tmp_path
 
