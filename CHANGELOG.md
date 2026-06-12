@@ -9,6 +9,13 @@ Curated, human-friendly history of WatchTower releases. Auto-generated GitHub Re
 
 ---
 
+## 1.16.1 — Desktop startup restart-loop fix
+
+- Fixed a regression in the Electron main process where a module-level relaunch call could execute during startup and repeatedly restart the app.
+- Restart/relaunch now only occurs from explicit update or user-triggered relaunch paths.
+
+---
+
 ## 1.16.0 — Self-host pillar: managed databases, HA, backups, Tailscale remote access
 
 Continues the "PC → website + database + backup" appliance vision. WatchTower now manages real databases (not just static-site projects), exposes itself over Tailscale without CLI fumbling, replicates Postgres across pods for hot-standby HA, and snapshots data on demand. Every new section opens with an inline SVG flow diagram so non-technical users understand what's actually happening behind each button before they click.

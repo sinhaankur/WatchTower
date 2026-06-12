@@ -114,6 +114,24 @@ try {
   // Silently skip auto-update rather than crashing.
 }
 
+function hasAppUpdateConfig() {
+  try {
+    if (!app.isPackaged) return false;
+    return fs.existsSync(path.join(process.resourcesPath, 'app-update.yml'));
+  } catch {
+    return false;
+  }
+}
+
+function canUseAutoUpdater() {
+  return Boolean(autoUpdater) && app.isPackaged && hasAppUpdateConfig();
+}
+
+function relaunchAppCleanEnv() {
+  delete process.env.ELECTRON_RUN_AS_NODE;
+  app.relaunch();
+}
+
 // ─── Manual self-replace updater for unsigned macOS builds ──────────────────
 // electron-updater's `quitAndInstall()` relies on Squirrel.Mac, which silently
 // fails to atomically replace bundles that lack a Developer ID signature. WatchTower
@@ -123,7 +141,6 @@ try {
 //
 //   1. Download the .dmg ourselves from GitHub Releases (we know the URL pattern).
 //   2. Write a detached shell script that waits for our PID to die, mounts the DMG,
-//      swaps /Applications/WatchTower.app, strips quarantine, and relaunches.
 //   3. Spawn the script with detached:true + unref() so it survives `app.quit()`.
 //
 // Runs in <30s on average. The shell script logs to ~/Library/Logs/WatchTower-update.log
@@ -339,7 +356,7 @@ function checkForAppUpdates(win) {
   // quit (autoInstallOnAppQuit=true). No modal dialogs, no
   // "Restart Now / Later" prompt — interrupting the user mid-task to
   // ask about an update is exactly what we want to avoid.
-  if (autoUpdater && app.isPackaged) {
+  if (canUseAutoUpdater()) {
     autoUpdater.on('update-available', (info) => {
       console.log(`[WatchTower] Update ${info.version} available — downloading in background`);
     });
@@ -433,6 +450,10 @@ function checkForAppUpdates(win) {
     return;
   }
 
+  if (app.isPackaged && autoUpdater && !hasAppUpdateConfig()) {
+    console.warn('[WatchTower] app-update.yml not found; skipping electron-updater and using GitHub update check fallback.');
+  }
+
   // ── Unpackaged / dev path: GitHub Releases API ─────────────────────────────
   checkForUpdatesViaGitHubAPI(win, false);
 }
@@ -488,6 +509,7 @@ function checkForUpdatesViaGitHubAPI(win, interactive) {
 
         if (isNewer) {
           if (win.isDestroyed()) return;
+          const supportsInAppDownload = canUseAutoUpdater();
           // Update Now is offered in two modes:
           //   - Packaged build: trigger electron-updater's download+install
           //     so the user doesn't have to visit the release page at all.
@@ -500,9 +522,11 @@ function checkForUpdatesViaGitHubAPI(win, interactive) {
             title: 'Update Available',
             message: `WatchTower ${latestTag} is available (you have ${currentVersion})`,
             detail: `${releaseNotes}\n\n` +
-              (app.isPackaged
+              (supportsInAppDownload
                 ? 'Click Update Now to download and install in the background.'
-                : 'Click Update Now to git pull + rebuild + restart from this dev clone.'),
+                : (app.isPackaged
+                  ? 'Click Update Now to open the release page and install the latest package manually.'
+                  : 'Click Update Now to git pull + rebuild + restart from this dev clone.')),
             buttons: ['Update Now', 'Open Release Page', 'Later'],
             defaultId: 0,
             cancelId: 2,
@@ -577,7 +601,7 @@ function checkForUpdatesViaGitHubAPI(win, interactive) {
  */
 async function runUpdateNow(win, releaseUrl) {
   if (app.isPackaged) {
-    if (!autoUpdater) {
+    if (!canUseAutoUpdater()) {
       shell.openExternal(releaseUrl);
       return;
     }
@@ -650,7 +674,7 @@ async function runUpdateNow(win, releaseUrl) {
     });
     // Give the dialog a moment to dismiss before we relaunch.
     await new Promise((r) => setTimeout(r, 200));
-    app.relaunch();
+    relaunchAppCleanEnv();
     app.exit(0);
   } catch (err) {
     console.error('[WatchTower] Update Now failed:', err.message);
@@ -2061,7 +2085,7 @@ ipcMain.handle('wt:getDependencyStatus', async () => {
 // cleanest UX for the user too — no "wait, did it actually find it?"
 // guesswork.
 ipcMain.handle('wt:relaunchApp', () => {
-  app.relaunch();
+  relaunchAppCleanEnv();
   app.exit(0);
   return { ok: true };
 });
@@ -2129,9 +2153,8 @@ ipcMain.handle('wt:openExternal', async (_event, url) => {
 //
 // We never send anything ourselves: a mailto: link puts the user in
 // control of what leaves their machine.
-ipcMain.handle('wt:openErrorReport', async (_event, payload = {}) => {
-  const TO = 'sinhaankur@ymail.com';
-  const userMessage = typeof payload.message === 'string' ? payload.message : '';
+async function openErrorReportEmail(userMessage = '') {
+  const TO = process.env.WATCHTOWER_SUPPORT_EMAIL || 'sinhaankur@ymail.com';
 
   let logTail = '';
   try {
@@ -2200,6 +2223,11 @@ ipcMain.handle('wt:openErrorReport', async (_event, payload = {}) => {
   } catch (err) {
     return { ok: false, error: err?.message ?? String(err) };
   }
+}
+
+ipcMain.handle('wt:openErrorReport', async (_event, payload = {}) => {
+  const userMessage = typeof payload.message === 'string' ? payload.message : '';
+  return openErrorReportEmail(userMessage);
 });
 
 // In-app "Update Now" — same code path as the native modal that fires on
@@ -2446,11 +2474,11 @@ async function showLaunchFailureDialog(error, backendLogPath) {
   // we mis-detected and a fresh DMG does help).
   let buttons;
   if (isMac && gatekeeperKill) {
-    buttons = ['Use Browser Mode', 'View Log', 'Reinstall Anyway', 'Quit'];
+    buttons = ['Use Browser Mode', 'Email Support', 'View Log', 'Reinstall Anyway', 'Quit'];
   } else if (isMac) {
-    buttons = ['Reinstall WatchTower', 'View Log', 'Quit'];
+    buttons = ['Reinstall WatchTower', 'Email Support', 'View Log', 'Quit'];
   } else {
-    buttons = ['View Log', 'Get Help', 'Quit'];
+    buttons = ['Email Support', 'View Log', 'Get Help', 'Quit'];
   }
 
   const response = await dialog.showMessageBox({
@@ -2465,7 +2493,7 @@ async function showLaunchFailureDialog(error, backendLogPath) {
   });
 
   if (isMac && gatekeeperKill) {
-    // Mac+Gatekeeper buttons: [Use Browser Mode, View Log, Reinstall Anyway, Quit]
+    // Mac+Gatekeeper buttons: [Use Browser Mode, Email Support, View Log, Reinstall Anyway, Quit]
     if (response.response === 0) {
       // Open the README anchor that walks the user through running
       // `./run.sh browser` or `pipx install watchtower-podman` so they
@@ -2478,11 +2506,15 @@ async function showLaunchFailureDialog(error, backendLogPath) {
       }, 250);
       return;
     }
-    if (response.response === 1 && backendLogPath) {
+    if (response.response === 1) {
+      await openErrorReportEmail(`${userMessage}\n\nStartup failure: ${raw}`);
+      return;
+    }
+    if (response.response === 2 && backendLogPath) {
       try { shell.openPath(backendLogPath); } catch {}
       return;
     }
-    if (response.response === 2) {
+    if (response.response === 3) {
       // "Reinstall Anyway" — same flow as the non-Gatekeeper Mac path.
       try {
         const latest = await fetchLatestReleaseTag();
@@ -2500,7 +2532,7 @@ async function showLaunchFailureDialog(error, backendLogPath) {
   }
 
   if (isMac) {
-    // Mac buttons: [Reinstall WatchTower, View Log, Quit]
+    // Mac buttons: [Reinstall WatchTower, Email Support, View Log, Quit]
     if (response.response === 0) {
       try {
         const latest = await fetchLatestReleaseTag();
@@ -2524,19 +2556,27 @@ async function showLaunchFailureDialog(error, backendLogPath) {
       }
       return;
     }
-    if (response.response === 1 && backendLogPath) {
+    if (response.response === 1) {
+      await openErrorReportEmail(`${userMessage}\n\nStartup failure: ${raw}`);
+      return;
+    }
+    if (response.response === 2 && backendLogPath) {
       try { shell.openPath(backendLogPath); } catch {}
       return;
     }
     return; // Quit
   }
 
-  // Linux/Windows buttons: [View Log, Get Help, Quit]
-  if (response.response === 0 && backendLogPath) {
+  // Linux/Windows buttons: [Email Support, View Log, Get Help, Quit]
+  if (response.response === 0) {
+    await openErrorReportEmail(`${userMessage}\n\nStartup failure: ${raw}`);
+    return;
+  }
+  if (response.response === 1 && backendLogPath) {
     try { shell.openPath(backendLogPath); } catch {}
     return;
   }
-  if (response.response === 1) {
+  if (response.response === 2) {
     try { shell.openExternal(pythonInstallGuide().docsUrl); } catch {}
   }
 }
