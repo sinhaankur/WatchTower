@@ -112,6 +112,7 @@ export function StatusPill({
 }
 
 /** Map a backend deployment status string to a StatusTone. */
+// eslint-disable-next-line react-refresh/only-export-components
 export function deploymentStatusTone(status: string | null | undefined): StatusTone {
   switch ((status ?? '').toLowerCase()) {
     case 'live':
@@ -138,6 +139,7 @@ export function deploymentStatusTone(status: string | null | undefined): StatusT
 }
 
 /** Map a backend node-health status to a StatusTone. */
+// eslint-disable-next-line react-refresh/only-export-components
 export function nodeStatusTone(status: string | null | undefined): StatusTone {
   switch ((status ?? '').toLowerCase()) {
     case 'healthy':

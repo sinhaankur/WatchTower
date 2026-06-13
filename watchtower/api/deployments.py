@@ -299,10 +299,10 @@ async def diagnose_deployment(
             "tell me the most likely root cause + a concrete fix.\n\n"
             f"Build log (last {len(log_excerpt)} chars):\n```\n{log_excerpt}\n```"
         )
-        # Path the SPA can deep-link to so "Ask the agent" lands the
-        # user on the agent panel with the prompt already in the
-        # input. Keeps the client free of backend-shape assumptions.
-        payload["agent_route"] = "/agent"
+        # Path the SPA deep-links to: the AI & Autonomy card in Settings,
+        # where the LLM connection and the self-heal intervention queue
+        # (which auto-analyzes UNKNOWN failures) both live.
+        payload["agent_route"] = "/settings"
 
     return payload
 

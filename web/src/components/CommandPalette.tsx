@@ -35,12 +35,14 @@ const NAV_ITEMS: Item[] = [
   { id: 'nav:team',          label: 'Team',              group: 'Navigate', to: '/team' },
   { id: 'nav:audit',         label: 'Audit Log',         group: 'Navigate', to: '/audit' },
   { id: 'nav:settings',      label: 'Settings',          group: 'Navigate', to: '/settings' },
+  { id: 'nav:report-bug',    label: 'Report Bug',        group: 'Navigate', to: '/report-bug' },
   { id: 'nav:setup',         label: 'New Project',       group: 'Navigate', hint: 'wizard', to: '/setup' },
 ];
 
 // Reusable open/close hook so other components can trigger the palette
 // (e.g., a future "press ⌘K" hint button somewhere).
 const OPEN_EVENT = 'watchtower:open-command-palette';
+// eslint-disable-next-line react-refresh/only-export-components
 export function openCommandPalette() {
   window.dispatchEvent(new CustomEvent(OPEN_EVENT));
 }

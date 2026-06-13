@@ -175,14 +175,26 @@ Probe failure is cached for the process lifetime so a missing/flapping broker do
 
 ### LLM agent (`watchtower/api/agent.py`)
 
-Provider-agnostic by design — talks to **any OpenAI-compatible chat-completions endpoint** (Ollama, LM Studio, vLLM, llama.cpp, OpenAI, OpenRouter, LiteLLM, etc.). The operator picks the LLM via env vars; WatchTower itself ships with no model bundled.
+Provider-agnostic by design — talks to **any OpenAI-compatible chat-completions endpoint** (Ollama, LM Studio, vLLM, llama.cpp, OpenAI, OpenRouter, LiteLLM, etc.). WatchTower ships with no model bundled.
 
-- `WATCHTOWER_LLM_BASE_URL` — required (e.g. `http://localhost:11434/v1` for Ollama)
+**Configuration is DB-first, env-fallback** (`watchtower/llm_settings.py` + the `system_settings` table). Operators configure from Settings → AI & Autonomy in the SPA (`PUT /api/agent/config`, `POST /api/agent/test` probes the endpoint and lists models); the env vars below still work as fallback. The API key is Fernet-encrypted via `encrypt_secret` and never echoed back — config reads return `has_api_key` only. `base_url` is scheme-validated but loopback is deliberately allowed (LM Studio/Ollama are the primary target); config writes are gated on `can_manage_team`.
+
+- `WATCHTOWER_LLM_BASE_URL` — e.g. `http://localhost:1234/v1` (LM Studio), `http://localhost:11434/v1` (Ollama), `http://localhost:8080/v1` (llama.cpp `llama-server` — the lightweight path; tiny 0.5–2B models suffice for self-heal analysis, see `docs/TINY_LLM_GUIDE.md`)
 - `WATCHTOWER_LLM_API_KEY` — local servers usually accept any non-empty string
 - `WATCHTOWER_LLM_MODEL` — default `gpt-4o-mini`; override per-deploy
+- `WATCHTOWER_LLM_ANALYSIS_MODEL` — optional dedicated (tiny) model for the self-heal loop's background analysis; UI: "Use a tiny model for autonomous self-heal" in the AI & Autonomy card. Falls back to the main model.
 - `WATCHTOWER_AGENT_READONLY=true` — blocks destructive tools (filtered from the tool list AND re-checked at execution time as defence-in-depth)
 
-`POST /api/agent/chat` returns Server-Sent Events. Tool registry wraps existing API operations (`list_projects`, `list_deployments`, `view_build_logs`, `trigger_deployment`, etc.) and runs every tool under the authenticated user's identity — the agent can only do what the user can do, no privilege escalation. `GET /api/agent/config` lets the SPA detect "operator hasn't configured an LLM yet" and show setup UI. If `WATCHTOWER_LLM_BASE_URL` is unset, `/chat` returns 503 with an actionable message.
+`POST /api/agent/chat` returns Server-Sent Events. Tool registry wraps existing API operations (`list_projects`, `list_deployments`, `view_build_logs`, `trigger_deployment`, etc.) and runs every tool under the authenticated user's identity — the agent can only do what the user can do, no privilege escalation. `GET /api/agent/config` lets the SPA detect "operator hasn't configured an LLM yet" and show setup UI. If no LLM is configured anywhere, `/chat` returns 503 with an actionable message.
+
+### Self-heal loop (`watchtower/self_heal.py` + `watchtower/api/healing.py`)
+
+The build/deploy-failure counterpart to `autonomous.py`'s runtime probe ladder. A scheduler tick (default 45s, `WATCHTOWER_SELF_HEAL_INTERVAL_SECS`, kill switch `WATCHTOWER_SELF_HEAL_DISABLE=true`) finds FAILED deployments from the last 24h, classifies each with `failure_analyzer`, and writes exactly one `HealingAction` row per deployment (unique `deployment_id` = idempotency anchor). Decision matrix:
+
+- **Autonomy switch ON + fix auto-applicable** (port conflict, registry flake) → applies the fix, queues a retry deployment (`DeploymentTrigger.SCHEDULED`), records `healing.auto_fix` in the audit log, marks AUTO_APPLIED. Thrash guardrail: 3 auto-fixes per project per 10 min, then it queues for a human.
+- **Everything else** → PENDING row = the human-intervention queue (Settings → AI & Autonomy, badge on the Settings nav item). UNKNOWN failures get a free-form LLM root-cause analysis attached when an LLM is configured (best-effort, never blocks the loop).
+
+The autonomy switch is global, stored in `system_settings` (`healing.autonomous_enabled`), toggled via `PUT /api/healing/config`, default OFF. `POST /api/healing/actions/{id}/approve` applies the fix (auto-applicable) or retries the deployment ("I fixed it myself"); `/dismiss` archives. Tests: `tests/test_healing.py`.
 
 ### Related-app bundles (`ProjectRelation`)
 
@@ -249,7 +261,17 @@ WatchTower ships open-core. The deploy/run-locally/integrations core is free for
 
 The TypeScript hook (`useEdition()`, `useProFeature()` in `web/src/hooks/queries.ts`) caches the tier for 5 minutes — tier doesn't flip mid-session in any normal flow, and refetching on every mount would mean every page round-trips `/edition` before deciding what to render. Defaults to `false` (locked) on loading/error so we never accidentally show a Pro feature to a Free user during a network blip.
 
-**Tests for Pro-gated routes** must `monkeypatch.setenv("WATCHTOWER_TIER", "pro")` to exercise the unlocked path, and a separate test should hit the route on Free to confirm the 402 contract still holds. See `tests/test_audit.py::test_audit_read_returns_402_on_free_tier` for the pattern.
+**Free preview**: `FREE_PREVIEW_FEATURES` (a set in `edition.py`) temporarily unlocks a Pro feature on the Free tier. Both the route gate (`require_pro`) and the UI lock (`unlocked` flag in `/api/edition`) route through `_feature_unlocked()`, so adding/removing a key from the set is the only change needed to un-gate or re-gate. Audit log is currently in the preview (product decision 2026-06-12, "no Pro for now"). Re-gate by removing `"audit-log"` from the set.
+
+**Tests for Pro-gated routes** must `monkeypatch.setenv("WATCHTOWER_TIER", "pro")` to exercise the unlocked path, and a separate test should confirm the 402/lock contract on Free. See `tests/test_audit.py::test_other_pro_features_still_402_on_free_tier` (gated path) and `::test_audit_read_is_free_preview` (preview path).
+
+### Local Podman manager — `watchtower/podman_runtime.py` + `watchtower/api/podman.py`
+
+Third member of the local-runtime family (alongside `local_runner.py` for project containers and `managed_db_runtime.py` for DB pods), reusing their `_run`/`_podman_path` subprocess seam. Backs the Containers page's full manager: `/api/podman/status` (+ `machine/start`), container CRUD (create/start/stop/restart/remove/logs), pod CRUD. The Services page's "Run locally" buttons also call this. **Security**: argv-list subprocess only (never a shell), and every user token is validated against strict regexes — names/images must start with `[a-zA-Z0-9]` so nothing can smuggle a `--flag`. Project links are podman **labels** (`watchtower.project=<uuid>`), no DB join table. `PodmanError` → 400, never 500.
+
+### Legal acceptance — `watchtower/legal_docs.py` + `watchtower/api/legal.py` + `LegalGate.tsx`
+
+Canonical Terms/Acceptable-Use/Privacy live in `legal_docs.py` (a module so packaged builds always ship them); `legal/*.md` are generated mirrors. The SPA `LegalGate` (inside `RequireAuth`) blocks all routes post-auth until the current `TERMS_VERSION` is accepted; acceptance is append-only in `legal_acceptances` (user/version/timestamp/IP) + audit log. Bump `TERMS_VERSION` to re-gate everyone after material changes.
 
 ## Release discipline (READ BEFORE TAGGING)
 

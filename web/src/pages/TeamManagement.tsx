@@ -393,9 +393,12 @@ const TeamManagement = () => {
               </div>
               <Button onClick={() => void inviteMember()}
                 disabled={inviting || offlineMode || !orgId || !email.trim() || !canManageTeam}
-                className="w-full bg-red-700 text-white hover:bg-red-800 rounded-md">
+                className="w-full rounded-lg border border-slate-800 bg-amber-400 hover:bg-amber-500 text-slate-900 font-semibold shadow-[1px_1px_0_0_#1f2937] disabled:opacity-40 disabled:shadow-none">
                 {inviting ? 'Sending invite…' : offlineMode ? 'Server offline' : !canManageTeam ? 'No permission to invite' : 'Send Invite'}
               </Button>
+              {!email.trim() && !inviting && (
+                <p className="text-[11px] text-slate-400 text-center">Enter an email address to enable the invite.</p>
+              )}
             </CardContent>
           </Card>
 
@@ -422,24 +425,27 @@ const TeamManagement = () => {
                 </div>
               )}
 
-              <div className="grid grid-cols-2 gap-2">
+              <div className="flex flex-col gap-2">
                 <Button onClick={() => void startOAuth('github_com')}
                   disabled={loading || !orgId || offlineMode}
-                  className="bg-red-700 text-white hover:bg-red-800 rounded-md text-sm">
+                  className="w-full rounded-lg border border-slate-800 bg-amber-400 hover:bg-amber-500 text-slate-900 font-semibold shadow-[1px_1px_0_0_#1f2937] disabled:opacity-40 disabled:shadow-none text-sm">
                   Connect GitHub.com App
                 </Button>
                 <Button onClick={() => void startOAuth('github_enterprise')}
                   disabled={loading || !orgId || offlineMode}
-                  variant="outline" className="text-sm">
-                  Connect Enterprise App
+                  variant="outline" className="w-full text-sm">
+                  Connect GitHub Enterprise instead
                 </Button>
               </div>
               <p className="text-xs text-gray-400">You'll be redirected to GitHub to authorize access.</p>
 
-              <div className="border-t border-dashed border-gray-200 pt-3 mt-3 space-y-2">
+              <details className="border-t border-dashed border-gray-200 pt-3 mt-3">
+                <summary className="text-xs font-semibold text-gray-700 cursor-pointer hover:text-gray-900">
+                  Or paste a Personal Access Token instead
+                </summary>
+                <div className="space-y-2 mt-2">
                 <div>
-                  <p className="text-xs font-semibold text-gray-700">Or paste a Personal Access Token</p>
-                  <p className="text-[11px] text-gray-500 mt-0.5">
+                  <p className="text-[11px] text-gray-500">
                     The fastest way to enable private repository deploys. Token is encrypted at rest and only used to
                     clone your repos. Required scopes: <code className="text-[10px]">repo</code>.
                     {' '}
@@ -489,14 +495,15 @@ const TeamManagement = () => {
                 <Button
                   onClick={() => void savePat()}
                   disabled={savingPat || offlineMode || !orgId || !patToken.trim() || !patUsername.trim()}
-                  className="w-full bg-slate-900 text-white hover:bg-slate-800 rounded-md text-sm h-9"
+                  className="w-full bg-slate-900 text-white hover:bg-slate-800 rounded-lg text-sm h-9 disabled:opacity-40"
                 >
                   {savingPat ? 'Saving…' : 'Save Personal Access Token'}
                 </Button>
-              </div>
+                </div>
+              </details>
 
               {connections.length === 0 && !loading && (
-                <div className="py-4 text-center border border-dashed border-gray-200">
+                <div className="py-4 text-center border border-dashed border-gray-200 rounded-lg">
                   <p className="text-xs text-gray-400">No GitHub accounts connected yet.</p>
                 </div>
               )}
@@ -538,10 +545,9 @@ const TeamManagement = () => {
           </CardHeader>
           <CardContent>
             {!loading && members.length === 0 && (
-              <div className="py-10 text-center border border-dashed border-gray-200">
-                <p className="text-2xl mb-2">👥</p>
-                <p className="text-sm font-medium text-gray-600">No team members yet</p>
-                <p className="text-xs text-gray-400 mt-1">Use the form above to invite your first teammate.</p>
+              <div className="py-10 text-center border border-dashed border-gray-200 rounded-lg">
+                <p className="text-sm font-medium text-gray-600">It's just you so far</p>
+                <p className="text-xs text-gray-400 mt-1">Invite a teammate with the form above — they'll get an email (or a link you can share).</p>
               </div>
             )}
             <div className="space-y-2">

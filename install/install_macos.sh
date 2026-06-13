@@ -21,6 +21,11 @@ if ! command -v python3 >/dev/null 2>&1; then
   exit 1
 fi
 
+if ! command -v rsync >/dev/null 2>&1; then
+  echo "rsync is required but was not found. Install Xcode Command Line Tools: xcode-select --install"
+  exit 1
+fi
+
 # ── Detect existing installation ───────────────────────────────────────────────
 EXISTING_VERSION="none"
 if [[ -x "${VENV_DIR}/bin/python" ]]; then
@@ -72,6 +77,21 @@ EOF
   chmod 600 "${CONFIG_DIR}/appcenter.env"
 fi
 
+# Create simple helper scripts so start/update is one command from install dir.
+cat > "${INSTALL_DIR}/start-app-center.sh" <<EOF
+#!/usr/bin/env bash
+set -euo pipefail
+exec "${INSTALL_DIR}/install/run_app_center_macos.sh"
+EOF
+chmod +x "${INSTALL_DIR}/start-app-center.sh"
+
+cat > "${INSTALL_DIR}/update-app-center.sh" <<EOF
+#!/usr/bin/env bash
+set -euo pipefail
+exec "${INSTALL_DIR}/install/install_macos.sh"
+EOF
+chmod +x "${INSTALL_DIR}/update-app-center.sh"
+
 # Reload LaunchAgent if a plist already existed (auto-start after update).
 if [[ -f "${PLIST_PATH}" ]]; then
   launchctl load "${PLIST_PATH}" 2>/dev/null || true
@@ -84,6 +104,8 @@ NEW_VER="$("${VENV_DIR}/bin/python" -c \
 echo
 echo "WatchTower App Center ${NEW_VER} — ready on macOS."
 echo "Start with:"
-echo "  ./run_app_center_macos.sh"
+echo "  ${INSTALL_DIR}/start-app-center.sh"
+echo "Update with:"
+echo "  ${INSTALL_DIR}/update-app-center.sh"
 echo
 echo "Health check: curl http://127.0.0.1:${PORT}/health"

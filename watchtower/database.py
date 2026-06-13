@@ -3,6 +3,8 @@ Database configuration and ORM setup for WatchTower
 """
 
 import os
+import logging
+import re
 from sqlalchemy import (
     create_engine,
     Column,
@@ -92,6 +94,7 @@ engine = create_engine(
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
+logger = logging.getLogger(__name__)
 
 
 # Enums
@@ -1102,6 +1105,95 @@ class ProjectDatabaseLink(Base):
     external_database = relationship("ExternalDatabase", backref="project_links")
 
 
+class SystemSetting(Base):
+    """Instance-wide key-value settings the operator edits from the UI.
+
+    Backs runtime-configurable knobs that previously required env vars —
+    first consumer is the LLM agent connection (base URL / API key /
+    model) and the self-heal autonomy switch. Env vars still work as a
+    fallback for everything stored here, so headless/compose installs
+    keep their existing configuration surface.
+
+    ``is_secret`` rows hold values encrypted with ``util.encrypt_secret``
+    (Fernet) — never store a secret here as plaintext.
+    """
+    __tablename__ = "system_settings"
+
+    key = Column(String(100), primary_key=True)
+    value = Column(Text, nullable=True)
+    is_secret = Column(Boolean, default=False, nullable=False)
+    updated_by_user_id = Column(Uuid(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
+
+
+class HealingActionStatus(str, enum.Enum):
+    PENDING = "pending"            # waiting for a human decision
+    AUTO_APPLIED = "auto_applied"  # autonomous mode applied the fix itself
+    APPROVED = "approved"          # human approved → fix applied / retried
+    DISMISSED = "dismissed"        # human dismissed without acting
+    FAILED = "failed"              # applying the fix raised — see error
+
+
+class HealingAction(Base):
+    """One self-heal decision for one failed deployment.
+
+    The self-heal tick (watchtower/self_heal.py) creates exactly one row
+    per failed deployment: the diagnosis from failure_analyzer, the
+    optional LLM analysis for unknown failures, and what happened next.
+    Rows in PENDING form the human-intervention queue; AUTO_APPLIED rows
+    are the audit trail of what autonomous mode did on its own.
+    """
+    __tablename__ = "healing_actions"
+
+    id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    org_id = Column(Uuid(as_uuid=True), ForeignKey("organizations.id"), nullable=True, index=True)
+    project_id = Column(Uuid(as_uuid=True), ForeignKey("projects.id"), nullable=False, index=True)
+    deployment_id = Column(
+        Uuid(as_uuid=True),
+        ForeignKey("deployments.id"),
+        nullable=False,
+        unique=True,  # one healing decision per deployment — the tick's idempotency anchor
+    )
+
+    failure_kind = Column(String(50), nullable=False)   # FailureKind value
+    cause = Column(Text, nullable=True)
+    fix_description = Column(Text, nullable=True)
+    auto_applicable = Column(Boolean, default=False, nullable=False)
+    # Free-form root-cause analysis from the configured LLM, populated
+    # only for UNKNOWN failures when an LLM endpoint is configured.
+    llm_analysis = Column(Text, nullable=True)
+
+    status = Column(Enum(HealingActionStatus), default=HealingActionStatus.PENDING, nullable=False)
+    # The retry deployment queued by apply/approve, for deep-linking.
+    result_deployment_id = Column(Uuid(as_uuid=True), nullable=True)
+    error = Column(Text, nullable=True)
+
+    created_at = Column(DateTime, default=_utcnow)
+    resolved_at = Column(DateTime, nullable=True)
+    resolved_by_user_id = Column(Uuid(as_uuid=True), ForeignKey("users.id"), nullable=True)
+
+    project = relationship("Project", backref="healing_actions")
+
+
+class LegalAcceptance(Base):
+    """Append-only record that a user accepted the legal documents.
+
+    One row per acceptance event — never updated, never deleted. The
+    (user_id, terms_version) pair is what the login gate checks; the
+    timestamp and IP make each row usable as evidence that a specific
+    user agreed to a specific version at a specific time. Canonical
+    document text + version live in watchtower/legal_docs.py.
+    """
+    __tablename__ = "legal_acceptances"
+
+    id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(Uuid(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
+    user_email = Column(String, nullable=True)  # denormalised — survives user renames
+    terms_version = Column(String(20), nullable=False)
+    ip_address = Column(String(64), nullable=True)
+    accepted_at = Column(DateTime, default=_utcnow, nullable=False)
+
+
 # Dependency for getting DB session
 def get_db():
     db = SessionLocal()
@@ -1157,7 +1249,40 @@ def init_db() -> None:
         command.stamp(cfg, "head")
     else:
         from alembic import command
-        command.upgrade(cfg, "head")
+        from alembic.util.exc import CommandError
+
+        try:
+            command.upgrade(cfg, "head")
+        except CommandError as exc:
+            missing_rev = _missing_revision_from_alembic_error(str(exc))
+            current_rev = _current_alembic_version()
+            is_sqlite = str(engine.url).startswith("sqlite")
+
+            # Recovery path for packaged installs that shipped an incomplete
+            # migration directory: if the DB's recorded revision is exactly
+            # the missing revision, re-stamp to available head and continue.
+            if (
+                is_sqlite
+                and missing_rev
+                and current_rev
+                and current_rev == missing_rev
+                and os.getenv("WATCHTOWER_DISABLE_ALEMBIC_SELF_HEAL", "").lower() != "true"
+            ):
+                logger.warning(
+                    "Alembic revision '%s' not found in bundled migrations; "
+                    "attempting sqlite self-heal by stamping to head.",
+                    missing_rev,
+                )
+                command.stamp(cfg, "head")
+                command.upgrade(cfg, "head")
+            else:
+                raise
+
+
+def _missing_revision_from_alembic_error(message: str) -> str | None:
+    """Extract missing Alembic revision ID from common CommandError text."""
+    m = re.search(r"(?:locate revision identified by|No such revision or branch) ['\"]([0-9a-fA-F]+)['\"]", message)
+    return m.group(1) if m else None
 
 
 def _current_alembic_version() -> str | None:
@@ -1184,8 +1309,19 @@ def _head_from_version_files() -> str | None:
     if not versions_dir.is_dir():
         return None
 
-    rev_re = re.compile(r"^revision\s*[:=]\s*['\"]([0-9a-fA-F]+)['\"]", re.MULTILINE)
-    down_re = re.compile(r"^down_revision\s*[:=]\s*['\"]([0-9a-fA-F]+)['\"]", re.MULTILINE)
+    # Must accept BOTH styles alembic templates have emitted over time:
+    #   revision = 'abc123'                      (old, unannotated)
+    #   revision: str = 'abc123'                 (new, type-annotated)
+    # and non-hex revision ids (e.g. 'add_unique_project_name').
+    # Matching only the unannotated hex subset made this scan compute a
+    # stale head equal to older DBs' current revision, so the fast path
+    # said "up to date" and silently skipped every newer migration.
+    rev_re = re.compile(
+        r"^revision(?:\s*:\s*[^=\n]+)?\s*=\s*['\"]([\w.\-]+)['\"]", re.MULTILINE
+    )
+    down_re = re.compile(
+        r"^down_revision(?:\s*:\s*[^=\n]+)?\s*=\s*['\"]([\w.\-]+)['\"]", re.MULTILINE
+    )
 
     revisions: set[str] = set()
     referenced: set[str] = set()

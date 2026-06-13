@@ -99,6 +99,13 @@ function Node({ x, y, w, h = 44, label, sub, variant = 'default', icon }: NodePr
 function FlowLine({
   x1, y1, x2, y2, animated = true, label,
 }: { x1: number; y1: number; x2: number; y2: number; animated?: boolean; label?: string }) {
+  // Chevron + label depend on direction. Horizontal lines point →,
+  // vertical lines point ↓ — a right-pointing chevron on a vertical
+  // drop reads as a glitch (it did, on the system overview).
+  const vertical = x1 === x2;
+  const chevron = vertical
+    ? `${x2 - 3.5},${y2 - 6} ${x2 + 3.5},${y2 - 6} ${x2},${y2 - 1}`
+    : `${x2 - 6},${y2 - 3.5} ${x2 - 6},${y2 + 3.5} ${x2 - 1},${y2}`;
   return (
     <g>
       <line
@@ -107,17 +114,12 @@ function FlowLine({
         strokeDasharray="6 4"
         className={animated ? 'anim-flow' : undefined}
       />
-      {/* Chevron at the destination — small triangle pointing →.
-          Placed 1px before x2 to avoid the line's own end-cap. */}
-      <polygon
-        points={`${x2 - 6},${y2 - 3.5} ${x2 - 6},${y2 + 3.5} ${x2 - 1},${y2}`}
-        fill="#94a3b8"
-      />
+      <polygon points={chevron} fill="#94a3b8" />
       {label && (
         <text
-          x={(x1 + x2) / 2}
-          y={y1 - 5}
-          textAnchor="middle"
+          x={vertical ? x1 + 8 : (x1 + x2) / 2}
+          y={vertical ? (y1 + y2) / 2 + 3 : y1 - 5}
+          textAnchor={vertical ? 'start' : 'middle'}
           fontSize="9"
           fill="#64748b"
           fontStyle="italic"
@@ -210,20 +212,31 @@ const IconGlobe = (
 // pattern used elsewhere (e.g. RunAsContainerCard descriptive text).
 
 function DiagramFrame({
-  children, viewBox, caption, ariaLabel,
+  children, viewBox, caption, ariaLabel, size = 'strip',
 }: {
   children: ReactNode;
   viewBox: string;
   caption?: string;
   ariaLabel: string;
+  /**
+   * 'strip' — the wide 480×80 section diagrams: cap height so they
+   *           stay a slim banner above the section content.
+   * 'hero'  — the tall 700×320 system overview: cap WIDTH and centre
+   *           instead. Capping height here is what shrank the whole
+   *           drawing into a corner of a huge empty card.
+   */
+  size?: 'strip' | 'hero';
 }) {
+  const svgClass = size === 'hero'
+    ? 'w-full h-auto max-w-[780px] mx-auto block'
+    : 'w-full h-auto max-h-[140px]';
   return (
     <div className="rounded-xl border border-border bg-slate-50/50 px-4 py-3">
       <svg
         viewBox={viewBox}
         role="img"
         aria-label={ariaLabel}
-        className="w-full h-auto max-h-[140px]"
+        className={svgClass}
         preserveAspectRatio="xMidYMid meet"
       >
         {children}
@@ -372,71 +385,86 @@ export function BackupDiagram() {
 // stroke-dashoffset trick the other diagrams use.
 
 export function SystemDiagram() {
+  // Smooth fan-out from the control plane to the three pillars: each
+  // connector is a single vertical-tangent cubic Bézier, so it leaves
+  // the badge straight down and arrives straight down at its pillar
+  // with a graceful S-curve in between — no sharp 90° elbows.
+  const badgeX = 350;       // control-plane bottom centre
+  const badgeY = 152;
+  const pillarTopY = 190;
+  const pillarXs = [160, 350, 545];
+  const curveTo = (x: number) => {
+    const midY = (badgeY + pillarTopY) / 2;
+    // Vertical tangents at both ends (control points share x with the
+    // endpoints) make the join into each box perfectly perpendicular.
+    return `M ${badgeX} ${badgeY} C ${badgeX} ${midY}, ${x} ${midY}, ${x} ${pillarTopY - 6}`;
+  };
   return (
     <DiagramFrame
-      ariaLabel="WatchTower system overview: GitHub provides identity and code; WatchTower runs on your PC with apps, databases, and backups; output reaches your other devices via Tailscale and public visitors via GitHub Pages."
-      viewBox="0 0 700 320"
+      ariaLabel="WatchTower system overview: GitHub provides identity and code; the WatchTower control plane on your PC orchestrates apps, databases, and backups; output reaches your other devices via Tailscale and public visitors via GitHub Pages."
+      viewBox="0 0 700 334"
+      size="hero"
       caption="One PC, three pillars (apps + databases + backups), private reach via Tailscale, public reach via GitHub Pages."
     >
       {/* ── Layer 1: GitHub at the top ────────────────────────────── */}
-      <Node x={285} y={10} w={130} icon={IconGithub}
+      <Node x={285} y={8} w={130} icon={IconGithub}
             label="GitHub" sub="OAuth + repos + Pages" variant="default" />
 
-      {/* Arrow from GitHub down into the PC ─────────────────────── */}
-      <FlowLine x1={350} y1={56} x2={350} y2={84} />
+      <FlowLine x1={350} y1={54} x2={350} y2={80} label="sign-in + code" />
 
-      {/* ── Layer 2: "Your PC" container with the three pillars ─── */}
-      {/* Big surrounding card */}
+      {/* ── Layer 2: Your PC — control plane on top, pillars below ── */}
       <g>
         <rect
-          x={40} y={88} width={620} height={150} rx={14} ry={14}
+          x={40} y={84} width={620} height={170} rx={14} ry={14}
           fill="#fef2f2" stroke="#fca5a5" strokeWidth={1.5}
         />
-        <text x={50} y={104} fontSize="10" fontWeight="700"
+        <text x={54} y={102} fontSize="10" fontWeight="700"
               fill="#7f1d1d" letterSpacing="1"
               style={{ fontFamily: 'inherit' }}>
-          YOUR PC · WATCHTOWER
+          YOUR PC
         </text>
 
-        {/* Three pillar boxes inside the PC */}
-        <Node x={70}  y={120} w={180} h={48} icon={IconContainer}
-              label="Apps" sub="Podman containers" variant="success" />
-        <Node x={260} y={120} w={180} h={48} icon={IconDatabase}
-              label="Databases" sub="postgres / mysql / mongo / redis" variant="success" />
-        <Node x={450} y={120} w={190} h={48} icon={IconFile}
-              label="Backups" sub="pg_dump / mysqldump / mongo" variant="success" />
-
-        {/* Small WatchTower core badge bottom-centred */}
-        <g transform="translate(290, 188)">
-          <rect x={0} y={0} width={120} height={36} rx={8}
-                fill="#ffffff" stroke="#b91c1c" strokeWidth={1.5} />
-          <g transform="translate(8, 10)">{IconWatchTower}</g>
-          <text x={30} y={16} fontSize="11" fontWeight="600" fill="#7f1d1d"
+        {/* WatchTower control plane — the protagonist, front and centre */}
+        <g transform="translate(262, 110)">
+          <rect x={0} y={0} width={176} height={42} rx={10}
+                fill="#ffffff" stroke="#b91c1c" strokeWidth={2} />
+          <g transform="translate(10, 13)">{IconWatchTower}</g>
+          <text x={34} y={18} fontSize="12" fontWeight="700" fill="#7f1d1d"
                 style={{ fontFamily: 'inherit' }}>WatchTower</text>
-          <text x={30} y={28} fontSize="9" fill="#94181c"
-                style={{ fontFamily: 'inherit' }}>FastAPI control plane</text>
+          <text x={34} y={31} fontSize="9" fill="#b91c1c"
+                style={{ fontFamily: 'inherit' }}>control plane · deploys + heals</text>
         </g>
 
-        {/* Lines connecting each pillar down to WatchTower badge */}
-        <line x1={160} y1={168} x2={310} y2={188}
-              stroke="#fca5a5" strokeWidth={1} strokeDasharray="3 3" />
-        <line x1={350} y1={168} x2={350} y2={188}
-              stroke="#fca5a5" strokeWidth={1} strokeDasharray="3 3" />
-        <line x1={545} y1={168} x2={390} y2={188}
-              stroke="#fca5a5" strokeWidth={1} strokeDasharray="3 3" />
+        {/* Smooth fan-out curves: control plane → each pillar */}
+        <g stroke="#fca5a5" strokeWidth={1.5} fill="none" strokeLinecap="round">
+          {pillarXs.map((x) => (
+            <path key={x} d={curveTo(x)} />
+          ))}
+        </g>
+        {pillarXs.map((x) => (
+          <polygon key={x}
+                   points={`${x - 3.5},${pillarTopY - 7} ${x + 3.5},${pillarTopY - 7} ${x},${pillarTopY - 1}`}
+                   fill="#fca5a5" />
+        ))}
+
+        {/* Three pillars the control plane runs */}
+        <Node x={70}  y={pillarTopY} w={180} h={48} icon={IconContainer}
+              label="Apps" sub="Podman containers" variant="success" />
+        <Node x={260} y={pillarTopY} w={180} h={48} icon={IconDatabase}
+              label="Databases" sub="postgres / mysql / mongo / redis" variant="success" />
+        <Node x={450} y={pillarTopY} w={190} h={48} icon={IconFile}
+              label="Backups" sub="pg_dump / mysqldump / mongo" variant="success" />
       </g>
 
-      {/* Arrows out of the PC down to the two destination groups */}
-      <FlowLine x1={170} y1={244} x2={170} y2={272} label="Tailscale" />
-      <FlowLine x1={530} y1={244} x2={530} y2={272} label="public web" />
+      {/* Arrows out of the PC to the two audiences */}
+      <FlowLine x1={170} y1={258} x2={170} y2={284} label="Tailscale (private)" />
+      <FlowLine x1={530} y1={258} x2={530} y2={284} label="public web" />
 
-      {/* ── Layer 3: Outputs ──────────────────────────────────────── */}
-      {/* Left: private devices reached via Tailscale */}
-      <Node x={40}  y={274} w={260} h={40} icon={IconDevice}
-            label="Your other devices" sub="phone, laptop, other PCs (private)"
+      {/* ── Layer 3: Who reaches it ───────────────────────────────── */}
+      <Node x={40}  y={286} w={260} h={40} icon={IconDevice}
+            label="Your other devices" sub="phone, laptop, other PCs"
             variant="default" />
-      {/* Right: public visitors via GitHub Pages / custom domain */}
-      <Node x={400} y={274} w={260} h={40} icon={IconGlobe}
+      <Node x={400} y={286} w={260} h={40} icon={IconGlobe}
             label="Public visitors" sub="GitHub Pages or custom domain"
             variant="default" />
     </DiagramFrame>

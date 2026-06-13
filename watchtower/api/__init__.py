@@ -265,6 +265,23 @@ async def lifespan(_app: FastAPI):
     else:
         stop_scheduler = None  # type: ignore[assignment]
 
+    # Self-heal loop: diagnoses every failed deployment and either fixes
+    # it (autonomy switch ON) or queues it for human approval. Separate
+    # scheduler + kill switch from the runtime-probe loop above so the
+    # two halves of autonomous ops can be toggled independently.
+    if os.getenv("WATCHTOWER_SELF_HEAL_DISABLE", "false").lower() != "true":
+        try:
+            from watchtower.self_heal import (
+                start_scheduler as start_self_heal,
+                stop_scheduler as stop_self_heal,
+            )
+            start_self_heal()
+        except Exception:
+            logger.exception("self-heal: scheduler failed to start — continuing without it")
+            stop_self_heal = None  # type: ignore[assignment]
+    else:
+        stop_self_heal = None  # type: ignore[assignment]
+
     # Backup scheduler — separate APScheduler instance so disabling
     # autonomous mode doesn't also disable backups (and vice versa).
     # Reads ManagedDatabase.schedule_cron rows on startup + registers
@@ -287,6 +304,11 @@ async def lifespan(_app: FastAPI):
             stop_scheduler()
         except Exception:
             logger.exception("autonomous: scheduler failed to stop cleanly")
+    if stop_self_heal is not None:
+        try:
+            stop_self_heal()
+        except Exception:
+            logger.exception("self-heal: scheduler failed to stop cleanly")
     if stop_backup_scheduler is not None:
         try:
             stop_backup_scheduler()
@@ -473,6 +495,12 @@ app.include_router(external_db.router)
 app.include_router(project_db_links.router)
 from watchtower.api import diagnose  # noqa: E402
 app.include_router(diagnose.router)
+from watchtower.api import healing  # noqa: E402
+app.include_router(healing.router)
+from watchtower.api import legal  # noqa: E402
+app.include_router(legal.router)
+from watchtower.api import podman  # noqa: E402
+app.include_router(podman.router)
 
 # ── Serve React SPA from web/dist (same-origin, no proxy needed) ──────────────
 # Resolution order:

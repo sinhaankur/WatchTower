@@ -3,7 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import BrandLogo from './BrandLogo';
 import TitleBar from './TitleBar';
 import { PageTransition } from './PageTransition';
-import { useUpdateCheck, useActiveDeploymentCount } from '@/hooks/queries';
+import { useUpdateCheck, useActiveDeploymentCount, useHealingConfig } from '@/hooks/queries';
 import { CommandPalette, openCommandPalette } from './CommandPalette';
 import { UserMenu } from './UserMenu';
 
@@ -151,6 +151,21 @@ function IconSettings() {
     </svg>
   );
 }
+function IconBug() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M8 2h8" />
+      <path d="M9 2v2.5" />
+      <path d="M15 2v2.5" />
+      <rect x="7" y="4.5" width="10" height="14" rx="4" />
+      <path d="M3 9h4" />
+      <path d="M17 9h4" />
+      <path d="M2 14h5" />
+      <path d="M17 14h5" />
+      <path d="M10 9h4" />
+    </svg>
+  );
+}
 function IconShield() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -235,9 +250,10 @@ const PRIMARY_NAV: NavItem[] = [
 const SECONDARY_NAV: NavItem[] = [
   { path: '/integrations',     label: 'Integrations',     Icon: IconPuzzle },
   { path: '/remote-access',    label: 'Remote Access',    Icon: IconRemoteAccess },
-  { path: '/local-containers', label: 'Local Containers', Icon: IconContainers },
+  { path: '/local-containers', label: 'Containers', Icon: IconContainers },
   { path: '/team',             label: 'Team',             Icon: IconUsers },
   { path: '/audit',            label: 'Audit Log',        Icon: IconShield },
+  { path: '/report-bug',       label: 'Report Bug',       Icon: IconBug },
   { path: '/settings',         label: 'Settings',         Icon: IconSettings },
 ];
 
@@ -366,6 +382,10 @@ export default function Layout({ children }: { children: ReactNode }) {
   }, []);
   const { data: activeDeploys } = useActiveDeploymentCount();
   const activeBuildCount = activeDeploys?.active ?? 0;
+  // Self-heal fixes waiting for a human decision — badge Settings so
+  // the intervention queue is discoverable without opening the page.
+  const { data: healingConfig } = useHealingConfig();
+  const pendingInterventions = healingConfig?.pending_actions ?? 0;
 
   // Wire badge counts per nav path. Right now we only badge
   // /applications with the active deployment count, but this is the
@@ -373,6 +393,7 @@ export default function Layout({ children }: { children: ReactNode }) {
   // unhealthy nodes).
   const navBadgeFor = (path: string): number | undefined => {
     if (path === '/applications') return activeBuildCount;
+    if (path === '/settings') return pendingInterventions > 0 ? pendingInterventions : undefined;
     return undefined;
   };
 

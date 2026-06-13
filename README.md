@@ -14,30 +14,28 @@
   Operator-facing tooling for container auto-updates, multi-node deployments, and guided host operations — without handing control to a hosted platform.
 </p>
 
-## How They Work Together
 
-**The complete integration stack:**
+## Install the App (easiest)
 
+**macOS** — install it like any Mac app:
+
+1. Download the latest `WatchTower-*-mac-arm64.dmg` (Apple Silicon) or `-x64.dmg` (Intel) from [**Releases**](https://github.com/sinhaankur/WatchTower/releases/latest)
+2. Open the DMG and **drag WatchTower into Applications**
+3. Launch WatchTower from Applications — done
+
+> **First launch:** builds are not yet signed with an Apple Developer ID, so macOS may warn you. Right-click the app → **Open** → **Open** (one time only). If the app still won't start, use [Browser mode](#browser-mode) — same UI, no Electron wrapper.
+
+**Linux** — download the `WatchTower-*-linux-x86_64.AppImage` from [Releases](https://github.com/sinhaankur/WatchTower/releases/latest), then:
+
+```bash
+chmod +x WatchTower-*.AppImage && ./WatchTower-*.AppImage
 ```
-Podman runs containers → Nginx proxies traffic → Tailscale secures node SSH
-  ↓
-Cloudflare exposes to internet → Coolify provides PaaS UI → WatchTower watchdog
-  ↓
-Keeps it all alive after reboots
-```
 
-- **Podman** runs your containerized workloads
-- **Nginx** routes HTTP/HTTPS traffic efficiently
-- **Tailscale** creates a secure, encrypted mesh network for node SSH access
-- **Cloudflare** exposes your applications to the internet with DDoS protection
-- **Coolify** provides a clean PaaS interface for app deployment and management
-- **WatchTower Watchdog** automatically restarts containers after any reboot or crash — **no manual intervention needed**
+**Windows** — run `install\install_watchtower_windows.cmd` from a clone (installer EXE coming soon).
 
-Manage everything from the **Integrations** page: see live connection status for all 6 tools, toggle the watchdog, and view install commands.
+The desktop app is self-contained: it bundles Python and the web UI, stores data in `~/.watchtower/`, and auto-updates from GitHub Releases.
 
----
-
-## Get Running in 30 Seconds
+## Get Running in 30 Seconds (from source)
 
 ```bash
 git clone https://github.com/sinhaankur/WatchTower.git
@@ -50,7 +48,7 @@ That's it. `run.sh` will:
 - Install Node packages (first run only)
 - Build the frontend (first run only)
 - Start the backend API on `127.0.0.1:8000`
-- Launch the **Electron desktop app** if a display is available, otherwise open the browser at `http://127.0.0.1:5222`
+- Launch the **Electron desktop app** if a display is available, otherwise open the browser at `http://127.0.0.1:8000`
 
 **Other commands:**
 
@@ -60,8 +58,23 @@ That's it. `run.sh` will:
 | `./run.sh browser` | Force browser mode |
 | `./run.sh stop` | Kill all WatchTower processes |
 | `./run.sh logs` | Tail backend + frontend logs |
+| `./run.sh update` | Pull latest code and rebuild dependencies |
 
 > **Requirements:** Python 3.8+, Node.js 18+, npm. Podman optional (only needed for container auto-update mode).
+
+### Easier install paths
+
+If you are installing App Center and do not want to memorize platform-specific steps:
+
+- macOS: `./install/install_watchtower.sh --mode appcenter`
+- Linux: `./install/install_watchtower.sh --mode appcenter`
+- Windows: `install\install_watchtower_windows.cmd`
+
+For an in-place update of a git-clone install, use:
+
+```bash
+./run.sh update
+```
 
 ### Browser mode
 
@@ -115,11 +128,50 @@ WatchTower is an operator-facing tool for two adjacent jobs:
 
 The project is intentionally lightweight. It is not trying to replace a full PaaS. It gives teams a clear release path, host operations, and a dashboard-oriented workflow without hiding what happens underneath.
 
+## How They Work Together
+
+```mermaid
+flowchart TB
+    GH["GitHub<br/><small>OAuth · repos · Pages</small>"]
+
+    subgraph PC["🖥 Your PC"]
+        WT["<b>WatchTower</b><br/><small>control plane — deploys + heals</small>"]
+        APPS["Apps<br/><small>Podman containers</small>"]
+        DBS["Databases<br/><small>postgres · mysql · mongo · redis</small>"]
+        BAK["Backups<br/><small>pg_dump · mysqldump · mongo</small>"]
+        WT --> APPS
+        WT --> DBS
+        WT --> BAK
+    end
+
+    GH -- "sign-in + code" --> WT
+    PC -- "Tailscale (private)" --> DEV["Your other devices<br/><small>phone · laptop · other PCs</small>"]
+    PC -- "public web" --> PUB["Public visitors<br/><small>GitHub Pages or custom domain</small>"]
+
+    style WT fill:#fff,stroke:#b91c1c,stroke-width:2px
+    style PC fill:#fef2f2,stroke:#fca5a5
+    style APPS fill:#ecfdf5,stroke:#6ee7b7
+    style DBS fill:#ecfdf5,stroke:#6ee7b7
+    style BAK fill:#ecfdf5,stroke:#6ee7b7
+```
+
+The wider integration stack slots in around that core:
+
+- **Podman** runs your containerized workloads; **Nginx** routes HTTP/HTTPS traffic
+- **Tailscale** creates a secure, encrypted mesh for node SSH and private access
+- **Cloudflare** exposes apps to the internet with DDoS protection
+- **WatchTower Watchdog** restarts containers after any reboot or crash — no manual intervention
+
+Manage everything from the **Integrations** page: live connection status for the whole stack, watchdog toggle, and install commands.
+
+---
+
 ## What It Does
 
 - **Container auto-update mode:** poll running containers, pull newer images, restart safely, and verify health.
 - **App Center mode:** register workloads in `config/apps.json`, package from a dev machine, sync to nodes, activate remotely, and confirm rollout state.
 - **Operator tooling:** expose guided actions, runtime inspection, and secure host operations from one control surface.
+- **AI & autonomous self-heal (optional):** every failed deployment is diagnosed automatically; with the autonomy switch ON, safe fixes (port conflicts, registry flakes) are applied and retried on their own, and everything else waits in a human-approval queue. Connect any OpenAI-compatible LLM for root-cause analysis of unrecognized failures — **a tiny 0.5–2B model under llama.cpp is enough**, so this works on mini-PCs and Raspberry Pis without LM Studio or Ollama. See the [Tiny LLM guide](docs/TINY_LLM_GUIDE.md).
 
 ## Choose Your Path
 
@@ -1038,6 +1090,17 @@ WatchTower is **dual-licensed** — pick the option that matches how you'll use 
 - **Commercial License** ([template](LICENSE-COMMERCIAL.md)): paid option for resellers / SaaS hosts / OEM embedders / regulated environments that need a written agreement, defined SLA, or removable attribution. Email **opensource@sinhaankur.dev** with subject "Commercial License Inquiry" to start. Pricing tiers at <https://sinhaankur.github.io/WatchTower/pricing/>.
 
 See [LICENSING.md](LICENSING.md) for the full breakdown of who needs which license, what each grants, and trademark notes.
+
+## Terms, Privacy & Acceptable Use
+
+Using a running WatchTower installation is governed by the
+[Terms of Use](legal/TERMS_OF_USE.md), [Acceptable Use Policy](legal/ACCEPTABLE_USE.md),
+and [Privacy Policy](legal/PRIVACY.md). Every user accepts them in-app at first
+login (recorded with version + timestamp), and re-accepts when they materially
+change. WatchTower is self-hosted: your data stays on your machine, there is no
+vendor telemetry, and you remain responsible for what you deploy and for any
+automated/AI features you enable. See [legal/README.md](legal/README.md) for how
+the acceptance flow works.
 
 ## Support
 

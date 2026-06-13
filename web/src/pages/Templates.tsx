@@ -35,6 +35,138 @@ const CATEGORY_BADGE: Record<string, string> = {
   other: 'border-slate-300 bg-slate-50 text-slate-700',
 };
 
+// Slug-safe project name: lowercase, hyphenated, no leading digit issues.
+function slugifyName(raw: string): string {
+  return raw.trim().toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40);
+}
+
+function TemplateCard({
+  template,
+  creating,
+  onCreate,
+}: {
+  template: Template;
+  creating: boolean;
+  onCreate: (name: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState(`my-${template.slug}`);
+  const placeholders = template.default_env_vars.filter((v) => v.placeholder);
+  const validName = slugifyName(name).length >= 2;
+
+  return (
+    <article
+      className="anim-fade-in-up rounded-xl border border-slate-800 bg-card p-4 shadow-[2px_2px_0_0_#1f2937] flex flex-col gap-3 transition-shadow hover:shadow-[3px_3px_0_0_#1f2937]"
+    >
+      <div className="flex items-start gap-3">
+        <div className="w-9 h-9 rounded-lg border border-slate-800 bg-amber-100 flex items-center justify-center text-[11px] font-mono font-bold text-slate-900 shadow-[1px_1px_0_0_#1f2937] uppercase">
+          {template.slug.slice(0, 2)}
+        </div>
+        <div className="flex-1 min-w-0">
+          <h2 className="text-sm font-semibold text-slate-900 truncate">{template.name}</h2>
+          <span
+            className={`inline-flex text-[10px] px-2 py-0.5 rounded-full border font-medium mt-1 ${
+              CATEGORY_BADGE[template.category] ?? CATEGORY_BADGE.other
+            }`}
+          >
+            {template.category}
+          </span>
+        </div>
+      </div>
+
+      <p className="text-xs text-slate-700 leading-relaxed">{template.description}</p>
+
+      <div className="text-[11px] text-slate-500 space-y-0.5">
+        <p>
+          Repo: <a href={template.repo_url} target="_blank" rel="noopener noreferrer" className="font-mono text-slate-700 hover:text-slate-900 underline-offset-2 hover:underline">{template.repo_url.replace('https://github.com/', '')}</a>
+        </p>
+        {template.memory_hint_mb && <p>Memory hint: {template.memory_hint_mb} MB</p>}
+        {template.default_env_vars.length > 0 && (
+          <p>Pre-fills {template.default_env_vars.length} env var{template.default_env_vars.length === 1 ? '' : 's'}{placeholders.length > 0 && `, ${placeholders.length} need${placeholders.length === 1 ? 's' : ''} your input`}</p>
+        )}
+      </div>
+
+      {template.notes && (
+        <p className="text-[10px] text-amber-800 bg-amber-50 border border-amber-200 rounded px-2 py-1">
+          {template.notes}
+        </p>
+      )}
+
+      {/* Inline create panel — replaces the old window.prompt/alert flow
+          so the user sees exactly what they're creating and what they'll
+          need to fill in, before committing. */}
+      {open ? (
+        <div className="rounded-lg border border-slate-300 bg-slate-50 p-3 space-y-2.5">
+          <label className="block">
+            <span className="text-[11px] font-medium text-slate-600">Project name</span>
+            <input
+              autoFocus
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter' && validName && !creating) onCreate(slugifyName(name)); }}
+              className="mt-1 w-full text-xs font-mono rounded border border-slate-300 px-2 py-1.5 focus:border-slate-800 focus:outline-none"
+            />
+            {name && !validName && (
+              <span className="text-[10px] text-red-600">Name needs at least 2 letters/digits.</span>
+            )}
+          </label>
+
+          {placeholders.length > 0 && (
+            <div>
+              <p className="text-[11px] font-medium text-slate-600 mb-1">You'll set these after creating:</p>
+              <ul className="space-y-1">
+                {placeholders.map((v) => (
+                  <li key={v.key} className="text-[10.5px] text-slate-600 flex items-start gap-1.5">
+                    <code className="font-mono text-amber-800 bg-amber-50 border border-amber-200 rounded px-1 shrink-0">{v.key}</code>
+                    {v.description && <span className="text-slate-500">{v.description}</span>}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          <div className="flex items-center gap-2 pt-0.5">
+            <button
+              onClick={() => onCreate(slugifyName(name))}
+              disabled={creating || !validName}
+              className="flex-1 text-xs px-3 py-1.5 rounded-lg border border-slate-800 bg-amber-400 hover:bg-amber-500 text-slate-900 font-semibold shadow-[1px_1px_0_0_#1f2937] disabled:opacity-50 disabled:cursor-wait"
+            >
+              {creating ? 'Creating…' : 'Create project →'}
+            </button>
+            <button
+              onClick={() => setOpen(false)}
+              disabled={creating}
+              className="text-[11px] px-2.5 py-1.5 rounded-lg border border-slate-300 text-slate-600 hover:border-slate-400 disabled:opacity-50"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="flex items-center gap-2 pt-1 mt-auto">
+          <button
+            onClick={() => setOpen(true)}
+            className="flex-1 text-xs px-3 py-1.5 rounded-lg border border-slate-800 bg-amber-400 hover:bg-amber-500 text-slate-900 font-semibold shadow-[1px_1px_0_0_#1f2937]"
+          >
+            Use this template
+          </button>
+          {template.documentation_url && (
+            <a
+              href={template.documentation_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[11px] text-slate-600 hover:text-slate-900"
+              title="Open upstream documentation"
+            >
+              docs ↗
+            </a>
+          )}
+        </div>
+      )}
+    </article>
+  );
+}
+
 export default function Templates() {
   const navigate = useNavigate();
   const [templates, setTemplates] = useState<Template[] | null>(null);
@@ -66,17 +198,10 @@ export default function Templates() {
     return () => { cancelled = true; };
   }, []);
 
-  async function handleCreate(template: Template) {
-    // Quick name prompt — full create flow lands users on the new
-    // project's detail page where they can fill in placeholder env
-    // vars before deploy.
-    const suggested = `my-${template.slug}`;
-    const name = window.prompt(
-      `Create a project from ${template.name}?\n\nGive it a name:`,
-      suggested
-    );
-    if (!name) return;
-
+  async function handleCreate(template: Template, name: string) {
+    // Inline create flow (no browser prompt/alert): the card collects
+    // the name and previews the env vars, then we create + navigate to
+    // the project detail page where placeholder vars are pre-populated.
     setCreating(template.slug);
     setCreatingError(null);
     try {
@@ -85,15 +210,6 @@ export default function Templates() {
         { name },
       );
       const projectId = r.data?.project_id;
-      const placeholders: string[] = r.data?.placeholder_env_var_keys ?? [];
-      if (placeholders.length > 0) {
-        // The user needs to fill these in before deploy succeeds.
-        // We send them straight to the project detail view; the env
-        // vars tab will already show the rows pre-populated.
-        window.alert(
-          `Project created!\n\nBefore your first deploy, edit these placeholder env vars:\n  ${placeholders.join(', ')}\n\nWe'll take you to the project page now.`
-        );
-      }
       if (projectId) {
         navigate(`/projects/${projectId}`);
       }
@@ -214,65 +330,12 @@ export default function Templates() {
 
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3 anim-stagger">
           {filtered.map(template => (
-            <article
+            <TemplateCard
               key={template.slug}
-              className="anim-fade-in-up rounded-xl border border-slate-800 bg-card p-4 shadow-[2px_2px_0_0_#1f2937] flex flex-col gap-3 transition-shadow hover:shadow-[3px_3px_0_0_#1f2937]"
-            >
-              <div className="flex items-start gap-3">
-                <div className="w-9 h-9 rounded-lg border border-slate-800 bg-amber-100 flex items-center justify-center text-[11px] font-mono font-bold text-slate-900 shadow-[1px_1px_0_0_#1f2937] uppercase">
-                  {template.slug.slice(0, 2)}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <h2 className="text-sm font-semibold text-slate-900 truncate">{template.name}</h2>
-                  <span
-                    className={`inline-flex text-[10px] px-2 py-0.5 rounded-full border font-medium mt-1 ${
-                      CATEGORY_BADGE[template.category] ?? CATEGORY_BADGE.other
-                    }`}
-                  >
-                    {template.category}
-                  </span>
-                </div>
-              </div>
-
-              <p className="text-xs text-slate-700 leading-relaxed">{template.description}</p>
-
-              <div className="text-[11px] text-slate-500 space-y-0.5">
-                <p>
-                  Repo: <a href={template.repo_url} target="_blank" rel="noopener noreferrer" className="font-mono text-slate-700 hover:text-slate-900 underline-offset-2 hover:underline">{template.repo_url.replace('https://github.com/', '')}</a>
-                </p>
-                {template.memory_hint_mb && <p>Memory hint: {template.memory_hint_mb} MB</p>}
-                {template.default_env_vars.length > 0 && (
-                  <p>Pre-fills {template.default_env_vars.length} env var{template.default_env_vars.length === 1 ? '' : 's'}{template.default_env_vars.some(v => v.placeholder) && ' (some need your input)'}</p>
-                )}
-              </div>
-
-              {template.notes && (
-                <p className="text-[10px] text-amber-800 bg-amber-50 border border-amber-200 rounded px-2 py-1">
-                  ⓘ {template.notes}
-                </p>
-              )}
-
-              <div className="flex items-center gap-2 pt-1 mt-auto">
-                <button
-                  onClick={() => void handleCreate(template)}
-                  disabled={creating === template.slug}
-                  className="flex-1 text-xs px-3 py-1.5 rounded-lg border border-slate-800 bg-amber-400 hover:bg-amber-500 text-slate-900 font-semibold shadow-[1px_1px_0_0_#1f2937] disabled:opacity-50 disabled:cursor-wait"
-                >
-                  {creating === template.slug ? 'Creating…' : 'Create from template'}
-                </button>
-                {template.documentation_url && (
-                  <a
-                    href={template.documentation_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-[11px] text-slate-600 hover:text-slate-900"
-                    title="Open upstream documentation"
-                  >
-                    docs ↗
-                  </a>
-                )}
-              </div>
-            </article>
+              template={template}
+              creating={creating === template.slug}
+              onCreate={(name) => void handleCreate(template, name)}
+            />
           ))}
         </div>
       </main>

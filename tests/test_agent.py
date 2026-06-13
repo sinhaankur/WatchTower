@@ -76,7 +76,7 @@ def patch_openai(monkeypatch):
     def _install(streams: list[list[Any]]):
         client = _make_fake_client(streams)
         holder["client"] = client
-        monkeypatch.setattr(agent, "_get_client", lambda: client)
+        monkeypatch.setattr(agent, "_get_client", lambda _db: client)
         return client
 
     return _install

@@ -44,11 +44,13 @@ function _push(kind: ToastKind, text: string, durationMs?: number) {
   return id;
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function dismiss(id: string) {
   _toasts = _toasts.filter((t) => t.id !== id);
   _emit();
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const toast = {
   success(text: string, durationMs?: number) { return _push('success', text, durationMs); },
   error(text: string, durationMs?: number) { return _push('error', text, durationMs); },

@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import apiClient from '@/lib/api';
+import AIAutonomyCard from '@/components/AIAutonomyCard';
 import DiagnosticsCard from '@/components/DiagnosticsCard';
 import {
   useVSCodeStatus,
@@ -738,30 +740,7 @@ function BackupCard() {
 }
 
 const Settings = () => {
-  const [showReportModal, setShowReportModal] = useState(false);
-  const [reportNote, setReportNote] = useState('');
-  const [reportSending, setReportSending] = useState(false);
-
-  const electron = (typeof window !== 'undefined' ? (window as unknown as { electronAPI?: {
-    openErrorReport?: (payload: { message?: string }) => Promise<{ ok: boolean; error?: string }>;
-  } }).electronAPI : undefined);
-
-  const handleSendReport = async () => {
-    setReportSending(true);
-    try {
-      if (electron?.openErrorReport) {
-        await electron.openErrorReport({ message: reportNote });
-      } else {
-        const subject = encodeURIComponent('WatchTower bug report');
-        const body = encodeURIComponent(reportNote || '');
-        window.open(`mailto:sinhaankur@ymail.com?subject=${subject}&body=${body}`, '_blank');
-      }
-      setShowReportModal(false);
-      setReportNote('');
-    } finally {
-      setReportSending(false);
-    }
-  };
+  const navigate = useNavigate();
 
   return (
     <div className="flex-1 overflow-auto bg-slate-50">
@@ -774,11 +753,11 @@ const Settings = () => {
           <p className="text-xs text-slate-600 mt-0.5">Configure your WatchTower instance</p>
         </div>
         <button
-          onClick={() => setShowReportModal(true)}
+          onClick={() => navigate('/report-bug')}
           className="text-xs px-3 py-1.5 rounded border border-slate-300 text-slate-600 hover:text-slate-900 hover:border-slate-400 transition-colors"
           title="Send a bug report with diagnostics attached"
         >
-          Send Error Report
+          Report Bug
         </button>
       </header>
 
@@ -786,6 +765,9 @@ const Settings = () => {
 
         {/* WatchTower version + update check */}
         <UpdateCheckCard />
+
+        {/* LLM connection + autonomous self-heal + intervention queue */}
+        <AIAutonomyCard />
 
         {/* Subsystem diagnostics — first stop for "why doesn't X work?" */}
         <DiagnosticsCard />
@@ -800,64 +782,6 @@ const Settings = () => {
         <VSCodeCard />
 
       </main>
-
-      {/* Report Problem Modal — opens user's mail client with diagnostics
-          pre-filled (Electron) or a plain mailto (browser). Sends to
-          sinhaankur@ymail.com so the maintainer gets the bug + system
-          info in one go. */}
-      {showReportModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg shadow-lg max-w-md w-full p-6 space-y-4">
-            <div className="flex items-start gap-3">
-              <div className="w-10 h-10 rounded-lg border border-slate-800 bg-red-700 flex items-center justify-center flex-shrink-0">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
-                  <path d="M10 19l-7-7m0 0l7-7m-7 7h18.5" />
-                </svg>
-              </div>
-              <div>
-                <h3 className="font-semibold text-slate-900">Send Error Report</h3>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  {electron
-                    ? 'System info + recent backend log are attached automatically.'
-                    : 'Opens your mail client with a pre-filled report.'}
-                </p>
-              </div>
-            </div>
-
-            <label className="block">
-              <span className="text-xs font-medium text-slate-700">What happened? (optional)</span>
-              <textarea
-                value={reportNote}
-                onChange={(e) => setReportNote(e.target.value)}
-                rows={4}
-                placeholder="A short description helps me reproduce and fix the issue."
-                className="mt-1 w-full text-sm px-3 py-2 rounded-lg border border-slate-300 focus:border-slate-800 focus:outline-none resize-none"
-              />
-            </label>
-
-            <p className="text-[11px] text-slate-500">
-              Goes to <span className="font-mono">sinhaankur@ymail.com</span>. You'll see the
-              email before it sends — review and click send in your mail client.
-            </p>
-
-            <div className="flex gap-2 pt-2">
-              <button
-                onClick={() => setShowReportModal(false)}
-                className="flex-1 py-2 px-3 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50 text-sm font-medium transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => void handleSendReport()}
-                disabled={reportSending}
-                className="flex-1 py-2 px-3 rounded-lg bg-red-700 text-white hover:bg-red-800 text-sm font-medium transition-colors disabled:opacity-60"
-              >
-                {reportSending ? 'Opening…' : 'Open in mail client'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

@@ -88,6 +88,11 @@ free_port() {
 cmd_update() {
   info "Checking for updates..."
 
+  if ! command -v git >/dev/null 2>&1; then
+    error "git is required for self-update. Install git and try again."
+    exit 1
+  fi
+
   # Must be run from a git checkout
   if [[ ! -d "$ROOT/.git" ]]; then
     error "Not a git repository — cannot self-update. Download the latest release from:"
@@ -105,6 +110,22 @@ cmd_update() {
     exit 0
   fi
 
+  # Keep updates resilient for users who have local tweaks (.env, config, etc.).
+  # We stash before pull and restore after rebuild.
+  STASHED=0
+  STASH_REF=""
+  if [[ -n "$(git -C "$ROOT" status --porcelain)" ]]; then
+    STASH_COUNT_BEFORE=$(git -C "$ROOT" stash list | wc -l | tr -d ' ')
+    STASH_MSG="watchtower-auto-update-$(date +%Y%m%d-%H%M%S)"
+    warn "Local changes detected — temporarily stashing them for a safe update."
+    git -C "$ROOT" stash push -u -m "$STASH_MSG" >/dev/null
+    STASH_COUNT_AFTER=$(git -C "$ROOT" stash list | wc -l | tr -d ' ')
+    if (( STASH_COUNT_AFTER > STASH_COUNT_BEFORE )); then
+      STASHED=1
+      STASH_REF=$(git -C "$ROOT" stash list | head -n1 | cut -d: -f1)
+    fi
+  fi
+
   CURRENT_VERSION=$(git -C "$ROOT" describe --tags --always 2>/dev/null || echo "${LOCAL:0:8}")
   NEW_VERSION=$(git -C "$ROOT" describe --tags --always origin/main 2>/dev/null || echo "${REMOTE:0:8}")
   info "Updating from $CURRENT_VERSION → $NEW_VERSION..."
@@ -118,6 +139,12 @@ cmd_update() {
   # Force dependency reinstall
   rm -f "$VENV/.deps_installed"
 
+  # Recreate venv if missing
+  if [[ ! -x "$VENV/bin/python" ]]; then
+    info "Creating Python virtualenv..."
+    python3 -m venv "$VENV"
+  fi
+
   # Recreate venv if Python was upgraded
   if [[ -x "$VENV/bin/python" ]]; then
     "$VENV/bin/pip" install --prefer-binary --upgrade pip -q
@@ -127,6 +154,14 @@ cmd_update() {
   fi
 
   # Rebuild frontend
+  if ! command -v npm >/dev/null 2>&1; then
+    error "npm is required to rebuild the frontend during update. Install Node.js 18+ and retry."
+    if [[ "$STASHED" -eq 1 ]]; then
+      warn "Your local changes are saved in ${STASH_REF}."
+    fi
+    exit 1
+  fi
+
   info "Rebuilding frontend..."
   npm --prefix "$ROOT/web" install --silent
   npm --prefix "$ROOT/web" run build --silent
@@ -134,6 +169,16 @@ cmd_update() {
   # Update desktop deps if present
   if [[ -d "$ROOT/desktop/node_modules" ]]; then
     npm --prefix "$ROOT/desktop" install --silent
+  fi
+
+  if [[ "$STASHED" -eq 1 ]]; then
+    info "Restoring local changes..."
+    if git -C "$ROOT" stash pop --index >/dev/null 2>&1; then
+      success "Local changes restored."
+    else
+      warn "Could not cleanly restore stashed changes. Resolve conflicts, then re-run if needed."
+      warn "Stash entry kept at ${STASH_REF}."
+    fi
   fi
 
   success "Update complete! Run ./run.sh to start the updated app."
@@ -329,7 +374,8 @@ if [[ "$MODE" == "browser" ]]; then
       echo -e "  ${GREEN}[$((i+1))]${NC} $label"
     done
     echo ""
-    read -r -p "  Enter choice [1-${#BROWSER_ENTRIES[@]}, default 1]: " BROWSER_CHOICE </dev/tty
+    # No TTY (scripted/CI/SSH-batch run) → don't die on the prompt; take the default.
+    read -r -p "  Enter choice [1-${#BROWSER_ENTRIES[@]}, default 1]: " BROWSER_CHOICE </dev/tty || BROWSER_CHOICE=1
     BROWSER_CHOICE="${BROWSER_CHOICE:-1}"
     # Validate; fall back to 1 on bad input.
     if ! [[ "$BROWSER_CHOICE" =~ ^[0-9]+$ ]] || \

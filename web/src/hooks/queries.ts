@@ -41,6 +41,14 @@ export const queryKeys = {
   managedDbSchedule: (id: string) => ['managed-databases', id, 'schedule'] as const,
   externalDatabases: ['external-databases'] as const,
   projectDatabases: (projectId: string) => ['projects', projectId, 'databases'] as const,
+  agentConfig: ['agent', 'config'] as const,
+  healingConfig: ['healing', 'config'] as const,
+  healingActions: (status?: string) => ['healing', 'actions', status ?? 'all'] as const,
+  legalStatus: ['legal', 'status'] as const,
+  legalDocuments: ['legal', 'documents'] as const,
+  podmanStatus: ['podman', 'status'] as const,
+  podmanContainers: ['podman', 'containers'] as const,
+  podmanPods: ['podman', 'pods'] as const,
 } as const;
 
 // ── Edition / license tier ───────────────────────────────────────────────────
@@ -914,5 +922,285 @@ export function useDeleteProjectDatabaseLink(projectId: string) {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: queryKeys.projectDatabases(projectId) });
     },
+  });
+}
+
+// ── AI & Autonomy (LLM agent config + self-heal) ─────────────────────────────
+
+export type AgentConfig = {
+  configured: boolean;
+  base_url: string | null;
+  model: string;
+  analysis_model: string;
+  has_dedicated_analysis_model: boolean;
+  source: 'database' | 'env' | null;
+  has_api_key: boolean;
+  readonly?: boolean;
+};
+
+export type AgentTestResult = {
+  ok: boolean;
+  base_url: string;
+  models: string[];
+  error: string | null;
+};
+
+export type HealingConfig = {
+  autonomous_enabled: boolean;
+  llm_configured: boolean;
+  pending_actions: number;
+};
+
+export type HealingAction = {
+  id: string;
+  project_id: string;
+  project_name: string | null;
+  deployment_id: string;
+  failure_kind: string;
+  cause: string | null;
+  fix_description: string | null;
+  auto_applicable: boolean;
+  llm_analysis: string | null;
+  status: 'pending' | 'auto_applied' | 'approved' | 'dismissed' | 'failed';
+  result_deployment_id: string | null;
+  error: string | null;
+  created_at: string | null;
+  resolved_at: string | null;
+};
+
+export function useAgentConfig() {
+  return useQuery<AgentConfig>({
+    queryKey: queryKeys.agentConfig,
+    queryFn: async () => (await apiClient.get<AgentConfig>('/agent/config')).data,
+    staleTime: 30_000,
+  });
+}
+
+export function useUpdateAgentConfig() {
+  const qc = useQueryClient();
+  return useMutation<AgentConfig, unknown, { base_url?: string; api_key?: string; model?: string; analysis_model?: string }>({
+    mutationFn: async (patch) => (await apiClient.put<AgentConfig>('/agent/config', patch)).data,
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.agentConfig });
+      void qc.invalidateQueries({ queryKey: queryKeys.healingConfig });
+    },
+  });
+}
+
+export function useTestAgentConnection() {
+  return useMutation<AgentTestResult, unknown, { base_url?: string; api_key?: string }>({
+    mutationFn: async (body) => (await apiClient.post<AgentTestResult>('/agent/test', body)).data,
+  });
+}
+
+export function useHealingConfig() {
+  return useQuery<HealingConfig>({
+    queryKey: queryKeys.healingConfig,
+    queryFn: async () => (await apiClient.get<HealingConfig>('/healing/config')).data,
+    // Pending count feeds the intervention badge — keep it reasonably fresh.
+    refetchInterval: 60_000,
+  });
+}
+
+export function useUpdateHealingConfig() {
+  const qc = useQueryClient();
+  return useMutation<{ autonomous_enabled: boolean }, unknown, boolean>({
+    mutationFn: async (enabled) =>
+      (await apiClient.put<{ autonomous_enabled: boolean }>('/healing/config', { autonomous_enabled: enabled })).data,
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.healingConfig });
+    },
+  });
+}
+
+export function useHealingActions(status?: string) {
+  return useQuery<HealingAction[]>({
+    queryKey: queryKeys.healingActions(status),
+    queryFn: async () =>
+      (await apiClient.get<HealingAction[]>('/healing/actions', {
+        params: status ? { status_filter: status } : {},
+      })).data,
+    refetchInterval: 60_000,
+  });
+}
+
+export function useResolveHealingAction() {
+  const qc = useQueryClient();
+  return useMutation<unknown, unknown, { id: string; verb: 'approve' | 'dismiss' }>({
+    mutationFn: async ({ id, verb }) => (await apiClient.post(`/healing/actions/${id}/${verb}`)).data,
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['healing'] });
+    },
+  });
+}
+
+// ── Legal documents + acceptance gate ────────────────────────────────────────
+
+export type LegalDocument = { id: string; title: string; content: string };
+
+export type LegalDocumentsResponse = {
+  terms_version: string;
+  effective_date: string;
+  documents: LegalDocument[];
+};
+
+export type LegalStatus = {
+  terms_version: string;
+  accepted: boolean;
+  accepted_at: string | null;
+};
+
+export function useLegalStatus() {
+  return useQuery<LegalStatus>({
+    queryKey: queryKeys.legalStatus,
+    queryFn: async () => (await apiClient.get<LegalStatus>('/legal/status')).data,
+    // Acceptance only changes via our own mutation (which invalidates) or
+    // a server-side version bump — no need to poll.
+    staleTime: 5 * 60_000,
+    retry: 1,
+  });
+}
+
+export function useLegalDocuments(enabled: boolean) {
+  return useQuery<LegalDocumentsResponse>({
+    queryKey: queryKeys.legalDocuments,
+    queryFn: async () => (await apiClient.get<LegalDocumentsResponse>('/legal/documents')).data,
+    enabled,
+    staleTime: Infinity,
+  });
+}
+
+export function useAcceptTerms() {
+  const qc = useQueryClient();
+  return useMutation<{ accepted: boolean }, unknown, string>({
+    mutationFn: async (termsVersion) =>
+      (await apiClient.post<{ accepted: boolean }>('/legal/accept', { terms_version: termsVersion })).data,
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.legalStatus });
+    },
+  });
+}
+
+// ── Local Podman manager (machine, containers, pods) ─────────────────────────
+
+export type PodmanStatus = {
+  available: boolean;
+  binary: string | null;
+  version: string | null;
+  machine: { name: string; running: boolean; cpus?: number; memory?: string } | null;
+  connected: boolean;
+  hint: string | null;
+};
+
+export type PodmanPort = { host: number; container: number };
+
+export type PodmanContainer = {
+  id: string;
+  name: string;
+  image: string;
+  state: string;
+  status: string;
+  pod: string | null;
+  created: string | null;
+  ports: PodmanPort[];
+  managed: boolean;
+  project_id: string | null;
+  project_name: string | null;
+};
+
+export type PodmanPod = {
+  id: string;
+  name: string;
+  status: string;
+  created: string | null;
+  containers: { id: string; names: string; status: string }[];
+  managed: boolean;
+  project_id: string | null;
+  project_name: string | null;
+};
+
+export type PodmanContainerCreate = {
+  name: string;
+  image: string;
+  ports?: PodmanPort[];
+  env?: Record<string, string>;
+  volumes?: { host: string; container: string }[];
+  pod?: string;
+  restart_policy?: string;
+  project_id?: string;
+};
+
+export function usePodmanStatus() {
+  return useQuery<PodmanStatus>({
+    queryKey: queryKeys.podmanStatus,
+    queryFn: async () => (await apiClient.get<PodmanStatus>('/podman/status')).data,
+    refetchInterval: 30_000,
+    retry: 1,
+  });
+}
+
+export function usePodmanContainers(enabled: boolean) {
+  return useQuery<PodmanContainer[]>({
+    queryKey: queryKeys.podmanContainers,
+    queryFn: async () => (await apiClient.get<PodmanContainer[]>('/podman/containers')).data,
+    enabled,
+    refetchInterval: 8_000,
+    retry: false,
+  });
+}
+
+export function usePodmanPods(enabled: boolean) {
+  return useQuery<PodmanPod[]>({
+    queryKey: queryKeys.podmanPods,
+    queryFn: async () => (await apiClient.get<PodmanPod[]>('/podman/pods')).data,
+    enabled,
+    refetchInterval: 10_000,
+    retry: false,
+  });
+}
+
+function invalidatePodman(qc: ReturnType<typeof useQueryClient>) {
+  void qc.invalidateQueries({ queryKey: ['podman'] });
+}
+
+export function useStartPodmanMachine() {
+  const qc = useQueryClient();
+  return useMutation<PodmanStatus, unknown, void>({
+    mutationFn: async () => (await apiClient.post<PodmanStatus>('/podman/machine/start')).data,
+    onSuccess: () => invalidatePodman(qc),
+  });
+}
+
+export function useCreatePodmanContainer() {
+  const qc = useQueryClient();
+  return useMutation<{ id: string; name: string }, unknown, PodmanContainerCreate>({
+    mutationFn: async (body) => (await apiClient.post<{ id: string; name: string }>('/podman/containers', body)).data,
+    onSuccess: () => invalidatePodman(qc),
+  });
+}
+
+export function usePodmanContainerAction() {
+  const qc = useQueryClient();
+  return useMutation<unknown, unknown, { name: string; action: 'start' | 'stop' | 'restart' | 'remove' }>({
+    mutationFn: async ({ name, action }) =>
+      (await apiClient.post(`/podman/containers/${encodeURIComponent(name)}/action`, { action })).data,
+    onSuccess: () => invalidatePodman(qc),
+  });
+}
+
+export function useCreatePodmanPod() {
+  const qc = useQueryClient();
+  return useMutation<{ id: string; name: string }, unknown, { name: string; ports?: PodmanPort[]; project_id?: string }>({
+    mutationFn: async (body) => (await apiClient.post<{ id: string; name: string }>('/podman/pods', body)).data,
+    onSuccess: () => invalidatePodman(qc),
+  });
+}
+
+export function usePodmanPodAction() {
+  const qc = useQueryClient();
+  return useMutation<unknown, unknown, { name: string; action: 'start' | 'stop' | 'restart' | 'remove' }>({
+    mutationFn: async ({ name, action }) =>
+      (await apiClient.post(`/podman/pods/${encodeURIComponent(name)}/action`, { action })).data,
+    onSuccess: () => invalidatePodman(qc),
   });
 }

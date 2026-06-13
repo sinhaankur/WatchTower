@@ -76,29 +76,31 @@ def _is_readonly() -> bool:
     return os.getenv("WATCHTOWER_AGENT_READONLY", "false").lower() == "true"
 
 
-def _get_client():
-    """Build an OpenAI-compatible client.
+def _get_client(db: Session):
+    """Build an OpenAI-compatible client from the resolved settings
+    (database first, env-var fallback — see watchtower.llm_settings).
 
     Imported lazily so the openai dependency is only loaded when the
     agent endpoint is actually called.
     """
     from openai import OpenAI
 
-    base_url = os.getenv("WATCHTOWER_LLM_BASE_URL")
-    if not base_url:
+    from watchtower.llm_settings import resolve_llm_config
+
+    cfg = resolve_llm_config(db)
+    if not cfg.base_url:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=(
-                "Agent is not configured. Set WATCHTOWER_LLM_BASE_URL to your "
-                "OpenAI-compatible endpoint (e.g. http://localhost:11434/v1 for "
-                "Ollama, or https://api.openai.com/v1 for OpenAI)."
+                "Agent is not configured. Open Settings → AI & Autonomy to "
+                "connect LM Studio, Ollama, or any OpenAI-compatible endpoint "
+                "(or set WATCHTOWER_LLM_BASE_URL)."
             ),
         )
     # Local LLM servers usually accept any non-empty key. Cloud providers
     # need a real one; fall back to a placeholder so the SDK doesn't 401
     # the request before it even leaves the box.
-    api_key = os.getenv("WATCHTOWER_LLM_API_KEY") or "not-set"
-    return OpenAI(base_url=base_url, api_key=api_key)
+    return OpenAI(base_url=cfg.base_url, api_key=cfg.api_key or "not-set")
 
 
 # ── System prompt ────────────────────────────────────────────────────────────
@@ -490,17 +492,172 @@ def _sse(event: Dict[str, Any]) -> bytes:
     return f"data: {json.dumps(event)}\n\n".encode("utf-8")
 
 
+class AgentConfigUpdate(BaseModel):
+    """PUT /config body. Omitted fields are left untouched; explicit
+    empty strings clear the stored value (falling back to env vars)."""
+    base_url: Optional[str] = None
+    api_key: Optional[str] = None
+    model: Optional[str] = None
+    # Dedicated (usually tiny) model for autonomous self-heal analysis.
+    # Empty string clears it → self-heal uses the main model again.
+    analysis_model: Optional[str] = None
+
+
+class AgentTestRequest(BaseModel):
+    """POST /test body — overrides let the SPA test before saving."""
+    base_url: Optional[str] = None
+    api_key: Optional[str] = None
+
+
+def _validate_llm_base_url(base_url: str) -> str:
+    """Scheme check only. Loopback hosts are deliberately allowed — local
+    LLM servers (LM Studio :1234, Ollama :11434) are the primary target,
+    so the SSRF guard used for GHES URLs doesn't apply here. Writes are
+    gated on can_manage_team, so only org admins can point this anywhere."""
+    cleaned = base_url.strip().rstrip("/")
+    if not cleaned.startswith(("http://", "https://")):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="base_url must start with http:// or https:// (e.g. http://localhost:1234/v1).",
+        )
+    return cleaned
+
+
+def _require_admin(db: Session, current_user: dict):
+    from watchtower.api.enterprise import _ensure_user_org_member
+
+    user, org, member = _ensure_user_org_member(db, current_user)
+    if not member or not member.can_manage_team:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Changing the LLM / autonomy configuration requires team-admin permission.",
+        )
+    return user, org
+
+
 @router.get("/config")
-async def agent_config(_user: dict = Depends(util.get_current_user)) -> Dict[str, Any]:
+async def agent_config(
+    _user: dict = Depends(util.get_current_user),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
     """Surface the agent's configuration to the SPA so it can show
-    "configure your LLM" UI when nothing is set."""
+    "configure your LLM" UI when nothing is set. Never returns the
+    API key — only whether one is stored."""
+    from watchtower.llm_settings import resolve_llm_config
+
+    cfg = resolve_llm_config(db)
     return {
-        "configured": bool(os.getenv("WATCHTOWER_LLM_BASE_URL")),
-        "base_url": os.getenv("WATCHTOWER_LLM_BASE_URL") or None,
-        "model": _default_model(),
+        "configured": cfg.configured,
+        "base_url": cfg.base_url,
+        "model": cfg.model,
+        "analysis_model": cfg.analysis_model,
+        "has_dedicated_analysis_model": cfg.has_dedicated_analysis_model,
+        "source": cfg.source,
+        "has_api_key": bool(cfg.api_key),
         "readonly": _is_readonly(),
         "max_iterations": _max_iterations(),
     }
+
+
+@router.put("/config")
+async def update_agent_config(
+    req: AgentConfigUpdate,
+    current_user: dict = Depends(util.get_current_user),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Persist the LLM connection so operators configure it from the UI
+    instead of env vars. Empty string clears a field (env fallback)."""
+    from watchtower import llm_settings
+
+    user, _org = _require_admin(db, current_user)
+
+    if req.base_url is not None:
+        value = _validate_llm_base_url(req.base_url) if req.base_url.strip() else None
+        llm_settings.set_setting(db, llm_settings.KEY_LLM_BASE_URL, value, user_id=user.id)
+    if req.api_key is not None:
+        llm_settings.set_setting(
+            db, llm_settings.KEY_LLM_API_KEY,
+            req.api_key.strip() or None,
+            secret=True, user_id=user.id,
+        )
+    if req.model is not None:
+        llm_settings.set_setting(
+            db, llm_settings.KEY_LLM_MODEL,
+            req.model.strip() or None,
+            user_id=user.id,
+        )
+    if req.analysis_model is not None:
+        llm_settings.set_setting(
+            db, llm_settings.KEY_LLM_ANALYSIS_MODEL,
+            req.analysis_model.strip() or None,
+            user_id=user.id,
+        )
+    db.commit()
+
+    cfg = llm_settings.resolve_llm_config(db)
+    return {
+        "configured": cfg.configured,
+        "base_url": cfg.base_url,
+        "model": cfg.model,
+        "analysis_model": cfg.analysis_model,
+        "has_dedicated_analysis_model": cfg.has_dedicated_analysis_model,
+        "source": cfg.source,
+        "has_api_key": bool(cfg.api_key),
+    }
+
+
+def _list_models(base_url: str, api_key: Optional[str]) -> List[str]:
+    """Probe {base_url}/models and return model ids. Factored out so
+    tests can monkeypatch the network call."""
+    from openai import OpenAI
+
+    client = OpenAI(base_url=base_url, api_key=api_key or "not-set", timeout=6.0, max_retries=0)
+    return [m.id for m in client.models.list().data]
+
+
+@router.post("/test")
+@limiter.limit("10/minute", key_func=_key_user_then_remote)
+async def test_agent_connection(
+    request: Request,
+    req: AgentTestRequest,
+    current_user: dict = Depends(util.get_current_user),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Live connectivity probe against an OpenAI-compatible endpoint.
+
+    Uses the request's overrides when present (so the SPA can test
+    before saving), otherwise the saved/env config. Returns the model
+    list on success — the SPA uses it to populate the model picker, and
+    a non-empty list doubles as proof the endpoint really is an
+    OpenAI-compatible server rather than something that merely accepted
+    a TCP connection.
+    """
+    from watchtower.llm_settings import resolve_llm_config
+
+    _require_admin(db, current_user)
+
+    cfg = resolve_llm_config(db)
+    base_url = _validate_llm_base_url(req.base_url) if req.base_url else cfg.base_url
+    api_key = req.api_key if req.api_key else cfg.api_key
+    if not base_url:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No base_url to test — provide one or save the configuration first.",
+        )
+
+    import anyio
+
+    try:
+        models = await anyio.to_thread.run_sync(_list_models, base_url, api_key)
+    except Exception as exc:  # noqa: BLE001 — connection errors are the expected failure mode here
+        logger.info("LLM test connection to %s failed: %s", base_url, exc)
+        return {
+            "ok": False,
+            "base_url": base_url,
+            "models": [],
+            "error": f"{type(exc).__name__}: {exc}",
+        }
+    return {"ok": True, "base_url": base_url, "models": models, "error": None}
 
 
 @router.post("/chat")
@@ -524,10 +681,12 @@ async def chat(
       - ``{type: "done", stop_reason, iterations}`` — loop ended cleanly
       - ``{type: "error", error}`` — fatal error during the loop
     """
-    client = _get_client()
+    from watchtower.llm_settings import resolve_llm_config
+
+    client = _get_client(db)
     user_id = util.canonical_user_id(db, current_user)
     tools = _build_tools()
-    model = (req.model or _default_model()).strip()
+    model = (req.model or resolve_llm_config(db).model or _default_model()).strip()
     max_iterations = _max_iterations()
     max_tokens = _max_tokens()
 

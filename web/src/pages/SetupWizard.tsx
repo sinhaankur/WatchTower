@@ -481,7 +481,7 @@ const SetupWizard = () => {
     steps.push('Create project and trigger first deployment from Overview.');
     steps.push('Add custom domain and TLS after first healthy deploy.');
     return steps;
-  }, [data.deployment_model, data.use_case]);
+  }, [data.deployment_target, data.use_case]);
 
   const saveLocalProject = () => {
     const existingRaw = localStorage.getItem(STORAGE_KEY);

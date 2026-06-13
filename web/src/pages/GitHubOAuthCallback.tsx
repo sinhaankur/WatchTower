@@ -44,7 +44,7 @@ const GitHubOAuthCallback = () => {
     };
 
     void complete();
-  }, [searchParams]);
+  }, [navigate, searchParams]);
 
   return (
     <div className="min-h-screen flex items-center justify-center px-6 bg-slate-50">

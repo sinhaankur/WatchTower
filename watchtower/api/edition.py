@@ -65,6 +65,18 @@ PRO_FEATURES: dict[str, dict[str, str]] = {
 }
 
 
+# Features temporarily unlocked on the Free tier. Product decision
+# 2026-06-12: let everyone use the audit log for a few weeks so the
+# feature gets real usage before billing lands. Re-gate by removing the
+# key from this set — the route gate AND the UI lock both follow
+# automatically (the SPA reads `unlocked` from /api/edition).
+FREE_PREVIEW_FEATURES: set[str] = {"audit-log"}
+
+
+def _feature_unlocked(feature_key: str) -> bool:
+    return is_pro() or feature_key in FREE_PREVIEW_FEATURES
+
+
 def current_tier() -> str:
     """Return the active license tier — currently env-var driven.
 
@@ -103,8 +115,8 @@ def require_pro(feature_key: str):
         )
 
     async def dependency() -> dict[str, str]:
-        if is_pro():
-            return {"tier": "pro", "feature": feature_key}
+        if _feature_unlocked(feature_key):
+            return {"tier": current_tier(), "feature": feature_key}
         raise HTTPException(
             status_code=status.HTTP_402_PAYMENT_REQUIRED,
             detail={
@@ -152,7 +164,7 @@ async def get_edition(
         "features": {
             key: {
                 **meta,
-                "unlocked": tier == "pro",
+                "unlocked": _feature_unlocked(key),
             }
             for key, meta in PRO_FEATURES.items()
         },

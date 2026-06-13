@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import apiClient from '@/lib/api';
 import { toast } from '@/lib/toast';
 import { Skeleton } from '@/components/Skeleton';
+import PodmanManager from '@/components/PodmanManager';
 
 /**
  * /local-containers — cross-project view of every WatchTower-managed
@@ -100,10 +101,10 @@ export default function LocalContainers() {
     <div className="max-w-5xl mx-auto px-6 py-8">
       <header className="mb-6 flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-xl font-semibold text-slate-900">Local containers</h1>
+          <h1 className="text-xl font-semibold text-slate-900">Containers</h1>
           <p className="mt-1 text-sm text-slate-500">
-            Every WatchTower-managed Podman container currently running on this machine.
-            Auto-refreshes every 5 seconds. Click a project name to manage it in detail.
+            Manage Podman on this machine: create containers and pods, start/stop anything,
+            and see what WatchTower projects are running locally. Auto-refreshes.
           </p>
         </div>
         <button
@@ -114,6 +115,13 @@ export default function LocalContainers() {
           Refresh
         </button>
       </header>
+
+      {/* Connection card, create wizards, pods + full container table */}
+      <div className="mb-8">
+        <PodmanManager />
+      </div>
+
+      <h2 className="text-sm font-semibold text-slate-900 mb-3">WatchTower project containers</h2>
 
       {error && (
         <div className="rounded-lg border border-red-300 bg-red-50 p-3 mb-4 text-xs text-red-800">

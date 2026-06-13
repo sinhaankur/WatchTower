@@ -9,6 +9,7 @@ import Dashboard from './pages/Dashboard';
 import Login from './pages/Login';
 import Layout from './components/Layout';
 import ErrorBoundary from './components/ErrorBoundary';
+import LegalGate from './components/LegalGate';
 import RouteErrorBoundary from './components/RouteErrorBoundary';
 import { PageTransition } from './components/PageTransition';
 import { Toaster } from './lib/toast';
@@ -36,6 +37,7 @@ const LocalContainers      = lazy(() => import('./pages/LocalContainers'));
 const HostConnect          = lazy(() => import('./pages/HostConnect'));
 const RemoteAccess         = lazy(() => import('./pages/RemoteAccess'));
 const ManagedDatabases     = lazy(() => import('./pages/ManagedDatabases'));
+const ReportBug            = lazy(() => import('./pages/ReportBug'));
 const GitHubOAuthCallback  = lazy(() => import('./pages/GitHubOAuthCallback'));
 const GitHubLoginCallback  = lazy(() => import('./pages/GitHubLoginCallback'));
 
@@ -100,7 +102,10 @@ function RequireAuth({ children }: { children: ReactElement }) {
     return <Navigate to="/login" replace state={{ from: location.pathname }} />;
   }
 
-  return children;
+  // Click-through legal gate: authenticated users must accept the
+  // current terms version before anything else renders. Recorded
+  // server-side; see watchtower/legal_docs.py + /api/legal.
+  return <LegalGate>{children}</LegalGate>;
 }
 
 /**
@@ -158,6 +163,7 @@ function App() {
             <Route path="/team"              element={withChrome('Team',             <TeamManagement />)} />
             <Route path="/invite/:token"     element={withChrome('Invitation',       <InviteAccept />, { bare: true })} />
             <Route path="/settings"          element={withChrome('Settings',         <Settings />)} />
+            <Route path="/report-bug"        element={withChrome('Report Bug',       <ReportBug />)} />
             <Route path="/audit"             element={withChrome('Audit log',        <AuditLog />)} />
             <Route path="/account"           element={withChrome('Account',          <Account />)} />
             <Route path="/local-containers"  element={withChrome('Local containers', <LocalContainers />)} />

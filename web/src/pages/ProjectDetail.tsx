@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, Link /*, useNavigate*/ } from 'react-router-dom';
 import apiClient from '@/lib/api';
 import { Skeleton } from '@/components/Skeleton';
@@ -1186,7 +1186,7 @@ function DeploymentsTab({ projectId }: { projectId: string }) {
   // diagnose doesn't re-fetch unless the user closes and reopens.
   const [diagnoses, setDiagnoses] = useState<Record<string, { state: 'loading' | 'ready' | 'error'; data?: Diagnosis; error?: string }>>({});
 
-  async function load() {
+  const load = useCallback(async () => {
     try {
       const r = await apiClient.get(`/projects/${projectId}/deployments`);
       setDeployments(r.data);
@@ -1195,13 +1195,13 @@ function DeploymentsTab({ projectId }: { projectId: string }) {
     } finally {
       setLoading(false);
     }
-  }
+  }, [projectId]);
 
   useEffect(() => {
-    load();
+    void load();
     const t = setInterval(load, 10_000);
     return () => clearInterval(t);
-  }, [projectId]);
+  }, [load]);
 
   async function runDiagnose(deploymentId: string) {
     // Toggle off if already open.
@@ -1473,24 +1473,23 @@ function DiagnosisPanel({ state, deploymentId, onApplied }: DiagnosisPanelProps)
         <div className="space-y-2">
           <p className="text-[11px] text-slate-500">
             No automatic pattern matched this failure.
-            {d.agent_prompt && ' The WatchTower agent can read the log and suggest a fix in plain English.'}
+            {d.agent_prompt && ' With an LLM connected (Settings → AI & Autonomy), WatchTower analyzes failures like this automatically — or copy the prompt for any AI assistant.'}
           </p>
           {d.agent_prompt && (
             <button
               onClick={async () => {
-                // Two-step handoff: copy the prompt to clipboard so
-                // the user can paste it into the agent's input,
-                // then navigate to the agent route. Avoids touching
-                // the agent component's internal state from here.
+                // Copy the pre-filled diagnosis prompt so the user can
+                // paste it into any assistant, then land on the AI &
+                // Autonomy card where the LLM connection (and the
+                // self-heal intervention queue) lives.
                 try { await navigator.clipboard.writeText(d.agent_prompt!); }
                 catch { /* clipboard blocked — user can re-copy from log */ }
-                const route = d.agent_route ?? '/agent';
-                window.location.assign(route);
+                window.location.assign('/settings');
               }}
               className="text-[11px] px-3 py-1 rounded border border-slate-800 bg-white hover:bg-slate-50 text-slate-800 font-semibold shadow-[1px_1px_0_0_#1f2937]"
-              title="Copy the diagnosis prompt to clipboard and open the WatchTower agent"
+              title="Copy the diagnosis prompt and open AI & Autonomy settings"
             >
-              Ask the agent (prompt copied) →
+              Copy prompt & open AI settings →
             </button>
           )}
           {!d.agent_prompt && (
@@ -1660,7 +1659,7 @@ function EnvVarsTab({ projectId }: { projectId: string }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function load() {
+  const load = useCallback(async () => {
     try {
       const r = await apiClient.get(`/projects/${projectId}/env`);
       setVars(r.data);
@@ -1669,9 +1668,9 @@ function EnvVarsTab({ projectId }: { projectId: string }) {
     } finally {
       setLoading(false);
     }
-  }
+  }, [projectId]);
 
-  useEffect(() => { load(); }, [projectId]);
+  useEffect(() => { void load(); }, [load]);
 
   async function addVar() {
     if (!newKey.trim() || !newValue) return;
@@ -1802,7 +1801,7 @@ function WebhooksTab({ projectId }: { projectId: string }) {
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<{ ok: boolean; detail?: string } | null>(null);
 
-  async function load() {
+  const load = useCallback(async () => {
     try {
       const r = await apiClient.get(`/projects/${projectId}/webhooks`);
       setHooks(r.data);
@@ -1811,9 +1810,9 @@ function WebhooksTab({ projectId }: { projectId: string }) {
     } finally {
       setLoading(false);
     }
-  }
+  }, [projectId]);
 
-  useEffect(() => { load(); }, [projectId]);
+  useEffect(() => { void load(); }, [load]);
 
   async function addHook() {
     if (!url.trim()) return;

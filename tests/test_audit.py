@@ -208,14 +208,30 @@ def test_audit_read_requires_auth(anon_client: TestClient):
     assert r.status_code == 401
 
 
-def test_audit_read_returns_402_on_free_tier(client: TestClient, monkeypatch):
-    """Free-tier installs hit a 402 Payment Required with a structured detail
-    that the frontend uses to render the upgrade card. Regression guard for
-    the Pro-gating in 1.12."""
+def test_audit_read_is_free_preview(client: TestClient, monkeypatch):
+    """Product decision 2026-06-12: audit-log is temporarily unlocked on the
+    Free tier via FREE_PREVIEW_FEATURES. A Free install reads the audit log
+    without a 402 and /api/edition reports it unlocked."""
     monkeypatch.delenv("WATCHTOWER_TIER", raising=False)
-    r = client.get("/api/audit")
-    assert r.status_code == 402
-    detail = r.json()["detail"]
-    assert detail["tier"] == "free"
-    assert detail["feature"] == "audit-log"
-    assert "Audit Log" in detail["feature_name"]
+    proj = _create_project(client, "preview-host")
+
+    r = client.get("/api/audit?limit=50")
+    assert r.status_code == 200
+    actions = [e["action"] for e in r.json()]
+    assert "project.create" in actions
+
+    ed = client.get("/api/edition").json()
+    assert ed["tier"] == "free"
+    assert ed["features"]["audit-log"]["unlocked"] is True
+
+
+def test_other_pro_features_still_402_on_free_tier(client: TestClient, monkeypatch):
+    """The 402 contract still holds for features NOT in the free preview —
+    regression guard so un-gating audit-log didn't open the whole gate."""
+    from watchtower.api import edition
+
+    monkeypatch.delenv("WATCHTOWER_TIER", raising=False)
+    # team-rbac is gated but not previewed; confirm it still 402s.
+    assert "team-rbac" not in edition.FREE_PREVIEW_FEATURES
+    ed = client.get("/api/edition").json()
+    assert ed["features"]["team-rbac"]["unlocked"] is False

@@ -81,6 +81,25 @@
       ],
       "category": "public.app-category.developer-tools"
     },
+    "dmg": {
+      "contents": [
+        {
+          "x": 180,
+          "y": 200,
+          "type": "file"
+        },
+        {
+          "x": 480,
+          "y": 200,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ],
+      "window": {
+        "width": 660,
+        "height": 420
+      }
+    },
     "linux": {
       "maintainer": "The WatchTower Authors <opensource@sinhaankur.dev>",
       "icon": "build/icons",

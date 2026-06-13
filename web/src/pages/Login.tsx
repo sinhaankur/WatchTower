@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import apiClient from '@/lib/api';
 import { trackEvent } from '@/lib/analytics';
@@ -102,22 +102,22 @@ const Login = () => {
 
   const [loggedInUser, setLoggedInUser] = useState<LoggedInUser | null>(null);
 
-  const resolveNextPath = () => {
+  const resolveNextPath = useCallback(() => {
     const fromState = (location.state as { from?: string } | null)?.from;
     const fromQuery = searchParams.get('next') || undefined;
     const candidate = fromQuery || fromState || '/';
     if (!candidate.startsWith('/') || candidate.startsWith('//')) return '/';
     if (candidate === '/login') return '/';
     return candidate;
-  };
+  }, [location.state, searchParams]);
 
-  const showSuccessAndRedirect = (user: LoggedInUser, delayMs = 1600, nextPath?: string) => {
+  const showSuccessAndRedirect = useCallback((user: LoggedInUser, delayMs = 1600, nextPath?: string) => {
     setLoggedInUser(user);
     const target = nextPath || '/';
     window.setTimeout(() => navigate(target, { replace: true }), delayMs);
-  };
+  }, [navigate]);
 
-  const resolveUserFromContext = async (): Promise<LoggedInUser> => {
+  const resolveUserFromContext = useCallback(async (): Promise<LoggedInUser> => {
     try {
       const resp = await apiClient.get<ContextResponse>('/context');
       const name = resp.data?.user?.name || undefined;
@@ -126,7 +126,7 @@ const Login = () => {
     } catch {
       return { name: 'Authenticated user' };
     }
-  };
+  }, []);
 
   useEffect(() => {
     const testLoginEnabled = searchParams.get('test_login') === '1';
@@ -170,7 +170,7 @@ const Login = () => {
     if (existing) {
       void hydrateExistingSession(existing);
     }
-  }, [location.state, navigate, searchParams]);
+  }, [resolveNextPath, resolveUserFromContext, searchParams, showSuccessAndRedirect]);
 
   useEffect(() => {
     const loadAuthStatus = async () => {
@@ -777,6 +777,16 @@ const Login = () => {
                 </div>
               </div>
             )}
+
+            {/* Per-login consent line — every sign-in reaffirms agreement.
+                The full documents render in the post-login LegalGate and
+                live in legal/ on GitHub. */}
+            <p className="mt-4 text-[11px] text-slate-400 text-center leading-relaxed">
+              By signing in you agree to this installation's{' '}
+              <a href="https://github.com/sinhaankur/WatchTower/blob/main/legal/TERMS_OF_USE.md" target="_blank" rel="noopener noreferrer" className="underline hover:text-slate-600">Terms of Use</a>,{' '}
+              <a href="https://github.com/sinhaankur/WatchTower/blob/main/legal/ACCEPTABLE_USE.md" target="_blank" rel="noopener noreferrer" className="underline hover:text-slate-600">Acceptable Use Policy</a>, and{' '}
+              <a href="https://github.com/sinhaankur/WatchTower/blob/main/legal/PRIVACY.md" target="_blank" rel="noopener noreferrer" className="underline hover:text-slate-600">Privacy Policy</a>.
+            </p>
 
             {/* Server-state advisories tucked at the bottom — surfaced
                 so the user can see them, but no longer competing with
