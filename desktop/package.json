@@ -1,6 +1,6 @@
 {
   "name": "watchtower-desktop",
-  "version": "1.16.1",
+  "version": "1.16.2",
   "private": true,
   "description": "WatchTower Desktop",
   "author": {
@@ -82,23 +82,24 @@
       "category": "public.app-category.developer-tools"
     },
     "dmg": {
+      "background": "build/installer/dmg-background.png",
+      "window": {
+        "width": 600,
+        "height": 400
+      },
       "contents": [
         {
-          "x": 180,
+          "x": 156,
           "y": 200,
           "type": "file"
         },
         {
-          "x": 480,
+          "x": 416,
           "y": 200,
           "type": "link",
           "path": "/Applications"
         }
-      ],
-      "window": {
-        "width": 660,
-        "height": 420
-      }
+      ]
     },
     "linux": {
       "maintainer": "The WatchTower Authors <opensource@sinhaankur.dev>",
@@ -130,26 +131,6 @@
       "shortcutName": "WatchTower",
       "installerSidebar": "build/installer/nsis-sidebar.png",
       "uninstallerSidebar": "build/installer/nsis-sidebar.png"
-    },
-    "dmg": {
-      "background": "build/installer/dmg-background.png",
-      "window": {
-        "width": 600,
-        "height": 400
-      },
-      "contents": [
-        {
-          "x": 156,
-          "y": 200,
-          "type": "file"
-        },
-        {
-          "x": 416,
-          "y": 200,
-          "type": "link",
-          "path": "/Applications"
-        }
-      ]
     }
   }
 }

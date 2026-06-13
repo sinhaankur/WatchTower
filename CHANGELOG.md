@@ -9,6 +9,14 @@ Curated, human-friendly history of WatchTower releases. Auto-generated GitHub Re
 
 ---
 
+## 1.16.2 — UX polish and professional bug reporting
+
+- Improved the desktop and website UX with a more polished, icon-led bug reporting flow.
+- Added a dedicated in-app report page plus a structured GitHub bug template so reports are actionable and consistent.
+- Cleaned frontend lint warnings and hardened the build pipeline so the release stays stable.
+
+---
+
 ## 1.16.1 — Desktop startup restart-loop fix
 
 - Fixed a regression in the Electron main process where a module-level relaunch call could execute during startup and repeatedly restart the app.
