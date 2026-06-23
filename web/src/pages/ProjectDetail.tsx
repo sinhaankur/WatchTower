@@ -50,7 +50,11 @@ type Deployment = {
   status: string;
   trigger: string;
   created_at: string;
+  started_at: string | null;
   completed_at: string | null;
+  triggered_by_user_id: string | null;
+  triggered_by_email: string | null;
+  triggered_by_name: string | null;
 };
 
 type Build = {
@@ -103,6 +107,43 @@ function Badge({ status }: { status: string }) {
 function fmtDate(s: string | null) {
   if (!s) return '—';
   return new Date(s).toLocaleString();
+}
+
+// Active = the deploy is still moving. Used to decide whether to poll
+// fast and whether to compute a live (ticking) duration.
+const ACTIVE_STATUSES = new Set(['pending', 'building', 'deploying']);
+function isActiveStatus(status: string | null | undefined): boolean {
+  return ACTIVE_STATUSES.has((status ?? '').toLowerCase());
+}
+
+/**
+ * Human duration for a deployment. While the deploy is still active we
+ * tick against `now` so the cell counts up live; once finished we freeze
+ * it at completed-started. Falls back to created_at when started_at
+ * hasn't been stamped yet (the brief PENDING window before the builder
+ * picks it up).
+ */
+function fmtDuration(d: Deployment, now: number): string {
+  const startMs = d.started_at ? Date.parse(d.started_at) : Date.parse(d.created_at);
+  if (!Number.isFinite(startMs)) return '—';
+  const endMs = isActiveStatus(d.status)
+    ? now
+    : (d.completed_at ? Date.parse(d.completed_at) : now);
+  let secs = Math.max(0, Math.round((endMs - startMs) / 1000));
+  if (secs < 60) return `${secs}s`;
+  const mins = Math.floor(secs / 60);
+  secs = secs % 60;
+  if (mins < 60) return `${mins}m ${secs.toString().padStart(2, '0')}s`;
+  const hrs = Math.floor(mins / 60);
+  return `${hrs}h ${(mins % 60).toString().padStart(2, '0')}m`;
+}
+
+/** Short label for who/what triggered a deploy. */
+function triggeredByLabel(d: Deployment): string {
+  if (d.triggered_by_name) return d.triggered_by_name;
+  if (d.triggered_by_email) return d.triggered_by_email;
+  // No user → the trigger type tells the story (webhook, scheduled, …).
+  return (d.trigger || 'system');
 }
 
 // ── Tabs ──────────────────────────────────────────────────────────────────────
@@ -1197,11 +1238,26 @@ function DeploymentsTab({ projectId }: { projectId: string }) {
     }
   }, [projectId]);
 
+  // Is any deployment still moving? Drives both the poll cadence and the
+  // live-duration ticker so an in-flight deploy visibly progresses.
+  const hasActive = deployments.some(d => isActiveStatus(d.status));
+
+  // Adaptive polling: 2.5s while a deploy is active (so the row updates
+  // in near-real-time), 15s when everything is settled (cheap idle).
   useEffect(() => {
     void load();
-    const t = setInterval(load, 10_000);
+    const t = setInterval(load, hasActive ? 2_500 : 15_000);
     return () => clearInterval(t);
-  }, [load]);
+  }, [load, hasActive]);
+
+  // Ticking clock so live durations count up between polls. Only runs
+  // while something is active — idle tabs don't re-render every second.
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!hasActive) return;
+    const t = setInterval(() => setNow(Date.now()), 1_000);
+    return () => clearInterval(t);
+  }, [hasActive]);
 
   async function runDiagnose(deploymentId: string) {
     // Toggle off if already open.
@@ -1239,7 +1295,10 @@ function DeploymentsTab({ projectId }: { projectId: string }) {
     if (!ok) return;
     setRolling(prev => ({ ...prev, [deploymentId]: true }));
     try {
-      await apiClient.post(`/deployments/${deploymentId}/rollback`);
+      // Route lives under the deployments router's /api/projects prefix
+      // (same as /diagnose and /auto-fix above). Calling /deployments/…
+      // directly resolves to /api/deployments/… which 405s.
+      await apiClient.post(`/projects/deployments/${deploymentId}/rollback`);
       // Optimistic refresh — the new rolled-back-to deployment shows up
       // at the top of the list, current row flips status. The 10s
       // polling interval would catch this anyway but immediate feedback
@@ -1274,9 +1333,9 @@ function DeploymentsTab({ projectId }: { projectId: string }) {
             <th className="px-4 py-3 text-left">Commit</th>
             <th className="px-4 py-3 text-left">Branch</th>
             <th className="px-4 py-3 text-left">Status</th>
-            <th className="px-4 py-3 text-left">Trigger</th>
+            <th className="px-4 py-3 text-left">Duration</th>
+            <th className="px-4 py-3 text-left">Triggered by</th>
             <th className="px-4 py-3 text-left">Started</th>
-            <th className="px-4 py-3 text-left">Finished</th>
             <th className="px-4 py-3 text-left"></th>
           </tr>
         </thead>
@@ -1284,17 +1343,36 @@ function DeploymentsTab({ projectId }: { projectId: string }) {
           {deployments.map(d => {
             const isFailed = d.status?.toLowerCase() === 'failed';
             const isLive = d.status?.toLowerCase() === 'live';
+            const isActive = isActiveStatus(d.status);
             const diag = diagnoses[d.id];
             const isRollingBack = Boolean(rolling[d.id]);
             return (
               <Fragment key={d.id}>
-                <tr className="hover:bg-muted/30 transition-colors">
-                  <td className="px-4 py-3 font-mono">{(d.commit_sha || '—').slice(0, 8)}</td>
+                <tr className={`hover:bg-muted/30 transition-colors ${isActive ? 'bg-blue-50/40' : ''}`}>
+                  <td className="px-4 py-3">
+                    <Link to={`/deployments/${d.id}`} className="font-mono text-red-700 hover:underline">
+                      {(d.commit_sha || '—').slice(0, 8)}
+                    </Link>
+                    {d.commit_message && (
+                      <div className="text-[11px] text-muted-foreground truncate max-w-[14rem]" title={d.commit_message}>
+                        {d.commit_message}
+                      </div>
+                    )}
+                  </td>
                   <td className="px-4 py-3 font-mono text-xs">{d.branch}</td>
-                  <td className="px-4 py-3"><Badge status={d.status} /></td>
-                  <td className="px-4 py-3 text-xs capitalize">{d.trigger}</td>
+                  <td className="px-4 py-3">
+                    <span className="inline-flex items-center gap-1.5">
+                      {isActive && <span className="w-1.5 h-1.5 rounded-full bg-blue-500 status-pulse" />}
+                      <Badge status={d.status} />
+                    </span>
+                  </td>
+                  <td className={`px-4 py-3 text-xs tabular-nums ${isActive ? 'text-blue-600 font-medium' : 'text-muted-foreground'}`}>
+                    {fmtDuration(d, now)}
+                  </td>
+                  <td className="px-4 py-3 text-xs text-muted-foreground truncate max-w-[12rem]" title={triggeredByLabel(d)}>
+                    <span className="capitalize">{triggeredByLabel(d)}</span>
+                  </td>
                   <td className="px-4 py-3 text-xs text-muted-foreground">{fmtDate(d.created_at)}</td>
-                  <td className="px-4 py-3 text-xs text-muted-foreground">{fmtDate(d.completed_at)}</td>
                   <td className="px-4 py-3 text-right">
                     <div className="inline-flex items-center gap-1.5">
                       {isFailed && (

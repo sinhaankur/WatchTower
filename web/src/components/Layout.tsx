@@ -3,7 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import BrandLogo from './BrandLogo';
 import TitleBar from './TitleBar';
 import { PageTransition } from './PageTransition';
-import { useUpdateCheck, useActiveDeploymentCount, useHealingConfig } from '@/hooks/queries';
+import { useUpdateCheck, useActiveDeploymentCount, useHealingConfig, useSelfUpdateStatus, useSelfUpdate } from '@/hooks/queries';
 import { CommandPalette, openCommandPalette } from './CommandPalette';
 import { UserMenu } from './UserMenu';
 
@@ -35,11 +35,24 @@ function UpdateBanner() {
   });
   const [updating, setUpdating] = useState(false);
 
+  // In browser mode, find out whether this install can update itself in
+  // place (a source checkout) vs. only point at the release page. The
+  // desktop path uses electron-updater and ignores this. Poll once an
+  // update has been kicked off so we can report progress across restarts.
+  const { data: selfUpdate } = useSelfUpdateStatus({ poll: updating && !isElectron });
+  const selfUpdateMut = useSelfUpdate();
+
+  const running = selfUpdate?.last_run?.state === 'running';
+  const lastState = selfUpdate?.last_run?.state;
+  const canSelfUpdate = !isElectron && Boolean(selfUpdate?.can_self_update);
+
+  // Once a server-side run resolves, drop the local spinner so the label
+  // reflects the result. Effect (not render) so we don't setState mid-render.
   useEffect(() => {
-    if (!data?.has_update) return;
-    // No-op — placeholder to silence the dependency lint and keep the
-    // visibility logic centralised in render.
-  }, [data?.has_update]);
+    if (updating && (lastState === 'succeeded' || lastState === 'failed')) {
+      setUpdating(false);
+    }
+  }, [updating, lastState]);
 
   if (!data?.has_update || dismissedFor === data.latest) return null;
 
@@ -51,9 +64,27 @@ function UpdateBanner() {
 
   const onUpdate = async () => {
     setUpdating(true);
-    try { await triggerUpdate(data.release_url); }
-    finally { setUpdating(false); }
+    try {
+      if (isElectron) {
+        await triggerUpdate(data.release_url);
+      } else if (canSelfUpdate) {
+        // Server-side update: pull + rebuild + restart on the host. The
+        // poll (enabled while `updating`) watches it through the restart.
+        await selfUpdateMut.mutateAsync();
+      } else {
+        // No in-place path on this install — open the release page.
+        await triggerUpdate(data.release_url);
+        setUpdating(false);
+      }
+    } catch {
+      setUpdating(false);
+    }
   };
+
+  let label = isElectron ? 'Update now' : canSelfUpdate ? 'Update & restart' : 'Get update';
+  if (updating || running) label = 'Updating…';
+  else if (lastState === 'succeeded') label = 'Updated — reload';
+  else if (lastState === 'failed') label = 'Update failed — retry';
 
   return (
     <div className="flex items-center gap-3 px-4 py-2 bg-amber-50 border-b border-amber-200 text-amber-900 text-xs">
@@ -61,6 +92,12 @@ function UpdateBanner() {
       <span className="flex-1">
         <strong>WatchTower {data.latest}</strong> is available
         {data.current && <> — you're on <span className="font-mono">{data.current}</span></>}.
+        {(updating || running) && canSelfUpdate && (
+          <> — pulling, rebuilding & restarting. This page reconnects automatically.</>
+        )}
+        {lastState === 'failed' && (
+          <> — last attempt failed{typeof selfUpdate?.last_run?.exit_code === 'number' ? ` (exit ${selfUpdate.last_run.exit_code})` : ''}.</>
+        )}
       </span>
       {data.release_url && (
         <a
@@ -75,10 +112,11 @@ function UpdateBanner() {
       <button
         type="button"
         onClick={() => void onUpdate()}
-        disabled={updating}
+        disabled={updating || running}
+        title={!isElectron && !canSelfUpdate && selfUpdate?.reason ? selfUpdate.reason : undefined}
         className="px-2 py-0.5 rounded border border-amber-800 bg-amber-700 hover:bg-amber-800 text-white font-semibold disabled:opacity-60 disabled:cursor-wait"
       >
-        {updating ? 'Updating…' : isElectron ? 'Update now' : 'Get update'}
+        {label}
       </button>
       <button
         onClick={dismiss}

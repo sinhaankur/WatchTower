@@ -21,6 +21,7 @@ import './App.css';
 // switches don't flash a giant spinner mid-layout.
 const SetupWizard          = lazy(() => import('./pages/SetupWizard'));
 const ProjectDetail        = lazy(() => import('./pages/ProjectDetail'));
+const DeploymentDetail     = lazy(() => import('./pages/DeploymentDetail'));
 const Templates            = lazy(() => import('./pages/Templates'));
 const TeamManagement       = lazy(() => import('./pages/TeamManagement'));
 const InviteAccept         = lazy(() => import('./pages/InviteAccept'));
@@ -150,6 +151,7 @@ function App() {
             {/* Pages with shared sidebar layout */}
             <Route path="/"                  element={withChrome('Dashboard',        <Dashboard />)} />
             <Route path="/projects/:id"      element={withChrome('Project',          <ProjectDetail />)} />
+            <Route path="/deployments/:id"   element={withChrome('Deployment',       <DeploymentDetail />)} />
             <Route path="/servers"           element={withChrome('Servers',          <Servers />)} />
             <Route path="/servers/local"     element={withChrome('Local node',       <LocalNode />)} />
             <Route path="/applications"      element={withChrome('Applications',     <Applications />)} />

@@ -274,6 +274,12 @@ class Deployment(Base):
     status = Column(Enum(DeploymentStatus), default=DeploymentStatus.PENDING, index=True)
     trigger = Column(Enum(DeploymentTrigger), default=DeploymentTrigger.MANUAL)
     pr_number = Column(Integer, nullable=True)  # For PR preview deployments
+    # Who kicked this off. Nullable because webhook/scheduled/self-heal
+    # deploys have no interactive user, and pre-existing rows predate the
+    # column. Deliberately NOT a hard FK — users can be deleted, and we'd
+    # rather keep the deploy's audit trail ("triggered by <uuid>") than
+    # cascade-null or block deletion. Resolved to an email at read time.
+    triggered_by_user_id = Column(Uuid(as_uuid=True), nullable=True, index=True)
     created_at = Column(DateTime, default=_utcnow, index=True)
     started_at = Column(DateTime, nullable=True)
     completed_at = Column(DateTime, nullable=True)

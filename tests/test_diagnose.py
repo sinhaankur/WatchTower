@@ -53,6 +53,8 @@ def test_diagnose_returns_structured_report(client: TestClient):
         "smtp",
         "llm_agent",
         "redis",
+        "podman",
+        "tailscale",
         "migration_head",
         "web_dist",
     }
@@ -214,3 +216,157 @@ def test_web_dist_check_function_status_depends_on_filesystem(monkeypatch, tmp_p
         assert real.detail and "index.html" in real.detail
     else:
         assert real.hint and "npm" in real.hint.lower()
+
+
+# ── Podman / container runtime ──────────────────────────────────────────────
+# Patch runtime_status() (the shared probe) so these don't depend on whether
+# the CI host has Podman, and certainly not on its machine being up.
+
+def test_podman_check_warn_when_not_installed(monkeypatch):
+    from watchtower.api import diagnose
+    monkeypatch.setattr(
+        "watchtower.podman_runtime.runtime_status",
+        lambda: {"available": False, "binary": None, "version": None,
+                 "machine": None, "connected": False,
+                 "hint": "Install Podman."},
+    )
+    chk = diagnose._check_podman()
+    assert chk.status == "warn"
+    assert "not installed" in (chk.detail or "")
+    assert chk.hint
+
+
+def test_podman_check_warn_when_machine_stopped(monkeypatch):
+    from watchtower.api import diagnose
+    monkeypatch.setattr(
+        "watchtower.podman_runtime.runtime_status",
+        lambda: {"available": True, "binary": "/usr/bin/podman",
+                 "version": "podman version 5.0.0",
+                 "machine": {"name": "podman-machine-default", "running": False},
+                 "connected": False,
+                 "hint": "The Podman machine is stopped — click Start to bring it up."},
+    )
+    chk = diagnose._check_podman()
+    assert chk.status == "warn"
+    assert "stopped" in (chk.detail or "")
+    assert chk.hint and "machine start" in chk.hint
+
+
+def test_podman_check_ok_when_connected(monkeypatch):
+    from watchtower.api import diagnose
+    monkeypatch.setattr(
+        "watchtower.podman_runtime.runtime_status",
+        lambda: {"available": True, "binary": "/usr/bin/podman",
+                 "version": "podman version 5.0.0",
+                 "machine": {"name": "podman-machine-default", "running": True},
+                 "connected": True, "hint": None},
+    )
+    chk = diagnose._check_podman()
+    assert chk.status == "ok"
+    assert "running" in (chk.detail or "")
+
+
+def test_podman_check_never_crashes_on_probe_error(monkeypatch):
+    from watchtower.api import diagnose
+
+    def _boom():
+        raise RuntimeError("podman exploded")
+
+    monkeypatch.setattr("watchtower.podman_runtime.runtime_status", _boom)
+    chk = diagnose._check_podman()
+    # A probe failure must degrade to warn, not raise out of the report.
+    assert chk.status == "warn"
+
+
+# ── Tailscale / remote access ───────────────────────────────────────────────
+
+def _ts_state(**overrides):
+    """Build a _ProviderState with sensible defaults for the test."""
+    from watchtower.api.remote_access import _ProviderState
+    base = dict(
+        id="tailscale", name="Tailscale", installed=False, ready=False,
+        sharing=False, url=None, detail=None, hint=None,
+        install_url="https://tailscale.com/download",
+    )
+    base.update(overrides)
+    return _ProviderState(**base)
+
+
+def test_tailscale_check_warn_when_not_installed(monkeypatch):
+    from watchtower.api import diagnose
+    monkeypatch.setattr(
+        "watchtower.api.remote_access.TailscaleProvider.state",
+        lambda self: _ts_state(installed=False, hint="Install Tailscale."),
+    )
+    chk = diagnose._check_tailscale()
+    assert chk.status == "warn"
+    assert "not installed" in (chk.detail or "")
+
+
+def test_tailscale_check_warn_when_not_signed_in(monkeypatch):
+    from watchtower.api import diagnose
+    monkeypatch.setattr(
+        "watchtower.api.remote_access.TailscaleProvider.state",
+        lambda self: _ts_state(
+            installed=True, ready=False,
+            detail="Not signed in (state: stopped)",
+            hint="Run `sudo tailscale up` and sign into your tailnet.",
+        ),
+    )
+    chk = diagnose._check_tailscale()
+    assert chk.status == "warn"
+    assert chk.hint and "tailscale up" in chk.hint
+
+
+def test_tailscale_check_ok_when_ready(monkeypatch):
+    from watchtower.api import diagnose
+    monkeypatch.setattr(
+        "watchtower.api.remote_access.TailscaleProvider.state",
+        lambda self: _ts_state(
+            installed=True, ready=True, sharing=False,
+            detail="Ready — click Enable to share",
+        ),
+    )
+    chk = diagnose._check_tailscale()
+    assert chk.status == "ok"
+
+
+def test_tailscale_check_never_crashes_on_probe_error(monkeypatch):
+    from watchtower.api import diagnose
+
+    def _boom(self):
+        raise RuntimeError("tailscale exploded")
+
+    monkeypatch.setattr(
+        "watchtower.api.remote_access.TailscaleProvider.state", _boom
+    )
+    chk = diagnose._check_tailscale()
+    assert chk.status == "warn"
+
+
+# ── macOS GUI-app binary detection ──────────────────────────────────────────
+
+def test_tailscale_binary_finds_gui_app_when_not_on_path(monkeypatch):
+    """The Tailscale macOS GUI bundles the CLI but doesn't symlink it onto
+    PATH. tailscale_binary() must still find it, otherwise a working install
+    reads as 'not installed' — the #1 silent dead-end on Macs.
+    """
+    from watchtower.api import remote_access
+
+    gui_path = "/Applications/Tailscale.app/Contents/MacOS/Tailscale"
+    monkeypatch.setattr(remote_access.shutil, "which", lambda _name: None)
+    monkeypatch.setattr(
+        remote_access.os.path, "isfile", lambda p: p == gui_path
+    )
+    monkeypatch.setattr(
+        remote_access.os, "access", lambda p, _mode: p == gui_path
+    )
+    assert remote_access.tailscale_binary() == gui_path
+
+
+def test_tailscale_binary_prefers_path_when_present(monkeypatch):
+    from watchtower.api import remote_access
+    monkeypatch.setattr(
+        remote_access.shutil, "which", lambda _name: "/usr/local/bin/tailscale"
+    )
+    assert remote_access.tailscale_binary() == "/usr/local/bin/tailscale"

@@ -20,7 +20,7 @@ import io
 import tarfile
 
 import requests
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
@@ -2359,6 +2359,207 @@ async def runtime_version(
     Settings "Check for Updates" button so the user gets a live answer).
     """
     return _check_for_update(force=force)
+
+
+# ── Server-side self-update ─────────────────────────────────────────────────
+# The desktop app auto-updates via electron-updater. Browser-mode and
+# self-hosted server installs had no apply path — the "Update" button just
+# opened the GitHub release page. This wires the same `./run.sh update`
+# flow (git pull + reinstall + frontend rebuild) the desktop dev-clone path
+# already uses, then lets run.sh restart the service.
+#
+# Only works on a SOURCE install (a git checkout that has run.sh). Packaged
+# / pip-wheel installs can't self-update this way — they get a clear message
+# pointing at their real update channel rather than a confusing failure.
+#
+# Gated on can_manage_team (org admin). Solo installs satisfy this naturally
+# (first user is promoted to OWNER), so it's invisible for desktop users and
+# meaningful for teams.
+
+SELF_UPDATE_LOG = DEV_DIR / "self-update.log"
+SELF_UPDATE_STATE = DEV_DIR / "self-update.state"
+
+
+def _self_update_capable() -> tuple[bool, Optional[str]]:
+    """Can this install self-update via run.sh? Returns (capable, reason).
+
+    `reason` is a user-facing explanation when not capable. We require a
+    git checkout (``.git``) AND an executable ``run.sh`` at ROOT_DIR — the
+    same tree the dev clone / source install runs from. A packaged build's
+    ROOT_DIR lives inside a read-only bundle or site-packages, so neither
+    is present there.
+    """
+    run_sh = ROOT_DIR / "run.sh"
+    git_dir = ROOT_DIR / ".git"
+    if not run_sh.is_file():
+        return False, (
+            "This install isn't a source checkout (no run.sh), so it can't "
+            "self-update. Update via your package manager, container image, "
+            "or the desktop app's built-in auto-update."
+        )
+    if not git_dir.exists():
+        return False, (
+            "This install isn't a git checkout (no .git), so `git pull` "
+            "can't run. Re-clone from source or use your package manager to update."
+        )
+    return True, None
+
+
+def _read_self_update_state() -> dict[str, Any]:
+    """Read the last update run's state. The state file is written by this
+    process before spawning, and the spawned `run.sh update` wrapper appends
+    its exit status — so the UI can poll across the API restart."""
+    try:
+        raw = SELF_UPDATE_STATE.read_text(encoding="utf-8").strip()
+        if raw:
+            return json.loads(raw)
+    except (FileNotFoundError, ValueError, OSError):
+        pass
+    return {"state": "idle"}
+
+
+class SelfUpdateStatus(BaseModel):
+    can_self_update: bool
+    reason: Optional[str] = None
+    current_version: str
+    last_run: dict[str, Any]
+
+
+@router.get("/self-update/status", response_model=SelfUpdateStatus)
+async def self_update_status(
+    _current_user: dict = Depends(util.get_current_user),
+) -> SelfUpdateStatus:
+    """Whether this install can self-update, plus the last run's state.
+
+    The SPA reads `can_self_update` to decide whether the browser-mode
+    Update button triggers a server-side update or just opens the release
+    page. `last_run` lets it show progress/result after a restart.
+    """
+    capable, reason = _self_update_capable()
+    return SelfUpdateStatus(
+        can_self_update=capable,
+        reason=reason,
+        current_version=watchtower.__version__,
+        last_run=_read_self_update_state(),
+    )
+
+
+@router.post("/self-update")
+async def self_update(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(util.get_current_user),
+):
+    """Pull the latest source, reinstall, rebuild the SPA, and restart.
+
+    Runs `bash run.sh update` detached so it survives the API process
+    restart that run.sh performs at the end. Returns immediately; the UI
+    polls GET /self-update/status to watch progress and confirm the new
+    version after the service comes back.
+
+    Admin-gated (can_manage_team). Refuses on non-source installs with an
+    actionable message.
+    """
+    if not _user_can_manage_org_secrets(db, current_user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Self-update requires can_manage_team permission.",
+        )
+
+    capable, reason = _self_update_capable()
+    if not capable:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=reason or "This install can't self-update.",
+        )
+
+    # Don't allow a second run while one is in flight.
+    last = _read_self_update_state()
+    if last.get("state") == "running":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="An update is already in progress.",
+        )
+
+    started_at = datetime.now(timezone.utc).isoformat()
+    try:
+        DEV_DIR.mkdir(parents=True, exist_ok=True)
+        SELF_UPDATE_STATE.write_text(
+            json.dumps({
+                "state": "running",
+                "started_at": started_at,
+                "from_version": watchtower.__version__,
+            }),
+            encoding="utf-8",
+        )
+    except OSError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Could not write update state: {exc}",
+        )
+
+    # Audit before spawning — once run.sh restarts us, this row is the only
+    # record of who pushed the button.
+    try:
+        from watchtower.api import audit as audit_log
+        from watchtower.api.enterprise import _ensure_user_org_member
+        org_id = None
+        try:
+            _u, org, _m = _ensure_user_org_member(db, current_user)
+            org_id = org.id
+        except Exception:  # noqa: BLE001 - org resolution is non-load-bearing
+            pass
+        audit_log.record_for_user(
+            db, current_user,
+            action="runtime.self_update",
+            entity_type="runtime",
+            org_id=org_id,
+            request=request,
+            extra={"from_version": watchtower.__version__},
+        )
+        db.commit()
+    except Exception:  # noqa: BLE001 - never block the update on audit
+        logger.exception("self-update: audit log write failed (continuing)")
+
+    _spawn_self_update()
+
+    return {
+        "started": True,
+        "message": (
+            "Update started. The service will pull the latest version, "
+            "rebuild, and restart. This page will reconnect automatically "
+            "once it's back."
+        ),
+        "from_version": watchtower.__version__,
+    }
+
+
+def _spawn_self_update() -> None:
+    """Spawn `run.sh update` fully detached so it outlives this process.
+
+    run.sh update does git pull + pip install + npm build and then (in
+    server modes) the operator's process manager restarts the API. We wrap
+    it in a tiny shell that records the exit status to the state file so the
+    UI can distinguish 'succeeded' from 'failed' after reconnecting.
+    """
+    run_sh = ROOT_DIR / "run.sh"
+    wrapper = (
+        f'set -o pipefail; '
+        f'"{run_sh}" update >> "{SELF_UPDATE_LOG}" 2>&1; rc=$?; '
+        f'if [ "$rc" -eq 0 ]; then st=succeeded; else st=failed; fi; '
+        f'printf \'{{"state":"%s","finished_at":"%s","exit_code":%s}}\' '
+        f'"$st" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$rc" > "{SELF_UPDATE_STATE}"'
+    )
+    # start_new_session detaches from the API's process group so the
+    # SIGTERM run.sh sends to port 8000 (to restart us) doesn't also kill
+    # the updater mid-flight.
+    subprocess.Popen(  # noqa: S603 - fixed argv, no user input in the command
+        ["/bin/bash", "-c", wrapper],
+        cwd=str(ROOT_DIR),
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        start_new_session=True,
+    )
 
 
 # ── Local node auto-config ──────────────────────────────────────────────────

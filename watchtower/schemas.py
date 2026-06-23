@@ -206,6 +206,13 @@ class DeploymentResponse(BaseModel):
     created_at: datetime
     started_at: Optional[datetime]
     completed_at: Optional[datetime]
+    # Who kicked it off. The id comes straight off the ORM row; email/name
+    # are resolved at read time (one batched lookup per list call) and
+    # attached as transient attributes, so they're Optional here. Webhook /
+    # scheduled / self-heal deploys have no user → all three are null.
+    triggered_by_user_id: Optional[UUID] = None
+    triggered_by_email: Optional[str] = None
+    triggered_by_name: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -225,6 +232,25 @@ class BuildResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class DeploymentNodeStatus(BaseModel):
+    """Per-node outcome for a deployment, with the node's human name
+    resolved (the row only stores node_id)."""
+    node_id: UUID
+    node_name: Optional[str] = None
+    node_host: Optional[str] = None
+    status: Optional[DeploymentStatus] = None
+    deployed_at: Optional[datetime] = None
+
+
+class DeploymentDetailResponse(BaseModel):
+    """Everything the deployment detail page needs in one call: the
+    deployment itself (with triggered-by resolved), its build history, and
+    per-node deploy status. Saves the SPA three separate round-trips."""
+    deployment: DeploymentResponse
+    builds: list[BuildResponse]
+    nodes: list[DeploymentNodeStatus]
 
 
 # Netlify-like Config Schemas

@@ -25,6 +25,7 @@ export const queryKeys = {
   vscodeStatus: ['vscode-status'] as const,
   health: ['health'] as const,
   updateCheck: ['runtime', 'version'] as const,
+  selfUpdateStatus: ['runtime', 'self-update', 'status'] as const,
   me: ['me'] as const,
   activeDeployments: ['deployments', 'active-count'] as const,
   edition: ['edition'] as const,
@@ -357,6 +358,50 @@ export function useUpdateCheck(opts?: { autoCheck?: boolean; force?: boolean }) 
     // Backend caches for 1h; UI cache for 30 min so a fresh tab gets a recheck-ish.
     staleTime: 30 * 60 * 1000,
     retry: false,
+  });
+}
+
+// ── Server-side self-update ───────────────────────────────────────────────────
+// Browser-mode / self-hosted installs can update in place when running from
+// a source checkout. The desktop app uses electron-updater instead. This hook
+// tells the UI which path applies and lets it poll a run's progress across the
+// API restart that run.sh performs.
+
+export type SelfUpdateStatus = {
+  can_self_update: boolean;
+  reason: string | null;
+  current_version: string;
+  last_run: {
+    state: 'idle' | 'running' | 'succeeded' | 'failed';
+    started_at?: string;
+    finished_at?: string;
+    exit_code?: number;
+    from_version?: string;
+  };
+};
+
+export function useSelfUpdateStatus(opts?: { poll?: boolean }) {
+  const poll = opts?.poll ?? false;
+  return useQuery<SelfUpdateStatus>({
+    queryKey: queryKeys.selfUpdateStatus,
+    queryFn: async () =>
+      (await apiClient.get<SelfUpdateStatus>('/runtime/self-update/status')).data,
+    // While an update is running the API restarts, so requests will fail
+    // transiently — keep polling so we catch it coming back up.
+    refetchInterval: poll ? 3000 : false,
+    retry: poll ? 10 : false,
+    staleTime: 0,
+  });
+}
+
+export function useSelfUpdate() {
+  const qc = useQueryClient();
+  return useMutation<{ started: boolean; message: string; from_version: string }, unknown, void>({
+    mutationFn: async () =>
+      (await apiClient.post('/runtime/self-update')).data,
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.selfUpdateStatus });
+    },
   });
 }
 

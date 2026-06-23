@@ -27,6 +27,12 @@ def _install_fake_tailscale(monkeypatch, status_payload=None, serve_payload=None
         remote_access.shutil, "which",
         lambda name: "/usr/bin/tailscale" if (installed and name == "tailscale") else None,
     )
+    # tailscale_binary() falls back to GUI-app bundle paths (e.g. the macOS
+    # /Applications/Tailscale.app CLI) when `which` misses. On a dev Mac
+    # that path really exists, which would make `installed=False` cases
+    # read as installed. Neutralise the fallback's filesystem probe so the
+    # `which` shim above is the sole source of truth in tests.
+    monkeypatch.setattr(remote_access.os.path, "isfile", lambda _p: False)
 
     def fake_run(cmd, *, timeout=8.0):
         # cmd is the full argv. Switch on the subcommand.

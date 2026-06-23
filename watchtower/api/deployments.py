@@ -22,6 +22,7 @@ from watchtower.database import (
     DeploymentNode,
     NodeStatus,
     Build,
+    User,
 )
 from watchtower import schemas
 from watchtower.api import util
@@ -93,8 +94,31 @@ async def list_deployments(
     deployments = db.query(Deployment).filter(
         Deployment.project_id == project_id
     ).order_by(Deployment.created_at.desc()).all()
-    
-    return deployments
+
+    return _serialize_deployments(db, deployments)
+
+
+def _serialize_deployments(db: Session, deployments: List[Deployment]) -> List[schemas.DeploymentResponse]:
+    """Attach the triggering user's email/name to each deployment.
+
+    Resolved in a single batched lookup keyed by user-id so a list of N
+    deployments costs one extra query, not N. Deployments with no
+    triggering user (webhook / scheduled / self-heal) get nulls.
+    """
+    user_ids = {d.triggered_by_user_id for d in deployments if d.triggered_by_user_id}
+    users_by_id: dict = {}
+    if user_ids:
+        rows = db.query(User.id, User.email, User.name).filter(User.id.in_(user_ids)).all()
+        users_by_id = {r.id: (r.email, r.name) for r in rows}
+
+    out: List[schemas.DeploymentResponse] = []
+    for d in deployments:
+        resp = schemas.DeploymentResponse.model_validate(d)
+        email, name = users_by_id.get(d.triggered_by_user_id, (None, None))
+        resp.triggered_by_email = email
+        resp.triggered_by_name = name
+        out.append(resp)
+    return out
 
 
 @router.post("/{project_id}/deployments", response_model=schemas.DeploymentResponse, status_code=status.HTTP_201_CREATED)
@@ -158,7 +182,8 @@ async def trigger_deployment(
             commit_sha=deploy_data.commit_sha or "manual-trigger",
             branch=deploy_data.branch,
             status=DeploymentStatus.PENDING,
-            trigger=DeploymentTrigger.MANUAL
+            trigger=DeploymentTrigger.MANUAL,
+            triggered_by_user_id=user_id,
         )
 
         db.add(deployment)
@@ -222,8 +247,65 @@ async def get_deployment(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Deployment not found"
         )
-    
+
     return deployment
+
+
+@router.get("/deployments/{deployment_id}/detail", response_model=schemas.DeploymentDetailResponse)
+async def get_deployment_detail(
+    deployment_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(util.get_current_user),
+):
+    """Full detail for the deployment detail page in one call.
+
+    Bundles the deployment (with triggered-by resolved), its build
+    history, and per-node deploy status (node name resolved). Owner-scoped
+    exactly like get_deployment.
+    """
+    deployment = db.query(Deployment).join(Project).filter(
+        Deployment.id == deployment_id,
+        Project.owner_id == util.canonical_user_id(db, current_user),
+    ).first()
+    if not deployment:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Deployment not found",
+        )
+
+    # Reuse the batched triggered-by resolver so this row matches the list.
+    dep_resp = _serialize_deployments(db, [deployment])[0]
+
+    builds = (
+        db.query(Build)
+        .filter(Build.deployment_id == deployment.id)
+        .order_by(Build.started_at.desc().nullslast())
+        .all()
+    )
+
+    # Per-node status, with node names resolved in one join.
+    node_rows = (
+        db.query(DeploymentNode, OrgNode.name, OrgNode.host)
+        .outerjoin(OrgNode, OrgNode.id == DeploymentNode.node_id)
+        .filter(DeploymentNode.deployment_id == deployment.id)
+        .all()
+    )
+    nodes = [
+        schemas.DeploymentNodeStatus(
+            node_id=dn.node_id,
+            node_name=name,
+            node_host=host,
+            status=dn.status,
+            deployed_at=dn.deployed_at,
+        )
+        for dn, name, host in node_rows
+    ]
+
+    return schemas.DeploymentDetailResponse(
+        deployment=dep_resp,
+        builds=[schemas.BuildResponse.model_validate(b) for b in builds],
+        nodes=nodes,
+    )
 
 
 @router.get("/deployments/{deployment_id}/diagnose")
@@ -465,6 +547,7 @@ async def auto_fix_deployment(
             branch=deployment.branch or "main",
             status=DeploymentStatus.PENDING,
             trigger=DeploymentTrigger.MANUAL,
+            triggered_by_user_id=_user.id,
         )
         db.add(new_deployment)
         db.flush()
@@ -549,6 +632,7 @@ async def auto_fix_deployment(
         branch=deployment.branch or "main",
         status=DeploymentStatus.PENDING,
         trigger=DeploymentTrigger.MANUAL,
+        triggered_by_user_id=_user.id,
     )
     db.add(new_deployment)
     db.flush()
@@ -641,7 +725,8 @@ async def rollback_deployment(
         commit_message=prev_deployment.commit_message,
         branch=prev_deployment.branch,
         status=DeploymentStatus.PENDING,
-        trigger=DeploymentTrigger.MANUAL
+        trigger=DeploymentTrigger.MANUAL,
+        triggered_by_user_id=util.canonical_user_id(db, current_user),
     )
     
     db.add(rollback)

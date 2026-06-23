@@ -329,6 +329,116 @@ def _check_migration_head() -> DiagnosticCheck:
         )
 
 
+def _check_podman() -> DiagnosticCheck:
+    """Local container runtime readiness.
+
+    The single most common "why won't Run Locally / Containers work?"
+    cause is the Podman machine being stopped (macOS/Windows VMs) or
+    Podman not being installed at all. runtime_status() already knows
+    all of this — surface it here so the answer lives in Diagnostics
+    instead of a raw socket-connection error deep in the Containers page.
+    """
+    try:
+        from watchtower.podman_runtime import runtime_status  # noqa: WPS433
+        st = runtime_status()
+    except Exception as e:  # noqa: BLE001 - never let a probe crash the report
+        return DiagnosticCheck(
+            id="podman",
+            name="Container runtime (Podman/Docker)",
+            status="warn",
+            detail=f"probe failed: {str(e)[:120]}",
+            hint="Optional. Needed only for local containers, Run Locally, and managed databases.",
+        )
+
+    if not st.get("available"):
+        return DiagnosticCheck(
+            id="podman",
+            name="Container runtime (Podman/Docker)",
+            status="warn",
+            detail="not installed",
+            hint=st.get("hint")
+            or "Optional. Install Podman (https://podman.io) or Docker for local containers and managed databases.",
+        )
+
+    machine = st.get("machine")
+    if st.get("connected"):
+        version = (st.get("version") or "podman").strip()
+        machine_note = ""
+        if machine and machine.get("name"):
+            machine_note = f", machine '{machine['name']}' running"
+        return DiagnosticCheck(
+            id="podman",
+            name="Container runtime (Podman/Docker)",
+            status="ok",
+            detail=f"{version}{machine_note}",
+        )
+
+    # Installed but the socket doesn't answer — almost always a stopped
+    # machine on Mac/Windows. This is the actionable case.
+    if machine and not machine.get("running"):
+        return DiagnosticCheck(
+            id="podman",
+            name="Container runtime (Podman/Docker)",
+            status="warn",
+            detail=f"machine '{machine.get('name') or 'podman-machine-default'}' is stopped",
+            hint="Start it from the Containers page (Start button) or run `podman machine start`.",
+        )
+    return DiagnosticCheck(
+        id="podman",
+        name="Container runtime (Podman/Docker)",
+        status="warn",
+        detail="installed but not responding",
+        hint=st.get("hint")
+        or "Run `podman machine start` (Mac/Windows) or check that the Podman/Docker socket is up.",
+    )
+
+
+def _check_tailscale() -> DiagnosticCheck:
+    """Remote-access readiness via Tailscale.
+
+    Reuses the Remote Access provider's own detection so this row and the
+    Remote Access page never disagree. Three states map to dot colours:
+      - not installed            → warn (it's optional)
+      - installed, not signed in → warn (actionable: `tailscale up`)
+      - ready / sharing          → ok
+    """
+    try:
+        from watchtower.api.remote_access import TailscaleProvider  # noqa: WPS433
+        st = TailscaleProvider().state()
+    except Exception as e:  # noqa: BLE001
+        return DiagnosticCheck(
+            id="tailscale",
+            name="Remote access (Tailscale)",
+            status="warn",
+            detail=f"probe failed: {str(e)[:120]}",
+            hint="Optional. Needed only to reach WatchTower from outside this machine.",
+        )
+
+    if not st.installed:
+        return DiagnosticCheck(
+            id="tailscale",
+            name="Remote access (Tailscale)",
+            status="warn",
+            detail="not installed",
+            hint=st.hint
+            or "Optional. Install Tailscale (https://tailscale.com/download) to reach WatchTower from your phone or another machine.",
+        )
+    if not st.ready:
+        return DiagnosticCheck(
+            id="tailscale",
+            name="Remote access (Tailscale)",
+            status="warn",
+            detail=st.detail or "installed but not ready",
+            hint=st.hint or "Run `sudo tailscale up` and sign into your tailnet.",
+        )
+    return DiagnosticCheck(
+        id="tailscale",
+        name="Remote access (Tailscale)",
+        status="ok",
+        detail=st.detail or ("sharing" if st.sharing else "ready"),
+    )
+
+
 def _check_web_dist() -> DiagnosticCheck:
     candidates = [
         Path(__file__).resolve().parents[2] / "web" / "dist" / "index.html",
@@ -360,6 +470,8 @@ _CHECKS = [
     _check_smtp,
     _check_llm_agent,
     _check_redis,
+    _check_podman,
+    _check_tailscale,
     _check_migration_head,
     _check_web_dist,
 ]
