@@ -514,7 +514,7 @@ function GoLiveCard({ project }: { project: Project }) {
 
   const submit = async () => {
     if (!hostname.trim()) { setError('Enter a hostname.'); return; }
-    if (mode === 'dns' && !credId) { setError('Pick a Cloudflare credential for DNS mode.'); return; }
+    if (!credId) { setError('Pick a Cloudflare credential (used for both DNS and tunnel setup).'); return; }
     setRunning(true);
     setError(null);
     setResult(null);
@@ -522,7 +522,9 @@ function GoLiveCard({ project }: { project: Project }) {
       const r = await apiClient.post<GoLiveResult>(`/projects/${project.id}/go-live`, {
         hostname: hostname.trim(),
         public_mode: mode,
-        cloudflare_credential_id: mode === 'dns' ? credId : null,
+        // Both modes use the Cloudflare API now (DNS A-record vs. tunnel +
+        // CNAME), so the credential applies to either.
+        cloudflare_credential_id: credId || null,
         proxied,
         enable_autonomous: true,
       });
@@ -575,27 +577,31 @@ function GoLiveCard({ project }: { project: Project }) {
           </div>
         </div>
 
-        {mode === 'dns' && (
-          <div className="flex flex-col gap-2">
-            <div className="flex flex-col gap-1">
-              <label className="text-xs text-muted-foreground">Cloudflare credential</label>
-              {creds.length === 0 ? (
-                <p className="text-xs text-amber-700">
-                  No Cloudflare credential configured. Add one under Integrations → Cloudflare first.
-                </p>
-              ) : (
-                <select value={credId} onChange={e => setCredId(e.target.value)}
-                  className="text-sm border border-border rounded-lg px-3 py-2 bg-card focus:outline-none focus:ring-2 focus:ring-red-500">
-                  {creds.map(c => <option key={c.id} value={c.id}>{c.name || c.account_name || c.id.slice(0, 8)}</option>)}
-                </select>
-              )}
-            </div>
+        <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-muted-foreground">Cloudflare credential</label>
+            {creds.length === 0 ? (
+              <p className="text-xs text-amber-700">
+                No Cloudflare credential configured. Add one under Integrations → Cloudflare first.
+              </p>
+            ) : (
+              <select value={credId} onChange={e => setCredId(e.target.value)}
+                className="text-sm border border-border rounded-lg px-3 py-2 bg-card focus:outline-none focus:ring-2 focus:ring-red-500">
+                {creds.map(c => <option key={c.id} value={c.id}>{c.name || c.account_name || c.id.slice(0, 8)}</option>)}
+              </select>
+            )}
+          </div>
+          {mode === 'dns' ? (
             <label className="flex items-center gap-2 text-xs text-muted-foreground">
               <input type="checkbox" checked={proxied} onChange={e => setProxied(e.target.checked)} />
               Proxy through Cloudflare (orange-cloud)
             </label>
-          </div>
-        )}
+          ) : (
+            <p className="text-xs text-muted-foreground">
+              Tunnel mode creates a Cloudflare Tunnel and installs the connector on your primary node — no public IP or port-forwarding needed.
+            </p>
+          )}
+        </div>
 
         {error && <p className="text-xs text-red-700 bg-red-50 border border-red-200 rounded-md p-2">{error}</p>}
 

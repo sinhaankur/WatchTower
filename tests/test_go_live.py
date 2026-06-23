@@ -145,8 +145,10 @@ def test_go_live_dns_mode_fails_public_without_node(client: TestClient, db_sessi
 
 # ── Tunnel mode ───────────────────────────────────────────────────────────────
 
-def test_go_live_tunnel_mode_returns_manual_steps(client: TestClient, db_session, monkeypatch):
-    p = _create_project(client, "golive-tunnel")
+def test_go_live_tunnel_falls_back_to_manual_without_credential(client: TestClient, db_session, monkeypatch):
+    """Tunnel mode with no Cloudflare credential can't run the API calls, so
+    it degrades to guided manual steps rather than failing the whole run."""
+    p = _create_project(client, "golive-tunnel-nocred")
     monkeypatch.setattr("watchtower.api.deployments.enqueue_build", lambda *a, **k: None)
 
     r = client.post(
@@ -157,9 +159,50 @@ def test_go_live_tunnel_mode_returns_manual_steps(client: TestClient, db_session
     body = r.json()
     steps = {s["step"]: s for s in body["steps"]}
     assert steps["public"]["status"] == "manual"
-    assert steps["public"]["instructions"]  # guided cloudflared commands
+    assert steps["public"]["instructions"]
     assert any("cloudflared" in line for line in steps["public"]["instructions"])
-    # Manual public step → overall is 'manual', not 'failed'.
     assert body["overall"] == "manual"
-    # The rest still applied.
     assert steps["autonomous"]["status"] in {"ok", "skipped"}
+
+
+def test_go_live_tunnel_mode_automates_when_ready(client: TestClient, db_session, monkeypatch):
+    """With a credential (account_id) + a node, tunnel mode creates the
+    tunnel, routes the CNAME, installs the connector, and reports 'ok'."""
+    from types import SimpleNamespace
+
+    p = _create_project(client, "golive-tunnel-ok")
+    _proj, cred = _seed_node_and_cred(db_session, p["id"])
+    # Ensure the credential has an account_id (required for tunnel API).
+    from watchtower.database import CloudflareCredential
+    cred_row = db_session.query(CloudflareCredential).filter(CloudflareCredential.id == cred.id).first()
+    cred_row.account_id = "acct-123"
+    db_session.commit()
+
+    monkeypatch.setattr("watchtower.api.deployments.enqueue_build", lambda *a, **k: None)
+    monkeypatch.setattr(
+        "watchtower.cloudflare_dns.create_tunnel",
+        lambda *a, **k: SimpleNamespace(tunnel_id="tun-1", token="connector-token", name="wt-golive-tunnel-ok"),
+    )
+    monkeypatch.setattr("watchtower.cloudflare_dns.configure_tunnel_ingress", lambda *a, **k: None)
+    monkeypatch.setattr(
+        "watchtower.cloudflare_dns.sync_cname",
+        lambda *a, **k: SimpleNamespace(record_id="rec-1", zone_id="zone-1", zone_name="example.com", target_ip="tun-1.cfargotunnel.com"),
+    )
+
+    async def _fake_install(node, token, append, prefix=""):
+        append("installing… (token elided)")
+        return True, ""
+    monkeypatch.setattr(
+        "watchtower.builder.install_cloudflared_tunnel_on_node", _fake_install
+    )
+
+    r = client.post(
+        f"/api/projects/{p['id']}/go-live",
+        json={"hostname": "t.example.com", "public_mode": "tunnel",
+              "cloudflare_credential_id": str(cred.id), "enable_autonomous": True},
+    )
+    assert r.status_code == 200, r.text
+    body = r.json()
+    steps = {s["step"]: s for s in body["steps"]}
+    assert steps["public"]["status"] == "ok", steps["public"]
+    assert body["overall"] == "live"

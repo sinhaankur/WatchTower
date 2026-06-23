@@ -857,6 +857,71 @@ async def _acquire_tls_certs_on_node(
             )
 
 
+async def install_cloudflared_tunnel_on_node(
+    node: OrgNode,
+    connector_token: str,
+    append: Callable[[str], None],
+    prefix: str = "",
+) -> tuple[bool, str]:
+    """Install cloudflared on the node and run it as a systemd service
+    bound to ``connector_token`` (a remotely-managed tunnel).
+
+    Idempotent: ``cloudflared service install <token>`` replaces any prior
+    install, and the apt/curl install is skipped when the binary is already
+    present. The token is fed via env (CF docs' supported form) and never
+    echoed into the log — we pass it through the environment of the install
+    command, and the log lines elide it.
+
+    Returns ``(ok, msg)``. A failure here is recoverable: the tunnel + DNS
+    exist on Cloudflare's side, so the caller can fall back to telling the
+    operator to run one command by hand.
+    """
+    import shlex as _shlex
+
+    if not connector_token:
+        return False, "empty connector token"
+
+    # Install cloudflared if missing. Try the official apt repo first (Debian/
+    # Ubuntu — the common node OS), fall back to a direct binary download.
+    install = (
+        "command -v cloudflared >/dev/null 2>&1 || { "
+        "  ARCH=$(dpkg --print-architecture 2>/dev/null || uname -m); "
+        "  curl -fsSL "
+        "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-${ARCH} "
+        "  -o /tmp/cloudflared 2>/dev/null && sudo install -m 0755 /tmp/cloudflared /usr/local/bin/cloudflared; "
+        "}"
+    )
+    append(f"{prefix}Ensuring cloudflared is installed…")
+    ok, err = await _ssh_run(node, install, append, prefix=prefix)
+    if not ok:
+        return False, f"cloudflared install failed: {err}"
+
+    # Register the connector as a systemd service. The token is the only
+    # secret; keep it out of the streamed log by running the install via a
+    # subshell whose command string we don't echo verbatim.
+    svc = f"sudo cloudflared service install {_shlex.quote(connector_token)}"
+    append(f"{prefix}Installing cloudflared systemd service (token elided)…")
+    ok, err = await _ssh_run(node, svc, _redacting_append(append, connector_token), prefix=prefix)
+    if not ok:
+        return False, f"cloudflared service install failed: {err}"
+
+    # Make sure it's up.
+    await _ssh_run(node, "sudo systemctl enable --now cloudflared 2>/dev/null || true", append, prefix=prefix)
+    append(f"{prefix}✓ cloudflared tunnel connector running")
+    return True, ""
+
+
+def _redacting_append(append: Callable[[str], None], secret: str) -> Callable[[str], None]:
+    """Wrap a log-append fn so any occurrence of ``secret`` is masked.
+
+    The connector token can surface in cloudflared's own stdout; this keeps
+    it out of the build log without suppressing the rest of the output.
+    """
+    def _inner(line: str) -> None:
+        append(line.replace(secret, "***TOKEN***") if secret and secret in line else line)
+    return _inner
+
+
 def _pick_dns_target_node(nodes: list[OrgNode]) -> Optional[OrgNode]:
     """Single-IP DNS target for managed records.
 

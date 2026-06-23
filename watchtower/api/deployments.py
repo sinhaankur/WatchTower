@@ -905,14 +905,13 @@ async def go_live(
 
     # ── 4. make it publicly reachable ─────────────────────────────────────
     overall_blocked = False
-    if body.public_mode == "tunnel":
-        # Server-side Cloudflare Tunnel automation isn't built yet. Rather
-        # than fake success, hand back the exact cloudflared steps. The
-        # rest of go-live still applies (deploy + autonomous), so the user
-        # only has this one manual piece.
+
+    def _tunnel_manual_fallback(reason: str) -> None:
+        """When auto-tunnel can't run, hand back the exact manual steps so
+        the user can finish by hand — the rest of go-live still applied."""
         add(
             "public", "Public access (Cloudflare Tunnel)", "manual",
-            "Tunnel automation isn't wired yet — run these on the deploy host:",
+            f"{reason} Run these on the deploy host to finish:",
             instructions=[
                 "curl -L https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 -o /usr/local/bin/cloudflared && chmod +x /usr/local/bin/cloudflared",
                 "cloudflared tunnel login",
@@ -921,7 +920,68 @@ async def go_live(
                 f"cloudflared tunnel run --url http://localhost:{project.recommended_port or 8080} {project.name}",
             ],
         )
-    else:  # dns
+
+    if body.public_mode == "tunnel":
+        # One-click remotely-managed tunnel: create it via the CF API, route
+        # the hostname through it (CNAME → <id>.cfargotunnel.com), and install
+        # the connector as a systemd service on the primary node. Each missing
+        # prerequisite degrades to the guided manual steps rather than failing.
+        cred = None
+        if body.cloudflare_credential_id:
+            cred = db.query(CloudflareCredential).filter(
+                CloudflareCredential.id == body.cloudflare_credential_id,
+                CloudflareCredential.org_id == project.org_id,
+            ).first()
+        primary_node = db.query(OrgNode).filter(
+            OrgNode.org_id == project.org_id,
+            OrgNode.is_active == True,  # noqa: E712
+        ).order_by(OrgNode.is_primary.desc(), OrgNode.updated_at.desc()).first()
+
+        token = util.decrypt_secret(cred.api_token_encrypted) if cred else None
+        port = project.recommended_port or 8080
+
+        if not cred or not token:
+            _tunnel_manual_fallback("No usable Cloudflare credential for automatic tunnel setup.")
+        elif not cred.account_id:
+            _tunnel_manual_fallback("The Cloudflare credential has no account id (re-verify it under Integrations).")
+        elif not primary_node:
+            _tunnel_manual_fallback("No active node to run the tunnel connector on.")
+        else:
+            try:
+                tunnel = cloudflare_dns.create_tunnel(token, cred.account_id, f"wt-{project.name}")
+                cloudflare_dns.configure_tunnel_ingress(
+                    token, cred.account_id, tunnel.tunnel_id, hostname, f"http://localhost:{port}",
+                )
+                cname_target = f"{tunnel.tunnel_id}.cfargotunnel.com"
+                result = cloudflare_dns.sync_cname(
+                    token, hostname, cname_target,
+                    existing_zone_id=domain.cloudflare_zone_id,
+                    existing_record_id=domain.cloudflare_record_id,
+                )
+                domain.cloudflare_credential_id = cred.id
+                domain.cloudflare_zone_id = result.zone_id
+                domain.cloudflare_record_id = result.record_id
+                domain.cloudflare_target_ip = cname_target
+                domain.cloudflare_synced_at = utcnow()
+
+                # Install the connector on the node (best-effort over SSH).
+                logs: list[str] = []
+                ok, err = await build_runner.install_cloudflared_tunnel_on_node(
+                    primary_node, tunnel.token, logs.append,
+                )
+                if ok:
+                    add("public", "Public access (Cloudflare Tunnel)", "ok",
+                        f"Tunnel '{tunnel.name}' live → {hostname} (connector on {primary_node.name}).")
+                else:
+                    # CF side is set up; only the node connector failed. Give
+                    # the one command to finish, not the whole sequence.
+                    add("public", "Public access (Cloudflare Tunnel)", "manual",
+                        f"Tunnel created and DNS routed, but installing the connector on "
+                        f"{primary_node.name} failed: {err[:200]} — run on that host:",
+                        instructions=[f"sudo cloudflared service install <token-from-Cloudflare-dashboard>"])
+            except cloudflare_dns.CloudflareDnsError as exc:
+                _tunnel_manual_fallback(f"Cloudflare tunnel API error: {exc.detail}")
+    elif body.public_mode == "dns":
         primary_node = db.query(OrgNode).filter(
             OrgNode.org_id == project.org_id,
             OrgNode.is_active == True,  # noqa: E712

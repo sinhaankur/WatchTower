@@ -198,3 +198,128 @@ def delete_a_record(token: str, zone_id: str, record_id: str) -> None:
         if exc.status == 404:
             return
         raise
+
+
+# ── Cloudflare Tunnel (remotely-managed) ──────────────────────────────────────
+# A remotely-managed tunnel is created via the API and configured entirely
+# server-side (config_src=cloudflare). The node just runs `cloudflared` with
+# the returned token — no local config file, no `cloudflared login`. This is
+# what makes one-click Go-Live-over-tunnel possible: the user never touches
+# the deploy host's cloudflared config; WatchTower owns it through the API.
+#
+# The hostname is pointed at the tunnel with a CNAME to
+# ``<tunnel_id>.cfargotunnel.com`` (always proxied — that's how tunnels work).
+
+
+@dataclass
+class TunnelResult:
+    tunnel_id: str
+    token: str          # the connector token — sensitive, store encrypted
+    name: str
+
+
+def create_tunnel(token: str, account_id: str, name: str) -> TunnelResult:
+    """Create (or reuse) a remotely-managed tunnel and return its id + token.
+
+    Idempotent on name: if a tunnel with this name already exists and isn't
+    deleted, we reuse it and fetch its token rather than erroring on the
+    duplicate — so re-running Go-Live doesn't pile up tunnels.
+    """
+    if not account_id:
+        raise CloudflareDnsError(400, "Cloudflare account_id is required to create a tunnel.")
+
+    base = f"/accounts/{account_id}/cfd_tunnel"
+    existing_id: Optional[str] = None
+    # Look for a live tunnel with this name first.
+    listing = _cf_get(token, base, params={"name": name, "is_deleted": "false"})
+    for t in listing.get("result") or []:
+        if t.get("name") == name and not t.get("deleted_at"):
+            existing_id = t.get("id")
+            break
+
+    if existing_id:
+        tunnel_id = existing_id
+    else:
+        created = _cf_post(token, base, {"name": name, "config_src": "cloudflare"})
+        tunnel_id = (created.get("result") or {}).get("id")
+        if not tunnel_id:
+            raise CloudflareDnsError(502, "Cloudflare did not return a tunnel id.")
+
+    # Fetch the connector token (works for both new and reused tunnels).
+    tok_body = _cf_get(token, f"{base}/{tunnel_id}/token")
+    connector_token = tok_body.get("result")
+    if not isinstance(connector_token, str) or not connector_token:
+        raise CloudflareDnsError(502, "Cloudflare did not return a tunnel connector token.")
+
+    return TunnelResult(tunnel_id=tunnel_id, token=connector_token, name=name)
+
+
+def configure_tunnel_ingress(
+    token: str, account_id: str, tunnel_id: str, hostname: str, service_url: str
+) -> None:
+    """Point the tunnel's ingress at the local service.
+
+    Sets a single ingress rule (hostname → service_url) plus the required
+    catch-all 404. Overwrites any prior config for this tunnel — Go-Live
+    owns one hostname per tunnel.
+    """
+    path = f"/accounts/{account_id}/cfd_tunnel/{tunnel_id}/configurations"
+    body = {
+        "config": {
+            "ingress": [
+                {"hostname": hostname, "service": service_url},
+                {"service": "http_status:404"},
+            ]
+        }
+    }
+    _cf_put(token, path, body)
+
+
+def sync_cname(
+    token: str,
+    domain: str,
+    target: str,
+    *,
+    existing_zone_id: Optional[str] = None,
+    existing_record_id: Optional[str] = None,
+) -> SyncResult:
+    """Create/update a proxied CNAME so ``domain`` → ``target`` (the
+    ``<tunnel_id>.cfargotunnel.com`` host). Mirrors sync_a_record's
+    idempotent create-or-update shape; tunnel CNAMEs are always proxied."""
+    if existing_zone_id:
+        zone_id, zone_name = existing_zone_id, ""
+    else:
+        zone = find_zone_for_domain(token, domain)
+        zone_id, zone_name = zone.id, zone.name
+
+    record_body = {"type": "CNAME", "name": domain, "content": target, "proxied": True}
+
+    if existing_record_id:
+        body = _cf_put(token, f"/zones/{zone_id}/dns_records/{existing_record_id}", record_body)
+    else:
+        # Find an existing CNAME for this name to avoid duplicate-record errors.
+        found = _cf_get(token, f"/zones/{zone_id}/dns_records", params={"type": "CNAME", "name": domain})
+        results = found.get("result") or []
+        if results:
+            rid = results[0]["id"]
+            body = _cf_put(token, f"/zones/{zone_id}/dns_records/{rid}", record_body)
+        else:
+            body = _cf_post(token, f"/zones/{zone_id}/dns_records", record_body)
+
+    rec = body.get("result") or {}
+    return SyncResult(
+        record_id=rec.get("id", existing_record_id or ""),
+        zone_id=zone_id,
+        zone_name=zone_name or rec.get("zone_name", ""),
+        target_ip=target,
+    )
+
+
+def delete_tunnel(token: str, account_id: str, tunnel_id: str) -> None:
+    """Delete a tunnel. 404 = already gone = success."""
+    try:
+        _cf_delete(token, f"/accounts/{account_id}/cfd_tunnel/{tunnel_id}")
+    except CloudflareDnsError as exc:
+        if exc.status == 404:
+            return
+        raise
