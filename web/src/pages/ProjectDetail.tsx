@@ -463,6 +463,183 @@ function _healthCheckHint(r: HealthResult): string | null {
   return null;
 }
 
+// ── GoLiveCard ────────────────────────────────────────────────────────────────
+// One guided action that chains the pieces (container deploy → domain →
+// Cloudflare DNS/Tunnel → autonomous) and renders a per-step checklist.
+
+type CloudflareCred = { id: string; name?: string; account_name?: string | null };
+
+type GoLiveStep = {
+  step: string;
+  title: string;
+  status: 'ok' | 'skipped' | 'failed' | 'manual';
+  detail?: string | null;
+  instructions?: string[] | null;
+};
+
+type GoLiveResult = {
+  project_id: string;
+  hostname: string;
+  overall: 'live' | 'partial' | 'manual' | 'failed';
+  live_url: string | null;
+  steps: GoLiveStep[];
+};
+
+const STEP_ICON: Record<GoLiveStep['status'], string> = {
+  ok: '✓', skipped: '–', failed: '✗', manual: '➜',
+};
+const STEP_COLOR: Record<GoLiveStep['status'], string> = {
+  ok: 'text-emerald-600', skipped: 'text-slate-400', failed: 'text-red-600', manual: 'text-amber-600',
+};
+
+function GoLiveCard({ project }: { project: Project }) {
+  const [hostname, setHostname] = useState('');
+  const [mode, setMode] = useState<'dns' | 'tunnel'>('dns');
+  const [credId, setCredId] = useState('');
+  const [proxied, setProxied] = useState(true);
+  const [creds, setCreds] = useState<CloudflareCred[]>([]);
+  const [running, setRunning] = useState(false);
+  const [result, setResult] = useState<GoLiveResult | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    apiClient.get<CloudflareCred[]>('/integrations/cloudflare')
+      .then(r => {
+        setCreds(r.data);
+        if (r.data.length && !credId) setCredId(r.data[0].id);
+      })
+      .catch(() => setCreds([]));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const submit = async () => {
+    if (!hostname.trim()) { setError('Enter a hostname.'); return; }
+    if (mode === 'dns' && !credId) { setError('Pick a Cloudflare credential for DNS mode.'); return; }
+    setRunning(true);
+    setError(null);
+    setResult(null);
+    try {
+      const r = await apiClient.post<GoLiveResult>(`/projects/${project.id}/go-live`, {
+        hostname: hostname.trim(),
+        public_mode: mode,
+        cloudflare_credential_id: mode === 'dns' ? credId : null,
+        proxied,
+        enable_autonomous: true,
+      });
+      setResult(r.data);
+    } catch (e) {
+      const detail = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      setError(typeof detail === 'string' ? detail : 'Go Live failed.');
+    } finally {
+      setRunning(false);
+    }
+  };
+
+  return (
+    <section className="rounded-xl border border-border bg-card overflow-hidden">
+      <div className="px-5 py-4 border-b border-border bg-muted/30 flex items-center justify-between">
+        <div>
+          <h2 className="text-sm font-semibold">Go Live</h2>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Deploy as a container, point a domain at it, and turn on autonomous monitoring — in one step.
+          </p>
+        </div>
+        {project.live_url && (
+          <a href={project.live_url} target="_blank" rel="noopener noreferrer"
+            className="text-xs text-emerald-700 hover:underline font-mono shrink-0">
+            {project.live_url.replace(/^https?:\/\//, '')} ↗
+          </a>
+        )}
+      </div>
+
+      <div className="p-5 flex flex-col gap-3">
+        <div className="flex flex-col gap-1">
+          <label className="text-xs text-muted-foreground">Hostname</label>
+          <input
+            type="text" value={hostname} onChange={e => setHostname(e.target.value)}
+            placeholder="app.example.com"
+            className="text-sm border border-border rounded-lg px-3 py-2 bg-card focus:outline-none focus:ring-2 focus:ring-red-500 font-mono"
+          />
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <label className="text-xs text-muted-foreground">Public access</label>
+          <div className="flex gap-2">
+            {(['dns', 'tunnel'] as const).map(m => (
+              <button key={m} type="button" onClick={() => setMode(m)}
+                className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${
+                  mode === m ? 'border-red-600 bg-red-50 text-red-700 font-medium' : 'border-border hover:bg-muted/50'}`}>
+                {m === 'dns' ? 'Cloudflare DNS' : 'Cloudflare Tunnel'}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {mode === 'dns' && (
+          <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-1">
+              <label className="text-xs text-muted-foreground">Cloudflare credential</label>
+              {creds.length === 0 ? (
+                <p className="text-xs text-amber-700">
+                  No Cloudflare credential configured. Add one under Integrations → Cloudflare first.
+                </p>
+              ) : (
+                <select value={credId} onChange={e => setCredId(e.target.value)}
+                  className="text-sm border border-border rounded-lg px-3 py-2 bg-card focus:outline-none focus:ring-2 focus:ring-red-500">
+                  {creds.map(c => <option key={c.id} value={c.id}>{c.name || c.account_name || c.id.slice(0, 8)}</option>)}
+                </select>
+              )}
+            </div>
+            <label className="flex items-center gap-2 text-xs text-muted-foreground">
+              <input type="checkbox" checked={proxied} onChange={e => setProxied(e.target.checked)} />
+              Proxy through Cloudflare (orange-cloud)
+            </label>
+          </div>
+        )}
+
+        {error && <p className="text-xs text-red-700 bg-red-50 border border-red-200 rounded-md p-2">{error}</p>}
+
+        <button
+          type="button" onClick={() => void submit()} disabled={running}
+          className="self-start text-sm px-4 py-2 rounded-lg border border-slate-800 bg-amber-400 hover:bg-amber-500 text-slate-900 font-semibold shadow-[1px_1px_0_0_#1f2937] disabled:opacity-50 disabled:cursor-wait">
+          {running ? 'Going live…' : '🚀 Go Live'}
+        </button>
+
+        {result && (
+          <div className="mt-1 rounded-lg border border-border p-3">
+            <div className="text-xs font-medium mb-2">
+              Result: <span className={
+                result.overall === 'live' ? 'text-emerald-700'
+                : result.overall === 'manual' ? 'text-amber-700'
+                : result.overall === 'partial' ? 'text-amber-700' : 'text-red-700'}>
+                {result.overall}
+              </span>
+            </div>
+            <ul className="flex flex-col gap-1.5">
+              {result.steps.map(s => (
+                <li key={s.step} className="text-xs">
+                  <span className="flex items-start gap-2">
+                    <span className={`font-bold ${STEP_COLOR[s.status]}`}>{STEP_ICON[s.status]}</span>
+                    <span className="flex-1">
+                      <span className="font-medium">{s.title}</span>
+                      {s.detail && <span className="text-muted-foreground"> — {s.detail}</span>}
+                      {s.instructions && s.instructions.length > 0 && (
+                        <pre className="mt-1 p-2 bg-slate-950 text-slate-100 rounded text-[11px] overflow-auto whitespace-pre-wrap">
+                          {s.instructions.join('\n')}
+                        </pre>
+                      )}
+                    </span>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
 // ── OverviewTab ───────────────────────────────────────────────────────────────
 
 function OverviewTab({ project }: { project: Project }) {
@@ -492,6 +669,8 @@ function OverviewTab({ project }: { project: Project }) {
           ))}
         </dl>
       </div>
+
+      <GoLiveCard project={project} />
 
       <HealthCheckCard projectId={project.id} />
 

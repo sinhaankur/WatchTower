@@ -253,6 +253,50 @@ class DeploymentDetailResponse(BaseModel):
     nodes: list[DeploymentNodeStatus]
 
 
+# ── Go Live orchestration ─────────────────────────────────────────────────────
+
+class GoLiveRequest(BaseModel):
+    """Take a project from deployed → globally reachable + autonomous in one
+    guided action. Each underlying step already exists; this chains them."""
+    hostname: str = Field(
+        min_length=3,
+        description="Public hostname to serve the app at, e.g. app.example.com.",
+    )
+    public_mode: str = Field(
+        default="dns",
+        description="How to make it reachable: 'dns' (Cloudflare A record to the node) or 'tunnel' (Cloudflare Tunnel — guided manual setup for now).",
+    )
+    cloudflare_credential_id: Optional[UUID] = Field(
+        default=None,
+        description="Required for 'dns' mode — which stored Cloudflare token to use.",
+    )
+    proxied: bool = Field(
+        default=True,
+        description="Whether the Cloudflare record is proxied (orange-cloud).",
+    )
+    enable_autonomous: bool = Field(
+        default=True,
+        description="Turn on autonomous monitoring (probe→restart→rollback) after going live.",
+    )
+
+
+class GoLiveStepResult(BaseModel):
+    step: str            # stable slug: container | deploy | domain | public | autonomous
+    title: str           # human label for the checklist row
+    status: str          # "ok" | "skipped" | "failed" | "manual"
+    detail: Optional[str] = None
+    # Free-form per-step extras (e.g. tunnel setup commands the UI renders).
+    instructions: Optional[list[str]] = None
+
+
+class GoLiveResponse(BaseModel):
+    project_id: UUID
+    hostname: str
+    overall: str         # "live" | "partial" | "manual" | "failed"
+    live_url: Optional[str] = None
+    steps: list[GoLiveStepResult]
+
+
 # Netlify-like Config Schemas
 class NetlifeLikeConfigBase(BaseModel):
     output_dir: str = "dist"

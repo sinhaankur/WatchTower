@@ -794,3 +794,220 @@ async def list_deployment_targets(
             for node in nodes
         ],
     }
+
+
+@router.post("/{project_id}/go-live", response_model=schemas.GoLiveResponse)
+async def go_live(
+    project_id: UUID,
+    body: schemas.GoLiveRequest,
+    request: Request,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(util.get_current_user),
+):
+    """Take a project from deployed → globally reachable + autonomous.
+
+    Orchestrates steps that already exist individually, returning a
+    per-step checklist so the UI can show exactly how far it got and
+    what (if anything) still needs a human:
+
+      container   — ensure the project deploys as a Podman container
+      deploy      — queue a fresh deployment so the container is current
+      domain      — ensure a CustomDomain row for the requested hostname
+      public      — DNS mode: create/update a Cloudflare A record to the
+                    primary node's host. Tunnel mode: return guided setup
+                    steps (server-side tunnel automation isn't built yet,
+                    so we don't pretend it is).
+      autonomous  — flip autonomous_mode on so the probe loop watches it
+
+    Each step is best-effort and recorded; a failure in one doesn't abort
+    the rest where it's safe to continue, so the user sees the full picture.
+    """
+    from watchtower.api.enterprise import _ensure_user_org_member
+    from watchtower.database import CustomDomain, CloudflareCredential
+    from watchtower import cloudflare_dns
+
+    _user, canonical_org, canonical_member = _ensure_user_org_member(db, current_user)
+
+    project = db.query(Project).filter(
+        Project.id == project_id, Project.owner_id == _user.id,
+    ).first()
+    if not project:
+        project = db.query(Project).filter(
+            Project.id == project_id, Project.org_id == canonical_org.id,
+        ).first()
+    if not project:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
+
+    if project.org_id == canonical_org.id:
+        member = canonical_member
+    else:
+        member = db.query(TeamMember).filter(
+            TeamMember.org_id == project.org_id,
+            TeamMember.user_id == _user.id,
+            TeamMember.is_active == True,  # noqa: E712
+        ).first()
+    if not member or not member.can_manage_deployments:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied")
+
+    hostname = body.hostname.strip().lower()
+    steps: list[schemas.GoLiveStepResult] = []
+
+    def add(step: str, title: str, status_: str, detail: str | None = None,
+            instructions: list[str] | None = None) -> None:
+        steps.append(schemas.GoLiveStepResult(
+            step=step, title=title, status=status_, detail=detail, instructions=instructions,
+        ))
+
+    # ── 1. container mode ─────────────────────────────────────────────────
+    if project.run_as_container:
+        add("container", "Run as container", "skipped", "Already enabled.")
+    else:
+        project.run_as_container = True
+        add("container", "Run as container", "ok", "Enabled — the app will deploy as a Podman container.")
+
+    # ── 2. queue a fresh deployment ───────────────────────────────────────
+    new_deployment = Deployment(
+        project_id=project.id,
+        commit_sha="go-live",
+        branch=project.repo_branch or "main",
+        status=DeploymentStatus.PENDING,
+        trigger=DeploymentTrigger.MANUAL,
+        triggered_by_user_id=_user.id,
+    )
+    db.add(new_deployment)
+    db.flush()
+    for node in _select_org_nodes_for_deploy(db, project, []):
+        db.add(DeploymentNode(
+            deployment_id=new_deployment.id, node_id=node.id, status=DeploymentStatus.PENDING,
+        ))
+    add("deploy", "Deploy latest", "ok", f"Queued deployment {str(new_deployment.id)[:8]}.")
+
+    # ── 3. ensure the custom domain ───────────────────────────────────────
+    domain = db.query(CustomDomain).filter(
+        CustomDomain.project_id == project.id,
+        CustomDomain.domain == hostname,
+    ).first()
+    if domain:
+        add("domain", "Custom domain", "skipped", f"{hostname} already attached.")
+    else:
+        # First domain on a project becomes primary.
+        has_primary = db.query(CustomDomain).filter(
+            CustomDomain.project_id == project.id,
+            CustomDomain.is_primary == True,  # noqa: E712
+        ).first() is not None
+        domain = CustomDomain(
+            project_id=project.id, domain=hostname, is_primary=not has_primary,
+        )
+        db.add(domain)
+        db.flush()
+        add("domain", "Custom domain", "ok", f"Attached {hostname}.")
+
+    # ── 4. make it publicly reachable ─────────────────────────────────────
+    overall_blocked = False
+    if body.public_mode == "tunnel":
+        # Server-side Cloudflare Tunnel automation isn't built yet. Rather
+        # than fake success, hand back the exact cloudflared steps. The
+        # rest of go-live still applies (deploy + autonomous), so the user
+        # only has this one manual piece.
+        add(
+            "public", "Public access (Cloudflare Tunnel)", "manual",
+            "Tunnel automation isn't wired yet — run these on the deploy host:",
+            instructions=[
+                "curl -L https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 -o /usr/local/bin/cloudflared && chmod +x /usr/local/bin/cloudflared",
+                "cloudflared tunnel login",
+                f"cloudflared tunnel create {project.name}",
+                f"cloudflared tunnel route dns {project.name} {hostname}",
+                f"cloudflared tunnel run --url http://localhost:{project.recommended_port or 8080} {project.name}",
+            ],
+        )
+    else:  # dns
+        primary_node = db.query(OrgNode).filter(
+            OrgNode.org_id == project.org_id,
+            OrgNode.is_active == True,  # noqa: E712
+        ).order_by(OrgNode.is_primary.desc(), OrgNode.updated_at.desc()).first()
+        cred = None
+        if body.cloudflare_credential_id:
+            cred = db.query(CloudflareCredential).filter(
+                CloudflareCredential.id == body.cloudflare_credential_id,
+                CloudflareCredential.org_id == project.org_id,
+            ).first()
+
+        if not primary_node or not primary_node.host:
+            add("public", "Public access (Cloudflare DNS)", "failed",
+                "No active node with a public host to point DNS at. Add or provision a node first.")
+            overall_blocked = True
+        elif not cred:
+            add("public", "Public access (Cloudflare DNS)", "failed",
+                "No Cloudflare credential selected/found for this org.")
+            overall_blocked = True
+        else:
+            token = util.decrypt_secret(cred.api_token_encrypted)
+            if not token:
+                add("public", "Public access (Cloudflare DNS)", "failed",
+                    "Could not decrypt the Cloudflare token (WATCHTOWER_SECRET_KEY may have changed).")
+                overall_blocked = True
+            else:
+                try:
+                    result = cloudflare_dns.sync_a_record(
+                        token, hostname, primary_node.host,
+                        existing_zone_id=domain.cloudflare_zone_id,
+                        existing_record_id=domain.cloudflare_record_id,
+                        proxied=body.proxied,
+                    )
+                    domain.cloudflare_credential_id = cred.id
+                    domain.cloudflare_zone_id = result.zone_id
+                    domain.cloudflare_record_id = result.record_id
+                    domain.cloudflare_target_ip = result.target_ip
+                    domain.cloudflare_synced_at = utcnow()
+                    add("public", "Public access (Cloudflare DNS)", "ok",
+                        f"{hostname} → {result.target_ip} ({'proxied' if body.proxied else 'DNS-only'}).")
+                except cloudflare_dns.CloudflareDnsError as exc:
+                    add("public", "Public access (Cloudflare DNS)", "failed", exc.detail)
+                    overall_blocked = True
+
+    # ── 5. autonomous mode ────────────────────────────────────────────────
+    if body.enable_autonomous:
+        if project.autonomous_mode:
+            add("autonomous", "Autonomous monitoring", "skipped", "Already on.")
+        else:
+            project.autonomous_mode = True
+            add("autonomous", "Autonomous monitoring", "ok",
+                "Enabled — WatchTower will probe, restart, and roll back automatically.")
+    else:
+        add("autonomous", "Autonomous monitoring", "skipped", "Left off per request.")
+
+    # Record the public URL on the project for convenience.
+    live_url = f"https://{hostname}"
+    project.live_url = live_url
+
+    audit_log.record_for_user(
+        db, current_user,
+        action="project.go_live",
+        entity_type="project",
+        entity_id=project.id,
+        org_id=project.org_id,
+        request=request,
+        extra={"hostname": hostname, "public_mode": body.public_mode,
+               "autonomous": body.enable_autonomous},
+    )
+    db.commit()
+    db.refresh(new_deployment)
+    enqueue_build(str(new_deployment.id), background_tasks)
+
+    # Overall verdict from the step statuses.
+    statuses = {s.status for s in steps}
+    if "failed" in statuses:
+        overall = "failed" if overall_blocked else "partial"
+    elif "manual" in statuses:
+        overall = "manual"
+    else:
+        overall = "live"
+
+    return schemas.GoLiveResponse(
+        project_id=project.id,
+        hostname=hostname,
+        overall=overall,
+        live_url=live_url,
+        steps=steps,
+    )
