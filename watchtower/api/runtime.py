@@ -373,47 +373,17 @@ def _command_exists(command: str) -> bool:
 # outside the bare ``/usr/bin`` PATH that systemd / Electron-spawned
 # processes inherit. Looked up only when ``which <cmd>`` fails, so a
 # normal Homebrew / apt install (already on PATH) costs nothing extra.
-_FALLBACK_TOOL_PATHS: dict[str, list[str]] = {
-    "tailscale": [
-        "/usr/local/bin/tailscale",
-        "/opt/homebrew/bin/tailscale",
-        "/Applications/Tailscale.app/Contents/MacOS/Tailscale",
-        "/usr/bin/tailscale",
-        "C:\\Program Files\\Tailscale\\tailscale.exe",
-        "C:\\Program Files (x86)\\Tailscale\\tailscale.exe",
-    ],
-    "docker": [
-        "/usr/local/bin/docker",
-        "/opt/homebrew/bin/docker",
-        "/Applications/Docker.app/Contents/Resources/bin/docker",
-    ],
-    "podman": [
-        "/usr/local/bin/podman",
-        "/opt/homebrew/bin/podman",
-    ],
-    "cloudflared": [
-        "/usr/local/bin/cloudflared",
-        "/opt/homebrew/bin/cloudflared",
-    ],
-}
-
-
 def _resolve_tool_path(command: str) -> Optional[str]:
     """Return an absolute path to ``command`` or None if not installed.
 
-    Tries PATH first (the fast common case), then falls back to a curated
-    list of GUI-installer locations. Result is suitable to pass straight
-    to ``subprocess.run`` — never returns a relative name.
+    Thin wrapper over the shared resolver (watchtower.tool_resolver), which
+    owns the PATH-then-GUI-fallback table. Kept under this name so existing
+    call sites in this module don't churn. See tool_resolver for why the
+    fallback table exists (macOS GUI bundles aren't on PATH).
     """
-    import shutil
+    from watchtower.tool_resolver import resolve_tool
 
-    found = shutil.which(command)
-    if found:
-        return found
-    for candidate in _FALLBACK_TOOL_PATHS.get(command, []):
-        if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
-            return candidate
-    return None
+    return resolve_tool(command)
 
 
 def _tool_status(command: str, version_args: list[str]) -> dict[str, Any]:

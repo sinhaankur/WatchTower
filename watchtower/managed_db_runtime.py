@@ -28,11 +28,9 @@ podman during CI.
 from __future__ import annotations
 
 import logging
-import shutil
 import socket
 import subprocess
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Optional
 
 logger = logging.getLogger(__name__)
@@ -49,16 +47,17 @@ def _podman_path() -> Optional[str]:
     """Resolve podman, falling back to docker for Linux dev hosts.
 
     Returns None if neither is installed — callers turn that into a
-    user-facing 400 with an install hint, not a 500.
+    user-facing 400 with an install hint, not a 500. Both lookups go
+    through the shared tool_resolver, so the GUI-bundle / Homebrew
+    fallback paths stay consistent with the rest of the app (no more
+    one-off "/opt/homebrew/bin/podman" check that drifts from the table).
     """
+    from watchtower.tool_resolver import resolve_tool
+
     for candidate in ("podman", "docker"):
-        which = shutil.which(candidate)
-        if which:
-            return which
-    # Common macOS Homebrew location not always on PATH for sub-shells.
-    brew = Path("/opt/homebrew/bin/podman")
-    if brew.exists():
-        return str(brew)
+        found = resolve_tool(candidate)
+        if found:
+            return found
     return None
 
 

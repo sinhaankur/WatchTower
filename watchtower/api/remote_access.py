@@ -25,7 +25,6 @@ from __future__ import annotations
 import json
 import logging
 import os
-import shutil
 import subprocess
 from dataclasses import dataclass
 from typing import Any, Optional
@@ -67,38 +66,11 @@ def _run(cmd: list[str], *, timeout: float = 8.0) -> tuple[int, str, str]:
         return 124, "", f"{cmd[0]}: timed out after {timeout}s"
 
 
-# Known absolute locations of the `tailscale` CLI when it ships *inside*
-# the desktop GUI app rather than on PATH. The macOS App Store / standalone
-# Tailscale.app bundles the binary but doesn't symlink it into
-# /usr/local/bin, so a bare `shutil.which("tailscale")` misses a perfectly
-# working install — the #1 silent dead-end on Macs. We probe these as a
-# fallback so detection matches reality. Order: most common first.
-_TAILSCALE_FALLBACK_PATHS = (
-    "/Applications/Tailscale.app/Contents/MacOS/Tailscale",
-    "/Applications/Tailscale.app/Contents/MacOS/tailscale",
-    # Homebrew cask sometimes lands here on Apple-silicon Macs.
-    "/opt/homebrew/bin/tailscale",
-    "/usr/local/bin/tailscale",
-    # Windows GUI install (when running the backend under WSL/native).
-    r"C:\Program Files\Tailscale\tailscale.exe",
-)
-
-
-def tailscale_binary() -> Optional[str]:
-    """Resolve the tailscale CLI, falling back to GUI-app bundle paths.
-
-    Returns the first usable path or None. Exposed at module level so the
-    diagnose endpoint can reuse the exact same resolution the provider
-    uses — no drift between "Remote Access says installed" and
-    "Diagnostics says installed".
-    """
-    found = shutil.which("tailscale")
-    if found:
-        return found
-    for candidate in _TAILSCALE_FALLBACK_PATHS:
-        if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
-            return candidate
-    return None
+# Tool resolution (incl. the macOS Tailscale GUI-bundle fallback) lives in
+# watchtower.tool_resolver — one source of truth shared with runtime.py so
+# "installed here, missing there" drift can't recur. Re-exported here under
+# the name callers/tests already use.
+from watchtower.tool_resolver import tailscale_binary  # noqa: E402,F401
 
 
 # ── Provider abstraction ─────────────────────────────────────────────────────

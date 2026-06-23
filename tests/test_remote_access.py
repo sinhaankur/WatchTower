@@ -23,16 +23,20 @@ def _install_fake_tailscale(monkeypatch, status_payload=None, serve_payload=None
     serialised back to the provider. Pass `None` to simulate a failed
     invocation of the corresponding subcommand.
     """
+    # Binary resolution now lives in watchtower.tool_resolver (shared with
+    # runtime.py). Patch the `which` shim there; the provider's _binary()
+    # delegates to tool_resolver.tailscale_binary().
+    from watchtower import tool_resolver
     monkeypatch.setattr(
-        remote_access.shutil, "which",
+        tool_resolver.shutil, "which",
         lambda name: "/usr/bin/tailscale" if (installed and name == "tailscale") else None,
     )
-    # tailscale_binary() falls back to GUI-app bundle paths (e.g. the macOS
+    # The resolver falls back to GUI-app bundle paths (e.g. the macOS
     # /Applications/Tailscale.app CLI) when `which` misses. On a dev Mac
     # that path really exists, which would make `installed=False` cases
     # read as installed. Neutralise the fallback's filesystem probe so the
     # `which` shim above is the sole source of truth in tests.
-    monkeypatch.setattr(remote_access.os.path, "isfile", lambda _p: False)
+    monkeypatch.setattr(tool_resolver.os.path, "isfile", lambda _p: False)
 
     def fake_run(cmd, *, timeout=8.0):
         # cmd is the full argv. Switch on the subcommand.
@@ -199,7 +203,8 @@ def test_enable_tailscale_returns_updated_state(client, monkeypatch):
             return 0, "", ""
         return 1, "", f"unexpected cmd: {cmd}"
 
-    monkeypatch.setattr(remote_access.shutil, "which", lambda n: "/usr/bin/tailscale")
+    from watchtower import tool_resolver
+    monkeypatch.setattr(tool_resolver.shutil, "which", lambda n: "/usr/bin/tailscale")
     monkeypatch.setattr(remote_access, "_run", fake_run)
 
     r = client.post(
@@ -213,7 +218,8 @@ def test_enable_tailscale_returns_updated_state(client, monkeypatch):
 
 
 def test_enable_tailscale_surfaces_cli_error(client, monkeypatch):
-    monkeypatch.setattr(remote_access.shutil, "which", lambda n: "/usr/bin/tailscale")
+    from watchtower import tool_resolver
+    monkeypatch.setattr(tool_resolver.shutil, "which", lambda n: "/usr/bin/tailscale")
 
     def fake_run(cmd, *, timeout=8.0):
         if cmd[:2] == ["/usr/bin/tailscale", "status"]:

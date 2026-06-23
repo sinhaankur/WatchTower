@@ -350,23 +350,24 @@ def test_tailscale_binary_finds_gui_app_when_not_on_path(monkeypatch):
     """The Tailscale macOS GUI bundles the CLI but doesn't symlink it onto
     PATH. tailscale_binary() must still find it, otherwise a working install
     reads as 'not installed' — the #1 silent dead-end on Macs.
+
+    Resolution now lives in watchtower.tool_resolver; we patch there and
+    assert through remote_access's re-export so the delegation is covered.
     """
     from watchtower.api import remote_access
+    from watchtower import tool_resolver
 
     gui_path = "/Applications/Tailscale.app/Contents/MacOS/Tailscale"
-    monkeypatch.setattr(remote_access.shutil, "which", lambda _name: None)
-    monkeypatch.setattr(
-        remote_access.os.path, "isfile", lambda p: p == gui_path
-    )
-    monkeypatch.setattr(
-        remote_access.os, "access", lambda p, _mode: p == gui_path
-    )
+    monkeypatch.setattr(tool_resolver.shutil, "which", lambda _name: None)
+    monkeypatch.setattr(tool_resolver.os.path, "isfile", lambda p: p == gui_path)
+    monkeypatch.setattr(tool_resolver.os, "access", lambda p, _mode: p == gui_path)
     assert remote_access.tailscale_binary() == gui_path
 
 
 def test_tailscale_binary_prefers_path_when_present(monkeypatch):
     from watchtower.api import remote_access
+    from watchtower import tool_resolver
     monkeypatch.setattr(
-        remote_access.shutil, "which", lambda _name: "/usr/local/bin/tailscale"
+        tool_resolver.shutil, "which", lambda _name: "/usr/local/bin/tailscale"
     )
     assert remote_access.tailscale_binary() == "/usr/local/bin/tailscale"
