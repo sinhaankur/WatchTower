@@ -9,6 +9,17 @@ Curated, human-friendly history of WatchTower releases. Auto-generated GitHub Re
 
 ---
 
+## 1.16.3 — Go Live, deployment insight, and self-service ops
+
+- **Go Live**: take a project from deployed to globally reachable in one guided action — runs it as a container, attaches a domain, makes it public via Cloudflare DNS *or* a one-click Cloudflare Tunnel (no public IP needed), and turns on autonomous monitoring. Each step reports its own status, and anything that can't run automatically degrades to clear guided instructions instead of failing silently.
+- **Deployment detail page** (`/deployments/:id`): a lifecycle timeline (queued → building → deploying → live), per-node status, live build-log streaming, and one-click rollback / redeploy / diagnose.
+- **Richer deployments view**: live-ticking duration, who triggered each deploy, and commit messages — with the table updating in near-real-time while a deploy is in flight.
+- **Server-side self-update**: browser and self-hosted installs can now update in place from the UI (pull + rebuild + restart), not just the desktop app.
+- **System readiness diagnostics**: Settings → Diagnostics now reports Podman and Tailscale status with actionable hints; fixed macOS Tailscale detection (the GUI app's CLI isn't on PATH).
+- **Reliability**: unified CLI-tool detection into one resolver (no more "installed here, missing there"), fixed a rollback button that hit the wrong route, hardened cloudflared install across CPU architectures, and tunnels are now cleaned up when a project is deleted.
+
+---
+
 ## 1.16.2 — UX polish and professional bug reporting
 
 - Improved the desktop and website UX with a more polished, icon-led bug reporting flow.
