@@ -379,6 +379,11 @@ class CustomDomain(Base):
     cloudflare_record_id = Column(String, nullable=True)
     cloudflare_target_ip = Column(String, nullable=True)
     cloudflare_synced_at = Column(DateTime, nullable=True)
+    # Set when this domain is served via a Cloudflare Tunnel (Go Live's
+    # tunnel mode) rather than a plain A record. Persisted so the tunnel
+    # can be torn down on project/domain delete instead of orphaning a
+    # billable connector on the user's Cloudflare account.
+    cloudflare_tunnel_id = Column(String, nullable=True)
 
     created_at = Column(DateTime, default=_utcnow)
     updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)

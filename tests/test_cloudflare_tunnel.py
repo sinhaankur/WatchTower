@@ -163,3 +163,32 @@ def test_install_cloudflared_empty_token_is_rejected():
     ok, err = asyncio.run(builder.install_cloudflared_tunnel_on_node(node, "", (lambda _l: None)))
     assert ok is False
     assert "token" in err.lower()
+
+
+def test_install_command_normalises_arch_for_non_debian_nodes():
+    """The install command must map uname -m values (x86_64/aarch64) to the
+    cloudflared release asset names (amd64/arm64) — otherwise the curl
+    fallback 404s on any node without dpkg (RHEL/Alpine/etc)."""
+    import asyncio
+    from unittest.mock import patch as _patch
+    from watchtower import builder
+    from watchtower.database import OrgNode
+
+    node = OrgNode(name="n1", host="1.2.3.4", user="deploy", port=22, remote_path="/srv")
+    cmds: list[str] = []
+
+    async def fake_ssh_run(_node, command, append, prefix=""):
+        cmds.append(command)
+        return True, ""
+
+    with _patch.object(builder, "_ssh_run", side_effect=fake_ssh_run):
+        asyncio.run(builder.install_cloudflared_tunnel_on_node(node, "tok", lambda _l: None))
+
+    install_cmd = next(c for c in cmds if "cloudflared-linux" in c)
+    # The arch normalisation must be present and cover the uname -m forms.
+    assert "x86_64) CFARCH=amd64" in install_cmd
+    assert "aarch64) CFARCH=arm64" in install_cmd
+    # And it must download by the normalised name, not raw ${ARCH}.
+    assert "cloudflared-linux-${CFARCH}" in install_cmd
+    # Unknown arch fails loudly rather than 404-ing a bad URL.
+    assert "unsupported arch" in install_cmd

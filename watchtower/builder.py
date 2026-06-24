@@ -881,14 +881,25 @@ async def install_cloudflared_tunnel_on_node(
     if not connector_token:
         return False, "empty connector token"
 
-    # Install cloudflared if missing. Try the official apt repo first (Debian/
-    # Ubuntu — the common node OS), fall back to a direct binary download.
+    # Install cloudflared if missing via a direct binary download (works on
+    # any distro — no apt assumption). The tricky part is arch naming:
+    # Cloudflare's release assets are cloudflared-linux-{amd64,arm64,arm},
+    # but `uname -m` reports x86_64/aarch64/armv7l and `dpkg` reports
+    # amd64/arm64. We normalise both into the asset names. An unrecognised
+    # arch fails loudly (echo + exit) instead of 404-ing a bad URL silently.
     install = (
         "command -v cloudflared >/dev/null 2>&1 || { "
-        "  ARCH=$(dpkg --print-architecture 2>/dev/null || uname -m); "
+        "  RAW=$(dpkg --print-architecture 2>/dev/null || uname -m); "
+        "  case \"$RAW\" in "
+        "    amd64|x86_64) CFARCH=amd64;; "
+        "    arm64|aarch64) CFARCH=arm64;; "
+        "    armhf|armv7l|arm) CFARCH=arm;; "
+        "    386|i386|i686) CFARCH=386;; "
+        "    *) echo \"unsupported arch: $RAW\" >&2; exit 3;; "
+        "  esac; "
         "  curl -fsSL "
-        "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-${ARCH} "
-        "  -o /tmp/cloudflared 2>/dev/null && sudo install -m 0755 /tmp/cloudflared /usr/local/bin/cloudflared; "
+        "\"https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-${CFARCH}\" "
+        "  -o /tmp/cloudflared && sudo install -m 0755 /tmp/cloudflared /usr/local/bin/cloudflared; "
         "}"
     )
     append(f"{prefix}Ensuring cloudflared is installed…")

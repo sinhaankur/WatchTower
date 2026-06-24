@@ -289,6 +289,12 @@ async def delete_project(
             detail="Project not found"
         )
     
+    # Tear down any Cloudflare tunnels/records this project's domains own
+    # before the cascade delete drops the rows — otherwise we'd lose the
+    # tunnel id and orphan the connector on the user's CF account.
+    for domain in db.query(CustomDomain).filter(CustomDomain.project_id == project.id).all():
+        _teardown_cloudflare_resources(db, domain)
+
     audit_log.record_for_user(
         db, current_user,
         action="project.delete",
@@ -986,6 +992,38 @@ async def update_domain(
     return domain
 
 
+def _teardown_cloudflare_resources(db: Session, domain: CustomDomain) -> None:
+    """Best-effort cleanup of Cloudflare resources a domain owns before it's
+    deleted. Deletes the Tunnel (if Go Live created one) and the DNS record,
+    so removing a project/domain doesn't orphan billable connectors or stray
+    records on the user's Cloudflare account.
+
+    Never raises — teardown is courtesy cleanup, not a precondition for the
+    local delete. A Cloudflare outage or a since-rotated token must not block
+    the user from removing their own project.
+    """
+    if not domain.cloudflare_credential_id:
+        return
+    try:
+        from watchtower.database import CloudflareCredential
+        from watchtower import cloudflare_dns
+
+        cred = db.query(CloudflareCredential).filter(
+            CloudflareCredential.id == domain.cloudflare_credential_id,
+        ).first()
+        if not cred:
+            return
+        token = util.decrypt_secret(cred.api_token_encrypted)
+        if not token:
+            return
+        if domain.cloudflare_tunnel_id and cred.account_id:
+            cloudflare_dns.delete_tunnel(token, cred.account_id, domain.cloudflare_tunnel_id)
+        if domain.cloudflare_zone_id and domain.cloudflare_record_id:
+            cloudflare_dns.delete_a_record(token, domain.cloudflare_zone_id, domain.cloudflare_record_id)
+    except Exception:  # noqa: BLE001 - cleanup is best-effort, never blocks delete
+        logger.exception("Cloudflare teardown for %s failed (continuing with delete)", domain.domain)
+
+
 @router.delete(
     "/{project_id}/domains/{domain_id}",
     status_code=status.HTTP_204_NO_CONTENT,
@@ -1004,6 +1042,7 @@ async def delete_domain(
     ).first()
     if not domain:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Domain not found")
+    _teardown_cloudflare_resources(db, domain)
     db.delete(domain)
     db.commit()
     logger.info("Domain %s removed from project %s", domain.domain, project_id)

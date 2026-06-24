@@ -206,3 +206,59 @@ def test_go_live_tunnel_mode_automates_when_ready(client: TestClient, db_session
     steps = {s["step"]: s for s in body["steps"]}
     assert steps["public"]["status"] == "ok", steps["public"]
     assert body["overall"] == "live"
+
+    # The tunnel id must be persisted on the domain so it can be torn down
+    # later (not orphaned on the user's Cloudflare account).
+    from watchtower.database import CustomDomain
+    dom = db_session.query(CustomDomain).filter(
+        CustomDomain.project_id == uuid.UUID(p["id"]),
+        CustomDomain.domain == "t.example.com",
+    ).first()
+    db_session.refresh(dom)
+    assert dom.cloudflare_tunnel_id == "tun-1"
+
+
+# ── Teardown on delete ────────────────────────────────────────────────────────
+
+def test_delete_project_tears_down_cloudflare_tunnel(client: TestClient, db_session):
+    """Deleting a project with a tunnel-backed domain must delete the
+    Cloudflare tunnel + record so nothing is orphaned."""
+    from watchtower.database import CloudflareCredential, CustomDomain, Project
+    from watchtower.api import util
+
+    p = _create_project(client, "golive-teardown")
+    proj = db_session.query(Project).filter(Project.id == uuid.UUID(p["id"])).first()
+    cred = CloudflareCredential(
+        org_id=proj.org_id, label="m", account_id="acct-9",
+        api_token_encrypted=util.encrypt_secret("tok"),
+    )
+    db_session.add(cred)
+    db_session.flush()
+    dom = CustomDomain(
+        project_id=proj.id, domain="td.example.com", is_primary=True,
+        cloudflare_credential_id=cred.id, cloudflare_tunnel_id="tun-del",
+        cloudflare_zone_id="zone-1", cloudflare_record_id="rec-1",
+    )
+    db_session.add(dom)
+    db_session.commit()
+
+    with patch("watchtower.cloudflare_dns.delete_tunnel") as del_tunnel, \
+         patch("watchtower.cloudflare_dns.delete_a_record") as del_rec:
+        r = client.delete(f"/api/projects/{p['id']}")
+
+    assert r.status_code == 204, r.text
+    del_tunnel.assert_called_once()
+    assert del_tunnel.call_args.args[2] == "tun-del"
+    del_rec.assert_called_once()
+
+
+def test_delete_project_without_tunnel_skips_cloudflare(client: TestClient, db_session, monkeypatch):
+    """A project with no Cloudflare-backed domain must delete cleanly
+    without touching the CF API."""
+    p = _create_project(client, "golive-plain")
+
+    with patch("watchtower.cloudflare_dns.delete_tunnel") as del_tunnel:
+        r = client.delete(f"/api/projects/{p['id']}")
+
+    assert r.status_code == 204
+    del_tunnel.assert_not_called()

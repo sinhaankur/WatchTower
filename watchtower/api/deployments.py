@@ -962,6 +962,7 @@ async def go_live(
                 domain.cloudflare_zone_id = result.zone_id
                 domain.cloudflare_record_id = result.record_id
                 domain.cloudflare_target_ip = cname_target
+                domain.cloudflare_tunnel_id = tunnel.tunnel_id
                 domain.cloudflare_synced_at = utcnow()
 
                 # Install the connector on the node (best-effort over SSH).
