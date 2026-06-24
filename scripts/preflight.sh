@@ -109,8 +109,15 @@ elif [ "$(uname -s)-$(uname -m)" != "Darwin-arm64" ]; then
 else
   rm -rf "$REPO_ROOT/desktop/dist"
   PACK_LOG=$(mktemp)
-  if (cd "$REPO_ROOT/desktop" && npm run pack -- --mac --arm64) >"$PACK_LOG" 2>&1; then
-    PASS "electron-builder pack succeeded"
+  # Pack WITHOUT code signing. WatchTower ships unsigned (no Apple Developer
+  # ID — see .claude/memory/code_signing_status.md), so the release pack and
+  # CI both build unsigned. Without this, electron-builder tries an ad-hoc
+  # local sign that fails on many dev machines (signApp → readDirectoryAndSign)
+  # and false-fails preflight on something that never ships. The check we
+  # actually care about — the bundled Python imports the critical deps — runs
+  # below regardless of signing.
+  if (cd "$REPO_ROOT/desktop" && CSC_IDENTITY_AUTO_DISCOVERY=false npm run pack -- --mac --arm64) >"$PACK_LOG" 2>&1; then
+    PASS "electron-builder pack succeeded (unsigned — matches release + CI)"
   else
     FAIL "electron-builder pack failed — see $PACK_LOG"
     cat "$PACK_LOG" | tail -20
