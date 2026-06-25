@@ -129,6 +129,21 @@ def pick_free_port() -> int:
         return s.getsockname()[1]
 
 
+def is_port_free(port: int) -> bool:
+    """True if nothing is currently bound on 127.0.0.1:<port>.
+
+    Used to validate a caller-pinned host_port before we try to publish
+    the pod on it — a clearer up-front 'port in use' than a raw podman
+    bind failure mid-create.
+    """
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        try:
+            s.bind(("127.0.0.1", port))
+            return True
+        except OSError:
+            return False
+
+
 # ── Pod / container lifecycle ────────────────────────────────────────────────
 
 

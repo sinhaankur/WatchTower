@@ -81,6 +81,54 @@ def test_create_returns_credentials_once(client, fake_podman):
     assert body["password"] in body["connection_string"]
 
 
+def test_create_with_fixed_host_port_pins_and_persists(client, fake_podman, monkeypatch):
+    """A pinned host_port is used verbatim (stable connection string) and
+    persisted, instead of auto-picking a random port."""
+    # The port-free check uses a real socket bind; force it True so the test
+    # doesn't depend on 55432 actually being free on the CI host.
+    monkeypatch.setattr(runtime, "is_port_free", lambda _p: True)
+    r = client.post(
+        "/api/managed-databases",
+        json={"name": "pinned-db", "host_port": 55432},
+    )
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["port"] == 55432
+    assert ":55432/" in body["connection_string"]
+
+
+def test_create_rejects_host_port_in_use(client, fake_podman, monkeypatch):
+    """A pinned port that's already bound returns a clear 409, not a raw
+    podman bind error."""
+    monkeypatch.setattr(runtime, "is_port_free", lambda _p: False)
+    r = client.post(
+        "/api/managed-databases",
+        json={"name": "busy-port-db", "host_port": 55432},
+    )
+    assert r.status_code == 409
+    assert "in use" in r.json()["detail"].lower()
+
+
+def test_create_without_host_port_auto_picks(client, fake_podman, monkeypatch):
+    """Omitting host_port keeps the existing auto-pick behaviour."""
+    monkeypatch.setattr(runtime, "pick_free_port", lambda: 54321)
+    r = client.post(
+        "/api/managed-databases",
+        json={"name": "auto-port-db"},
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["port"] == 54321
+
+
+def test_create_rejects_out_of_range_host_port(client, fake_podman):
+    """host_port below 1024 is rejected by schema validation (422)."""
+    r = client.post(
+        "/api/managed-databases",
+        json={"name": "lowport-db", "host_port": 80},
+    )
+    assert r.status_code == 422
+
+
 def test_create_rejects_without_runtime(client, no_podman):
     r = client.post("/api/managed-databases", json={"name": "x"})
     assert r.status_code == 400

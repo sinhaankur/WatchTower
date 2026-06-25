@@ -221,6 +221,14 @@ class CreateRequest(BaseModel):
     version: str = Field("16")
     database_name: str = Field("appdb", min_length=1, max_length=63)
     username: str = Field("watchtower", min_length=1, max_length=63)
+    host_port: Optional[int] = Field(
+        default=None, ge=1024, le=65535,
+        description=(
+            "Pin the host port the DB publishes on (e.g. 55432) so the "
+            "connection string stays stable across pod recreates. Omit to "
+            "auto-pick a free port."
+        ),
+    )
 
 
 def _validate_create_input(body: CreateRequest) -> None:
@@ -631,7 +639,22 @@ async def create_database(
     pod = runtime.pod_name(str(row.id))
     container = runtime.container_name(str(row.id))
     volume = runtime.volume_name(str(row.id))
-    port = runtime.pick_free_port()
+    # Caller can pin the host port (stable connection string across pod
+    # recreates); otherwise auto-pick a free one. Validate a pinned port is
+    # actually free so we fail with a clear message instead of a raw podman
+    # bind error mid-create.
+    if body.host_port is not None:
+        if not runtime.is_port_free(body.host_port):
+            row.status = ManagedDatabaseStatus.FAILED
+            row.status_message = f"host_port {body.host_port} is already in use"
+            db.commit()
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Port {body.host_port} is already in use on this host. Pick another or omit host_port to auto-assign.",
+            )
+        port = body.host_port
+    else:
+        port = runtime.pick_free_port()
 
     row.pod_name = pod
     row.container_name = container
