@@ -142,7 +142,43 @@ verify_mac_dmg() {
       FAIL "  This is the 1.12.0-class bug. Block release."
     fi
   fi
+  verify_bundle_contents "$dmg" "$mount_point/WatchTower.app/Contents/Resources/python"
   hdiutil detach "$mount_point" 2>/dev/null || true
+}
+
+# Stale-bundle guard. A DMG can carry the right ARCH but a stale Python
+# bundle — wrong watchtower __version__ and an incomplete alembic/versions
+# set. That's the 1.16.3 incident: a 1.14.4 bundle whose migrations stopped
+# before the user's DB revision, so the app crashed on every launch with
+# "Can't locate revision". Arch checks never see it. This does.
+verify_bundle_contents() {
+  local label="$1"
+  local python_root="$2"
+  local wt_init
+  wt_init=$(find "$python_root" -path '*/site-packages/watchtower/__init__.py' 2>/dev/null | head -1)
+  if [ -z "$wt_init" ]; then
+    FAIL "$label: bundled watchtower package not found under $python_root"
+    return 1
+  fi
+  # Version must match the tag.
+  local bundle_ver
+  bundle_ver=$(grep -E '^__version__' "$wt_init" | sed -E 's/.*"([^"]+)".*/\1/')
+  if [ "$bundle_ver" = "$VERSION" ]; then
+    PASS "$label: bundled watchtower __version__ = $bundle_ver (matches tag)"
+  else
+    FAIL "$label: bundled watchtower __version__ = '$bundle_ver' but tag is $VERSION — STALE BUNDLE. Block release."
+  fi
+  # Migration count must match the repo (incomplete migrations crash on
+  # users whose DB is past the bundle's last revision).
+  local repo_mig bundle_mig vers_dir
+  vers_dir="$(dirname "$wt_init")/alembic/versions"
+  repo_mig=$(ls "$REPO_ROOT"/alembic/versions/*.py 2>/dev/null | grep -v __pycache__ | wc -l | tr -d ' ')
+  bundle_mig=$(ls "$vers_dir"/*.py 2>/dev/null | grep -v __pycache__ | wc -l | tr -d ' ')
+  if [ "$bundle_mig" = "$repo_mig" ]; then
+    PASS "$label: $bundle_mig alembic migrations bundled (matches repo)"
+  else
+    FAIL "$label: bundle has $bundle_mig migrations, repo has $repo_mig — INCOMPLETE. Users past the bundle's head will crash. Block release."
+  fi
 }
 
 # Linux AppImage — extract the embedded squashfs and check the .so arch.

@@ -107,6 +107,29 @@ if [ -n "${SKIP_PACK:-}" ]; then
 elif [ "$(uname -s)-$(uname -m)" != "Darwin-arm64" ]; then
   WARN "Not on Darwin-arm64 — skipping local pack (CI will catch other-arch issues)"
 else
+  # Stale-bundle guard. electron-builder packs whatever sits in
+  # desktop/python-bundle — if that bundle is from an OLD build (stale
+  # watchtower code + incomplete migrations), the DMG passes arch checks but
+  # crashes users whose DB is past the bundle's last migration. This is the
+  # 1.16.3 incident (a 1.14.4 bundle reused locally). Refuse to pack on a
+  # stale/missing bundle; CI always rebuilds fresh, but local packs must too.
+  BUNDLE_INIT=$(find "$REPO_ROOT/desktop/python-bundle" -path '*/site-packages/watchtower/__init__.py' 2>/dev/null | head -1)
+  if [ -z "$BUNDLE_INIT" ]; then
+    WARN "No desktop/python-bundle found — run scripts/build-python-bundle.sh before packing (CI builds it fresh; the local pack needs it too)"
+  else
+    BUNDLE_VER=$(grep -E '^__version__' "$BUNDLE_INIT" | sed -E 's/.*"([^"]+)".*/\1/')
+    if [ "$BUNDLE_VER" = "$PKG_VERSION" ]; then
+      PASS "Python bundle is fresh (watchtower $BUNDLE_VER matches repo)"
+    else
+      FAIL "Python bundle is STALE: bundles watchtower $BUNDLE_VER but repo is $PKG_VERSION"
+      echo "    Rebuild it before packing:  ./scripts/build-python-bundle.sh"
+      echo "    (A stale bundle ships old code + incomplete migrations → users crash on launch.)"
+      echo
+      echo "Aborting: refusing to pack a stale Python bundle."
+      exit 1
+    fi
+  fi
+
   rm -rf "$REPO_ROOT/desktop/dist"
   PACK_LOG=$(mktemp)
   # Pack WITHOUT code signing. WatchTower ships unsigned (no Apple Developer
