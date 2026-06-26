@@ -29,6 +29,7 @@ from watchtower import managed_db_backup as backup
 from watchtower import managed_db_backup_scheduler as backup_scheduler
 from watchtower import managed_db_replication as replication
 from watchtower import managed_db_runtime as runtime
+from watchtower import tailscale as ts
 from watchtower.api import audit as audit_log
 from watchtower.api import util
 from watchtower.api.util import utcnow
@@ -824,13 +825,47 @@ async def delete_database(
     return {"ok": True, "id": str(db_id), "purged_volume": purge}
 
 
-# ── Replicas (HA v1: Postgres streaming replication, single-PC) ──────────────
+# ── Replicas (HA: Postgres streaming replication, local + remote via Tailscale)
+
+
+class TailscalePeerResponse(BaseModel):
+    hostname: str
+    tailscale_ip: str
+    online: bool
+    os: str
+
+
+@router.get("/tailscale-peers", response_model=list[TailscalePeerResponse])
+async def list_tailscale_peers(
+    _current_user: dict = Depends(util.get_current_user),
+) -> list[TailscalePeerResponse]:
+    """Return Tailscale peers visible from this machine.
+
+    Used by the Add Replica modal to populate the remote-node picker.
+    Returns an empty list (not an error) when Tailscale is not running.
+    """
+    return [
+        TailscalePeerResponse(
+            hostname=p.hostname,
+            tailscale_ip=p.tailscale_ip,
+            online=p.online,
+            os=p.os,
+        )
+        for p in ts.peers()
+    ]
 
 
 class CreateReplicaRequest(BaseModel):
     name: Optional[str] = Field(
         default=None, max_length=64,
         description="Display name. Auto-generated from the primary's name if omitted.",
+    )
+    node_tailscale_ip: Optional[str] = Field(
+        default=None,
+        description=(
+            "Tailscale IP of the remote machine that will run the standby "
+            "(e.g. '100.91.27.70'). Omit for a local same-host standby (v1 behaviour)."
+        ),
     )
 
 
@@ -846,6 +881,8 @@ class ReplicaResponse(BaseModel):
     pod_name: str
     container_name: str
     replication_slot_name: str
+    is_remote: bool = False
+    node_tailscale_ip: Optional[str] = None
     last_lag_seconds: Optional[int] = None
     last_health_check: Optional[str] = None
     created_at: Optional[str] = None
@@ -865,6 +902,8 @@ def _serialize_replica(r: ManagedDatabaseReplica) -> ReplicaResponse:
         pod_name=r.pod_name,
         container_name=r.container_name,
         replication_slot_name=r.replication_slot_name,
+        is_remote=bool(r.is_remote),
+        node_tailscale_ip=r.node_tailscale_ip,
         last_lag_seconds=r.last_lag_seconds,
         last_health_check=r.last_health_check.isoformat() if r.last_health_check else None,
         created_at=r.created_at.isoformat() if r.created_at else None,
@@ -964,8 +1003,12 @@ async def add_replica(
     row.volume_name = runtime.volume_name(str(row.id))
     row.replication_slot_name = slot_name
 
+    is_remote = bool(body.node_tailscale_ip)
+    row.is_remote = is_remote
+    row.node_tailscale_ip = body.node_tailscale_ip or None
+
     try:
-        # Steps 1-3: prep the primary.
+        # Steps 1-3: prep the primary (same for local and remote).
         replication.configure_primary_for_replication(
             primary.container_name, primary.username, primary.database_name,
         )
@@ -977,20 +1020,29 @@ async def add_replica(
             primary.container_name, primary.username, primary.database_name,
             slot_name,
         )
-        replication.allow_replication_in_pg_hba(primary.container_name)
-
-        # Steps 4-5: bootstrap + start the standby.
-        spec = replication.StandbySpec(
-            replica_id=str(row.id),
-            image=primary.image,
-            primary_host="127.0.0.1",
-            primary_port=primary.port,
-            replica_port=row.port,
-            repl_user=repl_user,
-            repl_password=repl_password,
-            slot_name=slot_name,
+        replication.allow_replication_in_pg_hba(
+            primary.container_name,
+            remote_cidr="100.64.0.0/10" if is_remote else None,
         )
-        replication.provision_standby(spec)
+
+        if is_remote:
+            # Remote path (v2): store encrypted password for compose download.
+            # pg_basebackup runs on the remote machine via the compose file.
+            row.replication_password_enc = util.encrypt_secret(repl_password)
+        else:
+            # Local path (v1): bootstrap + start standby on this host.
+            spec = replication.StandbySpec(
+                replica_id=str(row.id),
+                image=primary.image,
+                primary_host="127.0.0.1",
+                primary_port=primary.port,
+                replica_port=row.port,
+                repl_user=repl_user,
+                repl_password=repl_password,
+                slot_name=slot_name,
+            )
+            replication.provision_standby(spec)
+
     except replication.ReplicationError as exc:
         row.status = ReplicaStatus.FAILED
         row.status_message = str(exc)[:500]
@@ -1001,8 +1053,15 @@ async def add_replica(
             detail=str(exc),
         ) from exc
 
-    row.status = ReplicaStatus.STREAMING
-    row.status_message = None
+    if is_remote:
+        row.status = ReplicaStatus.INITIALIZING
+        row.status_message = (
+            "Remote standby: download the compose file and run it on the remote machine. "
+            "Status will show STREAMING once the standby connects."
+        )
+    else:
+        row.status = ReplicaStatus.STREAMING
+        row.status_message = None
     row.last_status_at = utcnow()
 
     audit_log.record_for_user(
@@ -1021,6 +1080,115 @@ async def add_replica(
     )
     db.commit()
     return _serialize_replica(row)
+
+
+@router.get("/{db_id}/replicas/{replica_id}/compose")
+async def get_replica_compose(
+    db_id: UUID,
+    replica_id: UUID,
+    db: Session = Depends(get_db),
+    _current_user: dict = Depends(util.get_current_user),
+):
+    """Return the docker-compose YAML for a remote standby replica.
+
+    The response is a zip archive containing:
+      - docker-compose.standby.yml
+      - init-standby.sh
+
+    Only available for remote replicas (is_remote=True).
+    """
+    from fastapi.responses import StreamingResponse
+    import io, zipfile
+
+    primary = _get_or_404(db, db_id)
+    replica = db.query(ManagedDatabaseReplica).filter(
+        ManagedDatabaseReplica.id == util.to_uuid(replica_id),
+        ManagedDatabaseReplica.primary_db_id == primary.id,
+    ).first()
+    if not replica:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Replica not found")
+    if not replica.is_remote:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Compose file is only available for remote standbys.",
+        )
+    if not replica.replication_password_enc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Replication credentials not stored. Re-create the replica.",
+        )
+
+    repl_password = util.decrypt_secret(replica.replication_password_enc)
+    primary_ts_ip = ts.local_ip() or "REPLACE_WITH_PRIMARY_TAILSCALE_IP"
+
+    compose_content = replication.build_remote_standby_compose(
+        primary_tailscale_ip=primary_ts_ip,
+        primary_port=primary.port,
+        repl_user=f"watchtower_repl_{str(replica.id).replace('-', '')[:12]}",
+        repl_password=repl_password,
+        slot_name=replica.replication_slot_name,
+        image=primary.image,
+    )
+    init_script = replication.build_remote_standby_init_script()
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr("docker-compose.standby.yml", compose_content)
+        zf.writestr("init-standby.sh", init_script)
+    buf.seek(0)
+
+    filename = f"standby-{replica.name.replace(' ', '_')}.zip"
+    return StreamingResponse(
+        buf,
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.get("/{db_id}/replicas/{replica_id}/lag")
+async def get_replica_lag(
+    db_id: UUID,
+    replica_id: UUID,
+    db: Session = Depends(get_db),
+    _current_user: dict = Depends(util.get_current_user),
+):
+    """Query live replication lag from the primary's pg_stat_replication."""
+    primary = _get_or_404(db, db_id)
+    replica = db.query(ManagedDatabaseReplica).filter(
+        ManagedDatabaseReplica.id == util.to_uuid(replica_id),
+        ManagedDatabaseReplica.primary_db_id == primary.id,
+    ).first()
+    if not replica:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Replica not found")
+
+    sql = (
+        f"SELECT state, sent_lsn::text, write_lsn::text, replay_lsn::text, "
+        f"EXTRACT(EPOCH FROM write_lag)::int AS write_lag_seconds "
+        f"FROM pg_stat_replication WHERE slot_name = '{replica.replication_slot_name}'"
+    )
+    rc, out, _err = replication._psql_in_container(
+        primary.container_name, primary.username, primary.database_name, sql,
+    )
+    if rc != 0 or not out.strip():
+        return {"state": "unknown", "write_lag_seconds": None, "connected": False}
+
+    parts = out.strip().split("|")
+    lag_s = int(parts[4]) if len(parts) > 4 and parts[4].strip().lstrip("-").isdigit() else None
+
+    # Persist the last observed lag on the replica row.
+    if lag_s is not None:
+        replica.last_lag_seconds = lag_s
+        replica.last_health_check = utcnow()
+        db.commit()
+
+    return {
+        "connected": True,
+        "state": parts[0].strip() if parts else "unknown",
+        "sent_lsn": parts[1].strip() if len(parts) > 1 else None,
+        "write_lsn": parts[2].strip() if len(parts) > 2 else None,
+        "replay_lsn": parts[3].strip() if len(parts) > 3 else None,
+        "write_lag_seconds": lag_s,
+    }
 
 
 @router.post("/{db_id}/replicas/{replica_id}/promote", response_model=ReplicaResponse)

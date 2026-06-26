@@ -7,7 +7,7 @@
     "name": "The WatchTower Authors",
     "email": "opensource@sinhaankur.dev"
   },
-  "homepage": "https://github.com/sinhaankur/WatchTower",
+  "homepage": "https://github.com/Node2-io/WatchTowerOps",
   "main": "main.js",
   "scripts": {
     "start": "node scripts/start-electron.js",
@@ -68,8 +68,8 @@
     "publish": [
       {
         "provider": "github",
-        "owner": "sinhaankur",
-        "repo": "WatchTower",
+        "owner": "Node2-io",
+        "repo": "WatchTowerOps",
         "releaseType": "release"
       }
     ],
@@ -80,26 +80,6 @@
         "zip"
       ],
       "category": "public.app-category.developer-tools"
-    },
-    "dmg": {
-      "background": "build/installer/dmg-background.png",
-      "window": {
-        "width": 600,
-        "height": 400
-      },
-      "contents": [
-        {
-          "x": 156,
-          "y": 200,
-          "type": "file"
-        },
-        {
-          "x": 416,
-          "y": 200,
-          "type": "link",
-          "path": "/Applications"
-        }
-      ]
     },
     "linux": {
       "maintainer": "The WatchTower Authors <opensource@sinhaankur.dev>",
@@ -131,6 +111,26 @@
       "shortcutName": "WatchTower",
       "installerSidebar": "build/installer/nsis-sidebar.png",
       "uninstallerSidebar": "build/installer/nsis-sidebar.png"
+    },
+    "dmg": {
+      "background": "build/installer/dmg-background.png",
+      "window": {
+        "width": 600,
+        "height": 400
+      },
+      "contents": [
+        {
+          "x": 156,
+          "y": 200,
+          "type": "file"
+        },
+        {
+          "x": 416,
+          "y": 200,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ]
     }
   }
 }

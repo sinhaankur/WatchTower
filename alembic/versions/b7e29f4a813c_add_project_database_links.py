@@ -27,7 +27,7 @@ def upgrade() -> None:
         sa.Column('managed_database_id', sa.Uuid(as_uuid=True), sa.ForeignKey('managed_databases.id'), nullable=True),
         sa.Column('external_database_id', sa.Uuid(as_uuid=True), sa.ForeignKey('external_databases.id'), nullable=True),
         sa.Column('env_var_name', sa.String(), nullable=False, server_default='DATABASE_URL'),
-        sa.Column('is_active', sa.Boolean(), nullable=False, server_default=sa.text('1')),
+        sa.Column('is_active', sa.Boolean(), nullable=False, server_default=sa.true()),
         sa.Column('notes', sa.String(), nullable=True),
         sa.Column('created_by_user_id', sa.Uuid(as_uuid=True), sa.ForeignKey('users.id'), nullable=True),
         sa.Column('created_at', sa.DateTime(), nullable=True),

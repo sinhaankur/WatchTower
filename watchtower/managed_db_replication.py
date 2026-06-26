@@ -1,15 +1,24 @@
-"""Postgres streaming replication for managed databases (v1: single-PC).
+"""Postgres streaming replication for managed databases.
 
-Scope (v1):
+Scope (v1 — single-PC):
   * Postgres only. Other engines have very different replication models
     (MySQL binlog, Mongo oplog/replsets, Redis), so we land Postgres
     correctly first and generalise later.
   * Both pods on the same host. The standby connects to the primary at
-    `127.0.0.1:<primary_port>` over the host network. v2 will add a
-    `node_id` so standbys run on remote PCs reachable via Tailscale.
+    `127.0.0.1:<primary_port>` over the host network.
   * Manual failover only. The endpoint runs `pg_promote()` on the
     standby; the caller is responsible for switching app connection
     strings. Automatic failover with witness quorum is v3.
+
+Scope (v2 — remote standby via Tailscale):
+  * `allow_replication_in_pg_hba` now accepts a `remote_cidr` param —
+    pass "100.64.0.0/10" to open the Tailscale CGNAT range.
+  * `build_remote_standby_compose` generates a docker-compose file the
+    user runs on the remote machine (Mac / other Linux PC). The remote
+    machine runs `pg_basebackup` on first boot and then streams WAL.
+  * `provision_standby` is local-only (v1). Remote provisioning is
+    handled by the compose-file handoff — the API surfaces it as a
+    downloadable artifact.
 
 The setup flow is delicate, so it's worth spelling out:
 
@@ -218,22 +227,37 @@ def create_replication_slot(
         )
 
 
-def allow_replication_in_pg_hba(primary_container: str) -> None:
-    """Append a `host replication` rule to pg_hba.conf and reload.
+def allow_replication_in_pg_hba(
+    primary_container: str,
+    remote_cidr: str | None = None,
+) -> None:
+    """Append `host replication` rules to pg_hba.conf and reload.
 
-    Idempotent — we check for our sentinel comment before appending so
-    re-running doesn't bloat the file.
+    Idempotent — checks for a sentinel comment before appending.
+
+    Args:
+        primary_container: Running Postgres container name.
+        remote_cidr: Extra CIDR to allow in addition to loopback —
+            pass ``"100.64.0.0/10"`` (Tailscale CGNAT range) when
+            provisioning a remote standby on another machine in the
+            tailnet.
     """
     bin_ = _podman()
     sentinel = "# watchtower-managed-db replication rule"
-    # Postgres reads pg_hba.conf top-down. Adding our rule at the end
-    # is fine because there's no `reject` rule above that would block
-    # the replication user.
+    extra = ""
+    if remote_cidr:
+        extra = (
+            f"  echo '# watchtower remote standby via Tailscale' "
+            f">> /var/lib/postgresql/data/pg_hba.conf; "
+            f"  echo 'host replication all {remote_cidr} scram-sha-256' "
+            f">> /var/lib/postgresql/data/pg_hba.conf; "
+        )
     sql_check = (
         f"if ! grep -q '{sentinel}' /var/lib/postgresql/data/pg_hba.conf; then "
         f"  echo '{sentinel}' >> /var/lib/postgresql/data/pg_hba.conf; "
         f"  echo 'host replication all 127.0.0.1/32 md5' >> /var/lib/postgresql/data/pg_hba.conf; "
         f"  echo 'host replication all ::1/128 md5' >> /var/lib/postgresql/data/pg_hba.conf; "
+        f"{extra}"
         f"fi"
     )
     rc, _out, err = runtime._run(
@@ -251,8 +275,6 @@ def allow_replication_in_pg_hba(primary_container: str) -> None:
         "SELECT pg_reload_conf()",
     )
     if rc != 0:
-        # Soft fail: the rule is written; reload will happen on the
-        # next restart. Log so the operator knows.
         logger.warning(
             "Failed to reload primary pg_hba: %s. Replication will work "
             "after the next primary restart.", err.strip()
@@ -366,6 +388,96 @@ def provision_standby(spec: StandbySpec) -> tuple[str, str, str]:
     return pod, container, volume
 
 
+# ── Remote standby (v2 — Tailscale compose handoff) ──────────────────────────
+
+def build_remote_standby_init_script() -> str:
+    """Return the shell init script that goes alongside the compose file.
+
+    On first boot (empty PGDATA) it runs ``pg_basebackup`` from the primary
+    over Tailscale, then starts Postgres in standby mode.  On subsequent
+    restarts it just starts Postgres directly.
+    """
+    return """\
+#!/bin/sh
+# WatchTower-generated init script for a remote Postgres streaming standby.
+# Save alongside docker-compose.standby.yml, chmod +x, then: docker compose up -d
+set -e
+
+if [ -z "$(ls -A "$PGDATA")" ]; then
+    echo "[wt-standby] PGDATA empty — running pg_basebackup from $PRIMARY_HOST:$PRIMARY_PORT ..."
+    PGPASSWORD="$REPL_PASSWORD" pg_basebackup \\
+        -h "$PRIMARY_HOST" \\
+        -p "$PRIMARY_PORT" \\
+        -U "$REPL_USER" \\
+        -D "$PGDATA" \\
+        -S "$SLOT_NAME" \\
+        -X stream \\
+        -R \\
+        -P
+    echo "[wt-standby] pg_basebackup complete — starting standby ..."
+fi
+
+exec docker-entrypoint.sh postgres
+"""
+
+
+def build_remote_standby_compose(
+    primary_tailscale_ip: str,
+    primary_port: int,
+    repl_user: str,
+    repl_password: str,
+    slot_name: str,
+    image: str,
+    replica_port: int = 5433,
+) -> str:
+    """Return a docker-compose YAML string for a remote Postgres standby.
+
+    The caller packages this with :func:`build_remote_standby_init_script`
+    into a zip the user downloads and runs on the remote machine::
+
+        chmod +x init-standby.sh
+        docker compose -f docker-compose.standby.yml up -d
+
+    On first boot the init script runs ``pg_basebackup`` against the primary
+    via Tailscale, then starts Postgres in standby mode.  On subsequent
+    restarts it just starts Postgres directly.
+    """
+    lines = [
+        "# WatchTower-generated remote standby compose file.",
+        f"# Primary Tailscale IP: {primary_tailscale_ip}:{primary_port}",
+        f"# Replication slot: {slot_name}",
+        "#",
+        "# 1. Save alongside init-standby.sh",
+        "# 2. chmod +x init-standby.sh",
+        "# 3. docker compose -f docker-compose.standby.yml up -d",
+        "",
+        'version: "3.9"',
+        "",
+        "services:",
+        "  standby:",
+        f"    image: {image}",
+        "    container_name: wt-standby",
+        "    restart: unless-stopped",
+        "    ports:",
+        f'      - "{replica_port}:5432"',
+        "    volumes:",
+        "      - standby-data:/var/lib/postgresql/data",
+        "      - ./init-standby.sh:/init-standby.sh:ro",
+        '    entrypoint: ["/bin/sh", "/init-standby.sh"]',
+        "    environment:",
+        "      PGDATA: /var/lib/postgresql/data",
+        f"      PRIMARY_HOST: {primary_tailscale_ip}",
+        f'      PRIMARY_PORT: "{primary_port}"',
+        f"      REPL_USER: {repl_user}",
+        f"      REPL_PASSWORD: {repl_password}",
+        f"      SLOT_NAME: {slot_name}",
+        "",
+        "volumes:",
+        "  standby-data:",
+    ]
+    return "\n".join(lines) + "\n"
+
+
 # ── Failover ─────────────────────────────────────────────────────────────────
 
 
@@ -419,6 +531,103 @@ def generate_replication_password() -> str:
     """URL-safe so it survives a stray shell-interpolation later
     (we still quote in SQL); long enough that brute force is moot."""
     return secrets.token_urlsafe(32)
+
+
+def build_remote_standby_compose(
+    *,
+    primary_tailscale_ip: str,
+    primary_port: int,
+    repl_user: str,
+    repl_password: str,
+    slot_name: str,
+    image: str,
+    replica_port: int = 5432,
+) -> str:
+    """Return a docker-compose YAML string the user runs on the remote machine.
+
+    The generated compose uses an init script that:
+      1. Waits for the primary to be reachable via Tailscale.
+      2. Runs pg_basebackup -R (writes standby.signal + primary_conninfo).
+      3. Hands off to the normal postgres entrypoint (which starts in standby mode).
+
+    The caller is responsible for surfacing this to the user (download
+    endpoint, copy-to-clipboard, etc.).
+    """
+    init_script = (
+        "#!/bin/bash\\n"
+        "set -e\\n"
+        "if [ -z \\\"$(ls -A \\$PGDATA)\\\" ]; then\\n"
+        "  echo 'Standby: waiting for primary...'\\n"
+        "  until pg_isready -h \\\"\\$PRIMARY_HOST\\\" -p \\\"\\$PRIMARY_PORT\\\" 2>/dev/null; do\\n"
+        "    sleep 2\\n"
+        "  done\\n"
+        "  echo 'Standby: running pg_basebackup...'\\n"
+        "  PGPASSWORD=\\\"\\$REPLICATION_PASSWORD\\\" pg_basebackup \\\\\\n"
+        "    -h \\\"\\$PRIMARY_HOST\\\" -p \\\"\\$PRIMARY_PORT\\\" \\\\\\n"
+        "    -U \\\"\\$REPLICATION_USER\\\" \\\\\\n"
+        "    -D \\\"\\$PGDATA\\\" -S \\\"\\$SLOT_NAME\\\" \\\\\\n"
+        "    -X stream -R -P\\n"
+        "  echo 'Standby: base backup complete.'\\n"
+        "fi\\n"
+    )
+    return f"""version: "3.9"
+# WatchTower-generated standby compose — run on the remote machine.
+# Primary: {primary_tailscale_ip}:{primary_port}
+# Replication slot: {slot_name}
+#
+# Steps:
+#   1. Make sure Tailscale is connected on this machine.
+#   2. Copy this file and the init script to the remote machine.
+#   3. Run: docker compose -f docker-compose.standby.yml up -d
+
+services:
+  postgres-standby:
+    image: {image}
+    container_name: watchtower-standby-{slot_name[:16]}
+    restart: unless-stopped
+    ports:
+      - "{replica_port}:5432"
+    environment:
+      POSTGRES_PASSWORD: standby_local_only
+      PGDATA: /var/lib/postgresql/data
+      PRIMARY_HOST: {primary_tailscale_ip}
+      PRIMARY_PORT: "{primary_port}"
+      REPLICATION_USER: {repl_user}
+      REPLICATION_PASSWORD: {repl_password}
+      SLOT_NAME: {slot_name}
+    volumes:
+      - standby_data:/var/lib/postgresql/data
+      - ./init-standby.sh:/docker-entrypoint-initdb.d/init-standby.sh
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  standby_data:
+    name: watchtower-standby-{slot_name[:16]}
+"""
+
+
+def build_remote_standby_init_script() -> str:
+    """Return the init-standby.sh content to place alongside the compose file."""
+    return """#!/bin/bash
+set -e
+if [ -z "$(ls -A "$PGDATA")" ]; then
+  echo "Standby: waiting for primary at $PRIMARY_HOST:$PRIMARY_PORT..."
+  until pg_isready -h "$PRIMARY_HOST" -p "$PRIMARY_PORT" 2>/dev/null; do
+    sleep 2
+  done
+  echo "Standby: running pg_basebackup..."
+  PGPASSWORD="$REPLICATION_PASSWORD" pg_basebackup \\
+    -h "$PRIMARY_HOST" -p "$PRIMARY_PORT" \\
+    -U "$REPLICATION_USER" \\
+    -D "$PGDATA" -S "$SLOT_NAME" \\
+    -X stream -R -P
+  echo "Standby: base backup complete, streaming replication configured."
+fi
+"""
 
 
 def drop_replication_slot_best_effort(

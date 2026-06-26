@@ -37,6 +37,8 @@ export const queryKeys = {
   managedDbRuntime: ['managed-databases', 'runtime'] as const,
   managedDbEngines: ['managed-databases', 'engines'] as const,
   managedDbReplicas: (id: string) => ['managed-databases', id, 'replicas'] as const,
+  managedDbReplicaLag: (dbId: string, replicaId: string) => ['managed-databases', dbId, 'replicas', replicaId, 'lag'] as const,
+  tailscalePeers: ['managed-databases', 'tailscale-peers'] as const,
   managedDbBackups: (id: string) => ['managed-databases', id, 'backups'] as const,
   managedDbBackupUsage: (id: string) => ['managed-databases', id, 'backups', 'usage'] as const,
   managedDbSchedule: (id: string) => ['managed-databases', id, 'schedule'] as const,
@@ -605,11 +607,38 @@ export type ManagedDbReplica = {
   pod_name: string;
   container_name: string;
   replication_slot_name: string;
+  is_remote: boolean;
+  node_tailscale_ip: string | null;
   last_lag_seconds: number | null;
   last_health_check: string | null;
   created_at: string | null;
   updated_at: string | null;
 };
+
+export type TailscalePeer = {
+  hostname: string;
+  tailscale_ip: string;
+  online: boolean;
+  os: string;
+};
+
+export type ReplicaLag = {
+  connected: boolean;
+  state: string;
+  sent_lsn: string | null;
+  write_lsn: string | null;
+  replay_lsn: string | null;
+  write_lag_seconds: number | null;
+};
+
+export function useTailscalePeers() {
+  return useQuery<TailscalePeer[]>({
+    queryKey: queryKeys.tailscalePeers,
+    queryFn: async () =>
+      (await apiClient.get<TailscalePeer[]>('/managed-databases/tailscale-peers')).data,
+    staleTime: 30_000,
+  });
+}
 
 export function useManagedDbReplicas(primaryId: string, enabled: boolean = true) {
   return useQuery<ManagedDbReplica[]>({
@@ -621,9 +650,20 @@ export function useManagedDbReplicas(primaryId: string, enabled: boolean = true)
   });
 }
 
+export function useReplicaLag(dbId: string, replicaId: string, enabled: boolean = true) {
+  return useQuery<ReplicaLag>({
+    queryKey: queryKeys.managedDbReplicaLag(dbId, replicaId),
+    queryFn: async () =>
+      (await apiClient.get<ReplicaLag>(`/managed-databases/${dbId}/replicas/${replicaId}/lag`)).data,
+    enabled,
+    staleTime: 10_000,
+    refetchInterval: enabled ? 15_000 : false,
+  });
+}
+
 export function useAddReplica(primaryId: string) {
   const qc = useQueryClient();
-  return useMutation<ManagedDbReplica, unknown, { name?: string }>({
+  return useMutation<ManagedDbReplica, unknown, { name?: string; node_tailscale_ip?: string }>({
     mutationFn: async (input) =>
       (await apiClient.post<ManagedDbReplica>(
         `/managed-databases/${primaryId}/replicas`,
@@ -631,7 +671,6 @@ export function useAddReplica(primaryId: string) {
       )).data,
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: queryKeys.managedDbReplicas(primaryId) });
-      // Promotion shifts the primary's state; refresh that list too.
       void qc.invalidateQueries({ queryKey: queryKeys.managedDatabases });
     },
   });

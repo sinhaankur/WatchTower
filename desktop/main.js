@@ -102,7 +102,7 @@ const NPM_BIN = resolveNpm();
 // ── Auto-updater (GitHub Releases) ──────────────────────────────────────────
 // electron-updater checks the GitHub Release for a newer version and
 // downloads + installs it automatically. The publish config in package.json
-// points at sinhaankur/WatchTower — the same repo that release.yml pushes to.
+// points at Node2-io/WatchTowerOps — the same repo that release.yml pushes to.
 let autoUpdater = null;
 try {
   ({ autoUpdater } = require('electron-updater'));
@@ -301,7 +301,7 @@ async function applyMacUpdate(targetVersion, parentWindow, onProgress) {
   }
   const arch = macDmgArch();
   const dmgFilename = `WatchTower-${targetVersion}-mac-${arch}.dmg`;
-  const url = `https://github.com/sinhaankur/WatchTower/releases/download/v${targetVersion}/${dmgFilename}`;
+  const url = `https://github.com/Node2-io/WatchTowerOps/releases/download/v${targetVersion}/${dmgFilename}`;
   const cacheDir = path.join(os.homedir(), 'Library', 'Caches', 'WatchTower');
   fs.mkdirSync(cacheDir, { recursive: true });
   const dmgPath = path.join(cacheDir, dmgFilename);
@@ -324,7 +324,7 @@ async function applyMacUpdate(targetVersion, parentWindow, onProgress) {
         defaultId: 0,
         cancelId: 1,
       }).then(({ response }) => {
-        if (response === 0) shell.openExternal(`https://github.com/sinhaankur/WatchTower/releases/tag/v${targetVersion}`);
+        if (response === 0) shell.openExternal(`https://github.com/Node2-io/WatchTowerOps/releases/tag/v${targetVersion}`);
       }).catch(() => {});
     }
     return false;
@@ -380,7 +380,7 @@ function checkForAppUpdates(win) {
       const buttons = isMac
         ? ['Restart and Install', 'Download Manually', 'Later']
         : ['Restart and Install', 'Later'];
-      const releaseUrl = `https://github.com/sinhaankur/WatchTower/releases/tag/v${info.version}`;
+      const releaseUrl = `https://github.com/Node2-io/WatchTowerOps/releases/tag/v${info.version}`;
       dialog.showMessageBox(mainWindow || win, {
         type: 'info',
         title: 'WatchTower update ready',
@@ -427,7 +427,7 @@ function checkForAppUpdates(win) {
       // that happen mid-download (after update-available fired). The
       // initial "no update" check failures are still silent.
       if (mainWindow && !mainWindow.isDestroyed()) {
-        const releaseUrl = 'https://github.com/sinhaankur/WatchTower/releases/latest';
+        const releaseUrl = 'https://github.com/Node2-io/WatchTowerOps/releases/latest';
         dialog.showMessageBox(mainWindow, {
           type: 'warning',
           title: 'Auto-update failed',
@@ -468,11 +468,11 @@ function checkForUpdatesViaGitHubAPI(win, interactive) {
   if (!win || win.isDestroyed()) return;
 
   const currentVersion = app.getVersion(); // from desktop/package.json
-  const apiUrl = 'https://api.github.com/repos/sinhaankur/WatchTower/releases/latest';
+  const apiUrl = 'https://api.github.com/repos/Node2-io/WatchTowerOps/releases/latest';
 
   const options = {
     hostname: 'api.github.com',
-    path: '/repos/sinhaankur/WatchTower/releases/latest',
+    path: '/repos/Node2-io/WatchTowerOps/releases/latest',
     headers: {
       'User-Agent': `WatchTower-Desktop/${currentVersion}`,
       'Accept': 'application/vnd.github+json',
@@ -500,7 +500,7 @@ function checkForUpdatesViaGitHubAPI(win, interactive) {
         }
         const data = JSON.parse(body);
         const latestTag = (data.tag_name || '').replace(/^v/, '');
-        const releaseUrl = data.html_url || 'https://github.com/sinhaankur/WatchTower/releases';
+        const releaseUrl = data.html_url || 'https://github.com/Node2-io/WatchTowerOps/releases';
         const releaseNotes = (data.body || '').slice(0, 400) || 'See release page for details.';
 
         if (!latestTag) return;
@@ -1556,7 +1556,7 @@ function pythonInstallGuide() {
         'brew install pipx',
         'pipx install watchtower-podman',
       ],
-      docsUrl: 'https://github.com/sinhaankur/WatchTower#macos-installation-app-center',
+      docsUrl: 'https://github.com/Node2-io/WatchTowerOps#macos-installation-app-center',
       // Note: we deliberately do NOT auto-launch xcode-select --install
       // here. That popup is the same one the system /usr/bin/python3
       // stub would have triggered on its own — letting the user drive
@@ -1586,7 +1586,7 @@ function pythonInstallGuide() {
       'sudo apt install -y python3 pipx',
       'pipx install watchtower-podman',
     ],
-    docsUrl: 'https://github.com/sinhaankur/WatchTower#installation',
+    docsUrl: 'https://github.com/Node2-io/WatchTowerOps#installation',
   };
 }
 
@@ -2237,7 +2237,7 @@ ipcMain.handle('wt:updateNow', async (_event, releaseUrl) => {
   if (!mainWindow || mainWindow.isDestroyed()) return { ok: false, error: 'no-window' };
   const safeUrl = typeof releaseUrl === 'string' && releaseUrl
     ? releaseUrl
-    : 'https://github.com/sinhaankur/WatchTower/releases';
+    : 'https://github.com/Node2-io/WatchTowerOps/releases';
   try {
     await runUpdateNow(mainWindow, safeUrl);
     return { ok: true };
@@ -2502,7 +2502,7 @@ async function showLaunchFailureDialog(error, backendLogPath) {
       // backend running (e.g. from a dev clone).
       shell.openExternal('http://127.0.0.1:8000').catch(() => {});
       setTimeout(() => {
-        shell.openExternal('https://github.com/sinhaankur/WatchTower#browser-mode');
+        shell.openExternal('https://github.com/Node2-io/WatchTowerOps#browser-mode');
       }, 250);
       return;
     }
@@ -2525,7 +2525,7 @@ async function showLaunchFailureDialog(error, backendLogPath) {
       } catch (err) {
         console.warn('[WatchTower] Reinstall failed:', err.message);
       }
-      shell.openExternal('https://github.com/sinhaankur/WatchTower/releases/latest');
+      shell.openExternal('https://github.com/Node2-io/WatchTowerOps/releases/latest');
       return;
     }
     return; // Quit
@@ -2545,14 +2545,14 @@ async function showLaunchFailureDialog(error, backendLogPath) {
             buttons: ['Open Release Page', 'Cancel'],
             defaultId: 0,
           }).then(({ response: r }) => {
-            if (r === 0) shell.openExternal('https://github.com/sinhaankur/WatchTower/releases/latest');
+            if (r === 0) shell.openExternal('https://github.com/Node2-io/WatchTowerOps/releases/latest');
           });
           return;
         }
         await applyMacUpdate(latest, null);
       } catch (err) {
         console.warn('[WatchTower] Reinstall failed:', err.message);
-        shell.openExternal('https://github.com/sinhaankur/WatchTower/releases/latest');
+        shell.openExternal('https://github.com/Node2-io/WatchTowerOps/releases/latest');
       }
       return;
     }
@@ -2590,7 +2590,7 @@ async function showLaunchFailureDialog(error, backendLogPath) {
 function fetchLatestReleaseTag() {
   return new Promise((resolve) => {
     const req = https.get(
-      'https://api.github.com/repos/sinhaankur/WatchTower/releases/latest',
+      'https://api.github.com/repos/Node2-io/WatchTowerOps/releases/latest',
       {
         headers: {
           'User-Agent': `WatchTower-Desktop/${app.getVersion()}`,
@@ -2896,7 +2896,7 @@ app.whenReady().then(async () => {
           submenu: [
             {
               label: `${appName} on GitHub`,
-              click: () => shell.openExternal('https://github.com/sinhaankur/WatchTower'),
+              click: () => shell.openExternal('https://github.com/Node2-io/WatchTowerOps'),
             },
             {
               label: 'Open Diagnostics',

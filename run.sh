@@ -96,7 +96,7 @@ cmd_update() {
   # Must be run from a git checkout
   if [[ ! -d "$ROOT/.git" ]]; then
     error "Not a git repository — cannot self-update. Download the latest release from:"
-    echo "  https://github.com/sinhaankur/WatchTower/releases"
+    echo "  https://github.com/Node2-io/WatchTowerOps/releases"
     exit 1
   fi
 
@@ -192,7 +192,7 @@ cmd_stop() {
   kill_port "$API_PORT" && info "Backend stopped." || true
   kill_port "$WEB_PORT" && info "Frontend stopped." || true
   success "Done."
-  exit 0
+  return 0
 }
 
 # ── logs ─────────────────────────────────────────────────────────────────────

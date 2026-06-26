@@ -31,7 +31,7 @@ def upgrade() -> None:
         sa.Column('database_name', sa.String(), nullable=False, server_default=''),
         sa.Column('username', sa.String(), nullable=False, server_default=''),
         sa.Column('password_encrypted', sa.Text(), nullable=False, server_default=''),
-        sa.Column('use_tls', sa.Boolean(), nullable=False, server_default=sa.text('1')),
+        sa.Column('use_tls', sa.Boolean(), nullable=False, server_default=sa.true()),
         sa.Column('notes', sa.String(), nullable=True),
         sa.Column('created_by_user_id', sa.Uuid(as_uuid=True), sa.ForeignKey('users.id'), nullable=True),
         sa.Column('created_at', sa.DateTime(), nullable=True),

@@ -29,7 +29,7 @@ def upgrade() -> None:
         'system_settings',
         sa.Column('key', sa.String(length=100), nullable=False),
         sa.Column('value', sa.Text(), nullable=True),
-        sa.Column('is_secret', sa.Boolean(), nullable=False, server_default=sa.text('0')),
+        sa.Column('is_secret', sa.Boolean(), nullable=False, server_default=sa.false()),
         sa.Column('updated_by_user_id', sa.Uuid(), nullable=True),
         sa.Column('updated_at', sa.DateTime(), nullable=True),
         sa.ForeignKeyConstraint(
@@ -48,7 +48,7 @@ def upgrade() -> None:
         sa.Column('failure_kind', sa.String(length=50), nullable=False),
         sa.Column('cause', sa.Text(), nullable=True),
         sa.Column('fix_description', sa.Text(), nullable=True),
-        sa.Column('auto_applicable', sa.Boolean(), nullable=False, server_default=sa.text('0')),
+        sa.Column('auto_applicable', sa.Boolean(), nullable=False, server_default=sa.false()),
         sa.Column('llm_analysis', sa.Text(), nullable=True),
         sa.Column(
             'status',

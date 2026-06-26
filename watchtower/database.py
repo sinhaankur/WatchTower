@@ -950,6 +950,11 @@ class ManagedDatabaseReplica(Base):
     status_message = Column(String, nullable=True)
     last_status_at = Column(DateTime, nullable=True)
 
+    # v2: remote standby via Tailscale
+    is_remote = Column(Boolean, nullable=False, default=False)
+    node_tailscale_ip = Column(String, nullable=True)   # peer IP e.g. "100.91.27.70"
+    replication_password_enc = Column(Text, nullable=True)  # Fernet-encrypted repl password
+
     # Last observed replay lag, populated by an explicit refresh (not
     # by every list call — querying both DBs on every list would be
     # expensive). NULL means "never measured."
