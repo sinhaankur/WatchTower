@@ -37,6 +37,8 @@
      */
     --border-soft:  45 14% 84%;
     --surface-soft: 45 30% 98%;
+    /* Corner radius scale — primitives derive md/sm from this. */
+    --radius: 0.5rem;
     /* Archetype-level motion + shadow tokens */
     --shadow: 4px 4px 0 0 hsl(0 0% 0% / 1);
     --shadow-hover: 6px 6px 0 0 hsl(0 0% 0% / 1);
