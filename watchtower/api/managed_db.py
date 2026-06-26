@@ -577,8 +577,15 @@ async def runtime_status(
     _current_user: dict = Depends(util.get_current_user),
 ) -> dict:
     """Whether a container runtime is installed. Lets the SPA decide
-    between rendering the create button vs. an install prompt."""
-    return {"available": runtime.have_runtime()}
+    between rendering the create button vs. an install prompt.
+    Also reports Tailscale connectivity so the scan banner can show
+    remote-standby availability."""
+    tailscale_ip = ts.local_ip()
+    return {
+        "available": runtime.have_runtime(),
+        "tailscale_ip": tailscale_ip,
+        "tailscale_connected": tailscale_ip is not None,
+    }
 
 
 @router.get("", response_model=list[ManagedDbResponse])
@@ -742,6 +749,159 @@ async def list_tailscale_peers(
         )
         for p in ts.peers()
     ]
+
+
+class DetectedDbResponse(BaseModel):
+    container_name: str
+    image: str
+    host_port: int
+    db_user: str
+    db_name: str
+    has_password: bool
+    replication_slots: list[str]
+    active_standbys: int
+    already_managed: bool = False
+
+
+@router.get("/scan", response_model=list[DetectedDbResponse])
+async def scan_databases(
+    db: Session = Depends(get_db),
+    _current_user: dict = Depends(util.get_current_user),
+) -> list[DetectedDbResponse]:
+    """Scan for Postgres containers running in Podman that are not yet
+    registered in WatchTower. Returns replication metadata so the operator
+    can decide whether to import.
+
+    Empty list is returned — never an error — when podman is absent or
+    no unmanaged containers are found.
+    """
+    managed_names = {
+        row.container_name
+        for row in db.query(ManagedDatabase.container_name).all()
+    }
+    replica_names = {
+        row.container_name
+        for row in db.query(ManagedDatabaseReplica.container_name).all()
+    }
+    all_managed = managed_names | replica_names
+    detected = runtime.scan_postgres_containers(all_managed)
+    return [
+        DetectedDbResponse(
+            container_name=d.container_name,
+            image=d.image,
+            host_port=d.host_port,
+            db_user=d.db_user,
+            db_name=d.db_name,
+            has_password=d.has_password,
+            replication_slots=d.replication_slots,
+            active_standbys=d.active_standbys,
+        )
+        for d in detected
+    ]
+
+
+class ImportDbRequest(BaseModel):
+    container_name: str
+    display_name: str = Field(max_length=64)
+
+
+@router.post("/import", response_model=ManagedDbResponse, status_code=status.HTTP_201_CREATED)
+async def import_database(
+    body: ImportDbRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(util.get_current_user),
+) -> ManagedDbResponse:
+    """Register an existing Podman container as a WatchTower-managed database.
+
+    We do NOT create or modify the container — it keeps running exactly as
+    the operator set it up. WatchTower just writes a row so the container
+    shows up in the UI and can be started/stopped/monitored from here.
+
+    The row uses ``status_message="Imported from existing container."`` as a
+    marker so the UI can distinguish imported entries from WatchTower-created
+    ones. No migration is needed — the existing table columns are sufficient.
+    """
+    # Reject duplicates: same container_name already tracked
+    existing = (
+        db.query(ManagedDatabase)
+        .filter(ManagedDatabase.container_name == body.container_name)
+        .first()
+    )
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Container '{body.container_name}' is already registered as '{existing.name}'.",
+        )
+
+    # Gather metadata by running a scan limited to this container.
+    # We re-use the scan path so the inspect/env-parsing logic lives in one place.
+    all_managed: set[str] = set()
+    detected_list = runtime.scan_postgres_containers(all_managed)
+    detected = next(
+        (d for d in detected_list if d.container_name == body.container_name),
+        None,
+    )
+    if detected is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=(
+                f"Container '{body.container_name}' is not running or is not a Postgres container."
+            ),
+        )
+
+    # Parse a version string from the image tag (e.g. "postgres:16-alpine" → "16").
+    # Fall back to "unknown" so the column constraint is satisfied.
+    version = "unknown"
+    if ":" in detected.image:
+        tag = detected.image.rsplit(":", 1)[1]
+        v = tag.split("-")[0]
+        if v.isdigit() or (v.replace(".", "").isdigit()):
+            version = v
+
+    # We can't know the password for a container we didn't create, so we store
+    # an empty placeholder encrypted.  The operator can rotate credentials via
+    # standard OS tooling; the WatchTower reveal endpoint will return an empty
+    # string rather than the real secret.
+    placeholder_password = util.encrypt_secret("")
+
+    new_db = ManagedDatabase(
+        name=body.display_name,
+        engine="postgres",
+        version=version,
+        image=detected.image,
+        pod_name=runtime.pod_name(body.container_name),
+        container_name=body.container_name,
+        volume_name=runtime.volume_name(body.container_name),
+        host="127.0.0.1",
+        port=detected.host_port or 5432,
+        database_name=detected.db_name,
+        username=detected.db_user,
+        password_encrypted=placeholder_password,
+        status=ManagedDatabaseStatus.RUNNING,
+        status_message="Imported from existing container.",
+    )
+    db.add(new_db)
+    db.flush()  # populate new_db.id before audit
+
+    audit_log.record_for_user(
+        db,
+        current_user,
+        action="managed_db.import",
+        entity_type="managed_database",
+        entity_id=new_db.id,
+        org_id=getattr(new_db, "org_id", None),
+        request=request,
+        extra={
+            "container_name": body.container_name,
+            "display_name": body.display_name,
+            "image": detected.image,
+            "host_port": detected.host_port,
+        },
+    )
+    db.commit()
+
+    return _serialize(new_db)
 
 
 @router.get("/{db_id}", response_model=ManagedDbResponse)

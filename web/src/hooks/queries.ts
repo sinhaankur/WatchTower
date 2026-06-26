@@ -39,6 +39,7 @@ export const queryKeys = {
   managedDbReplicas: (id: string) => ['managed-databases', id, 'replicas'] as const,
   managedDbReplicaLag: (dbId: string, replicaId: string) => ['managed-databases', dbId, 'replicas', replicaId, 'lag'] as const,
   tailscalePeers: ['managed-databases', 'tailscale-peers'] as const,
+  managedDbScan: ['managed-databases', 'scan'] as const,
   managedDbBackups: (id: string) => ['managed-databases', id, 'backups'] as const,
   managedDbBackupUsage: (id: string) => ['managed-databases', id, 'backups', 'usage'] as const,
   managedDbSchedule: (id: string) => ['managed-databases', id, 'schedule'] as const,
@@ -504,11 +505,17 @@ export type ManagedDatabaseCreateResponse = ManagedDatabase & {
   connection_string: string;
 };
 
+export type ManagedDbRuntime = {
+  available: boolean;
+  tailscale_ip: string | null;
+  tailscale_connected: boolean;
+};
+
 export function useManagedDbRuntime() {
-  return useQuery<{ available: boolean }>({
+  return useQuery<ManagedDbRuntime>({
     queryKey: queryKeys.managedDbRuntime,
     queryFn: async () =>
-      (await apiClient.get<{ available: boolean }>('/managed-databases/runtime')).data,
+      (await apiClient.get<ManagedDbRuntime>('/managed-databases/runtime')).data,
     staleTime: 60 * 1000,
   });
 }
@@ -527,6 +534,39 @@ export function useManagedDbEngines() {
     queryFn: async () =>
       (await apiClient.get<ManagedDbEngine[]>('/managed-databases/engines')).data,
     staleTime: 60 * 60 * 1000,
+  });
+}
+
+export type DetectedDatabase = {
+  container_name: string;
+  image: string;
+  host_port: number;
+  db_user: string;
+  db_name: string;
+  has_password: boolean;
+  replication_slots: string[];
+  active_standbys: number;
+};
+
+export function useScanDatabases(enabled: boolean = false) {
+  return useQuery<DetectedDatabase[]>({
+    queryKey: queryKeys.managedDbScan,
+    queryFn: async () =>
+      (await apiClient.get<DetectedDatabase[]>('/managed-databases/scan')).data,
+    enabled,
+    staleTime: 0,
+  });
+}
+
+export function useImportDatabase() {
+  const qc = useQueryClient();
+  return useMutation<ManagedDatabase, unknown, { container_name: string; display_name: string }>({
+    mutationFn: async (input) =>
+      (await apiClient.post<ManagedDatabase>('/managed-databases/import', input)).data,
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.managedDatabases });
+      void qc.invalidateQueries({ queryKey: queryKeys.managedDbScan });
+    },
   });
 }
 

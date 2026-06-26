@@ -19,6 +19,7 @@ import {
 } from '@/components/SectionDiagrams';
 import {
   type BackupSchedule,
+  type DetectedDatabase,
   type ExternalDatabase,
   type ManagedDatabase,
   type ManagedDatabaseCreateResponse,
@@ -26,10 +27,10 @@ import {
   type ManagedDbReplica,
   useAddReplica,
   useTailscalePeers,
-  useReplicaLag,
   type TailscalePeer,
   useBackupSchedule,
   useCreateBackup,
+  useImportDatabase,
   useUpdateBackupSchedule,
   useCreateExternalDatabase,
   useCreateManagedDatabase,
@@ -48,6 +49,7 @@ import {
   useRemoveReplica,
   useRevealExternalDatabase,
   useRevealManagedDatabase,
+  useScanDatabases,
   useStartManagedDatabase,
   useStopManagedDatabase,
 } from '@/hooks/queries';
@@ -179,12 +181,127 @@ function TabButton({
   );
 }
 
+function ScanBanner({
+  runtime,
+}: {
+  runtime: { available: boolean; tailscale_ip?: string | null; tailscale_connected?: boolean } | undefined;
+}) {
+  const [scanEnabled, setScanEnabled] = useState(false);
+  const { data: detected, refetch, isFetching } = useScanDatabases(scanEnabled);
+  const importDb = useImportDatabase();
+  const [importName, setImportName] = useState<Record<string, string>>({});
+  const [importError, setImportError] = useState<string | null>(null);
+
+  if (!runtime?.available) return null;
+
+  const onScan = async () => {
+    setScanEnabled(true);
+    await refetch();
+  };
+
+  const onImport = async (containerName: string) => {
+    const displayName = importName[containerName]?.trim() || containerName;
+    setImportError(null);
+    try {
+      await importDb.mutateAsync({ container_name: containerName, display_name: displayName });
+    } catch (err: unknown) {
+      const msg =
+        err && typeof err === 'object' && 'response' in err
+          ? ((err as { response?: { data?: { detail?: string } } }).response?.data?.detail ?? String(err))
+          : String(err);
+      setImportError(msg);
+    }
+  };
+
+  return (
+    <div className="mb-4 rounded-xl border border-border bg-white p-4 space-y-3">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-sm font-semibold text-slate-800">Detect existing databases</p>
+          <p className="text-xs text-slate-500 mt-0.5">
+            Find Postgres containers already running in Podman that aren't registered here yet.
+          </p>
+        </div>
+        <button
+          onClick={onScan}
+          disabled={isFetching}
+          className="rounded-lg border border-border bg-slate-50 px-3 py-1.5 text-xs font-medium hover:bg-slate-100 disabled:opacity-50"
+        >
+          {isFetching ? 'Scanning…' : 'Scan'}
+        </button>
+      </div>
+
+      {runtime.tailscale_connected && (
+        <p className="text-xs text-emerald-700">
+          Tailscale connected ({runtime.tailscale_ip}) — remote standby available.
+        </p>
+      )}
+
+      {importError && (
+        <p className="text-xs text-red-600">{importError}</p>
+      )}
+
+      {detected && detected.length === 0 && scanEnabled && !isFetching && (
+        <p className="text-xs text-slate-500">No unmanaged Postgres containers found.</p>
+      )}
+
+      {detected && detected.length > 0 && (
+        <div className="space-y-2">
+          {detected.map((d: DetectedDatabase) => (
+            <div
+              key={d.container_name}
+              className="rounded-lg border border-border bg-slate-50 p-3 space-y-2"
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-xs font-mono font-semibold text-slate-800 truncate">
+                    {d.container_name}
+                  </p>
+                  <p className="text-xs text-slate-500">{d.image}</p>
+                  <p className="text-xs text-slate-500">
+                    Port {d.host_port} · user <span className="font-mono">{d.db_user}</span> · db{' '}
+                    <span className="font-mono">{d.db_name}</span>
+                    {d.replication_slots.length > 0 && (
+                      <> · {d.replication_slots.length} replication slot{d.replication_slots.length !== 1 ? 's' : ''}</>
+                    )}
+                    {d.active_standbys > 0 && (
+                      <> · {d.active_standbys} active standby{d.active_standbys !== 1 ? 's' : ''}</>
+                    )}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  placeholder={d.container_name}
+                  value={importName[d.container_name] ?? ''}
+                  onChange={(e) =>
+                    setImportName((prev) => ({ ...prev, [d.container_name]: e.target.value }))
+                  }
+                  className="flex-1 rounded border border-border bg-white px-2 py-1 text-xs outline-none focus:ring-1 focus:ring-primary"
+                />
+                <button
+                  onClick={() => onImport(d.container_name)}
+                  disabled={importDb.isPending}
+                  className="rounded-lg border border-border bg-white px-3 py-1 text-xs font-medium hover:bg-slate-100 disabled:opacity-50"
+                >
+                  Import
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ManagedTabContent({
   runtime,
   data,
   isLoading,
 }: {
-  runtime: { available: boolean } | undefined;
+  runtime: { available: boolean; tailscale_ip?: string | null; tailscale_connected?: boolean } | undefined;
   data: ManagedDatabase[] | undefined;
   isLoading: boolean;
 }) {
@@ -205,6 +322,8 @@ function ManagedTabContent({
           (or Docker) and refresh.
         </div>
       )}
+
+      <ScanBanner runtime={runtime} />
 
       {isLoading && (
         <div className="rounded-xl border border-border bg-card p-6 text-sm text-slate-600">
@@ -730,25 +849,146 @@ function DatabaseCard({ db }: { db: ManagedDatabase }) {
 }
 
 /* ---------------------------------------------------------------- replicas */
-// HA v1: lets the user spin up a standby pod and (when needed) promote
-// it to primary. Postgres-only in v1; other engines still show the card
-// gated above (`db.engine === 'postgres'`).
+
+type ReplicaMode = 'local' | 'remote';
+
+function AddReplicaModal({
+  primaryDb,
+  onClose,
+}: {
+  primaryDb: ManagedDatabase;
+  onClose: () => void;
+}) {
+  const [mode, setMode] = useState<ReplicaMode>('local');
+  const [selectedPeer, setSelectedPeer] = useState<TailscalePeer | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const add = useAddReplica(primaryDb.id);
+  const { data: peers = [], isLoading: peersLoading } = useTailscalePeers();
+
+  const onSubmit = () => {
+    setError(null);
+    const payload =
+      mode === 'remote' && selectedPeer
+        ? { node_tailscale_ip: selectedPeer.tailscale_ip }
+        : {};
+    add.mutate(payload, {
+      onError: (err) => {
+        const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+        setError(typeof detail === 'string' ? detail : 'Provisioning failed.');
+      },
+      onSuccess: () => onClose(),
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+      <div className="bg-white rounded-xl shadow-xl border border-border w-full max-w-md mx-4 p-5 space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-slate-900">Add Standby Replica</h2>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-lg leading-none">×</button>
+        </div>
+
+        {/* Mode tabs */}
+        <div className="flex rounded-lg border border-border overflow-hidden text-xs font-medium">
+          {(['local', 'remote'] as ReplicaMode[]).map((m) => (
+            <button
+              key={m}
+              onClick={() => { setMode(m); setSelectedPeer(null); }}
+              className={`flex-1 py-2 transition-colors ${
+                mode === m
+                  ? 'bg-slate-900 text-white'
+                  : 'bg-white text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              {m === 'local' ? 'Local (this PC)' : 'Remote (Tailscale)'}
+            </button>
+          ))}
+        </div>
+
+        {mode === 'local' && (
+          <p className="text-xs text-slate-500">
+            Provisions a standby pod on this machine. It streams WAL from the primary
+            and can be promoted if the primary fails.
+          </p>
+        )}
+
+        {mode === 'remote' && (
+          <div className="space-y-3">
+            <p className="text-xs text-slate-500">
+              Sets up replication to a remote machine on your Tailnet. WatchTower
+              configures the primary and generates a compose file you run on the
+              remote machine — it handles the <code className="font-mono">pg_basebackup</code> automatically.
+            </p>
+            <p className="text-[11px] font-semibold text-slate-700">Select remote machine:</p>
+            {peersLoading && <p className="text-xs text-slate-400">Discovering Tailscale peers…</p>}
+            {!peersLoading && peers.length === 0 && (
+              <p className="text-xs text-slate-400 italic">
+                No Tailscale peers found. Make sure Tailscale is running.
+              </p>
+            )}
+            <div className="space-y-1 max-h-40 overflow-y-auto">
+              {peers.map((peer) => (
+                <button
+                  key={peer.tailscale_ip}
+                  onClick={() => setSelectedPeer(peer)}
+                  className={`w-full flex items-center justify-between px-3 py-2 rounded-lg border text-xs transition-colors ${
+                    selectedPeer?.tailscale_ip === peer.tailscale_ip
+                      ? 'border-slate-900 bg-slate-50'
+                      : 'border-border hover:border-slate-400'
+                  }`}
+                >
+                  <span className="font-medium text-slate-800">{peer.hostname}</span>
+                  <div className="flex items-center gap-2 text-slate-500">
+                    <span className="font-mono">{peer.tailscale_ip}</span>
+                    <span className="text-[10px]">{peer.os}</span>
+                    <span className={`w-1.5 h-1.5 rounded-full ${peer.online ? 'bg-green-500' : 'bg-slate-300'}`} />
+                  </div>
+                </button>
+              ))}
+            </div>
+            {selectedPeer && (
+              <p className="text-[11px] text-slate-500 bg-blue-50 border border-blue-200 rounded-md px-3 py-2">
+                After clicking "Add standby", download the compose file from the replica
+                card and run it on <span className="font-medium">{selectedPeer.hostname}</span>.
+              </p>
+            )}
+          </div>
+        )}
+
+        {error && (
+          <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 break-all">
+            {error}
+          </div>
+        )}
+
+        <div className="flex items-center gap-2 pt-1">
+          <button
+            onClick={onSubmit}
+            disabled={
+              add.isPending ||
+              primaryDb.status !== 'running' ||
+              (mode === 'remote' && !selectedPeer)
+            }
+            className="flex-1 py-2 rounded-md bg-red-700 hover:bg-red-800 text-white text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {add.isPending ? 'Provisioning…' : 'Add standby'}
+          </button>
+          <button
+            onClick={onClose}
+            className="px-4 py-2 rounded-md border border-border text-xs text-slate-600 hover:bg-slate-50"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function ReplicasSection({ primaryDb }: { primaryDb: ManagedDatabase }) {
   const [open, setOpen] = useState(false);
+  const [showAddModal, setShowAddModal] = useState(false);
   const { data: replicas, isLoading } = useManagedDbReplicas(primaryDb.id, open);
-  const add = useAddReplica(primaryDb.id);
-  const [error, setError] = useState<string | null>(null);
-
-  const handleErr = (err: unknown) => {
-    const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
-    setError(typeof detail === 'string' ? detail : 'Action failed.');
-  };
-
-  const onAdd = () => {
-    setError(null);
-    add.mutate({}, { onError: handleErr });
-  };
 
   return (
     <div className="border-t border-border -mx-5 -mb-5 mt-2 px-5 pt-3 pb-4 bg-slate-50/40 rounded-b-xl">
@@ -765,23 +1005,17 @@ function ReplicasSection({ primaryDb }: { primaryDb: ManagedDatabase }) {
           <ReplicationDiagram />
           <div className="flex items-center justify-between">
             <p className="text-[11px] text-slate-500">
-              Postgres streaming replication. Standbys run as separate pods on this PC and stream WAL from the primary.
+              Postgres streaming replication — local pod on this PC, or remote machine via Tailscale.
             </p>
             <button
-              onClick={onAdd}
-              disabled={add.isPending || primaryDb.status !== 'running'}
+              onClick={() => setShowAddModal(true)}
+              disabled={primaryDb.status !== 'running'}
               className="px-3 py-1 rounded-md bg-red-700 hover:bg-red-800 text-white text-[11px] font-medium border border-slate-800 shadow-[2px_2px_0_0_#1f2937] disabled:opacity-50 disabled:cursor-not-allowed"
               title={primaryDb.status !== 'running' ? 'Primary must be running' : ''}
             >
-              {add.isPending ? 'Provisioning…' : '+ Add standby'}
+              + Add standby
             </button>
           </div>
-
-          {error && (
-            <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 break-all">
-              {error}
-            </div>
-          )}
 
           {isLoading && <p className="text-xs text-slate-500">Loading replicas…</p>}
 
@@ -794,15 +1028,15 @@ function ReplicasSection({ primaryDb }: { primaryDb: ManagedDatabase }) {
           {replicas && replicas.length > 0 && (
             <div className="space-y-2">
               {replicas.map((r) => (
-                <ReplicaRow
-                  key={r.id}
-                  primaryDb={primaryDb}
-                  replica={r}
-                />
+                <ReplicaRow key={r.id} primaryDb={primaryDb} replica={r} />
               ))}
             </div>
           )}
         </div>
+      )}
+
+      {showAddModal && (
+        <AddReplicaModal primaryDb={primaryDb} onClose={() => setShowAddModal(false)} />
       )}
     </div>
   );
@@ -835,9 +1069,26 @@ function ReplicaRow({
           <span className="text-xs font-semibold text-slate-800 truncate">{replica.name}</span>
           <ReplicaStatusBadge status={replica.status} />
           <ReplicaRoleBadge role={replica.role} />
-          <span className="text-[11px] text-slate-500 font-mono">{replica.host}:{replica.port}</span>
+          {replica.is_remote && (
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 font-medium">
+              Tailscale {replica.node_tailscale_ip}
+            </span>
+          )}
+          {!replica.is_remote && (
+            <span className="text-[11px] text-slate-500 font-mono">{replica.host}:{replica.port}</span>
+          )}
         </div>
         <div className="flex items-center gap-1">
+          {replica.is_remote && replica.status === 'initializing' && (
+            <a
+              href={`/api/managed-databases/${primaryDb.id}/replicas/${replica.id}/compose`}
+              download
+              className="px-2 py-1 rounded-md border border-blue-300 bg-blue-50 text-[11px] text-blue-800 hover:bg-blue-100 transition-colors"
+              title="Download compose file and run on the remote machine"
+            >
+              Download compose
+            </a>
+          )}
           {replica.role === 'standby' && replica.status === 'streaming' && (
             <button
               onClick={() => setConfirm('promote')}

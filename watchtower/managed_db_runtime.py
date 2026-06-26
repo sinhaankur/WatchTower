@@ -30,7 +30,7 @@ from __future__ import annotations
 import logging
 import socket
 import subprocess
-from dataclasses import dataclass
+from dataclasses import dataclass, field as dc_field
 from typing import Optional
 
 logger = logging.getLogger(__name__)
@@ -327,3 +327,114 @@ def pod_running(db_id: str) -> bool:
     if rc != 0:
         return False
     return out.strip().lower() in ("running", "degraded")
+
+
+# ── Auto-detection (scan) ────────────────────────────────────────────────────
+
+
+@dataclass
+class DetectedContainer:
+    container_name: str
+    image: str
+    host_port: int
+    db_user: str
+    db_name: str
+    has_password: bool
+    replication_slots: list[str] = dc_field(default_factory=list)
+    active_standbys: int = 0
+
+
+def scan_postgres_containers(managed_container_names: set[str]) -> list[DetectedContainer]:
+    """Return running Postgres containers NOT already managed by WatchTower.
+
+    Inspects each running container that has 'postgres' in its image name,
+    reads its environment for POSTGRES_USER/DB/PASSWORD, and probes for
+    replication slots and active standbys. Containers whose names are in
+    ``managed_container_names`` are skipped (already imported).
+
+    Returns an empty list — never raises — on any runtime/parse failure.
+    """
+    import json
+
+    bin_ = _podman_path()
+    if not bin_:
+        return []
+    rc, out, _ = _run([bin_, "ps", "--format", "json"], timeout=10.0)
+    if rc != 0 or not out.strip():
+        return []
+    try:
+        containers = json.loads(out)
+    except Exception:
+        return []
+    if not isinstance(containers, list):
+        return []
+
+    results: list[DetectedContainer] = []
+    for c in containers:
+        names = c.get("Names", [])
+        name = names[0] if names else c.get("Name", "")
+        image = c.get("Image", "")
+        if "postgres" not in image.lower():
+            continue
+        if name in managed_container_names:
+            continue
+
+        # Inspect for env vars + port bindings
+        rc2, out2, _ = _run([bin_, "inspect", name, "--format", "json"], timeout=10.0)
+        env_map: dict[str, str] = {}
+        host_port = 0
+        if rc2 == 0:
+            try:
+                data = json.loads(out2)
+                item = data[0] if isinstance(data, list) else data
+                for env_str in item.get("Config", {}).get("Env", []):
+                    if "=" in env_str:
+                        k, v = env_str.split("=", 1)
+                        env_map[k] = v
+                for binding in item.get("HostConfig", {}).get("PortBindings", {}).values():
+                    if binding:
+                        try:
+                            host_port = int(binding[0].get("HostPort", 0))
+                        except (ValueError, TypeError, KeyError):
+                            pass
+            except Exception:
+                pass
+
+        db_user = env_map.get("POSTGRES_USER", "postgres")
+        db_name = env_map.get("POSTGRES_DB", db_user)
+        has_password = bool(env_map.get("POSTGRES_PASSWORD"))
+
+        # Probe replication slots
+        slots: list[str] = []
+        rc3, out3, _ = _run(
+            [bin_, "exec", name, "psql", "-U", db_user, "-tA",
+             "-c", "SELECT slot_name FROM pg_replication_slots WHERE slot_type='physical'"],
+            timeout=5.0,
+        )
+        if rc3 == 0:
+            slots = [s.strip() for s in out3.strip().splitlines() if s.strip()]
+
+        # Probe active standbys
+        standbys = 0
+        rc4, out4, _ = _run(
+            [bin_, "exec", name, "psql", "-U", db_user, "-tA",
+             "-c", "SELECT COUNT(*) FROM pg_stat_replication"],
+            timeout=5.0,
+        )
+        if rc4 == 0:
+            try:
+                standbys = int(out4.strip())
+            except ValueError:
+                pass
+
+        results.append(DetectedContainer(
+            container_name=name,
+            image=image,
+            host_port=host_port,
+            db_user=db_user,
+            db_name=db_name,
+            has_password=has_password,
+            replication_slots=slots,
+            active_standbys=standbys,
+        ))
+    return results

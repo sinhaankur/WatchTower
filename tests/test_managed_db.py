@@ -53,13 +53,17 @@ def test_create_requires_auth(anon_client):
 def test_runtime_reports_available(client, fake_podman):
     r = client.get("/api/managed-databases/runtime")
     assert r.status_code == 200
-    assert r.json() == {"available": True}
+    body = r.json()
+    assert body["available"] is True
+    assert "tailscale_connected" in body
 
 
 def test_runtime_reports_unavailable(client, no_podman):
     r = client.get("/api/managed-databases/runtime")
     assert r.status_code == 200
-    assert r.json() == {"available": False}
+    body = r.json()
+    assert body["available"] is False
+    assert "tailscale_connected" in body
 
 
 # ── Create / list ────────────────────────────────────────────────────────────
