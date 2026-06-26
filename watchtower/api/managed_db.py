@@ -717,6 +717,33 @@ async def create_database(
     )
 
 
+class TailscalePeerResponse(BaseModel):
+    hostname: str
+    tailscale_ip: str
+    online: bool
+    os: str
+
+
+@router.get("/tailscale-peers", response_model=list[TailscalePeerResponse])
+async def list_tailscale_peers(
+    _current_user: dict = Depends(util.get_current_user),
+) -> list[TailscalePeerResponse]:
+    """Return Tailscale peers visible from this machine.
+
+    Used by the Add Replica modal to populate the remote-node picker.
+    Returns an empty list (not an error) when Tailscale is not running.
+    """
+    return [
+        TailscalePeerResponse(
+            hostname=p.hostname,
+            tailscale_ip=p.tailscale_ip,
+            online=p.online,
+            os=p.os,
+        )
+        for p in ts.peers()
+    ]
+
+
 @router.get("/{db_id}", response_model=ManagedDbResponse)
 async def get_database(
     db_id: UUID,
@@ -826,33 +853,6 @@ async def delete_database(
 
 
 # ── Replicas (HA: Postgres streaming replication, local + remote via Tailscale)
-
-
-class TailscalePeerResponse(BaseModel):
-    hostname: str
-    tailscale_ip: str
-    online: bool
-    os: str
-
-
-@router.get("/tailscale-peers", response_model=list[TailscalePeerResponse])
-async def list_tailscale_peers(
-    _current_user: dict = Depends(util.get_current_user),
-) -> list[TailscalePeerResponse]:
-    """Return Tailscale peers visible from this machine.
-
-    Used by the Add Replica modal to populate the remote-node picker.
-    Returns an empty list (not an error) when Tailscale is not running.
-    """
-    return [
-        TailscalePeerResponse(
-            hostname=p.hostname,
-            tailscale_ip=p.tailscale_ip,
-            online=p.online,
-            os=p.os,
-        )
-        for p in ts.peers()
-    ]
 
 
 class CreateReplicaRequest(BaseModel):
