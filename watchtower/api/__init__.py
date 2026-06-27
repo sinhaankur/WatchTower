@@ -330,17 +330,37 @@ app = FastAPI(
 )
 
 
-allowed_origins = [
-    o.strip()
-    for o in os.getenv(
-        "CORS_ORIGINS",
-        (
-            "http://localhost:3000,http://localhost:8000,"
-            "http://127.0.0.1:5173,http://127.0.0.1:5222"
-        ),
-    ).split(",")
-    if o.strip()
-]
+_DEFAULT_CORS_ORIGINS = (
+    "http://localhost:3000,http://localhost:8000,"
+    "http://127.0.0.1:5173,http://127.0.0.1:5222"
+)
+
+
+def _resolve_cors_origins(raw: str | None) -> list[str]:
+    """Parse CORS_ORIGINS into a safe allowlist.
+
+    Security guard: a wildcard origin with credentials is a credential-leak
+    footgun. The CORS spec forbids the combination, and Starlette would
+    silently neuter the wildcard — but "silently" is the problem: an operator
+    who set CORS_ORIGINS=* expecting it to work gets confusing breakage with
+    no signal. Strip any '*', keep the explicit origins, and warn loudly so
+    the misconfiguration is visible. allow_credentials stays True because the
+    SPA sends the Authorization header (a credentialed request).
+    """
+    origins = [o.strip() for o in (raw or _DEFAULT_CORS_ORIGINS).split(",") if o.strip()]
+    if "*" in origins:
+        origins = [o for o in origins if o != "*"]
+        logger.warning(
+            "CORS_ORIGINS contained '*', which is unsafe with credentialed "
+            "requests and is ignored. Set CORS_ORIGINS to an explicit "
+            "comma-separated allowlist of trusted origins. Effective "
+            "allowlist: %s",
+            origins or "(empty — no cross-origin requests will be allowed)",
+        )
+    return origins
+
+
+allowed_origins = _resolve_cors_origins(os.getenv("CORS_ORIGINS"))
 
 app.add_middleware(
     CORSMiddleware,

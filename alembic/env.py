@@ -31,7 +31,13 @@ if _db_url:
     config.set_main_option("sqlalchemy.url", _db_url)
 
 if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+    # disable_existing_loggers=False is critical: init_db() runs migrations at
+    # app-import time via command.upgrade(), which calls this env.py. Python's
+    # fileConfig() defaults that flag to True, which would silence every
+    # watchtower.* logger created before this point for the rest of the
+    # process — a silent, hard-to-trace log-line drop. Keeping our loggers
+    # alive is the whole reason setup_logging() exists.
+    fileConfig(config.config_file_name, disable_existing_loggers=False)
 
 
 target_metadata = Base.metadata
