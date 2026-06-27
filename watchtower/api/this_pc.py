@@ -310,3 +310,38 @@ async def discover_nodes(
         c["already_added"] = bool(candidates & known_hosts)
 
     return {"source": "tailscale", "peers": peers}
+
+
+# ── Guided SSH setup ─────────────────────────────────────────────────────────
+
+
+@router.get("/ssh-key")
+async def get_managed_ssh_key(
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(util.get_current_user),
+) -> Dict[str, Any]:
+    """Return WatchTower's managed deploy public key (generating it on first
+    use), plus the private-key path to register on a node and a copy-paste
+    one-liner to authorize it on the remote host.
+
+    Only the PUBLIC key is ever returned — the private key stays on this host.
+    """
+    from watchtower import ssh_setup
+
+    ok, message = ssh_setup.ensure_keypair()
+    if not ok:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Could not prepare an SSH key: {message}",
+        )
+    pubkey = ssh_setup.read_public_key()
+    if not pubkey:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="SSH key was created but the public key could not be read.",
+        )
+    return {
+        "public_key": pubkey,
+        "private_key_path": str(ssh_setup.private_key_path()),
+        "authorize_command": ssh_setup.authorized_keys_oneliner(pubkey),
+    }

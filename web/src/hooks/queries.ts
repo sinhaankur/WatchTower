@@ -885,6 +885,22 @@ export function useCreateExternalDatabase() {
   });
 }
 
+export type ManagedSshKey = {
+  public_key: string;
+  private_key_path: string;
+  authorize_command: string;
+};
+
+export function useManagedSshKey(enabled: boolean = true) {
+  return useQuery<ManagedSshKey>({
+    queryKey: ['this-pc', 'ssh-key'],
+    queryFn: async () =>
+      (await apiClient.get<ManagedSshKey>('/this-pc/ssh-key')).data,
+    enabled,
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
 export type TailnetPeer = {
   hostname: string;
   dns_name: string | null;

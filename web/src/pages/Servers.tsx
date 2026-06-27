@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import EmptyState from '@/components/EmptyState';
 import UseThisPcCard from '@/components/UseThisPcCard';
 import DiscoverNodesCard from '@/components/DiscoverNodesCard';
+import GuidedSshSetup from '@/components/GuidedSshSetup';
 import { Label } from '@/components/ui/label';
 import { StatusPill, nodeStatusTone } from '@/components/ui/status-pill';
 import { useMe } from '@/hooks/queries';
@@ -363,6 +364,7 @@ const Servers = () => {
             {/* Step 1: SSH Access */}
             {step === 1 && (
               <div className="space-y-4">
+                <GuidedSshSetup onUseKey={(path) => setField('ssh_key_path', path)} />
                 <div className="grid sm:grid-cols-3 gap-4">
                   <div>
                     <Label htmlFor="s-user" className="text-slate-700 text-xs">SSH User</Label>
