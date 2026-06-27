@@ -15,8 +15,16 @@ import logging
 import os
 import sys
 
-from redis import Redis
-from rq import Queue, Worker
+try:
+    from redis import Redis
+    from rq import Queue, Worker
+except ImportError as exc:  # pragma: no cover - exercised only without [queue]
+    raise SystemExit(
+        "The durable build worker requires the optional 'queue' extra. "
+        "Install it with: pip install 'watchtower-podman[queue]'\n"
+        "(Without it, builds run in-process via FastAPI BackgroundTasks and "
+        "no separate worker is needed.)"
+    ) from exc
 
 # Import the watchtower package so the builder module + DB engine are loaded
 # when each job runs (the queue holds string callables; resolution happens

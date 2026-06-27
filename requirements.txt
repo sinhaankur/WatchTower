@@ -1,3 +1,17 @@
+# Full pinned dependency set for the dev clone, CI, and the Docker image —
+# i.e. everything, including all optional features. PyPI / pipx consumers
+# get a LEANER default and opt into extras instead (see pyproject.toml
+# [project.optional-dependencies]):
+#
+#   pip install watchtower-podman           # lean: API + DB + Podman + deploy
+#   pip install 'watchtower-podman[ssh]'     # + SSH/rsync deploys (fabric)
+#   pip install 'watchtower-podman[agent]'   # + LLM agent / self-heal (openai)
+#   pip install 'watchtower-podman[queue]'   # + durable build queue (redis/rq)
+#   pip install 'watchtower-podman[all]'     # the same full set as this file
+#
+# The fabric / openai / redis / rq lines below are the optional ones; they
+# stay here so the dev clone and CI always exercise every code path.
+
 # Core
 fastapi==0.115.0
 uvicorn==0.29.0
@@ -20,25 +34,31 @@ alembic==1.13.1
 pyyaml>=6.0
 apscheduler>=3.10.0
 requests==2.31.0
-fabric==3.2.2
 # podman Python SDK only has Linux binaries — skip on macOS/Windows
 podman==5.0.0; sys_platform == "linux"
 
 # HTTP client (used in tests and health checks)
 httpx==0.25.2
 
-# Build queue — durable across API restarts. The watchtower.queue module
-# falls back to in-process execution when REDIS_URL is unset, so dev /
-# desktop installs without Redis still work.
-redis==5.0.1
-rq==1.16.2
-
-# Agent — talks to ANY OpenAI-compatible chat-completions endpoint.
-# Works with Ollama, LM Studio, vLLM, llama.cpp, OpenAI, OpenRouter,
-# LiteLLM, etc. Operators pick their own LLM via WATCHTOWER_LLM_BASE_URL
-# — WatchTower itself is provider-agnostic.
-openai>=1.50.0
-
 # Rate limiting — protects auth and webhook endpoints from brute force /
 # DoS even on single-operator installs without a CDN/WAF in front.
 slowapi>=0.1.9
+
+# ── Optional features (pyproject extras; lazy-imported in code) ───────────────
+# Present here so the dev clone / CI / Docker image exercise every path.
+# Lean PyPI installs skip these unless the matching extra is requested.
+
+# [ssh] SSH/rsync deploys (legacy JSON-file path). The DB-path deploy
+# runner uses plain ssh/rsync, so fabric is only for watchtower-deploy.
+fabric==3.2.2
+
+# [queue] Durable build queue. watchtower.queue falls back to in-process
+# execution when REDIS_URL is unset, so dev / desktop installs without
+# Redis still work.
+redis==5.0.1
+rq==1.16.2
+
+# [agent] LLM agent — talks to ANY OpenAI-compatible chat-completions
+# endpoint (Ollama, LM Studio, vLLM, llama.cpp, OpenAI, OpenRouter,
+# LiteLLM, etc.). WatchTower itself is provider-agnostic.
+openai>=1.50.0

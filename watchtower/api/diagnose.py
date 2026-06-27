@@ -265,6 +265,19 @@ def _check_redis() -> DiagnosticCheck:
         )
     try:
         import redis  # noqa: WPS433
+    except ImportError:
+        return DiagnosticCheck(
+            id="redis",
+            name="Redis (build queue)",
+            status="warn",
+            detail="REDIS_URL set but the 'queue' extra isn't installed",
+            hint=(
+                "Install the durable-queue support with "
+                "`pip install 'watchtower-podman[queue]'`, or unset REDIS_URL "
+                "to use the in-process BackgroundTasks fallback."
+            ),
+        )
+    try:
         client = redis.Redis.from_url(url, socket_connect_timeout=1)
         client.ping()
         return DiagnosticCheck(

@@ -76,6 +76,27 @@ def _is_readonly() -> bool:
     return os.getenv("WATCHTOWER_AGENT_READONLY", "false").lower() == "true"
 
 
+def _import_openai():
+    """Import the OpenAI SDK or raise a 503 with install guidance.
+
+    The SDK lives in the optional 'agent' extra so minimal installs stay
+    lean. We import lazily at the call site rather than at module top, so
+    importing this router never requires the package — only reaching the
+    agent endpoints does.
+    """
+    try:
+        from openai import OpenAI
+    except ImportError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=(
+                "The AI agent requires the optional 'agent' extra. Install it "
+                "with: pip install 'watchtower-podman[agent]'"
+            ),
+        ) from exc
+    return OpenAI
+
+
 def _get_client(db: Session):
     """Build an OpenAI-compatible client from the resolved settings
     (database first, env-var fallback — see watchtower.llm_settings).
@@ -83,7 +104,7 @@ def _get_client(db: Session):
     Imported lazily so the openai dependency is only loaded when the
     agent endpoint is actually called.
     """
-    from openai import OpenAI
+    OpenAI = _import_openai()
 
     from watchtower.llm_settings import resolve_llm_config
 
@@ -609,7 +630,7 @@ async def update_agent_config(
 def _list_models(base_url: str, api_key: Optional[str]) -> List[str]:
     """Probe {base_url}/models and return model ids. Factored out so
     tests can monkeypatch the network call."""
-    from openai import OpenAI
+    OpenAI = _import_openai()
 
     client = OpenAI(base_url=base_url, api_key=api_key or "not-set", timeout=6.0, max_retries=0)
     return [m.id for m in client.models.list().data]
