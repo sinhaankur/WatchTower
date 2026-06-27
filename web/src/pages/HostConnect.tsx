@@ -446,7 +446,7 @@ const HostConnect = () => {
             onClick={() => setActiveTab(tab)}
             className={`px-4 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
               activeTab === tab
-                ? 'border-red-700 text-red-700'
+                ? 'border-primary text-red-700'
                 : 'border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300'
             }`}
           >
@@ -476,7 +476,7 @@ const HostConnect = () => {
                     onClick={() => setTab(tab)}
                     className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
                       activeTab === tab
-                        ? 'border-red-700 bg-red-700 text-white'
+                        ? 'border-primary bg-primary text-white'
                         : 'border-slate-300 bg-white text-slate-700 hover:border-slate-400 hover:bg-slate-50'
                     }`}
                   >
@@ -487,13 +487,13 @@ const HostConnect = () => {
               <div className="mt-4 flex flex-wrap gap-2">
                 <Link
                   to="/servers"
-                  className="rounded-lg border border-slate-800 bg-white px-3 py-2 text-xs font-semibold text-slate-900 shadow-[2px_2px_0_0_#1f2937] hover:bg-amber-50"
+                  className="rounded-lg border border-border bg-white px-3 py-2 text-xs font-semibold text-slate-900 shadow-retro hover:bg-amber-50"
                 >
                   Open Servers
                 </Link>
                 <Link
                   to="/setup"
-                  className="rounded-lg border border-slate-800 bg-red-700 px-3 py-2 text-xs font-semibold text-white shadow-[2px_2px_0_0_#1f2937] hover:bg-red-800"
+                  className="rounded-lg border border-border bg-primary px-3 py-2 text-xs font-semibold text-white shadow-retro hover:bg-primary/90"
                 >
                   Deploy an App
                 </Link>
@@ -515,7 +515,7 @@ const HostConnect = () => {
               <button
                 type="button"
                 onClick={() => setTab(recommendedTab)}
-                className="mt-3 rounded-lg border border-slate-800 bg-white px-3 py-2 text-xs font-semibold text-slate-900 shadow-[2px_2px_0_0_#1f2937] hover:bg-slate-50"
+                className="mt-3 rounded-lg border border-border bg-white px-3 py-2 text-xs font-semibold text-slate-900 shadow-retro hover:bg-slate-50"
               >
                 Open {recommendedTab}
               </button>
@@ -546,7 +546,7 @@ const HostConnect = () => {
               </div>
               <div className="h-2.5 rounded-full bg-slate-100 border border-slate-200 overflow-hidden">
                 <div
-                  className={`h-full transition-all rounded-full ${readiness >= 5 ? 'bg-emerald-500' : readiness >= 3 ? 'bg-amber-500' : 'bg-red-600'}`}
+                  className={`h-full transition-all rounded-full ${readiness >= 5 ? 'bg-emerald-500' : readiness >= 3 ? 'bg-amber-500' : 'bg-primary'}`}
                   style={{ width: `${Math.round((readiness / 6) * 100)}%` }}
                 />
               </div>
@@ -668,7 +668,7 @@ const HostConnect = () => {
               <button
                 onClick={() => void generateDomainPlan()}
                 disabled={domainLoading}
-                className="px-4 py-2 rounded-lg bg-red-700 hover:bg-red-800 text-white text-sm disabled:opacity-50 border border-slate-800 shadow-[2px_2px_0_0_#1f2937]"
+                className="px-4 py-2 rounded-lg bg-primary hover:bg-primary/90 text-white text-sm disabled:opacity-50 border border-border shadow-retro"
               >
                 {domainLoading ? 'Generating…' : 'Generate Cloudflare Plan'}
               </button>
@@ -782,7 +782,7 @@ const HostConnect = () => {
               <button
                 onClick={() => void generateDatabasePlan()}
                 disabled={dbPlanLoading}
-                className="px-4 py-2 rounded-lg bg-red-700 hover:bg-red-800 text-white text-sm disabled:opacity-50 border border-slate-800 shadow-[2px_2px_0_0_#1f2937]"
+                className="px-4 py-2 rounded-lg bg-primary hover:bg-primary/90 text-white text-sm disabled:opacity-50 border border-border shadow-retro"
               >
                 {dbPlanLoading ? 'Generating…' : 'Generate Database Plan'}
               </button>
@@ -877,7 +877,7 @@ const HostConnect = () => {
               <button
                 onClick={() => void generateNginxPlan()}
                 disabled={nginxPlanLoading}
-                className="px-4 py-2 rounded-lg bg-red-700 hover:bg-red-800 text-white text-sm disabled:opacity-50 border border-slate-800 shadow-[2px_2px_0_0_#1f2937]"
+                className="px-4 py-2 rounded-lg bg-primary hover:bg-primary/90 text-white text-sm disabled:opacity-50 border border-border shadow-retro"
               >
                 {nginxPlanLoading ? 'Generating…' : 'Generate Nginx Config'}
               </button>
@@ -1000,7 +1000,7 @@ const HostConnect = () => {
               <button
                 onClick={() => void runSecureTerminalCommand()}
                 disabled={terminalRunning || !terminalPolicy?.enabled}
-                className="px-4 py-2 rounded-lg bg-red-700 hover:bg-red-800 text-white text-sm disabled:opacity-50 border border-slate-800 shadow-[2px_2px_0_0_#1f2937]"
+                className="px-4 py-2 rounded-lg bg-primary hover:bg-primary/90 text-white text-sm disabled:opacity-50 border border-border shadow-retro"
               >
                 {terminalRunning ? 'Running…' : terminalPolicy?.enabled ? 'Run Command' : 'Terminal Disabled'}
               </button>

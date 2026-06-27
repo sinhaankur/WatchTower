@@ -84,7 +84,7 @@ function ConnectionCard() {
             });
           }}
           disabled={startMachine.isPending}
-          className="text-xs px-4 py-2 rounded-lg border border-slate-800 bg-amber-400 hover:bg-amber-500 text-slate-900 font-semibold shadow-[1px_1px_0_0_#1f2937] disabled:opacity-50"
+          className="text-xs px-4 py-2 rounded-lg border border-border bg-amber-400 hover:bg-amber-500 text-slate-900 font-semibold shadow-retro disabled:opacity-50"
         >
           {startMachine.isPending ? 'Starting… (can take a minute)' : 'Start Podman'}
         </button>
@@ -225,7 +225,7 @@ function CreateContainerForm({ pods, onDone }: { pods: PodmanPod[]; onDone: () =
         <button
           onClick={submit}
           disabled={create.isPending || !name.trim() || !image.trim()}
-          className="text-xs px-4 py-1.5 rounded-lg border border-slate-800 bg-amber-400 hover:bg-amber-500 text-slate-900 font-semibold shadow-[1px_1px_0_0_#1f2937] disabled:opacity-50"
+          className="text-xs px-4 py-1.5 rounded-lg border border-border bg-amber-400 hover:bg-amber-500 text-slate-900 font-semibold shadow-retro disabled:opacity-50"
         >
           {create.isPending ? 'Creating… (first pull can take a while)' : 'Create & start'}
         </button>
@@ -270,7 +270,7 @@ function CreatePodForm({ onDone }: { onDone: () => void }) {
             },
           )}
           disabled={create.isPending || !name.trim()}
-          className="text-xs px-4 py-1.5 rounded-lg border border-slate-800 bg-amber-400 hover:bg-amber-500 text-slate-900 font-semibold shadow-[1px_1px_0_0_#1f2937] disabled:opacity-50"
+          className="text-xs px-4 py-1.5 rounded-lg border border-border bg-amber-400 hover:bg-amber-500 text-slate-900 font-semibold shadow-retro disabled:opacity-50"
         >
           {create.isPending ? 'Creating…' : 'Create pod'}
         </button>
@@ -413,7 +413,7 @@ export default function PodmanManager() {
             </button>
             <button
               onClick={() => setCreating(creating === 'container' ? null : 'container')}
-              className="text-xs px-3 py-1.5 rounded-lg border border-slate-800 bg-amber-400 hover:bg-amber-500 text-slate-900 font-semibold shadow-[1px_1px_0_0_#1f2937]"
+              className="text-xs px-3 py-1.5 rounded-lg border border-border bg-amber-400 hover:bg-amber-500 text-slate-900 font-semibold shadow-retro"
             >
               New container
             </button>
@@ -428,7 +428,7 @@ export default function PodmanManager() {
             </div>
           )}
 
-          <div className="rounded-xl border border-slate-200 bg-white overflow-hidden shadow-[2px_2px_0_0_#1f2937]">
+          <div className="rounded-xl border border-slate-200 bg-white overflow-hidden shadow-retro">
             <table className="w-full text-sm">
               <thead className="bg-slate-50 border-b border-slate-200">
                 <tr className="text-left">

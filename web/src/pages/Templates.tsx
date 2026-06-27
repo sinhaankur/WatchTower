@@ -56,10 +56,10 @@ function TemplateCard({
 
   return (
     <article
-      className="anim-fade-in-up rounded-xl border border-slate-800 bg-card p-4 shadow-[2px_2px_0_0_#1f2937] flex flex-col gap-3 transition-shadow hover:shadow-[3px_3px_0_0_#1f2937]"
+      className="anim-fade-in-up rounded-xl border border-border bg-card p-4 shadow-retro flex flex-col gap-3 transition-shadow hover:shadow-retro"
     >
       <div className="flex items-start gap-3">
-        <div className="w-9 h-9 rounded-lg border border-slate-800 bg-amber-100 flex items-center justify-center text-[11px] font-mono font-bold text-slate-900 shadow-[1px_1px_0_0_#1f2937] uppercase">
+        <div className="w-9 h-9 rounded-lg border border-border bg-amber-100 flex items-center justify-center text-[11px] font-mono font-bold text-slate-900 shadow-retro uppercase">
           {template.slug.slice(0, 2)}
         </div>
         <div className="flex-1 min-w-0">
@@ -104,7 +104,7 @@ function TemplateCard({
               value={name}
               onChange={(e) => setName(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter' && validName && !creating) onCreate(slugifyName(name)); }}
-              className="mt-1 w-full text-xs font-mono rounded border border-slate-300 px-2 py-1.5 focus:border-slate-800 focus:outline-none"
+              className="mt-1 w-full text-xs font-mono rounded border border-slate-300 px-2 py-1.5 focus:border-border focus:outline-none"
             />
             {name && !validName && (
               <span className="text-[10px] text-red-600">Name needs at least 2 letters/digits.</span>
@@ -129,7 +129,7 @@ function TemplateCard({
             <button
               onClick={() => onCreate(slugifyName(name))}
               disabled={creating || !validName}
-              className="flex-1 text-xs px-3 py-1.5 rounded-lg border border-slate-800 bg-amber-400 hover:bg-amber-500 text-slate-900 font-semibold shadow-[1px_1px_0_0_#1f2937] disabled:opacity-50 disabled:cursor-wait"
+              className="flex-1 text-xs px-3 py-1.5 rounded-lg border border-border bg-amber-400 hover:bg-amber-500 text-slate-900 font-semibold shadow-retro disabled:opacity-50 disabled:cursor-wait"
             >
               {creating ? 'Creating…' : 'Create project →'}
             </button>
@@ -146,7 +146,7 @@ function TemplateCard({
         <div className="flex items-center gap-2 pt-1 mt-auto">
           <button
             onClick={() => setOpen(true)}
-            className="flex-1 text-xs px-3 py-1.5 rounded-lg border border-slate-800 bg-amber-400 hover:bg-amber-500 text-slate-900 font-semibold shadow-[1px_1px_0_0_#1f2937]"
+            className="flex-1 text-xs px-3 py-1.5 rounded-lg border border-border bg-amber-400 hover:bg-amber-500 text-slate-900 font-semibold shadow-retro"
           >
             Use this template
           </button>
@@ -249,7 +249,7 @@ export default function Templates() {
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
           placeholder="Filter…"
-          className="text-xs px-3 py-1.5 rounded border border-slate-300 focus:border-slate-800 focus:outline-none w-48"
+          className="text-xs px-3 py-1.5 rounded border border-slate-300 focus:border-border focus:outline-none w-48"
         />
       </header>
 

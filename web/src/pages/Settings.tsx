@@ -69,10 +69,10 @@ function VSCodeCard() {
   const os = navigator.userAgent.includes('Mac') ? 'macos' : navigator.userAgent.includes('Win') ? 'windows' : 'linux';
 
   return (
-    <div className="rounded-xl border border-slate-800 bg-card p-5 shadow-[2px_2px_0_0_#1f2937]">
+    <div className="rounded-xl border border-border bg-card p-5 shadow-retro">
       {/* Header */}
       <div className="flex items-center gap-3 mb-4">
-        <div className="w-9 h-9 rounded-lg border border-slate-800 bg-[#007ACC] flex items-center justify-center shadow-[1px_1px_0_0_#1f2937]">
+        <div className="w-9 h-9 rounded-lg border border-border bg-[#007ACC] flex items-center justify-center shadow-retro">
           <svg width="18" height="18" viewBox="0 0 100 100" fill="none">
             <path d="M74.9 13.3L51.7 38.6 31.4 22.6 13.3 33.2v33.6l18.1 10.6 20.3-16 23.2 25.3L87 75.5V24.5L74.9 13.3zM31.4 60.8l-9-5.4V44.6l9-5.4 13 10.8-13 10.8z" fill="white"/>
           </svg>
@@ -111,7 +111,7 @@ function VSCodeCard() {
           <button
             onClick={() => void openRoot()}
             disabled={openLoading || !status?.installed}
-            className="w-full py-2 rounded-lg border border-slate-800 bg-red-700 hover:bg-red-800 text-white text-xs font-semibold shadow-[2px_2px_0_0_#1f2937] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full py-2 rounded-lg border border-border bg-primary hover:bg-primary/90 text-white text-xs font-semibold shadow-retro transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {openLoading ? 'Opening…' : 'Open WatchTower in VS Code'}
           </button>
@@ -235,9 +235,9 @@ function UpdateCheckCard() {
   const checked = data?.checked_at ? new Date(data.checked_at).toLocaleString() : null;
 
   return (
-    <div className="rounded-xl border border-slate-800 bg-card p-5 shadow-[2px_2px_0_0_#1f2937]">
+    <div className="rounded-xl border border-border bg-card p-5 shadow-retro">
       <div className="flex items-center gap-3 mb-4">
-        <div className="w-9 h-9 rounded-lg border border-slate-800 bg-slate-900 flex items-center justify-center shadow-[1px_1px_0_0_#1f2937]">
+        <div className="w-9 h-9 rounded-lg border border-border bg-slate-900 flex items-center justify-center shadow-retro">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
             <polyline points="23 4 23 10 17 10" />
             <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
@@ -324,7 +324,7 @@ function UpdateCheckCard() {
           <button
             onClick={() => void handleCheckNow()}
             disabled={isFetching}
-            className="text-xs px-3 py-1.5 rounded-lg border border-slate-800 bg-white hover:bg-slate-50 text-slate-800 font-medium shadow-[1px_1px_0_0_#1f2937] disabled:opacity-50 disabled:cursor-not-allowed"
+            className="text-xs px-3 py-1.5 rounded-lg border border-border bg-white hover:bg-slate-50 text-slate-800 font-medium shadow-retro disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isFetching ? 'Checking…' : 'Check for Updates'}
           </button>
@@ -475,9 +475,9 @@ function SystemCard() {
   );
 
   return (
-    <div className="rounded-xl border border-slate-800 bg-card p-5 shadow-[2px_2px_0_0_#1f2937]">
+    <div className="rounded-xl border border-border bg-card p-5 shadow-retro">
       <div className="flex items-center gap-3 mb-4">
-        <div className="w-9 h-9 rounded-lg border border-slate-800 bg-slate-900 flex items-center justify-center shadow-[1px_1px_0_0_#1f2937]">
+        <div className="w-9 h-9 rounded-lg border border-border bg-slate-900 flex items-center justify-center shadow-retro">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
             <rect x="3" y="3" width="18" height="18" rx="2" />
             <path d="M9 9h6v6H9z" />
@@ -569,14 +569,14 @@ function SystemCard() {
               <button
                 onClick={() => void handleSendReport()}
                 disabled={reportSending}
-                className="text-xs px-3 py-1.5 rounded-lg border border-slate-800 bg-white hover:bg-slate-50 text-slate-800 font-medium shadow-[1px_1px_0_0_#1f2937] disabled:opacity-50"
+                className="text-xs px-3 py-1.5 rounded-lg border border-border bg-white hover:bg-slate-50 text-slate-800 font-medium shadow-retro disabled:opacity-50"
                 title="Open mail client with diagnostics pre-filled — sent to the maintainer for fixing."
               >
                 {reportSending ? 'Opening…' : 'Send Error Report'}
               </button>
               <button
                 onClick={() => void handleRecheck()}
-                className="text-xs px-3 py-1.5 rounded-lg border border-slate-800 bg-amber-400 hover:bg-amber-500 text-slate-900 font-semibold shadow-[1px_1px_0_0_#1f2937]"
+                className="text-xs px-3 py-1.5 rounded-lg border border-border bg-amber-400 hover:bg-amber-500 text-slate-900 font-semibold shadow-retro"
               >
                 Recheck (restarts app)
               </button>
@@ -643,9 +643,9 @@ function BackupCard() {
   };
 
   return (
-    <div className="rounded-xl border border-slate-800 bg-card p-5 shadow-[2px_2px_0_0_#1f2937]">
+    <div className="rounded-xl border border-border bg-card p-5 shadow-retro">
       <div className="flex items-center gap-3 mb-4">
-        <div className="w-9 h-9 rounded-lg border border-slate-800 bg-slate-900 flex items-center justify-center shadow-[1px_1px_0_0_#1f2937]">
+        <div className="w-9 h-9 rounded-lg border border-border bg-slate-900 flex items-center justify-center shadow-retro">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
             <polyline points="7 10 12 15 17 10" />
@@ -721,7 +721,7 @@ function BackupCard() {
             <button
               onClick={() => void handleDownload()}
               disabled={downloading || !status.ready_for_backup || !status.can_export}
-              className="text-xs px-3 py-1.5 rounded-lg border border-slate-800 bg-amber-400 hover:bg-amber-500 text-slate-900 font-semibold shadow-[1px_1px_0_0_#1f2937] disabled:opacity-50 disabled:cursor-not-allowed"
+              className="text-xs px-3 py-1.5 rounded-lg border border-border bg-amber-400 hover:bg-amber-500 text-slate-900 font-semibold shadow-retro disabled:opacity-50 disabled:cursor-not-allowed"
               title={
                 !status.can_export
                   ? "Requires can_manage_team permission on this org"

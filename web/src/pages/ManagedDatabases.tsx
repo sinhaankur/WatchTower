@@ -87,7 +87,7 @@ export default function ManagedDatabases() {
             <button
               onClick={() => setShowCreate(true)}
               disabled={!runtime?.available}
-              className="px-3 sm:px-4 py-1.5 rounded-lg bg-red-700 hover:bg-red-800 text-white text-xs sm:text-sm font-medium transition-colors border border-slate-800 shadow-[2px_2px_0_0_#1f2937] disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-3 sm:px-4 py-1.5 rounded-lg bg-primary hover:bg-primary/90 text-white text-xs sm:text-sm font-medium transition-colors border border-border shadow-retro disabled:opacity-50 disabled:cursor-not-allowed"
               title={runtime?.available ? '' : 'Install Podman or Docker first'}
             >
               + New Database
@@ -95,7 +95,7 @@ export default function ManagedDatabases() {
           ) : (
             <button
               onClick={() => setShowCreateExternal(true)}
-              className="px-3 sm:px-4 py-1.5 rounded-lg bg-red-700 hover:bg-red-800 text-white text-xs sm:text-sm font-medium transition-colors border border-slate-800 shadow-[2px_2px_0_0_#1f2937]"
+              className="px-3 sm:px-4 py-1.5 rounded-lg bg-primary hover:bg-primary/90 text-white text-xs sm:text-sm font-medium transition-colors border border-border shadow-retro"
             >
               + Connect External
             </button>
@@ -167,7 +167,7 @@ function TabButton({
       onClick={onClick}
       className={`px-4 py-2 text-xs font-medium transition-colors border-b-2 -mb-px ${
         active
-          ? 'border-red-700 text-red-700'
+          ? 'border-primary text-red-700'
           : 'border-transparent text-slate-600 hover:text-slate-900'
       }`}
     >
@@ -340,7 +340,7 @@ function ExternalDatabaseCard({ db }: { db: ExternalDatabase }) {
                 del.mutate(db.id, { onError: handleErr });
               }}
               disabled={del.isPending}
-              className="px-3 py-1 rounded-md bg-red-700 hover:bg-red-800 text-white text-xs font-medium disabled:opacity-50"
+              className="px-3 py-1 rounded-md bg-primary hover:bg-primary/90 text-white text-xs font-medium disabled:opacity-50"
             >
               {del.isPending ? 'Removing…' : 'Confirm remove'}
             </button>
@@ -398,7 +398,7 @@ function ExternalCredentialsModal({
       <div className="mt-5 flex items-center justify-end">
         <button
           onClick={onClose}
-          className="px-4 py-1.5 rounded-lg bg-red-700 hover:bg-red-800 text-white text-xs font-medium border border-slate-800 shadow-[2px_2px_0_0_#1f2937]"
+          className="px-4 py-1.5 rounded-lg bg-primary hover:bg-primary/90 text-white text-xs font-medium border border-border shadow-retro"
         >
           Done
         </button>
@@ -572,7 +572,7 @@ function CreateExternalModal({ onClose }: { onClose: () => void }) {
         <button
           onClick={submit}
           disabled={create.isPending}
-          className="px-4 py-1.5 rounded-lg bg-red-700 hover:bg-red-800 text-white text-xs font-medium border border-slate-800 shadow-[2px_2px_0_0_#1f2937] disabled:opacity-50"
+          className="px-4 py-1.5 rounded-lg bg-primary hover:bg-primary/90 text-white text-xs font-medium border border-border shadow-retro disabled:opacity-50"
         >
           {create.isPending ? 'Saving…' : 'Save connection'}
         </button>
@@ -633,7 +633,7 @@ function DatabaseCard({ db }: { db: ManagedDatabase }) {
               start.mutate(db.id, { onError: handleErr });
             }}
             disabled={busy}
-            className="px-3 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-medium border border-slate-800 shadow-[2px_2px_0_0_#1f2937] disabled:opacity-50"
+            className="px-3 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-medium border border-border shadow-retro disabled:opacity-50"
           >
             Start
           </button>
@@ -698,7 +698,7 @@ function DatabaseCard({ db }: { db: ManagedDatabase }) {
                 );
               }}
               disabled={del.isPending}
-              className="px-3 py-1 rounded-md bg-red-700 hover:bg-red-800 text-white text-xs font-medium disabled:opacity-50"
+              className="px-3 py-1 rounded-md bg-primary hover:bg-primary/90 text-white text-xs font-medium disabled:opacity-50"
             >
               {del.isPending ? 'Deleting…' : 'Confirm delete'}
             </button>
@@ -767,7 +767,7 @@ function ReplicasSection({ primaryDb }: { primaryDb: ManagedDatabase }) {
             <button
               onClick={onAdd}
               disabled={add.isPending || primaryDb.status !== 'running'}
-              className="px-3 py-1 rounded-md bg-red-700 hover:bg-red-800 text-white text-[11px] font-medium border border-slate-800 shadow-[2px_2px_0_0_#1f2937] disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-3 py-1 rounded-md bg-primary hover:bg-primary/90 text-white text-[11px] font-medium border border-border shadow-retro disabled:opacity-50 disabled:cursor-not-allowed"
               title={primaryDb.status !== 'running' ? 'Primary must be running' : ''}
             >
               {add.isPending ? 'Provisioning…' : '+ Add standby'}
@@ -910,7 +910,7 @@ function ReplicaRow({
                 });
               }}
               disabled={busy}
-              className="px-2 py-1 rounded-md bg-red-700 hover:bg-red-800 text-white text-[11px] font-medium disabled:opacity-50"
+              className="px-2 py-1 rounded-md bg-primary hover:bg-primary/90 text-white text-[11px] font-medium disabled:opacity-50"
             >
               {remove.isPending ? 'Removing…' : 'Confirm remove'}
             </button>
@@ -1018,7 +1018,7 @@ function BackupsSection({ primaryDb }: { primaryDb: ManagedDatabase }) {
             <button
               onClick={onCreate}
               disabled={create.isPending || primaryDb.status !== 'running'}
-              className="px-3 py-1.5 rounded-md bg-red-700 hover:bg-red-800 text-white text-[11px] font-medium border border-slate-800 shadow-[2px_2px_0_0_#1f2937] disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+              className="px-3 py-1.5 rounded-md bg-primary hover:bg-primary/90 text-white text-[11px] font-medium border border-border shadow-retro disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
               title={primaryDb.status !== 'running' ? 'Database must be running' : ''}
             >
               {create.isPending ? 'Backing up…' : 'Backup now'}
@@ -1135,7 +1135,7 @@ function BackupRow({
               });
             }}
             disabled={busy}
-            className="px-2 py-1 rounded-md bg-red-700 hover:bg-red-800 text-white text-[11px] font-medium disabled:opacity-50"
+            className="px-2 py-1 rounded-md bg-primary hover:bg-primary/90 text-white text-[11px] font-medium disabled:opacity-50"
           >
             {del.isPending ? 'Deleting…' : 'Confirm'}
           </button>
@@ -1667,7 +1667,7 @@ function CreateModal({
         <button
           onClick={submit}
           disabled={create.isPending}
-          className="px-4 py-1.5 rounded-lg bg-red-700 hover:bg-red-800 text-white text-xs font-medium border border-slate-800 shadow-[2px_2px_0_0_#1f2937] disabled:opacity-50"
+          className="px-4 py-1.5 rounded-lg bg-primary hover:bg-primary/90 text-white text-xs font-medium border border-border shadow-retro disabled:opacity-50"
         >
           {create.isPending ? 'Creating…' : 'Create database'}
         </button>
@@ -1733,7 +1733,7 @@ function CredentialsModal({
       <div className="mt-5 flex items-center justify-end">
         <button
           onClick={onClose}
-          className="px-4 py-1.5 rounded-lg bg-red-700 hover:bg-red-800 text-white text-xs font-medium border border-slate-800 shadow-[2px_2px_0_0_#1f2937]"
+          className="px-4 py-1.5 rounded-lg bg-primary hover:bg-primary/90 text-white text-xs font-medium border border-border shadow-retro"
         >
           Done
         </button>

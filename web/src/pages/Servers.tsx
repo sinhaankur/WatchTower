@@ -215,14 +215,14 @@ const Servers = () => {
             <>
               <button
                 onClick={() => { setShowProvision((v) => !v); setShowForm(false); }}
-                className="px-4 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-sm font-medium transition-colors border border-slate-800 shadow-[2px_2px_0_0_#1f2937]"
+                className="px-4 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-sm font-medium transition-colors border border-border shadow-retro"
                 title="Auto-provision a fresh VM on DigitalOcean or Hetzner"
               >
                 {showProvision ? 'Cancel' : '✨ Provision Server'}
               </button>
               <button
                 onClick={() => { setShowForm((v) => !v); setShowProvision(false); }}
-                className="px-4 py-1.5 rounded-lg bg-red-700 hover:bg-red-800 text-white text-sm font-medium transition-colors border border-slate-800 shadow-[2px_2px_0_0_#1f2937]"
+                className="px-4 py-1.5 rounded-lg bg-primary hover:bg-primary/90 text-white text-sm font-medium transition-colors border border-border shadow-retro"
                 title="Manually register an existing server you've already set up"
               >
                 {showForm ? 'Cancel' : '+ Add Server'}
@@ -299,8 +299,8 @@ const Servers = () => {
                     }`}
                   >
                     <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs border ${
-                      i < step ? 'bg-red-700 border-red-700 text-white' :
-                      i === step ? 'border-red-700 text-red-700 bg-red-50' :
+                      i < step ? 'bg-primary border-primary text-white' :
+                      i === step ? 'border-primary text-primary bg-primary/5' :
                       'border-border text-slate-500'
                     }`}>
                       {i < step ? '✓' : i + 1}
@@ -308,7 +308,7 @@ const Servers = () => {
                     {label}
                   </button>
                   {i < STEP_LABELS.length - 1 && (
-                    <div className={`flex-1 h-px mx-3 ${i < step ? 'bg-red-700' : 'bg-border'}`} />
+                    <div className={`flex-1 h-px mx-3 ${i < step ? 'bg-primary' : 'bg-border'}`} />
                   )}
                 </div>
               ))}
@@ -384,7 +384,7 @@ const Servers = () => {
               <button
                 onClick={() => step > 0 && setStep((s) => s - 1)}
                 disabled={step === 0}
-                className="px-4 py-2 text-sm font-semibold text-slate-800 border border-slate-800 bg-white rounded-lg shadow-[2px_2px_0_0_#1f2937] hover:bg-amber-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                className="px-4 py-2 text-sm font-semibold text-slate-800 border border-border bg-white rounded-lg shadow-retro hover:bg-amber-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
               >
                 ← Back
               </button>
@@ -392,7 +392,7 @@ const Servers = () => {
                 <button
                   onClick={() => setStep((s) => s + 1)}
                   disabled={!isStepValid(step)}
-                  className="px-4 py-2 text-sm font-semibold bg-red-700 hover:bg-red-800 text-white rounded-lg border border-slate-800 shadow-[2px_2px_0_0_#1f2937] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="px-4 py-2 text-sm font-semibold bg-primary hover:bg-primary/90 text-white rounded-lg border border-border shadow-retro transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   Continue →
                 </button>
@@ -400,7 +400,7 @@ const Servers = () => {
                 <button
                   onClick={() => void addNode()}
                   disabled={addingNode || !orgId}
-                  className="px-6 py-2 text-sm font-semibold bg-red-700 hover:bg-red-800 text-white rounded-lg border border-slate-800 shadow-[2px_2px_0_0_#1f2937] transition-colors disabled:opacity-40"
+                  className="px-6 py-2 text-sm font-semibold bg-primary hover:bg-primary/90 text-white rounded-lg border border-border shadow-retro transition-colors disabled:opacity-40"
                 >
                   {addingNode ? 'Adding…' : 'Add Server'}
                 </button>
@@ -490,7 +490,7 @@ const Servers = () => {
                     )}
                     <Link
                       to="/servers/local"
-                      className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-red-700 hover:bg-red-800 text-white text-sm transition-colors border border-slate-800 shadow-[2px_2px_0_0_#1f2937]"
+                      className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary hover:bg-primary/90 text-white text-sm transition-colors border border-border shadow-retro"
                     >
                       💻 Use This PC
                     </Link>

@@ -143,7 +143,7 @@ export default function LocalContainers() {
           </p>
         </div>
       ) : (
-        <div className="rounded-xl border border-slate-200 bg-white overflow-hidden shadow-[2px_2px_0_0_#1f2937]">
+        <div className="rounded-xl border border-slate-200 bg-white overflow-hidden shadow-retro">
           <table className="w-full text-sm">
             <thead className="bg-slate-50 border-b border-slate-200">
               <tr className="text-left">

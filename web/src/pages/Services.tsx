@@ -149,7 +149,7 @@ function ServiceCard({ svc, connected }: { svc: ServiceDef; connected: boolean }
               <a
                 href={`http://localhost:${svc.openPort}`}
                 target="_blank" rel="noopener noreferrer"
-                className="text-xs px-3 py-1.5 rounded-lg border border-slate-800 bg-amber-400 hover:bg-amber-500 text-slate-900 font-semibold shadow-[1px_1px_0_0_#1f2937]"
+                className="text-xs px-3 py-1.5 rounded-lg border border-border bg-amber-400 hover:bg-amber-500 text-slate-900 font-semibold shadow-retro"
               >
                 Open ↗
               </a>
@@ -163,7 +163,7 @@ function ServiceCard({ svc, connected }: { svc: ServiceDef; connected: boolean }
             onClick={() => void runNow()}
             disabled={busy || !connected}
             title={connected ? `podman run ${svc.image}` : 'Start Podman first (Containers page)'}
-            className="text-xs px-3 py-1.5 rounded-lg border border-slate-800 bg-amber-400 hover:bg-amber-500 text-slate-900 font-semibold shadow-[1px_1px_0_0_#1f2937] disabled:opacity-50 disabled:cursor-not-allowed"
+            className="text-xs px-3 py-1.5 rounded-lg border border-border bg-amber-400 hover:bg-amber-500 text-slate-900 font-semibold shadow-retro disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {busy ? 'Starting…' : existing ? 'Start' : 'Run locally'}
           </button>

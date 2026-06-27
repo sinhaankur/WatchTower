@@ -264,7 +264,7 @@ function TriggerDeployButton({ projectId, branch }: { projectId: string; branch:
       <button
         onClick={trigger}
         disabled={busy}
-        className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-medium disabled:opacity-50 transition-colors"
+        className="px-4 py-2 rounded-lg bg-primary hover:bg-primary/90 text-white text-sm font-medium disabled:opacity-50 transition-colors"
       >
         {busy ? 'Queueing…' : 'Deploy Now'}
       </button>
@@ -341,12 +341,12 @@ function HealthCheckCard({ projectId }: { projectId: string }) {
             value={path}
             onChange={(e) => setPath(e.target.value)}
             placeholder="/health"
-            className="flex-1 text-xs px-2 py-1.5 rounded border border-slate-300 focus:border-slate-800 focus:outline-none font-mono"
+            className="flex-1 text-xs px-2 py-1.5 rounded border border-slate-300 focus:border-border focus:outline-none font-mono"
           />
           <button
             onClick={() => void runProbe()}
             disabled={checking}
-            className="text-xs px-3 py-1.5 rounded-lg border border-slate-800 bg-amber-400 hover:bg-amber-500 text-slate-900 font-semibold shadow-[1px_1px_0_0_#1f2937] disabled:opacity-50 disabled:cursor-wait"
+            className="text-xs px-3 py-1.5 rounded-lg border border-border bg-amber-400 hover:bg-amber-500 text-slate-900 font-semibold shadow-retro disabled:opacity-50 disabled:cursor-wait"
           >
             {checking ? 'Probing…' : 'Check health'}
           </button>
@@ -607,7 +607,7 @@ function GoLiveCard({ project }: { project: Project }) {
 
         <button
           type="button" onClick={() => void submit()} disabled={running}
-          className="self-start text-sm px-4 py-2 rounded-lg border border-slate-800 bg-amber-400 hover:bg-amber-500 text-slate-900 font-semibold shadow-[1px_1px_0_0_#1f2937] disabled:opacity-50 disabled:cursor-wait">
+          className="self-start text-sm px-4 py-2 rounded-lg border border-border bg-amber-400 hover:bg-amber-500 text-slate-900 font-semibold shadow-retro disabled:opacity-50 disabled:cursor-wait">
           {running ? 'Going live…' : '🚀 Go Live'}
         </button>
 
@@ -838,7 +838,7 @@ function DatabaseLinksCard({ project }: { project: { id: string } }) {
               <button
                 onClick={onAdd}
                 disabled={create.isPending || !picker}
-                className="px-4 py-2 rounded bg-red-700 hover:bg-red-800 text-white text-xs font-medium border border-slate-800 shadow-[2px_2px_0_0_#1f2937] disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                className="px-4 py-2 rounded bg-primary hover:bg-primary/90 text-white text-xs font-medium border border-border shadow-retro disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
               >
                 {create.isPending ? 'Linking…' : 'Link'}
               </button>
@@ -1021,7 +1021,7 @@ function LiveUrlCard({ project }: { project: Project }) {
               <button
                 onClick={save}
                 disabled={busy}
-                className="text-xs px-3 py-1.5 rounded bg-red-700 hover:bg-red-800 text-white border border-slate-800 shadow-[2px_2px_0_0_#1f2937] disabled:opacity-50"
+                className="text-xs px-3 py-1.5 rounded bg-primary hover:bg-primary/90 text-white border border-border shadow-retro disabled:opacity-50"
               >
                 {busy ? 'Saving…' : 'Save'}
               </button>
@@ -1709,7 +1709,7 @@ function DiagnosisPanel({ state, deploymentId, onApplied }: DiagnosisPanelProps)
             <button
               onClick={() => void applyFix()}
               disabled={applying}
-              className="text-[11px] px-3 py-1 rounded border border-slate-800 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-[1px_1px_0_0_#1f2937] disabled:opacity-60"
+              className="text-[11px] px-3 py-1 rounded border border-border bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-retro disabled:opacity-60"
               title="Apply the suggested fix and trigger a fresh deployment"
             >
               {applying ? 'Applying…' : 'Apply fix'}
@@ -1749,7 +1749,7 @@ function DiagnosisPanel({ state, deploymentId, onApplied }: DiagnosisPanelProps)
                 catch { /* clipboard blocked — user can re-copy from log */ }
                 window.location.assign('/settings');
               }}
-              className="text-[11px] px-3 py-1 rounded border border-slate-800 bg-white hover:bg-slate-50 text-slate-800 font-semibold shadow-[1px_1px_0_0_#1f2937]"
+              className="text-[11px] px-3 py-1 rounded border border-border bg-white hover:bg-slate-50 text-slate-800 font-semibold shadow-retro"
               title="Copy the diagnosis prompt and open AI & Autonomy settings"
             >
               Copy prompt & open AI settings →
@@ -2005,7 +2005,7 @@ function EnvVarsTab({ projectId }: { projectId: string }) {
           <button
             onClick={addVar}
             disabled={saving || !newKey.trim()}
-            className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-medium disabled:opacity-50 transition-colors"
+            className="px-4 py-2 rounded-lg bg-primary hover:bg-primary/90 text-white text-sm font-medium disabled:opacity-50 transition-colors"
           >
             {saving ? 'Saving…' : 'Add'}
           </button>
@@ -2216,7 +2216,7 @@ function WebhooksTab({ projectId }: { projectId: string }) {
           <button
             onClick={addHook}
             disabled={saving || testing || !url.trim()}
-            className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-medium disabled:opacity-50 transition-colors"
+            className="px-4 py-2 rounded-lg bg-primary hover:bg-primary/90 text-white text-sm font-medium disabled:opacity-50 transition-colors"
           >
             {saving ? 'Saving…' : 'Add'}
           </button>
@@ -2338,7 +2338,7 @@ function RelatedTab({ projectId }: { projectId: string }) {
           <button
             onClick={runBundle}
             disabled={running}
-            className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-medium disabled:opacity-50 transition-colors whitespace-nowrap"
+            className="px-4 py-2 rounded-lg bg-primary hover:bg-primary/90 text-white text-sm font-medium disabled:opacity-50 transition-colors whitespace-nowrap"
           >
             {running ? 'Queueing…' : 'Run with Related'}
           </button>
@@ -2410,7 +2410,7 @@ function RelatedTab({ projectId }: { projectId: string }) {
             <button
               onClick={add}
               disabled={saving || !chosenId}
-              className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-medium disabled:opacity-50 transition-colors"
+              className="px-4 py-2 rounded-lg bg-primary hover:bg-primary/90 text-white text-sm font-medium disabled:opacity-50 transition-colors"
             >
               {saving ? 'Saving…' : 'Add'}
             </button>
@@ -2561,7 +2561,7 @@ function DomainsTab({ projectId }: { projectId: string }) {
             onChange={(e) => setNewDomain(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && void addDomain()}
             placeholder="app.example.com"
-            className="flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-800 focus:ring-1 focus:ring-slate-800 outline-none"
+            className="flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-border focus:ring-1 focus:ring-slate-800 outline-none"
           />
           <button
             type="button"
@@ -3001,7 +3001,7 @@ function RunLocallyCard({ projectId }: { projectId: string }) {
             {/* Logs panel — collapsible, polls every 3s while open + follow */}
             {logsOpen && (
               <div className="rounded-lg border border-slate-300 bg-slate-950 overflow-hidden">
-                <div className="px-3 py-2 border-b border-slate-800 bg-slate-900 flex items-center justify-between">
+                <div className="px-3 py-2 border-b border-border bg-slate-900 flex items-center justify-between">
                   <div className="flex items-center gap-3 text-[11px] text-slate-300">
                     <span className="font-medium">Container logs</span>
                     <span className="text-slate-500">last 200 lines</span>

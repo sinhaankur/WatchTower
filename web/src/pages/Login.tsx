@@ -644,7 +644,7 @@ const Login = () => {
                     className={`w-full rounded-lg gap-2 py-6 text-base font-semibold flex items-center justify-center ${
                       (oauthReady || deviceFlowReady)
                         ? 'bg-slate-900 hover:bg-slate-800 text-white'
-                        : 'bg-slate-200 text-slate-700 hover:bg-slate-300 border border-slate-300'
+                        : 'bg-slate-200 text-slate-700 hover:bg-border border border-slate-300'
                     }`}
                     title={
                       (oauthReady || deviceFlowReady)
@@ -750,7 +750,7 @@ const Login = () => {
                     value={tokenInput}
                     onChange={(e) => setTokenInput(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && void continueWithToken()}
-                    className="w-full rounded-lg border border-slate-300 focus:border-red-700 focus:ring-1 focus:ring-red-700 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition"
+                    className="w-full rounded-lg border border-slate-300 focus:border-primary focus:ring-1 focus:ring-red-700 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition"
                     placeholder="WATCHTOWER_API_TOKEN"
                     autoComplete="current-password"
                   />

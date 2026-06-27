@@ -262,7 +262,7 @@ const Applications = () => {
           </button>
           <Link
             to="/setup"
-            className="px-3 sm:px-4 py-1.5 rounded-lg bg-red-700 hover:bg-red-800 text-white text-xs sm:text-sm font-medium transition-colors border border-slate-800 shadow-[2px_2px_0_0_#1f2937]"
+            className="px-3 sm:px-4 py-1.5 rounded-lg bg-primary hover:bg-primary/90 text-white text-xs sm:text-sm font-medium transition-colors border border-border shadow-retro"
           >
             + Deploy App
           </Link>
@@ -391,7 +391,7 @@ const Applications = () => {
                       <button
                         onClick={() => void triggerDeploy(p.id, p.repo_branch)}
                         disabled={isDeploying || inProgress}
-                        className="px-3 py-1.5 rounded-lg bg-red-700 hover:bg-red-800 text-white text-xs font-medium transition-colors border border-slate-800 shadow-[1px_1px_0_0_#1f2937] disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="px-3 py-1.5 rounded-lg bg-primary hover:bg-primary/90 text-white text-xs font-medium transition-colors border border-border shadow-retro disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         {isDeploying || inProgress ? (
                           <span className="inline-flex items-center gap-1">
@@ -450,7 +450,7 @@ const Applications = () => {
                       → Add Server First
                     </Link>
                     <Link to="/setup"
-                      className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-red-700 hover:bg-red-800 text-white text-sm transition-colors border border-slate-800 shadow-[2px_2px_0_0_#1f2937]">
+                      className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary hover:bg-primary/90 text-white text-sm transition-colors border border-border shadow-retro">
                       Setup Wizard →
                     </Link>
                   </>
@@ -527,7 +527,7 @@ const Applications = () => {
               </button>
               <button
                 onClick={() => void deleteProject(confirmDelete)}
-                className="px-4 py-2 rounded-lg bg-red-700 hover:bg-red-800 text-white text-sm font-medium transition-colors"
+                className="px-4 py-2 rounded-lg bg-primary hover:bg-primary/90 text-white text-sm font-medium transition-colors"
               >
                 Delete
               </button>

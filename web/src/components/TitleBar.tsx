@@ -42,7 +42,7 @@ function WinControls({ isMaximized }: { isMaximized: boolean }) {
       <button
         title="Close"
         onClick={() => electronAPI?.close()}
-        className="flex items-center justify-center w-11 h-full text-slate-600 hover:bg-red-600 hover:text-white transition-colors"
+        className="flex items-center justify-center w-11 h-full text-slate-600 hover:bg-primary hover:text-white transition-colors"
       >
         <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5">
           <line x1="1" y1="1" x2="9" y2="9" />

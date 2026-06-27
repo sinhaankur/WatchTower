@@ -245,8 +245,8 @@ const NodeManagement = () => {
                     }`}
                   >
                     <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs border ${
-                      i < step ? 'bg-red-700 border-red-700 text-white' :
-                      i === step ? 'border-red-700 text-red-700 bg-red-50' :
+                      i < step ? 'bg-primary border-primary text-white' :
+                      i === step ? 'border-primary text-primary bg-primary/5' :
                       'border-slate-300 text-slate-400'
                     }`}>
                       {i < step ? '✓' : i + 1}
@@ -254,7 +254,7 @@ const NodeManagement = () => {
                     {label}
                   </button>
                   {i < STEP_LABELS.length - 1 && (
-                    <div className={`flex-1 h-px mx-3 ${i < step ? 'bg-red-700' : 'bg-slate-300'}`} />
+                    <div className={`flex-1 h-px mx-3 ${i < step ? 'bg-primary' : 'bg-border'}`} />
                   )}
                 </div>
               ))}

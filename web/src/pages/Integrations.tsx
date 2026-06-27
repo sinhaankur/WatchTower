@@ -814,7 +814,7 @@ function WatchtowerConfigCard() {
         <button
           onClick={() => void save()}
           disabled={!dirty || saving}
-          className="px-3 py-1.5 rounded-lg text-xs font-medium border bg-slate-900 text-white border-slate-800 hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="px-3 py-1.5 rounded-lg text-xs font-medium border bg-slate-900 text-white border-border hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {saving ? 'Saving…' : 'Save settings'}
         </button>
@@ -1051,7 +1051,7 @@ const PROVIDER_META = {
   },
   hetzner: {
     name: 'Hetzner Cloud',
-    color: 'bg-red-600 hover:bg-red-700',
+    color: 'bg-primary hover:bg-primary/90',
     tokenHint: 'Create at console.hetzner.cloud → Security → API tokens. Pick Read & Write — Phase 5 needs to create servers and SSH keys.',
     placeholder: '01ABCD…',
     docsUrl: 'https://console.hetzner.cloud/',
