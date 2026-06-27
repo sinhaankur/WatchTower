@@ -4,6 +4,7 @@ import axios from 'axios';
 import apiClient from '@/lib/api';
 import { Input } from '@/components/ui/input';
 import EmptyState from '@/components/EmptyState';
+import UseThisPcCard from '@/components/UseThisPcCard';
 import { Label } from '@/components/ui/label';
 import { StatusPill, nodeStatusTone } from '@/components/ui/status-pill';
 import { useMe } from '@/hooks/queries';
@@ -233,6 +234,12 @@ const Servers = () => {
       </header>
 
       <main className="px-4 sm:px-6 lg:px-8 py-6 space-y-6 max-w-5xl mx-auto w-full">
+        {/* Plug-and-play: register the local machine as a deploy target in
+            one click. Hidden for guests (they can't manage nodes). */}
+        {!isGuest && (
+          <UseThisPcCard onRegistered={() => { if (orgId) void refreshNodes(orgId); }} />
+        )}
+
         {/* Guest-mode notice */}
         {isGuest && (
           <div className="flex items-start gap-3 rounded-xl border border-slate-300 bg-slate-50 px-4 py-3">
