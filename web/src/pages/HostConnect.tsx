@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import apiClient from '@/lib/api';
+import ToolInstallButton from '@/components/ToolInstallButton';
 
 type IntegrationStatus = {
   installed: boolean;
@@ -580,7 +581,12 @@ const HostConnect = () => {
                               <p className="text-sm font-medium text-slate-900 capitalize">{name}</p>
                               <p className="text-xs text-slate-600 truncate" title={row?.version ?? 'Not installed'}>{row?.version || 'Not installed'}</p>
                             </div>
-                            <StatusBadge ok={installed} label={installed ? 'Installed' : 'Missing'} />
+                            <div className="flex items-center gap-2 shrink-0">
+                              {!installed && (
+                                <ToolInstallButton tool={name} onInstalled={() => void loadAll()} />
+                              )}
+                              <StatusBadge ok={installed} label={installed ? 'Installed' : 'Missing'} />
+                            </div>
                           </div>
                         </div>
                       );
