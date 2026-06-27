@@ -276,23 +276,51 @@ function IconContainers() {
 //                     the same content (Tailscale, Cloudflare, Podman
 //                     install commands, domain wiring); two nav entries
 //                     for one concept was confusing.
-const PRIMARY_NAV: NavItem[] = [
-  { path: '/',                   label: 'Dashboard',         Icon: IconDashboard },
-  { path: '/applications',       label: 'Applications',      Icon: IconBox },
-  { path: '/templates',          label: 'Templates',         Icon: IconLayers },
-  { path: '/servers',            label: 'Servers',           Icon: IconServer },
-  { path: '/services',           label: 'Services',          Icon: IconLayers },
-  { path: '/managed-databases',  label: 'Databases',         Icon: IconBox },
-];
+// Navigation is grouped by user intent rather than a flat list, so a
+// newcomer can tell "what am I trying to do?" at a glance:
+//   DEPLOY         — ways to create + ship things
+//   INFRASTRUCTURE — the machines + data + containers underneath
+//   CONNECT        — wiring to the outside world
+//   SYSTEM         — account, governance, configuration
+// "Services" was a catalogue of one-click apps to launch (not running
+// services), so it's renamed "Catalog" and sits in DEPLOY next to
+// Templates. "Report Bug" moved out of the nav into the footer — it's a
+// support link, not a workspace.
+type NavGroup = { label: string; items: NavItem[] };
 
-const SECONDARY_NAV: NavItem[] = [
-  { path: '/integrations',     label: 'Integrations',     Icon: IconPuzzle },
-  { path: '/remote-access',    label: 'Remote Access',    Icon: IconRemoteAccess },
-  { path: '/local-containers', label: 'Containers', Icon: IconContainers },
-  { path: '/team',             label: 'Team',             Icon: IconUsers },
-  { path: '/audit',            label: 'Audit Log',        Icon: IconShield },
-  { path: '/report-bug',       label: 'Report Bug',       Icon: IconBug },
-  { path: '/settings',         label: 'Settings',         Icon: IconSettings },
+const NAV_GROUPS: NavGroup[] = [
+  {
+    label: 'Deploy',
+    items: [
+      { path: '/',             label: 'Dashboard',    Icon: IconDashboard },
+      { path: '/applications', label: 'Applications', Icon: IconBox },
+      { path: '/templates',    label: 'Templates',    Icon: IconLayers },
+      { path: '/services',     label: 'Catalog',      Icon: IconPuzzle },
+    ],
+  },
+  {
+    label: 'Infrastructure',
+    items: [
+      { path: '/servers',           label: 'Servers',    Icon: IconServer },
+      { path: '/managed-databases', label: 'Databases',  Icon: IconBox },
+      { path: '/local-containers',  label: 'Containers', Icon: IconContainers },
+    ],
+  },
+  {
+    label: 'Connect',
+    items: [
+      { path: '/integrations',  label: 'Integrations',   Icon: IconPuzzle },
+      { path: '/remote-access', label: 'Remote Access',  Icon: IconRemoteAccess },
+    ],
+  },
+  {
+    label: 'System',
+    items: [
+      { path: '/team',     label: 'Team',      Icon: IconUsers },
+      { path: '/audit',    label: 'Audit Log', Icon: IconShield },
+      { path: '/settings', label: 'Settings',  Icon: IconSettings },
+    ],
+  },
 ];
 
 // A small, opinionated section header. Slate-400 + uppercase +
@@ -479,36 +507,25 @@ export default function Layout({ children }: { children: ReactNode }) {
       )}
 
       <nav className={`flex-1 ${rail ? 'px-1.5' : 'px-2'} pt-1 pb-2 overflow-y-auto`}>
-        {!rail && <NavSectionLabel>Workspace</NavSectionLabel>}
-        <div className="space-y-px">
-          {PRIMARY_NAV.map((item) => (
-            <NavLink
-              key={item.path}
-              item={item}
-              pathname={pathname}
-              onClick={onNavClick}
-              rail={rail}
-              badge={navBadgeFor(item.path)}
-            />
-          ))}
-        </div>
-        {rail ? (
-          <div className="my-2 mx-3 border-t border-slate-200" />
-        ) : (
-          <NavSectionLabel>Admin</NavSectionLabel>
-        )}
-        <div className="space-y-px">
-          {SECONDARY_NAV.map((item) => (
-            <NavLink
-              key={item.path}
-              item={item}
-              pathname={pathname}
-              onClick={onNavClick}
-              rail={rail}
-              badge={navBadgeFor(item.path)}
-            />
-          ))}
-        </div>
+        {NAV_GROUPS.map((group, gi) => (
+          <div key={group.label}>
+            {rail
+              ? gi > 0 && <div className="my-2 mx-3 border-t border-border-soft" />
+              : <NavSectionLabel>{group.label}</NavSectionLabel>}
+            <div className="space-y-px">
+              {group.items.map((item) => (
+                <NavLink
+                  key={item.path}
+                  item={item}
+                  pathname={pathname}
+                  onClick={onNavClick}
+                  rail={rail}
+                  badge={navBadgeFor(item.path)}
+                />
+              ))}
+            </div>
+          </div>
+        ))}
       </nav>
 
       {/* Rail-mode footer: avatar dropdown trigger + update dot. The
@@ -534,6 +551,28 @@ export default function Layout({ children }: { children: ReactNode }) {
             settings + sign out. Replaces the old inline identity card +
             naked "Sign out" link footer. */}
         <UserMenu />
+        {/* Support + feedback — open-source funding (GitHub Sponsors) and a
+            bug-report link. Kept out of the primary nav (they're not
+            workspaces) but easy to reach from the footer. */}
+        <div className="mt-3 flex items-center gap-2">
+          <a
+            href="https://github.com/sponsors/sinhaankur"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-md border border-border-soft px-2 py-1.5 text-[11px] font-medium text-foreground hover:bg-muted transition-colors"
+            title="Support WatchTower's development"
+          >
+            <span className="text-primary">♥</span> Support
+          </a>
+          <Link
+            to="/report-bug"
+            onClick={onNavClick}
+            className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-md border border-border-soft px-2 py-1.5 text-[11px] font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors [&_svg]:size-3.5"
+            title="Report a bug"
+          >
+            <IconBug /> Report Bug
+          </Link>
+        </div>
         {/* Version line — quiet, single line, separates from chrome with
             a thin top border. The "update available" affordance is the
             only thing meant to draw the eye when relevant. */}
