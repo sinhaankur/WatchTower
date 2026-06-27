@@ -83,10 +83,12 @@ function StatCard({ label, value, sub, accent }: { label: string; value: string 
   const animated = useCountUp(isNumber ? (value as number) : 0);
   const display = isNumber ? animated : value;
   return (
-    <div className="rounded-xl border border-border bg-card p-5 hover:border-red-300 hover:-translate-y-0.5 transition-[transform,border-color] duration-150 shadow-sm">
-      <p className="text-xs text-muted-foreground uppercase tracking-wider mb-2">{label}</p>
-      <p className={`text-3xl font-bold tabular-nums ${accent ?? 'text-foreground'}`}>{display}</p>
-      {sub && <p className="text-xs text-muted-foreground mt-1">{sub}</p>}
+    <div className="group relative rounded-md border-2 border-border bg-card p-5 shadow-retro transition-all duration-fast ease-spring hover:-translate-x-0.5 hover:-translate-y-0.5 hover:shadow-retro-hover">
+      <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-[0.14em] mb-2">{label}</p>
+      <p className={`text-3xl font-extrabold tabular-nums leading-none ${accent ?? 'text-foreground'}`}>{display}</p>
+      {sub && <p className="text-xs text-muted-foreground mt-2">{sub}</p>}
+      {/* brand accent bar that grows on hover — subtle motion cue */}
+      <span className="absolute bottom-0 left-0 h-1 w-0 bg-secondary transition-all duration-base ease-spring group-hover:w-full rounded-b-md" />
     </div>
   );
 }
@@ -354,20 +356,24 @@ const Dashboard = () => {
         <SystemOverviewBanner />
 
         {/* Hero / onboarding banner */}
-        <section className="wt-panel p-5 bg-gradient-to-br from-white to-amber-50">
-          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+        <section className="relative overflow-hidden rounded-md border-2 border-border bg-gradient-to-br from-card via-card to-secondary/20 p-6 shadow-retro">
+          {/* decorative brand glyph block, bleeds off the corner */}
+          <span aria-hidden className="pointer-events-none absolute -right-6 -top-6 h-28 w-28 rotate-12 rounded-2xl border-2 border-border bg-secondary/40" />
+          <div className="relative flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
             <div className="min-w-0">
-              <p className="text-[11px] uppercase tracking-[0.18em] text-red-700 font-semibold">WatchTower</p>
-              <h2 className="text-xl font-bold text-slate-900 mt-1">Simple Infrastructure Control</h2>
-              <p className="text-sm text-slate-600 mt-1.5">
-                Manage hosts, deploy apps, connect databases, and keep containers up to date from one place.
+              <p className="inline-flex items-center gap-1.5 text-[11px] uppercase tracking-[0.2em] text-primary font-bold">
+                <span className="h-1.5 w-1.5 rounded-full bg-primary" /> WatchTower
+              </p>
+              <h2 className="text-2xl font-extrabold text-foreground mt-1.5 tracking-tight">Simple Infrastructure Control</h2>
+              <p className="text-sm text-muted-foreground mt-2 max-w-xl">
+                Manage hosts, deploy apps, connect databases, and keep containers up to date — all from one place.
               </p>
             </div>
             <Link
               to="/host-connect?tab=tools"
-              className="shrink-0 px-4 py-2 rounded-xl border border-slate-800 bg-white hover:bg-amber-50 text-red-700 text-sm font-semibold transition-colors shadow-[2px_2px_0_0_#1f2937]"
+              className="shrink-0 inline-flex items-center gap-2 rounded-md border-2 border-border bg-card px-4 py-2 text-sm font-bold text-primary shadow-[3px_3px_0_0_hsl(var(--border))] transition-all duration-fast ease-spring hover:-translate-x-0.5 hover:-translate-y-0.5 hover:shadow-[5px_5px_0_0_hsl(var(--border))] active:translate-x-0.5 active:translate-y-0.5 active:shadow-none"
             >
-              Host Connect
+              Host Connect →
             </Link>
           </div>
           {/* Quick start steps — shown when offline / no projects */}
