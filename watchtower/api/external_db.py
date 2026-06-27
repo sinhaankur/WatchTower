@@ -53,6 +53,45 @@ class UpdateExternalRequest(BaseModel):
     notes: Optional[str] = Field(None, max_length=500)
 
 
+class DiscoveredDb(BaseModel):
+    """A database container already running on this host that WatchTower didn't
+    create — an adoption candidate. The UI pre-fills the 'connect external DB'
+    form from this so the user just adds the password."""
+    container_id: str
+    container_name: str
+    image: str
+    engine: str                     # classified from the image
+    suggested_host: str = "127.0.0.1"
+    suggested_port: Optional[int]   # published host port, if any
+    suggested_username: str
+    state: str
+    already_connected: bool         # an ExternalDatabase already points here
+
+
+# Image-substring → engine. Covers the common official images regardless of
+# registry prefix or tag (e.g. "docker.io/library/postgres:16", "postgres:16-alpine",
+# "mariadb:11", "bitnami/redis"). Order matters: check mariadb before mysql
+# isn't needed (distinct substrings) but mongo before mongodb-ish is fine.
+_IMAGE_ENGINE_HINTS: tuple[tuple[str, str], ...] = (
+    ("postgres", "postgres"),
+    ("postgis", "postgres"),
+    ("mariadb", "mariadb"),
+    ("mysql", "mysql"),
+    ("percona", "mysql"),
+    ("mongo", "mongodb"),
+    ("redis", "redis"),
+    ("valkey", "redis"),
+)
+
+
+def _classify_engine(image: str) -> Optional[str]:
+    img = (image or "").lower()
+    for hint, engine in _IMAGE_ENGINE_HINTS:
+        if hint in img:
+            return engine
+    return None
+
+
 class ExternalDbResponse(BaseModel):
     id: str
     name: str
@@ -125,6 +164,59 @@ async def list_external(
 ) -> list[ExternalDbResponse]:
     rows = db.query(ExternalDatabase).order_by(ExternalDatabase.created_at.desc()).all()
     return [_serialize(r) for r in rows]
+
+
+@router.get("/discover", response_model=list[DiscoveredDb])
+async def discover_local_databases(
+    db: Session = Depends(get_db),
+    _current_user: dict = Depends(util.get_current_user),
+) -> list[DiscoveredDb]:
+    """Find database containers already running on this host that WatchTower
+    didn't create, so the user can adopt them in one click instead of typing
+    host/port/engine by hand. WatchTower-managed DBs are excluded (they're
+    already first-class). Best-effort: if podman isn't available, returns []."""
+    try:
+        from watchtower import podman_runtime
+        containers = podman_runtime.list_containers()
+    except Exception as exc:  # noqa: BLE001 — no runtime / probe failure → nothing to adopt
+        logger.info("discover: could not list containers (%s)", exc)
+        return []
+
+    # Hosts/ports already registered as external DBs → mark candidates as
+    # already-connected so the UI can disable "adopt" for them.
+    existing = db.query(ExternalDatabase).all()
+    connected_hostports = {(e.host, e.port) for e in existing}
+
+    out: list[DiscoveredDb] = []
+    for c in containers:
+        if c.get("managed"):
+            continue  # WatchTower's own managed DB — not an adoption candidate
+        engine = _classify_engine(c.get("image") or "")
+        if not engine:
+            continue  # not a recognised database image
+        # First published host port (the one an app would connect to).
+        host_port: Optional[int] = None
+        for p in c.get("ports") or []:
+            hp = p.get("host")
+            if hp:
+                try:
+                    host_port = int(hp)
+                    break
+                except (TypeError, ValueError):
+                    continue
+        spec = _ENGINES.get(engine)
+        out.append(DiscoveredDb(
+            container_id=c.get("id", ""),
+            container_name=c.get("name", "?"),
+            image=c.get("image") or "",
+            engine=engine,
+            suggested_port=host_port,
+            suggested_username=spec.default_user if spec else "",
+            state=c.get("state") or "",
+            already_connected=host_port is not None
+            and ("127.0.0.1", host_port) in connected_hostports,
+        ))
+    return out
 
 
 @router.post("", response_model=ExternalDbResponse)

@@ -885,6 +885,27 @@ export function useCreateExternalDatabase() {
   });
 }
 
+export type DiscoveredDb = {
+  container_id: string;
+  container_name: string;
+  image: string;
+  engine: string;
+  suggested_host: string;
+  suggested_port: number | null;
+  suggested_username: string;
+  state: string;
+  already_connected: boolean;
+};
+
+export function useDiscoverLocalDatabases() {
+  return useQuery<DiscoveredDb[]>({
+    queryKey: ['external-databases', 'discover'],
+    queryFn: async () =>
+      (await apiClient.get<DiscoveredDb[]>('/external-databases/discover')).data,
+    staleTime: 15_000,
+  });
+}
+
 export function useDeleteExternalDatabase() {
   const qc = useQueryClient();
   return useMutation<void, unknown, string>({

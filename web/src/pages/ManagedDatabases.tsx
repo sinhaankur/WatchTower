@@ -19,12 +19,14 @@ import {
 } from '@/components/SectionDiagrams';
 import {
   type BackupSchedule,
+  type DiscoveredDb,
   type ExternalDatabase,
   type ManagedDatabase,
   type ManagedDatabaseCreateResponse,
   type ManagedDbBackup,
   type ManagedDbReplica,
   useAddReplica,
+  useDiscoverLocalDatabases,
   useBackupSchedule,
   useCreateBackup,
   useUpdateBackupSchedule,
@@ -411,6 +413,7 @@ function ExternalCredentialsModal({
 
 function CreateExternalModal({ onClose }: { onClose: () => void }) {
   const { data: engines } = useManagedDbEngines();
+  const { data: discovered } = useDiscoverLocalDatabases();
   const [name, setName] = useState('');
   const [engineId, setEngineId] = useState('postgres');
   const [host, setHost] = useState('');
@@ -459,12 +462,52 @@ function CreateExternalModal({ onClose }: { onClose: () => void }) {
     );
   };
 
+  // Pre-fill the form from a discovered local DB container — the user then
+  // just adds the password and saves.
+  const adopt = (d: DiscoveredDb) => {
+    setName(d.container_name);
+    onEngineChange(d.engine);
+    setHost(d.suggested_host || '127.0.0.1');
+    if (d.suggested_port) setPort(d.suggested_port);
+    if (d.suggested_username) setUsername(d.suggested_username);
+    setUseTls(false); // local containers are plaintext on loopback
+  };
+
+  const adoptable = (discovered ?? []).filter((d) => !d.already_connected);
+
   return (
     <Modal onClose={onClose}>
       <h2 className="text-base font-semibold text-slate-900">Connect external database</h2>
       <p className="text-xs text-slate-600 mt-1">
         Point WatchTower at a database you already run. Credentials are encrypted at rest.
       </p>
+
+      {adoptable.length > 0 && (
+        <div className="mt-3 rounded-lg border border-border-soft bg-surface-soft p-3">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-2">
+            Found on this PC
+          </p>
+          <div className="space-y-1.5">
+            {adoptable.map((d) => (
+              <div key={d.container_id} className="flex items-center gap-2 text-xs">
+                <span className={`inline-block w-1.5 h-1.5 rounded-full shrink-0 ${d.state === 'running' ? 'bg-emerald-500' : 'bg-slate-400'}`} />
+                <span className="font-mono text-foreground truncate">{d.container_name}</span>
+                <span className="text-muted-foreground">· {d.engine}{d.suggested_port ? ` :${d.suggested_port}` : ''}</span>
+                <button
+                  type="button"
+                  onClick={() => adopt(d)}
+                  className="ml-auto px-2 py-0.5 rounded border border-border bg-card text-foreground hover:bg-muted transition-colors shrink-0"
+                >
+                  Adopt
+                </button>
+              </div>
+            ))}
+          </div>
+          <p className="text-[10px] text-muted-foreground mt-2">
+            Adopt pre-fills the form — just add the password and save.
+          </p>
+        </div>
+      )}
 
       <div className="mt-4 space-y-3">
         <Field label="Name">
