@@ -495,11 +495,16 @@ export type ManagedDatabaseCreateInput = {
   version?: string;
   database_name?: string;
   username?: string;
+  // Plug-and-play: auto-wire the new DB into a project's deploy env on create.
+  link_project_id?: string;
+  link_env_var_name?: string;
 };
 
 export type ManagedDatabaseCreateResponse = ManagedDatabase & {
   password: string;
   connection_string: string;
+  linked_project_id?: string | null;
+  linked_env_var_name?: string | null;
 };
 
 export function useManagedDbRuntime() {

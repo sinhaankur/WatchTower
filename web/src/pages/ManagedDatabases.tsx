@@ -45,6 +45,7 @@ import {
   useRemoveReplica,
   useRevealExternalDatabase,
   useRevealManagedDatabase,
+  useProjects,
   useStartManagedDatabase,
   useStopManagedDatabase,
 } from '@/hooks/queries';
@@ -1530,11 +1531,14 @@ function CreateModal({
   onCreated: (resp: ManagedDatabaseCreateResponse) => void;
 }) {
   const { data: engines } = useManagedDbEngines();
+  const { data: projects } = useProjects();
   const [name, setName] = useState('');
   const [engineId, setEngineId] = useState<string>('postgres');
   const [version, setVersion] = useState<string>('16');
   const [databaseName, setDatabaseName] = useState('appdb');
   const [username, setUsername] = useState('watchtower');
+  const [linkProjectId, setLinkProjectId] = useState<string>('');
+  const [linkEnvVar, setLinkEnvVar] = useState<string>('DATABASE_URL');
   const [error, setError] = useState<string | null>(null);
 
   const create = useCreateManagedDatabase();
@@ -1567,6 +1571,10 @@ function CreateModal({
         version,
         database_name: isRedis ? 'appdb' : databaseName,
         username: isRedis ? 'watchtower' : username,
+        // Plug-and-play: when a project is chosen, wire the connection
+        // string straight into its deploy env as link_env_var_name.
+        link_project_id: linkProjectId || undefined,
+        link_env_var_name: linkProjectId ? (linkEnvVar.trim() || 'DATABASE_URL') : undefined,
       },
       {
         onSuccess: onCreated,
@@ -1648,6 +1656,38 @@ function CreateModal({
             Redis only uses a password for authentication — no database name or username needed.
           </p>
         )}
+
+        {/* Plug-and-play: optionally wire the connection string straight into
+            a project's deploy env so there's no separate "link" step. */}
+        <div className="pt-1 border-t border-border-soft">
+          <Field
+            label="Connect to a project (optional)"
+            hint="Auto-injects the connection string into that project's deploy environment."
+          >
+            <select
+              value={linkProjectId}
+              onChange={(e) => setLinkProjectId(e.target.value)}
+              className="w-full rounded-lg border border-border bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+            >
+              <option value="">Don't connect — just create the database</option>
+              {(projects ?? []).map((p) => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+          </Field>
+          {linkProjectId && (
+            <div className="mt-2">
+              <Field label="Inject as env var" hint="The project reads this on deploy.">
+                <input
+                  value={linkEnvVar}
+                  onChange={(e) => setLinkEnvVar(e.target.value)}
+                  placeholder="DATABASE_URL"
+                  className="w-full rounded-lg border border-border bg-white px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-ring"
+                />
+              </Field>
+            </div>
+          )}
+        </div>
       </div>
 
       {error && (
