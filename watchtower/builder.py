@@ -627,7 +627,9 @@ async def _run_static_container_on_node(
         return False, msg
 
     cname = _container_name(project)
-    remote_path = node.remote_path.rstrip("/")
+    # Use the local-safe path for local nodes (handles empty remote_path);
+    # for SSH nodes this is just node.remote_path.rstrip("/") as before.
+    remote_path = _local_deploy_path(node) if _is_local_node(node) else node.remote_path.rstrip("/")
     # `:ro,z` keeps SELinux-enforcing hosts (Fedora/RHEL) happy — the `z`
     # relabels the bind source so the container can read it. On systems
     # without SELinux it's a no-op. `--restart=always` covers Podman
@@ -1336,7 +1338,26 @@ def _own_hostname() -> str:
         return ""
 
 
+def _local_deploy_path(node: OrgNode) -> str:
+    """Effective deploy directory for a local node. Defends against an empty
+    remote_path (which would make rsync/bind-mount target '/'): older local
+    nodes registered before this_pc.py set a default still resolve to a safe
+    per-machine directory under the data dir."""
+    rp = (node.remote_path or "").strip()
+    if rp and rp != "/":
+        return rp.rstrip("/")
+    base = os.getenv("WATCHTOWER_DATA_DIR")
+    root = Path(base).expanduser() if base else (Path.home() / ".watchtower")
+    return str(root / "deployments" / "this-pc")
+
+
 def _is_local_node(node: OrgNode) -> bool:
+    # Authoritative marker first: the one-click "Use this PC" flow registers
+    # the node with provider="local" (see watchtower/api/this_pc.py). That's
+    # an explicit operator declaration, more reliable than host-string
+    # heuristics — and it's how a local node deploys without SSH.
+    if (getattr(node, "provider", None) or "").strip().lower() == "local":
+        return True
     host = (node.host or "").strip().lower()
     if host in _LOCALHOST_HOSTS:
         return True
@@ -1360,7 +1381,7 @@ async def _rsync_to_node(
     # missing directory ("No such file or directory") obscures the real
     # issue when a user just registered a fresh local node.
     if _is_local_node(node):
-        dest = f"{node.remote_path.rstrip('/')}/"
+        dest = f"{_local_deploy_path(node)}/"
         try:
             Path(dest).mkdir(parents=True, exist_ok=True)
         except OSError as exc:
@@ -1429,7 +1450,7 @@ async def _ssh_run(
     # ssh. The cwd is set to remote_path so relative paths in the script
     # resolve where the deployed files live.
     if _is_local_node(node):
-        cwd = node.remote_path or None
+        cwd = _local_deploy_path(node) or None
         if cwd:
             try:
                 Path(cwd).mkdir(parents=True, exist_ok=True)

@@ -74,3 +74,25 @@ def test_registered_local_node_appears_with_local_provider(client: TestClient):
     body = client.get("/api/this-pc/status").json()
     assert body["registered"] is True
     assert body["node_status"] in {"healthy", "offline", "unreachable", "degraded"}
+
+
+def test_registered_local_node_has_real_deploy_path(client: TestClient):
+    """The registered node must carry a non-empty, non-root remote_path so the
+    builder's local rsync + container bind-mount don't target '/'. This is the
+    contract that makes local deploys actually work."""
+    from watchtower.database import OrgNode, SessionLocal
+    from watchtower.api import this_pc
+
+    client.post("/api/this-pc/use-as-server")
+    db = SessionLocal()
+    try:
+        node = (
+            db.query(OrgNode)
+            .filter(OrgNode.provider == this_pc.LOCAL_PROVIDER)
+            .first()
+        )
+        assert node is not None
+        assert node.remote_path not in ("", "/", None)
+        assert node.remote_path.rstrip("/").endswith("deployments/this-pc")
+    finally:
+        db.close()

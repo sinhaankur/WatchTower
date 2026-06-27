@@ -20,8 +20,10 @@ Servers list) treats it uniformly.
 from __future__ import annotations
 
 import logging
+import os
 import platform
 import socket
+from pathlib import Path
 from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -71,6 +73,17 @@ def _local_hostname() -> str:
         return socket.gethostname() or "this-pc"
     except Exception:  # noqa: BLE001
         return "this-pc"
+
+
+def _local_deploy_root() -> Path:
+    """Where local deploys land. The builder rsyncs each deploy here and (for
+    container projects) bind-mounts it. Must be a real, writable directory —
+    an empty remote_path would make rsync/bind-mount target '/'. Mirrors the
+    data-dir convention used elsewhere (WATCHTOWER_DATA_DIR → ~/.watchtower).
+    """
+    base = os.getenv("WATCHTOWER_DATA_DIR")
+    root = Path(base).expanduser() if base else (Path.home() / ".watchtower")
+    return root / "deployments" / "this-pc"
 
 
 def _find_local_node(db: Session, org_id) -> Optional[OrgNode]:
@@ -146,13 +159,23 @@ async def use_this_pc_as_server(
         return {"node": _serialize(existing), "created": False}
 
     runtime = _detect_runtime()
+
+    # Resolve (and create) the local deploy directory now so the node carries
+    # a valid remote_path — the builder rsyncs here and bind-mounts it for
+    # container projects. An empty path would target '/'.
+    deploy_root = _local_deploy_root()
+    try:
+        deploy_root.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        logger.warning("Could not create local deploy dir %s: %s", deploy_root, exc)
+
     node = OrgNode(
         org_id=org.id,
         name=f"This PC ({_local_hostname()})",
         host=LOCAL_HOST,
         user="",                       # no SSH user — runs locally
         port=0,                        # not an SSH node
-        remote_path="",                # local runner picks its own workdir
+        remote_path=str(deploy_root),  # local deploy workdir (rsync + bind-mount target)
         reload_command="",             # local runner manages restarts
         provider=LOCAL_PROVIDER,
         is_primary=True,               # the obvious default target on a fresh install

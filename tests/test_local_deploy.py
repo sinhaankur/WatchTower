@@ -21,15 +21,15 @@ from typing import Optional
 
 import pytest
 
-from watchtower.builder import _is_local_node, check_ssh_connectivity
+from watchtower.builder import _is_local_node, _local_deploy_path, check_ssh_connectivity
 
 
 @dataclass
 class _Node:
     """Minimal stand-in for an OrgNode row.
 
-    The functions under test only read .host / .remote_path, so we
-    don't need to spin up a database or fixture.
+    The functions under test only read .host / .remote_path / .provider, so
+    we don't need to spin up a database or fixture.
     """
 
     host: Optional[str] = None
@@ -37,6 +37,7 @@ class _Node:
     port: int = 22
     user: str = "watchtower"
     ssh_key_path: Optional[str] = None
+    provider: Optional[str] = None
 
 
 @pytest.mark.parametrize(
@@ -56,6 +57,31 @@ class _Node:
 def test_is_local_node_classifies_correctly(host, expected):
     """Misclassification here = wrong deploy code path. Pin it down."""
     assert _is_local_node(_Node(host=host)) is expected
+
+
+def test_provider_local_marks_node_local_regardless_of_host():
+    """The one-click 'Use this PC' flow sets provider='local'. That marker is
+    authoritative — a node with it must take the local (no-SSH) path even if
+    its host string wouldn't otherwise classify as local."""
+    assert _is_local_node(_Node(host="127.0.0.1", provider="local")) is True
+    # Even a non-loopback host is treated local when explicitly marked.
+    assert _is_local_node(_Node(host="10.0.0.5", provider="local")) is True
+    assert _is_local_node(_Node(host="10.0.0.5", provider=None)) is False
+
+
+def test_local_deploy_path_falls_back_when_empty():
+    """An empty remote_path must NOT resolve to '/' (which would make rsync
+    --delete and the container bind-mount target the filesystem root). It
+    falls back to a safe per-machine directory under the data dir."""
+    node = _Node(host="127.0.0.1", provider="local", remote_path="")
+    p = _local_deploy_path(node)
+    assert p not in ("", "/")
+    assert p.endswith("deployments/this-pc")
+
+
+def test_local_deploy_path_honors_explicit_path():
+    node = _Node(host="127.0.0.1", provider="local", remote_path="/srv/site/")
+    assert _local_deploy_path(node) == "/srv/site"
 
 
 def test_check_ssh_connectivity_local_node_writable_path(tmp_path: Path):
