@@ -885,6 +885,24 @@ export function useCreateExternalDatabase() {
   });
 }
 
+export type TailnetPeer = {
+  hostname: string;
+  dns_name: string | null;
+  ip: string;
+  online: boolean;
+  os: string | null;
+  already_added: boolean;
+};
+
+export function useDiscoverNodes() {
+  return useQuery<{ source: string; peers: TailnetPeer[] }>({
+    queryKey: ['this-pc', 'discover-nodes'],
+    queryFn: async () =>
+      (await apiClient.get<{ source: string; peers: TailnetPeer[] }>('/this-pc/discover-nodes')).data,
+    staleTime: 15_000,
+  });
+}
+
 export type DiscoveredDb = {
   container_id: string;
   container_name: string;

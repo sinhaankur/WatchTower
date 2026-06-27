@@ -5,6 +5,7 @@ import apiClient from '@/lib/api';
 import { Input } from '@/components/ui/input';
 import EmptyState from '@/components/EmptyState';
 import UseThisPcCard from '@/components/UseThisPcCard';
+import DiscoverNodesCard from '@/components/DiscoverNodesCard';
 import { Label } from '@/components/ui/label';
 import { StatusPill, nodeStatusTone } from '@/components/ui/status-pill';
 import { useMe } from '@/hooks/queries';
@@ -238,6 +239,18 @@ const Servers = () => {
             one click. Hidden for guests (they can't manage nodes). */}
         {!isGuest && (
           <UseThisPcCard onRegistered={() => { if (orgId) void refreshNodes(orgId); }} />
+        )}
+
+        {/* Tailnet discovery: pre-fill the add-server form from a peer. */}
+        {!isGuest && (
+          <DiscoverNodesCard
+            onPick={(host, name) => {
+              setField('host', host);
+              setField('name', name);
+              setShowForm(true);
+              setShowProvision(false);
+            }}
+          />
         )}
 
         {/* Guest-mode notice */}

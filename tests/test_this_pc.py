@@ -96,3 +96,95 @@ def test_registered_local_node_has_real_deploy_path(client: TestClient):
         assert node.remote_path.rstrip("/").endswith("deployments/this-pc")
     finally:
         db.close()
+
+
+# ── Tailnet node discovery ───────────────────────────────────────────────────
+
+import json as _json  # noqa: E402
+from types import SimpleNamespace  # noqa: E402
+
+from watchtower.api import this_pc as _this_pc  # noqa: E402
+
+
+_FAKE_TS_STATUS = _json.dumps({
+    "Self": {"HostName": "my-pc", "TailscaleIPs": ["100.64.0.1"], "DNSName": "my-pc.tail.ts.net."},
+    "Peer": {
+        "k1": {"HostName": "build-box", "TailscaleIPs": ["100.64.0.2"],
+               "DNSName": "build-box.tail.ts.net.", "Online": True, "OS": "linux"},
+        "k2": {"HostName": "old-laptop", "TailscaleIPs": ["100.64.0.3"],
+               "DNSName": "old-laptop.tail.ts.net.", "Online": False, "OS": "macOS"},
+    },
+})
+
+
+def test_discover_nodes_requires_auth(anon_client: TestClient):
+    assert anon_client.get("/api/this-pc/discover-nodes").status_code == 401
+
+
+def test_discover_nodes_empty_without_tailscale(client: TestClient, monkeypatch):
+    """No Tailscale CLI → empty list, not an error."""
+    monkeypatch.setattr("watchtower.tool_resolver.tailscale_binary", lambda: None)
+    r = client.get("/api/this-pc/discover-nodes")
+    assert r.status_code == 200
+    assert r.json() == {"source": "tailscale", "peers": []}
+
+
+def test_discover_nodes_lists_peers(client: TestClient, monkeypatch):
+    monkeypatch.setattr("watchtower.tool_resolver.tailscale_binary", lambda: "/usr/bin/tailscale")
+    monkeypatch.setattr(
+        _this_pc.subprocess, "run",
+        lambda *a, **k: SimpleNamespace(returncode=0, stdout=_FAKE_TS_STATUS, stderr=""),
+    )
+    r = client.get("/api/this-pc/discover-nodes")
+    assert r.status_code == 200
+    peers = r.json()["peers"]
+    names = [p["hostname"] for p in peers]
+    # Self excluded; both peers present; online sorted first.
+    assert "my-pc" not in names
+    assert names[0] == "build-box"  # online peer ranks above offline
+    assert {"build-box", "old-laptop"} == set(names)
+    bb = next(p for p in peers if p["hostname"] == "build-box")
+    assert bb["ip"] == "100.64.0.2"
+    assert bb["online"] is True
+    assert bb["already_added"] is False
+
+
+def test_discover_nodes_flags_already_added(client: TestClient, monkeypatch):
+    """A peer whose IP matches a registered OrgNode is flagged already_added."""
+    monkeypatch.setattr("watchtower.tool_resolver.tailscale_binary", lambda: "/usr/bin/tailscale")
+    monkeypatch.setattr(
+        _this_pc.subprocess, "run",
+        lambda *a, **k: SimpleNamespace(returncode=0, stdout=_FAKE_TS_STATUS, stderr=""),
+    )
+    # Register an OrgNode at build-box's IP in the caller's org, then confirm
+    # discovery flags that peer as already added.
+    import uuid as _uuid
+    from watchtower.database import OrgNode, SessionLocal
+    from watchtower.api import enterprise
+
+    # First call establishes the caller's org membership.
+    client.get("/api/this-pc/discover-nodes")
+    db = SessionLocal()
+    try:
+        _u, org, _m = enterprise._ensure_user_org_member(
+            db, {"user_id": str(_uuid.uuid5(_uuid.NAMESPACE_DNS, "watchtower-static-token-user")),
+                 "email": "developer@watchtower.local"}
+        )
+        # The static-token user's org is deterministic; register the node there.
+        db.add(OrgNode(org_id=org.id, name="bb", host="100.64.0.2", user="x",
+                       port=22, remote_path="/srv", reload_command="true"))
+        db.commit()
+        target_org = org.id
+    finally:
+        db.close()
+
+    r = client.get("/api/this-pc/discover-nodes")
+    assert r.status_code == 200
+    peers = r.json()["peers"]
+    bb = next(p for p in peers if p["hostname"] == "build-box")
+    # If the registration landed in the same org the endpoint resolves, the
+    # peer is flagged. (Static-token org resolution is deterministic, so it
+    # should match; assert defensively that the key exists regardless.)
+    assert "already_added" in bb
+    if target_org is not None:
+        assert bb["already_added"] is True

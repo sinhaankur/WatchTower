@@ -19,12 +19,14 @@ Servers list) treats it uniformly.
 """
 from __future__ import annotations
 
+import json
 import logging
 import os
 import platform
 import socket
+import subprocess
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
@@ -226,3 +228,85 @@ def _serialize(node: OrgNode) -> Dict[str, Any]:
         "status": node.status.value if node.status else None,
         "status_message": node.status_message,
     }
+
+
+# ── Tailnet node discovery ───────────────────────────────────────────────────
+
+
+def _discover_tailnet_peers() -> List[Dict[str, Any]]:
+    """Parse `tailscale status --json` into reachable peer candidates.
+
+    Returns one entry per online peer (excluding this machine): hostname, the
+    first Tailscale IP, and online state. Best-effort — returns [] if the
+    Tailscale CLI isn't found or the call fails, so the endpoint never errors
+    just because Tailscale isn't set up.
+    """
+    try:
+        from watchtower.tool_resolver import tailscale_binary
+        bin_ = tailscale_binary()
+    except Exception:  # noqa: BLE001
+        bin_ = None
+    if not bin_:
+        return []
+    try:
+        proc = subprocess.run(
+            [bin_, "status", "--json"],
+            capture_output=True, text=True, timeout=8.0,
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        logger.info("discover-nodes: tailscale status failed (%s)", exc)
+        return []
+    if proc.returncode != 0 or not (proc.stdout or "").strip():
+        return []
+    try:
+        data = json.loads(proc.stdout)
+    except json.JSONDecodeError:
+        return []
+
+    peers = (data.get("Peer") or {}).values()
+    out: List[Dict[str, Any]] = []
+    for p in peers:
+        ips = p.get("TailscaleIPs") or []
+        ip = ips[0] if ips else None
+        if not ip:
+            continue
+        dns = (p.get("DNSName") or "").rstrip(".")
+        host_label = (p.get("HostName") or dns or ip)
+        out.append({
+            "hostname": host_label,
+            "dns_name": dns or None,
+            "ip": ip,
+            "online": bool(p.get("Online")),
+            "os": p.get("OS") or None,
+        })
+    # Online peers first, then alphabetical — most-useful candidates on top.
+    out.sort(key=lambda c: (not c["online"], c["hostname"].lower()))
+    return out
+
+
+@router.get("/discover-nodes")
+async def discover_nodes(
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(util.get_current_user),
+) -> Dict[str, Any]:
+    """List machines on this Tailnet as one-click deploy-target candidates.
+
+    Flags peers already registered as OrgNodes (by host == IP or DNS name) so
+    the UI can disable "add" for them. Tailscale-only for now (it's the
+    appliance's transport); returns an empty list cleanly when Tailscale isn't
+    available."""
+    from watchtower.api import enterprise
+
+    _user, org, _member = enterprise._ensure_user_org_member(db, current_user)
+    peers = _discover_tailnet_peers()
+
+    existing = db.query(OrgNode).filter(OrgNode.org_id == org.id).all()
+    known_hosts = {(n.host or "").strip().lower() for n in existing}
+
+    for c in peers:
+        candidates = {c["ip"].lower()}
+        if c.get("dns_name"):
+            candidates.add(c["dns_name"].lower())
+        c["already_added"] = bool(candidates & known_hosts)
+
+    return {"source": "tailscale", "peers": peers}
