@@ -138,3 +138,51 @@ def test_link_to_cross_org_project_refused(client, db_session, fake_podman):
     )
     assert r.status_code == 200, r.text
     assert r.json()["linked_project_id"] is None
+
+
+# ── Auto-backup on create ────────────────────────────────────────────────────
+
+
+def test_auto_backup_sets_default_schedule(client, db_session, fake_podman):
+    r = client.post(
+        "/api/managed-databases",
+        json={"name": "safe-db", "auto_backup": True},
+    )
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["backup_schedule_cron"] == "0 3 * * *"
+
+    row = db_session.query(ManagedDatabase).filter(
+        ManagedDatabase.id == uuid.UUID(body["id"])
+    ).first()
+    assert row.schedule_cron == "0 3 * * *"
+
+
+def test_auto_backup_custom_cron(client, db_session, fake_podman):
+    r = client.post(
+        "/api/managed-databases",
+        json={"name": "hourly-db", "auto_backup": True, "auto_backup_cron": "0 * * * *"},
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["backup_schedule_cron"] == "0 * * * *"
+
+
+def test_no_auto_backup_by_default_via_api(client, db_session, fake_podman):
+    """Omitting auto_backup leaves the DB without a schedule (the API default
+    is False; the UI opts in)."""
+    r = client.post("/api/managed-databases", json={"name": "plain-db"})
+    assert r.status_code == 200
+    assert r.json()["backup_schedule_cron"] is None
+
+
+def test_auto_backup_invalid_cron_skips_not_fails(client, db_session, fake_podman):
+    """A bad cron must not fail the (already-created) database — it just skips
+    the schedule."""
+    r = client.post(
+        "/api/managed-databases",
+        json={"name": "resilient-backup-db", "auto_backup": True, "auto_backup_cron": "nonsense"},
+    )
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["id"]
+    assert body["backup_schedule_cron"] is None

@@ -242,6 +242,16 @@ class CreateRequest(BaseModel):
         default="DATABASE_URL",
         description="Env var the connection string is injected as when link_project_id is set.",
     )
+    # Data-safety from day one: install a default daily backup schedule on
+    # create so the DB is protected without a separate setup step.
+    auto_backup: bool = Field(
+        default=False,
+        description="If true, set up a daily backup schedule on create.",
+    )
+    auto_backup_cron: str = Field(
+        default="0 3 * * *",  # 03:00 UTC daily — quiet hours, off-peak
+        description="Cron (UTC) for the auto-backup schedule when auto_backup is true.",
+    )
 
 
 def _validate_create_input(body: CreateRequest) -> None:
@@ -284,6 +294,8 @@ class CreateResponse(BaseModel):
     # Populated when link_project_id was supplied and the auto-wire succeeded.
     linked_project_id: Optional[str] = None
     linked_env_var_name: Optional[str] = None
+    # Set to the active cron when auto_backup was requested and scheduled.
+    backup_schedule_cron: Optional[str] = None
 
 
 class ManagedDbResponse(BaseModel):
@@ -728,7 +740,24 @@ async def create_database(
             body.link_project_id, body.link_env_var_name,
         )
 
+    # Auto-backup: persist a default schedule on the row now. Validation is
+    # best-effort — a bad cron or unsupported engine just skips the schedule
+    # rather than failing the (already-created) database.
+    backup_schedule_cron: Optional[str] = None
+    if body.auto_backup:
+        backup_schedule_cron = _apply_auto_backup(
+            db, current_user, request, row, org_id, body.auto_backup_cron,
+        )
+
     db.commit()
+
+    # Register the live scheduler job AFTER commit so a saved schedule survives
+    # a scheduler hiccup (mirrors update_schedule's ordering).
+    if backup_schedule_cron:
+        try:
+            backup_scheduler.register_schedule(str(row.id), backup_schedule_cron)
+        except Exception:  # noqa: BLE001 — scheduler issue must not fail create
+            logger.exception("auto-backup: could not register scheduler job for %s", row.id)
 
     return CreateResponse(
         id=str(row.id),
@@ -744,7 +773,45 @@ async def create_database(
         connection_string=_conn_string(row, password),
         linked_project_id=linked_project_id,
         linked_env_var_name=linked_env_var_name,
+        backup_schedule_cron=backup_schedule_cron,
     )
+
+
+def _apply_auto_backup(
+    db: Session,
+    current_user: dict,
+    request: Request,
+    row: ManagedDatabase,
+    org_id,
+    cron: str,
+) -> Optional[str]:
+    """Persist a default backup schedule on *row*. Returns the cron on success,
+    None if the engine isn't supported or the cron is invalid (best-effort —
+    never raises out, so it can't fail an already-created database)."""
+    if row.engine not in backup.ENGINE_DUMP_FORMAT:
+        logger.info(
+            "auto-backup: engine %s not supported for scheduled backups; skipping",
+            row.engine,
+        )
+        return None
+    cron = (cron or "").strip()
+    try:
+        backup_scheduler.parse_cron_or_raise(cron)
+    except ValueError as exc:
+        logger.warning("auto-backup: invalid cron %r (%s); skipping", cron, exc)
+        return None
+
+    row.schedule_cron = cron
+    audit_log.record_for_user(
+        db, current_user,
+        action="managed_db.backup.schedule.update",
+        entity_type="managed_database",
+        entity_id=row.id,
+        org_id=org_id,
+        request=request,
+        extra={"name": row.name, "updated_fields": ["schedule_cron"], "auto_on_create": True},
+    )
+    return cron
 
 
 def _auto_link_to_project(

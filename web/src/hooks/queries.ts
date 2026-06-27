@@ -498,6 +498,9 @@ export type ManagedDatabaseCreateInput = {
   // Plug-and-play: auto-wire the new DB into a project's deploy env on create.
   link_project_id?: string;
   link_env_var_name?: string;
+  // Data safety: install a default daily backup schedule on create.
+  auto_backup?: boolean;
+  auto_backup_cron?: string;
 };
 
 export type ManagedDatabaseCreateResponse = ManagedDatabase & {
@@ -505,6 +508,7 @@ export type ManagedDatabaseCreateResponse = ManagedDatabase & {
   connection_string: string;
   linked_project_id?: string | null;
   linked_env_var_name?: string | null;
+  backup_schedule_cron?: string | null;
 };
 
 export function useManagedDbRuntime() {

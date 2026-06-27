@@ -1539,6 +1539,7 @@ function CreateModal({
   const [username, setUsername] = useState('watchtower');
   const [linkProjectId, setLinkProjectId] = useState<string>('');
   const [linkEnvVar, setLinkEnvVar] = useState<string>('DATABASE_URL');
+  const [autoBackup, setAutoBackup] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
   const create = useCreateManagedDatabase();
@@ -1575,6 +1576,8 @@ function CreateModal({
         // string straight into its deploy env as link_env_var_name.
         link_project_id: linkProjectId || undefined,
         link_env_var_name: linkProjectId ? (linkEnvVar.trim() || 'DATABASE_URL') : undefined,
+        // Data safety: protect the DB from day one with a daily backup.
+        auto_backup: autoBackup,
       },
       {
         onSuccess: onCreated,
@@ -1688,6 +1691,21 @@ function CreateModal({
             </div>
           )}
         </div>
+
+        {/* Data safety: default a daily backup on so the DB is protected from
+            day one. Off by hand if the user really wants no backups. */}
+        <label className="flex items-start gap-2.5 pt-1 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={autoBackup}
+            onChange={(e) => setAutoBackup(e.target.checked)}
+            className="mt-0.5 h-4 w-4 rounded border-border accent-[hsl(var(--primary))]"
+          />
+          <span className="text-xs text-foreground">
+            Back up automatically
+            <span className="text-muted-foreground"> — daily at 03:00 UTC, keeping the last 7. You can change this later.</span>
+          </span>
+        </label>
       </div>
 
       {error && (
