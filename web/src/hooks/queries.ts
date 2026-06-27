@@ -557,6 +557,15 @@ export function useCreateManagedDatabase() {
   });
 }
 
+export type TestConnectionResult = { ok: boolean; message: string };
+
+export function useTestManagedDbConnection() {
+  return useMutation<TestConnectionResult, unknown, string>({
+    mutationFn: async (dbId) =>
+      (await apiClient.post<TestConnectionResult>(`/managed-databases/${dbId}/test-connection`)).data,
+  });
+}
+
 export function useStartManagedDatabase() {
   const qc = useQueryClient();
   return useMutation<ManagedDatabase, unknown, string>({

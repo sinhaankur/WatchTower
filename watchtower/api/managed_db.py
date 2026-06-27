@@ -1741,6 +1741,41 @@ async def delete_backup(
     return {"ok": True, "id": str(backup_id)}
 
 
+# ── Test connection ─────────────────────────────────────────────────────────
+
+
+class TestConnectionResponse(BaseModel):
+    ok: bool
+    message: str
+
+
+@router.post("/{db_id}/test-connection", response_model=TestConnectionResponse)
+async def test_connection(
+    db_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(util.get_current_user),
+) -> TestConnectionResponse:
+    """Run a single authenticated probe against the database so the operator
+    can confirm it's reachable right after creating it. Decrypts the password
+    server-side and execs the engine's readiness check inside the container —
+    the plaintext never leaves the host."""
+    row = _get_or_404(db, db_id)
+    if row.status != ManagedDatabaseStatus.RUNNING:
+        return TestConnectionResponse(
+            ok=False,
+            message=f"Database is {row.status.value}, not running. Start it, then test again.",
+        )
+    password = util.decrypt_secret(row.password_encrypted)
+    ok, message = runtime.probe_connection(
+        container=row.container_name,
+        engine=row.engine,
+        db_user=row.username,
+        db_password=password,
+        db_name=row.database_name,
+    )
+    return TestConnectionResponse(ok=ok, message=message)
+
+
 # ── Schedule (v1.1: cron-driven scheduled backups) ──────────────────────────
 
 

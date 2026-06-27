@@ -186,3 +186,39 @@ def test_auto_backup_invalid_cron_skips_not_fails(client, db_session, fake_podma
     body = r.json()
     assert body["id"]
     assert body["backup_schedule_cron"] is None
+
+
+# ── Test connection ──────────────────────────────────────────────────────────
+
+
+def test_test_connection_requires_auth(anon_client):
+    fake = "00000000-0000-0000-0000-000000000001"
+    assert anon_client.post(f"/api/managed-databases/{fake}/test-connection").status_code == 401
+
+
+def test_test_connection_ok_for_running_db(client, db_session, fake_podman):
+    """fake_podman makes every exec return rc=0, so the probe succeeds."""
+    created = client.post("/api/managed-databases", json={"name": "probe-db"}).json()
+    r = client.post(f"/api/managed-databases/{created['id']}/test-connection")
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["ok"] is True
+    assert "connected" in body["message"].lower()
+
+
+def test_test_connection_reports_not_running(client, db_session, fake_podman):
+    """A stopped DB reports a clean, actionable result (not a 500)."""
+    from watchtower.database import ManagedDatabase, ManagedDatabaseStatus
+
+    created = client.post("/api/managed-databases", json={"name": "stopped-db"}).json()
+    row = db_session.query(ManagedDatabase).filter(
+        ManagedDatabase.id == uuid.UUID(created["id"])
+    ).first()
+    row.status = ManagedDatabaseStatus.STOPPED
+    db_session.commit()
+
+    r = client.post(f"/api/managed-databases/{created['id']}/test-connection")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["ok"] is False
+    assert "not running" in body["message"].lower()

@@ -48,6 +48,7 @@ import {
   useProjects,
   useStartManagedDatabase,
   useStopManagedDatabase,
+  useTestManagedDbConnection,
 } from '@/hooks/queries';
 
 type Tab = 'managed' | 'external';
@@ -1744,6 +1745,8 @@ function CredentialsModal({
   onClose: () => void;
 }) {
   const [copied, setCopied] = useState<string | null>(null);
+  const test = useTestManagedDbConnection();
+  const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(null);
   const copy = async (text: string, key: string) => {
     try {
       await navigator.clipboard.writeText(text);
@@ -1752,6 +1755,14 @@ function CredentialsModal({
     } catch {
       /* ignore */
     }
+  };
+
+  const runTest = () => {
+    setTestResult(null);
+    test.mutate(response.id, {
+      onSuccess: (r) => setTestResult(r),
+      onError: () => setTestResult({ ok: false, message: 'Could not run the connection test.' }),
+    });
   };
 
   return (
@@ -1788,7 +1799,27 @@ function CredentialsModal({
         </div>
       </div>
 
-      <div className="mt-5 flex items-center justify-end">
+      {/* Test connection — confirms the DB is reachable right after create. */}
+      {testResult && (
+        <div
+          className={`mt-4 rounded-lg border px-3 py-2 text-xs ${
+            testResult.ok
+              ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+              : 'border-red-200 bg-red-50 text-red-700'
+          }`}
+        >
+          {testResult.ok ? '✓ ' : '✗ '}{testResult.message}
+        </div>
+      )}
+
+      <div className="mt-5 flex items-center justify-between gap-2">
+        <button
+          onClick={runTest}
+          disabled={test.isPending}
+          className="px-4 py-1.5 rounded-lg border border-border bg-white text-xs font-medium text-foreground hover:bg-muted transition-colors disabled:opacity-50"
+        >
+          {test.isPending ? 'Testing…' : 'Test connection'}
+        </button>
         <button
           onClick={onClose}
           className="px-4 py-1.5 rounded-lg bg-primary hover:bg-primary/90 text-white text-xs font-medium border border-border shadow-retro"
