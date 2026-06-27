@@ -295,13 +295,20 @@ async def discover_nodes(
     the UI can disable "add" for them. Tailscale-only for now (it's the
     appliance's transport); returns an empty list cleanly when Tailscale isn't
     available."""
-    from watchtower.api import enterprise
-
-    _user, org, _member = enterprise._ensure_user_org_member(db, current_user)
     peers = _discover_tailnet_peers()
 
-    existing = db.query(OrgNode).filter(OrgNode.org_id == org.id).all()
-    known_hosts = {(n.host or "").strip().lower() for n in existing}
+    # Org resolution is best-effort: discovery is a read-only listing any
+    # authenticated user can do. If the caller has no org (e.g. owner-mode
+    # blocks a non-member), we still return the peers — just without the
+    # already-added flag, rather than 403-ing on a harmless list.
+    known_hosts: set[str] = set()
+    try:
+        from watchtower.api import enterprise
+        _user, org, _member = enterprise._ensure_user_org_member(db, current_user)
+        existing = db.query(OrgNode).filter(OrgNode.org_id == org.id).all()
+        known_hosts = {(n.host or "").strip().lower() for n in existing}
+    except Exception:  # noqa: BLE001 — flagging is a nicety, not load-bearing
+        pass
 
     for c in peers:
         candidates = {c["ip"].lower()}
