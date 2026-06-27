@@ -83,12 +83,12 @@ function StatCard({ label, value, sub, accent }: { label: string; value: string 
   const animated = useCountUp(isNumber ? (value as number) : 0);
   const display = isNumber ? animated : value;
   return (
-    <div className="group relative rounded-md border-2 border-border bg-card p-5 shadow-retro transition-all duration-fast ease-spring hover:-translate-x-0.5 hover:-translate-y-0.5 hover:shadow-retro-hover">
-      <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-[0.14em] mb-2">{label}</p>
-      <p className={`text-3xl font-extrabold tabular-nums leading-none ${accent ?? 'text-foreground'}`}>{display}</p>
+    <div className="group relative overflow-hidden rounded-lg border border-border bg-card p-5 shadow-retro transition-all duration-fast ease-out-soft hover:shadow-retro-hover">
+      <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-[0.12em] mb-2">{label}</p>
+      <p className={`text-3xl font-bold tabular-nums leading-none ${accent ?? 'text-foreground'}`}>{display}</p>
       {sub && <p className="text-xs text-muted-foreground mt-2">{sub}</p>}
-      {/* brand accent bar that grows on hover — subtle motion cue */}
-      <span className="absolute bottom-0 left-0 h-1 w-0 bg-secondary transition-all duration-base ease-spring group-hover:w-full rounded-b-md" />
+      {/* accent bar that grows on hover — subtle motion cue */}
+      <span className="absolute bottom-0 left-0 h-0.5 w-0 bg-primary transition-all duration-base ease-out-soft group-hover:w-full" />
     </div>
   );
 }
@@ -101,9 +101,9 @@ function StatusDot({ running }: { running: boolean }) {
 
 function NoticeBanner({ notice }: { notice: Notice }) {
   const styles = {
-    success: 'border-emerald-300 bg-emerald-50 text-emerald-700',
-    error:   'border-red-300 bg-red-50 text-red-700',
-    info:    'border-amber-300 bg-amber-50 text-amber-800',
+    success: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+    error:   'border-red-200 bg-red-50 text-red-700',
+    info:    'border-border bg-muted text-foreground',
   };
   return (
     <div className={`border rounded-lg px-4 py-3 text-sm ${styles[notice.kind]}`}>
@@ -312,17 +312,17 @@ const Dashboard = () => {
         style={{ borderColor: 'hsl(var(--border-soft))', background: 'hsl(var(--surface-soft) / 0.9)' }}
       >
         <div className="min-w-0">
-          <h1 className="text-lg font-semibold text-slate-900">Dashboard</h1>
-          <p className="text-xs text-slate-600 mt-0.5 hidden sm:block">Overview of your self-hosted infrastructure</p>
+          <h1 className="text-lg font-semibold text-foreground">Dashboard</h1>
+          <p className="text-xs text-muted-foreground mt-0.5 hidden sm:block">Overview of your self-hosted infrastructure</p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <span
             className={`hidden sm:inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border font-medium ${
               serverStatus === 'online'
-                ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                 : serverStatus === 'offline'
-                  ? 'bg-red-50 text-red-800 border-red-300'
-                  : 'bg-slate-100 text-slate-700 border-slate-300'
+                  ? 'bg-red-50 text-red-700 border-red-200'
+                  : 'bg-muted text-muted-foreground border-border'
             }`}
           >
             <StatusDot running={serverStatus === 'online'} />
@@ -331,13 +331,13 @@ const Dashboard = () => {
           <button
             onClick={() => void loadProjects()}
             disabled={loading}
-            className="px-3 py-1.5 rounded-lg border border-border text-xs text-slate-700 hover:bg-slate-100 transition-colors disabled:opacity-50"
+            className="px-3 py-1.5 rounded-md border border-border bg-card text-xs text-foreground hover:bg-muted transition-colors disabled:opacity-50"
           >
             {loading ? '…' : 'Refresh'}
           </button>
           <Link
             to="/setup"
-            className="px-3 sm:px-4 py-1.5 rounded-lg bg-red-700 hover:bg-red-800 transition-colors text-white text-xs sm:text-sm font-medium border border-slate-800 shadow-[2px_2px_0_0_#1f2937]"
+            className="px-3 sm:px-4 py-1.5 rounded-md bg-primary hover:bg-primary/90 transition-colors text-primary-foreground text-xs sm:text-sm font-semibold shadow-retro"
           >
             + New
           </Link>
@@ -355,42 +355,40 @@ const Dashboard = () => {
             release surfaces itself again. */}
         <SystemOverviewBanner />
 
-        {/* Hero / onboarding banner */}
-        <section className="relative overflow-hidden rounded-md border-2 border-border bg-gradient-to-br from-card via-card to-secondary/20 p-6 shadow-retro">
-          {/* decorative brand glyph block, bleeds off the corner */}
-          <span aria-hidden className="pointer-events-none absolute -right-6 -top-6 h-28 w-28 rotate-12 rounded-2xl border-2 border-border bg-secondary/40" />
+        {/* Hero / onboarding banner — quiet, professional */}
+        <section className="relative overflow-hidden rounded-lg border border-border bg-card p-6 shadow-retro">
           <div className="relative flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
             <div className="min-w-0">
-              <p className="inline-flex items-center gap-1.5 text-[11px] uppercase tracking-[0.2em] text-primary font-bold">
+              <p className="inline-flex items-center gap-1.5 text-[11px] uppercase tracking-[0.18em] text-muted-foreground font-semibold">
                 <span className="h-1.5 w-1.5 rounded-full bg-primary" /> WatchTower
               </p>
-              <h2 className="text-2xl font-extrabold text-foreground mt-1.5 tracking-tight">Simple Infrastructure Control</h2>
+              <h2 className="text-2xl font-bold text-foreground mt-1.5 tracking-tight">Simple Infrastructure Control</h2>
               <p className="text-sm text-muted-foreground mt-2 max-w-xl">
                 Manage hosts, deploy apps, connect databases, and keep containers up to date — all from one place.
               </p>
             </div>
             <Link
               to="/host-connect?tab=tools"
-              className="shrink-0 inline-flex items-center gap-2 rounded-md border-2 border-border bg-card px-4 py-2 text-sm font-bold text-primary shadow-[3px_3px_0_0_hsl(var(--border))] transition-all duration-fast ease-spring hover:-translate-x-0.5 hover:-translate-y-0.5 hover:shadow-[5px_5px_0_0_hsl(var(--border))] active:translate-x-0.5 active:translate-y-0.5 active:shadow-none"
+              className="shrink-0 inline-flex items-center gap-2 rounded-md border border-border bg-card px-4 py-2 text-sm font-semibold text-foreground shadow-retro transition-all duration-fast ease-out-soft hover:bg-muted hover:shadow-retro-hover"
             >
               Host Connect →
             </Link>
           </div>
           {/* Quick start steps — shown when offline / no projects */}
           {(serverStatus !== 'online' || projects.length === 0) && !loading && (
-            <div className="mt-4 pt-4 border-t border-amber-200">
-              <p className="text-xs font-semibold text-slate-700 mb-2">Getting started</p>
+            <div className="mt-5 pt-5 border-t border-border-soft">
+              <p className="text-xs font-semibold text-foreground mb-3">Getting started</p>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                 {[
                   { step: '1', label: 'Set up tools', desc: 'Install Podman, Docker or Nginx on your server', to: '/host-connect?tab=tools' },
                   { step: '2', label: 'Add a server', desc: 'Connect your infrastructure node to WatchTower', to: '/servers' },
                   { step: '3', label: 'Deploy a project', desc: 'Use the Setup Wizard to launch your first app', to: '/setup' },
                 ].map(({ step, label, desc, to }) => (
-                  <Link key={step} to={to} className="flex items-start gap-3 p-3 rounded-lg border border-amber-200 bg-white/60 hover:bg-white hover:border-amber-300 transition-all">
-                    <span className="w-5 h-5 rounded-full bg-red-700 text-white text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">{step}</span>
+                  <Link key={step} to={to} className="flex items-start gap-3 p-3 rounded-md border border-border-soft bg-surface-soft hover:bg-muted hover:border-border transition-all">
+                    <span className="w-5 h-5 rounded-full bg-primary text-primary-foreground text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">{step}</span>
                     <div>
-                      <p className="text-xs font-semibold text-slate-800">{label}</p>
-                      <p className="text-[11px] text-slate-500 mt-0.5">{desc}</p>
+                      <p className="text-xs font-semibold text-foreground">{label}</p>
+                      <p className="text-[11px] text-muted-foreground mt-0.5">{desc}</p>
                     </div>
                   </Link>
                 ))}
@@ -401,7 +399,7 @@ const Dashboard = () => {
 
         {/* Stats row */}
         <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-          <StatCard label="Total Projects" value={stats.total} sub={dataSource === 'server' ? 'from API' : 'local cache'} accent="text-red-700" />
+          <StatCard label="Total Projects" value={stats.total} sub={dataSource === 'server' ? 'from API' : 'local cache'} accent="text-primary" />
           <StatCard label="Containers" value={containers} sub={runtimeStatus?.podman.installed ? `Podman ${runtimeStatus.podman.version ?? ''}` : 'Podman not detected'} />
           <StatCard label="Static Sites"   value={stats.static} sub="Netlify-style" />
           <StatCard label="Docker Apps"    value={stats.docker} sub="Container-based" />
@@ -410,13 +408,13 @@ const Dashboard = () => {
         {/* Runtime health + quick actions */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {/* Container status */}
-          <div className="rounded-xl border border-border bg-card p-5 space-y-3">
+          <div className="rounded-lg border border-border bg-card p-5 space-y-3">
             <div className="flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-slate-900">Container Runtime</h2>
+              <h2 className="text-sm font-semibold text-foreground">Container Runtime</h2>
               <button
                 onClick={() => void loadRuntime()}
                 disabled={runtimeLoading}
-                className="text-xs text-slate-600 hover:text-slate-900 transition-colors disabled:opacity-50"
+                className="text-xs text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
               >
                 {runtimeLoading ? 'Refreshing…' : '↻ Refresh'}
               </button>
@@ -444,17 +442,17 @@ const Dashboard = () => {
               <div key={row.label} className="flex items-center gap-3 p-3 rounded-lg bg-muted/40">
                 <StatusDot running={row.running} />
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm text-slate-900 font-medium">{row.label}</p>
-                  <p className="text-xs text-slate-600 truncate">{row.detail}</p>
+                  <p className="text-sm text-foreground font-medium">{row.label}</p>
+                  <p className="text-xs text-muted-foreground truncate">{row.detail}</p>
                 </div>
-                {row.right && <span className="text-xs text-slate-600 shrink-0">{row.right}</span>}
+                {row.right && <span className="text-xs text-muted-foreground shrink-0">{row.right}</span>}
               </div>
             ))}
           </div>
 
           {/* Quick actions */}
-          <div className="rounded-xl border border-border bg-card p-5 space-y-3">
-            <h2 className="text-sm font-semibold text-slate-900">Quick Actions</h2>
+          <div className="rounded-lg border border-border bg-card p-5 space-y-3">
+            <h2 className="text-sm font-semibold text-foreground">Quick Actions</h2>
             <button
               onClick={() => void (bgRunning ? stopBackground() : startBackground())}
               disabled={runtimeAction !== null}
@@ -476,7 +474,7 @@ const Dashboard = () => {
             <button
               onClick={() => void runUpdateNow()}
               disabled={runtimeAction !== null}
-              className="w-full flex items-center gap-3 p-3 rounded-lg border border-red-300 bg-red-50 hover:bg-red-100 text-red-700 transition-colors disabled:opacity-50 text-left"
+              className="w-full flex items-center gap-3 p-3 rounded-lg border border-border bg-muted hover:bg-secondary text-foreground transition-colors disabled:opacity-50 text-left"
             >
               <span className="text-lg leading-none">🔄</span>
               <div>
@@ -487,12 +485,12 @@ const Dashboard = () => {
 
             <Link
               to="/servers"
-              className="flex items-center gap-3 p-3 rounded-lg border border-border hover:bg-slate-100 text-slate-800 transition-colors"
+              className="flex items-center gap-3 p-3 rounded-lg border border-border hover:bg-muted text-foreground transition-colors"
             >
               <span className="text-lg leading-none">🖥</span>
               <div>
                 <p className="text-sm font-medium">Manage Servers</p>
-                <p className="text-xs text-slate-600 mt-0.5">Add or monitor infrastructure nodes</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Add or monitor infrastructure nodes</p>
               </div>
             </Link>
           </div>
@@ -500,15 +498,15 @@ const Dashboard = () => {
 
         {/* Monitored containers (if any) */}
         {Array.isArray(runtimeStatus?.podman?.sample_containers) && runtimeStatus.podman.sample_containers.length > 0 && (
-          <div className="rounded-xl border border-border bg-card p-5">
-            <h2 className="text-sm font-semibold text-slate-900 mb-3">Monitored Containers</h2>
+          <div className="rounded-lg border border-border bg-card p-5">
+            <h2 className="text-sm font-semibold text-foreground mb-3">Monitored Containers</h2>
             <div className="space-y-2">
               {runtimeStatus.podman.sample_containers.map((c) => (
                 <div key={c.name} className="flex items-center gap-3 p-3 rounded-lg bg-muted/40 hover:bg-muted/60 transition-colors">
                   <StatusDot running={c.state === 'running'} />
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm text-slate-900 font-mono truncate">{c.name}</p>
-                    <p className="text-xs text-slate-600 truncate">{c.image}</p>
+                    <p className="text-sm text-foreground font-mono truncate">{c.name}</p>
+                    <p className="text-xs text-muted-foreground truncate">{c.image}</p>
                   </div>
                   <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${
                     c.state === 'running' ? 'badge-running' : c.state === 'exited' ? 'badge-stopped' : 'badge-unknown'
@@ -522,11 +520,11 @@ const Dashboard = () => {
         )}
 
         {/* Projects list */}
-        <div className="rounded-xl border border-border bg-card p-5">
+        <div className="rounded-lg border border-border bg-card p-5">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h2 className="text-sm font-semibold text-slate-900">Projects</h2>
-              <p className="text-xs text-slate-600 mt-0.5">
+              <h2 className="text-sm font-semibold text-foreground">Projects</h2>
+              <p className="text-xs text-muted-foreground mt-0.5">
                 {loading ? 'Loading…' : projects.length === 0
                   ? 'No projects yet'
                   : `${projects.length} project${projects.length !== 1 ? 's' : ''} · ${dataSource === 'server' ? 'live data' : 'local cache'}`}
@@ -534,7 +532,7 @@ const Dashboard = () => {
             </div>
             <Link
               to="/setup"
-              className="px-3 py-1.5 rounded-lg bg-red-700 hover:bg-red-800 transition-colors text-white text-xs font-medium border border-slate-800 shadow-[2px_2px_0_0_#1f2937]"
+              className="px-3 py-1.5 rounded-md bg-primary hover:bg-primary/90 transition-colors text-primary-foreground text-xs font-semibold shadow-retro"
             >
               + New Project
             </Link>
@@ -542,14 +540,14 @@ const Dashboard = () => {
 
           {!loading && projects.length === 0 && (
             <div className="text-center py-14 border border-dashed border-border rounded-xl">
-              <div className="w-12 h-12 rounded-xl bg-red-50 border border-red-200 flex items-center justify-center mx-auto mb-3">
+              <div className="w-12 h-12 rounded-xl bg-muted border border-border flex items-center justify-center mx-auto mb-3">
                 <span className="text-xl">📦</span>
               </div>
-              <p className="text-sm font-medium text-slate-900">No projects yet</p>
-              <p className="text-xs text-slate-600 mt-1 mb-4">Deploy your first application to get started.</p>
+              <p className="text-sm font-medium text-foreground">No projects yet</p>
+              <p className="text-xs text-muted-foreground mt-1 mb-4">Deploy your first application to get started.</p>
               <Link
                 to="/setup"
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-red-700 hover:bg-red-800 text-white text-sm transition-colors border border-slate-800 shadow-[2px_2px_0_0_#1f2937]"
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-primary hover:bg-primary/90 text-primary-foreground text-sm font-semibold transition-colors shadow-retro"
               >
                 Start Setup Wizard →
               </Link>
@@ -564,16 +562,16 @@ const Dashboard = () => {
                 return (
                   <div
                     key={project.id}
-                    className="flex items-center justify-between gap-4 p-4 rounded-xl border border-border hover:border-red-300 bg-muted/20 hover:bg-red-50/40 transition-all"
+                    className="flex items-center justify-between gap-4 p-4 rounded-lg border border-border-soft bg-surface-soft hover:border-border hover:bg-muted transition-all"
                   >
                     <div className="flex items-center gap-3 min-w-0">
                       <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${meta.dot}`} />
                       <Link to={`/projects/${project.id}`} className="min-w-0 hover:underline">
-                        <p className="text-sm font-semibold text-slate-900 truncate">{project.name}</p>
+                        <p className="text-sm font-semibold text-foreground truncate">{project.name}</p>
                         <div className="flex items-center gap-2 mt-1 flex-wrap">
                           <span className={`text-xs px-2 py-0.5 rounded-full border ${meta.color}`}>{meta.label}</span>
-                          <span className="text-xs text-slate-600">{project.deployment_model === 'self_hosted' ? 'Self-hosted' : 'SaaS'}</span>
-                          <span className="font-mono text-xs text-slate-500">{project.repo_branch}</span>
+                          <span className="text-xs text-muted-foreground">{project.deployment_model === 'self_hosted' ? 'Self-hosted' : 'SaaS'}</span>
+                          <span className="font-mono text-xs text-muted-foreground">{project.repo_branch}</span>
                         </div>
                       </Link>
                     </div>
@@ -601,27 +599,27 @@ const Dashboard = () => {
                       })()}
                       {launchUrl && (
                         <a href={launchUrl} target="_blank" rel="noreferrer"
-                          className="text-xs text-red-700 hover:text-red-800 transition-colors">
+                          className="text-xs text-primary hover:text-primary/80 font-medium transition-colors">
                           Open ↗
                         </a>
                       )}
                       {project.repo_url && (
                         <a href={project.repo_url} target="_blank" rel="noreferrer"
-                          className="text-xs text-slate-600 hover:text-slate-900 transition-colors">
+                          className="text-xs text-muted-foreground hover:text-foreground font-medium transition-colors">
                           Repo ↗
                         </a>
                       )}
                       {confirmDelete === project.id ? (
                         <div className="flex items-center gap-1">
-                          <span className="text-xs text-slate-600">Delete?</span>
+                          <span className="text-xs text-muted-foreground">Delete?</span>
                           <button onClick={() => void deleteProject(project.id)}
                             className="px-2 py-1 text-xs rounded border border-red-300 text-red-600 hover:bg-red-50 transition-colors">Yes</button>
                           <button onClick={() => setConfirmDelete(null)}
-                            className="px-2 py-1 text-xs rounded border border-border text-slate-600 hover:bg-slate-100 transition-colors">No</button>
+                            className="px-2 py-1 text-xs rounded border border-border text-muted-foreground hover:bg-muted transition-colors">No</button>
                         </div>
                       ) : (
                         <button onClick={() => setConfirmDelete(project.id)}
-                          className="px-2 py-1 text-xs rounded border border-border text-slate-600 hover:border-red-300 hover:text-red-600 transition-colors">
+                          className="px-2 py-1 text-xs rounded border border-border text-muted-foreground hover:border-red-300 hover:text-red-600 transition-colors">
                           Delete
                         </button>
                       )}
@@ -637,8 +635,8 @@ const Dashboard = () => {
         <SystemResourceMonitor />
 
         {/* Getting started */}
-        <div className="rounded-xl border border-border bg-card p-5">
-          <h2 className="text-sm font-semibold text-slate-900 mb-4">Getting Started</h2>
+        <div className="rounded-lg border border-border bg-card p-5">
+          <h2 className="text-sm font-semibold text-foreground mb-4">Getting Started</h2>
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
             {[
               { n: 1, title: 'Start the server',  desc: 'Run ./scripts/dev-up.sh to launch the UI + API backend.' },
@@ -647,12 +645,12 @@ const Dashboard = () => {
               { n: 4, title: 'Monitor & scale',    desc: 'Track containers, set up teams, and manage deployments.' },
             ].map(({ n, title, desc }) => (
               <div key={n} className="flex gap-3 p-4 rounded-lg bg-muted/30 border border-border">
-                <span className="w-6 h-6 rounded-full bg-blue-100 text-blue-700 border border-blue-200 text-xs flex items-center justify-center shrink-0 font-bold mt-0.5">
+                <span className="w-6 h-6 rounded-full bg-primary/10 text-primary border border-primary/20 text-xs flex items-center justify-center shrink-0 font-bold mt-0.5">
                   {n}
                 </span>
                 <div>
-                  <p className="text-sm font-medium text-slate-900">{title}</p>
-                  <p className="text-xs text-slate-600 mt-1">{desc}</p>
+                  <p className="text-sm font-medium text-foreground">{title}</p>
+                  <p className="text-xs text-muted-foreground mt-1">{desc}</p>
                 </div>
               </div>
             ))}
@@ -702,15 +700,15 @@ function SystemOverviewBanner() {
       <button
         onClick={dismiss}
         aria-label="Dismiss overview"
-        className="absolute top-2 right-2 w-7 h-7 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors flex items-center justify-center text-base leading-none"
+        className="absolute top-2 right-2 w-7 h-7 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted transition-colors flex items-center justify-center text-base leading-none"
       >
         ×
       </button>
       <div className="mb-2">
-        <p className="text-[11px] uppercase tracking-[0.18em] text-red-700 font-semibold">
+        <p className="text-[11px] uppercase tracking-[0.18em] text-primary font-semibold">
           How WatchTower fits together
         </p>
-        <p className="text-xs text-slate-600 mt-1">
+        <p className="text-xs text-muted-foreground mt-1">
           One PC, lightweight, GitHub-authenticated. Below is the whole picture in one view.
         </p>
       </div>

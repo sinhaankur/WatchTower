@@ -5,15 +5,16 @@ import { cn } from '@/lib/utils';
 /**
  * Card — surface primitive, token-sourced.
  *
- * `retro` keeps the brand's signature hard-border + offset shadow (use for
- * hero/standalone panels). `flat` is the quieter soft-border surface for
- * dense layouts (lists, settings rows) where a wall of drop-shadows is too
- * loud. Both derive from tokens so the whole app recolors together.
+ * `retro` is the elevated panel (1px border + soft shadow) for hero/standalone
+ * cards. `flat` is the quieter soft-border surface for dense layouts (lists,
+ * settings rows). Both derive from tokens so the whole app recolors together.
+ * (The `retro` name is kept for drop-in compatibility; it's no longer
+ * neo-brutalist — just a gently elevated card.)
  */
 const cardVariants = cva('bg-card text-card-foreground', {
   variants: {
     variant: {
-      retro: 'rounded-md border-2 border-border shadow-retro',
+      retro: 'rounded-lg border border-border shadow-retro',
       flat: 'rounded-lg border border-border-soft',
     },
   },

@@ -329,7 +329,7 @@ const NAV_GROUPS: NavGroup[] = [
 // things" mental map without screaming for attention.
 function NavSectionLabel({ children }: { children: ReactNode }) {
   return (
-    <div className="px-3 pt-3 pb-1.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-400">
+    <div className="px-3 pt-3 pb-1.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/70">
       {children}
     </div>
   );
@@ -347,8 +347,8 @@ function NavBadge({ count, active }: { count: number; active: boolean }) {
       aria-label={`${count} active`}
       className={`ml-auto text-[10px] font-semibold tabular-nums px-1.5 py-0.5 rounded-full transition-colors ${
         active
-          ? 'bg-white/15 text-white'
-          : 'bg-slate-200 text-slate-700'
+          ? 'bg-primary/15 text-primary'
+          : 'bg-muted text-muted-foreground'
       }`}
     >
       {display}
@@ -382,11 +382,11 @@ function NavLink({ item, pathname, onClick, rail, badge }: NavLinkProps) {
         rail ? 'justify-center px-2 py-2' : 'px-3 py-1.5'
       } ${
         active
-          ? 'bg-slate-900 text-white'
-          : 'text-slate-600 hover:bg-slate-100/80 hover:text-slate-900'
+          ? 'bg-primary/10 text-primary'
+          : 'text-muted-foreground hover:bg-muted hover:text-foreground'
       }`}
     >
-      <span className={active ? 'text-white' : 'text-slate-400 group-hover:text-slate-700'}>
+      <span className={active ? 'text-primary' : 'text-muted-foreground/70 group-hover:text-foreground'}>
         <item.Icon />
       </span>
       {!rail && (
@@ -485,7 +485,7 @@ export default function Layout({ children }: { children: ReactNode }) {
           title={rail ? 'New Resource' : undefined}
           className={`flex items-center justify-center gap-2 w-full ${
             rail ? 'py-2' : 'py-1.5 px-3'
-          } rounded-md bg-slate-900 hover:bg-slate-800 transition-colors text-white text-[13px] font-medium`}
+          } rounded-md bg-primary hover:bg-primary/90 transition-colors text-primary-foreground text-[13px] font-semibold shadow-retro`}
         >
           <IconPlus />
           {!rail && <>New Resource</>}
@@ -496,13 +496,13 @@ export default function Layout({ children }: { children: ReactNode }) {
         <button
           type="button"
           onClick={openCommandPalette}
-          className="mx-3 mb-2 flex items-center gap-2 px-3 py-1.5 rounded-md border border-slate-200 bg-white hover:bg-slate-50 text-[12px] text-slate-500 hover:text-slate-700 transition-colors"
+          className="mx-3 mb-2 flex items-center gap-2 px-3 py-1.5 rounded-md border border-border bg-card hover:bg-muted text-[12px] text-muted-foreground hover:text-foreground transition-colors"
         >
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
           </svg>
           <span className="flex-1 text-left">Search…</span>
-          <kbd className="text-[10px] font-mono text-slate-400 border border-slate-200 px-1 rounded">⌘K</kbd>
+          <kbd className="text-[10px] font-mono text-muted-foreground border border-border px-1 rounded">⌘K</kbd>
         </button>
       )}
 
@@ -576,8 +576,8 @@ export default function Layout({ children }: { children: ReactNode }) {
         {/* Version line — quiet, single line, separates from chrome with
             a thin top border. The "update available" affordance is the
             only thing meant to draw the eye when relevant. */}
-        <div className="mt-3 pt-2 px-1 border-t border-slate-200/70 flex items-center justify-between">
-          <span className="text-[10px] text-slate-400 tracking-wide flex items-center gap-1.5">
+        <div className="mt-3 pt-2 px-1 border-t border-border-soft flex items-center justify-between">
+          <span className="text-[10px] text-muted-foreground tracking-wide flex items-center gap-1.5">
             <span>WatchTower{versionLabel ? ` ${versionLabel}` : ''}</span>
             {envInfo && (envInfo.mode !== 'desktop' || envInfo.env !== 'production' || envInfo.insecure_dev_auth) && (
               <span
@@ -626,7 +626,7 @@ export default function Layout({ children }: { children: ReactNode }) {
               <BrandLogo withLabel size="md" />
               <button
                 onClick={() => setMobileSidebarOpen(false)}
-                className="p-1.5 rounded hover:bg-slate-200 text-slate-500 transition-colors"
+                className="p-1.5 rounded hover:bg-muted text-muted-foreground transition-colors"
               >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
@@ -664,7 +664,7 @@ export default function Layout({ children }: { children: ReactNode }) {
               : 'Show sidebar'
           }
           onClick={cycleSidebar}
-          className="hidden lg:flex absolute z-10 items-center justify-center w-4 h-10 bg-slate-100 border border-slate-200 hover:bg-slate-200 transition-colors text-slate-500"
+          className="hidden lg:flex absolute z-10 items-center justify-center w-4 h-10 bg-muted border border-border hover:bg-secondary transition-colors text-muted-foreground"
           style={{
             left: sidebarMode === 'full' ? 224 : sidebarMode === 'rail' ? 56 : 0,
             top: '50%',
@@ -690,7 +690,7 @@ export default function Layout({ children }: { children: ReactNode }) {
           >
             <button
               onClick={() => setMobileSidebarOpen(true)}
-              className="p-1.5 rounded hover:bg-slate-100 text-slate-600 transition-colors"
+              className="p-1.5 rounded hover:bg-muted text-muted-foreground transition-colors"
               aria-label="Open menu"
             >
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -702,7 +702,7 @@ export default function Layout({ children }: { children: ReactNode }) {
             <BrandLogo withLabel size="sm" />
             <Link
               to="/setup"
-              className="ml-auto px-3 py-1.5 rounded-lg bg-red-700 hover:bg-red-800 text-white text-xs font-semibold border border-slate-800"
+              className="ml-auto px-3 py-1.5 rounded-md bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold shadow-retro"
             >
               + New
             </Link>

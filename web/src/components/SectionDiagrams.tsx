@@ -39,7 +39,7 @@ type NodeProps = {
 
 const VARIANT_FILL: Record<NonNullable<NodeProps['variant']>, string> = {
   default: '#f8fafc',   // slate-50
-  accent: '#fef2f2',    // red-50
+  accent: '#eef2ff',    // indigo-50 (brand primary)
   standby: '#fffbeb',   // amber-50
   success: '#ecfdf5',   // emerald-50
   external: '#f5f3ff',  // violet-50
@@ -47,8 +47,8 @@ const VARIANT_FILL: Record<NonNullable<NodeProps['variant']>, string> = {
 };
 
 const VARIANT_STROKE: Record<NonNullable<NodeProps['variant']>, string> = {
-  default: '#cbd5e1',   // slate-300
-  accent: '#fca5a5',    // red-300
+  default: '#e2e8f0',   // slate-200 (softer)
+  accent: '#a5b4fc',    // indigo-300 (brand primary)
   standby: '#fcd34d',   // amber-300
   success: '#6ee7b7',   // emerald-300
   external: '#c4b5fd',  // violet-300
@@ -136,7 +136,7 @@ function FlowLine({
 // Each is a <g> snippet positioned by the parent's translate.
 
 const IconWatchTower = (
-  <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#b91c1c" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+  <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#4f46e5" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
     <rect x={3} y={4} width={18} height={16} rx={2} />
     <path d="M3 9h18M12 4v16" />
   </svg>
@@ -416,10 +416,10 @@ export function SystemDiagram() {
       <g>
         <rect
           x={40} y={84} width={620} height={170} rx={14} ry={14}
-          fill="#fef2f2" stroke="#fca5a5" strokeWidth={1.5}
+          fill="#f8fafc" stroke="#e2e8f0" strokeWidth={1.5}
         />
         <text x={54} y={102} fontSize="10" fontWeight="700"
-              fill="#7f1d1d" letterSpacing="1"
+              fill="#64748b" letterSpacing="1"
               style={{ fontFamily: 'inherit' }}>
           YOUR PC
         </text>
@@ -427,16 +427,16 @@ export function SystemDiagram() {
         {/* WatchTower control plane — the protagonist, front and centre */}
         <g transform="translate(262, 110)">
           <rect x={0} y={0} width={176} height={42} rx={10}
-                fill="#ffffff" stroke="#b91c1c" strokeWidth={2} />
+                fill="#eef2ff" stroke="#4f46e5" strokeWidth={1.5} />
           <g transform="translate(10, 13)">{IconWatchTower}</g>
-          <text x={34} y={18} fontSize="12" fontWeight="700" fill="#7f1d1d"
+          <text x={34} y={18} fontSize="12" fontWeight="700" fill="#312e81"
                 style={{ fontFamily: 'inherit' }}>WatchTower</text>
-          <text x={34} y={31} fontSize="9" fill="#b91c1c"
+          <text x={34} y={31} fontSize="9" fill="#4f46e5"
                 style={{ fontFamily: 'inherit' }}>control plane · deploys + heals</text>
         </g>
 
         {/* Smooth fan-out curves: control plane → each pillar */}
-        <g stroke="#fca5a5" strokeWidth={1.5} fill="none" strokeLinecap="round">
+        <g stroke="#a5b4fc" strokeWidth={1.5} fill="none" strokeLinecap="round">
           {pillarXs.map((x) => (
             <path key={x} d={curveTo(x)} />
           ))}
@@ -444,7 +444,7 @@ export function SystemDiagram() {
         {pillarXs.map((x) => (
           <polygon key={x}
                    points={`${x - 3.5},${pillarTopY - 7} ${x + 3.5},${pillarTopY - 7} ${x},${pillarTopY - 1}`}
-                   fill="#fca5a5" />
+                   fill="#a5b4fc" />
         ))}
 
         {/* Three pillars the control plane runs */}
