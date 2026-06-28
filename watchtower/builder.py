@@ -1679,43 +1679,20 @@ async def _send_notifications(
     deployment: Deployment,
     success: bool,
 ) -> None:
-    """Fire-and-forget notification webhooks (Discord + Slack)."""
-    from watchtower.database import NotificationWebhook  # imported lazily
-    try:
-        hooks = db.query(NotificationWebhook).filter_by(
-            project_id=project.id, is_active=True
-        ).all()
-    except Exception:
-        return  # table may not exist yet
+    """Fire-and-forget notification webhooks (Discord + Slack) for a deploy.
 
-    if not hooks:
-        return
-
+    Delegates the actual send to watchtower.notifier (the shared dispatcher) so
+    every event source posts through one code path.
+    """
     status_text = "✅ Deployment succeeded" if success else "❌ Deployment failed"
+    commit = (deployment.commit_sha or "")[:8]
     message = (
         f"{status_text}\n"
         f"**Project:** {project.name}\n"
-        f"**Branch:** {deployment.branch}  |  `{deployment.commit_sha[:8]}`"
+        f"**Branch:** {deployment.branch}  |  `{commit}`"
     )
-
-    for hook in hooks:
-        try:
-            payload: dict
-            if hook.provider == "slack":
-                payload = {"text": message.replace("**", "*")}
-            else:  # discord
-                payload = {"content": message}
-            data = _json.dumps(payload).encode("utf-8")
-            req = urllib.request.Request(
-                hook.url,
-                data=data,
-                headers={"Content-Type": "application/json"},
-                method="POST",
-            )
-            with urllib.request.urlopen(req, timeout=10):
-                pass
-        except Exception as exc:
-            logger.warning("Notification webhook failed (%s): %s", hook.url[:40], exc)
+    from watchtower.notifier import notify_project
+    notify_project(db, project.id, message)
 
 
 # ---------------------------------------------------------------------------
