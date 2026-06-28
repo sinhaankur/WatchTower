@@ -9,6 +9,16 @@ Curated, human-friendly history of WatchTower releases. Auto-generated GitHub Re
 
 ---
 
+## 1.17.1 — Reliable macOS auto-update
+
+Fixes the long-standing "the app doesn't update itself" problem on macOS, and makes the update feel smooth.
+
+- **macOS auto-update actually works now.** The two Mac builds (Apple Silicon and Intel) were each publishing their own update manifest and overwriting each other, so one architecture never saw new versions. The release now publishes a single combined manifest that lists both — so every Mac gets updates. (Linux and Windows were unaffected.)
+- **Visible download progress.** Choosing "Restart and Install" on macOS now shows progress while the update downloads (dock progress bar + tray tooltip) instead of appearing frozen, then replaces the app and reopens automatically.
+- **Release safety net.** The post-release verifier now fails if the macOS update manifest is missing either architecture, so this class of bug can't ship again.
+
+---
+
 ## 1.17.0 — Plug-and-play setup, a calmer redesign, and control-plane HA
 
 The biggest theme is **plug-and-play**: turning "a PC into a server + database" should take clicks, not copy-pasted shell commands. This release also restyles the whole app to a calmer, more professional look and lays the groundwork for high-availability control planes.
