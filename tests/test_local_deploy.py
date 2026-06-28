@@ -79,9 +79,25 @@ def test_local_deploy_path_falls_back_when_empty():
     assert p.endswith("deployments/this-pc")
 
 
-def test_local_deploy_path_honors_explicit_path():
-    node = _Node(host="127.0.0.1", provider="local", remote_path="/srv/site/")
-    assert _local_deploy_path(node) == "/srv/site"
+def test_local_deploy_path_honors_writable_explicit_path(tmp_path):
+    """A configured path that exists / can be created AND is writable is used
+    as-is (trailing slash trimmed)."""
+    target = tmp_path / "site"
+    node = _Node(host="127.0.0.1", provider="local", remote_path=f"{target}/")
+    assert _local_deploy_path(node) == str(target)
+
+
+def test_local_deploy_path_falls_back_when_unwritable(monkeypatch, tmp_path):
+    """Regression ('simple deployment doesn't work'): a legacy local node with
+    an UNWRITABLE remote_path (e.g. /usr/local/var/watchtower/agent → EACCES)
+    must fall back to the data-dir deploy path, not fail the rsync."""
+    monkeypatch.setenv("WATCHTOWER_DATA_DIR", str(tmp_path))
+    # A path the test user cannot create/write under.
+    node = _Node(host="127.0.0.1", provider="local",
+                 remote_path="/usr/local/var/watchtower/agent")
+    resolved = _local_deploy_path(node)
+    assert resolved != "/usr/local/var/watchtower/agent"
+    assert resolved.endswith("deployments/this-pc")
 
 
 def test_check_ssh_connectivity_local_node_writable_path(tmp_path: Path):
@@ -103,31 +119,28 @@ def test_check_ssh_connectivity_local_node_writable_path(tmp_path: Path):
     assert leftovers == [], f"probe file left behind: {leftovers}"
 
 
-def test_check_ssh_connectivity_local_node_unwritable_path():
-    """A non-writable local path should fail loud, not silently succeed.
-
-    /proc/1 exists on Linux but isn't writable for any normal user.
-    On macOS where /proc doesn't exist, ``mkdir -p`` would create it
-    elsewhere, so we use a path under a read-only file (which can't
-    have children) to force the failure portably.
+def test_check_ssh_connectivity_local_node_unwritable_path_falls_back(monkeypatch, tmp_path):
+    """A legacy local node with an UNWRITABLE configured remote_path now reports
+    HEALTHY, because the deploy transparently falls back to the writable
+    data-dir path. This is the corrected behaviour for the
+    '/usr/local/var/watchtower/agent → Permission denied' bug — the health
+    check must agree with what the deploy will actually do.
     """
-    with tempfile.NamedTemporaryFile() as f:
-        # Trying to mkdir a child of a regular file always fails.
-        node = _Node(host="localhost", remote_path=os.path.join(f.name, "subdir"))
-        ok, msg = check_ssh_connectivity(node)
-        assert not ok
-        assert "not writable" in msg.lower() or "not a directory" in msg.lower()
+    monkeypatch.setenv("WATCHTOWER_DATA_DIR", str(tmp_path))
+    node = _Node(host="localhost", remote_path="/usr/local/var/watchtower/agent")
+    ok, msg = check_ssh_connectivity(node)
+    assert ok, f"expected healthy via fallback, got: {msg}"
+    assert "writable" in msg.lower()
+    # And the reported path is the fallback, not the unwritable original.
+    assert "/usr/local/var" not in msg
 
 
-def test_check_ssh_connectivity_local_node_no_remote_path():
-    """remote_path empty string / None should still report registered.
-
-    A user might add a local node before configuring a deploy path.
-    The connectivity check shouldn't crash — it should report 'no
-    remote_path set' so the UI can prompt them to set one.
-    """
+def test_check_ssh_connectivity_local_node_no_remote_path_uses_fallback(monkeypatch, tmp_path):
+    """An empty/None remote_path now resolves to the writable data-dir deploy
+    path and reports healthy — a local node always has somewhere to deploy."""
+    monkeypatch.setenv("WATCHTOWER_DATA_DIR", str(tmp_path))
     for path in ("", None):
         node = _Node(host="127.0.0.1", remote_path=path)
         ok, msg = check_ssh_connectivity(node)
         assert ok
-        assert "no remote_path" in msg.lower()
+        assert "writable" in msg.lower()

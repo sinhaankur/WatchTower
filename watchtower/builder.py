@@ -1338,17 +1338,51 @@ def _own_hostname() -> str:
         return ""
 
 
-def _local_deploy_path(node: OrgNode) -> str:
-    """Effective deploy directory for a local node. Defends against an empty
-    remote_path (which would make rsync/bind-mount target '/'): older local
-    nodes registered before this_pc.py set a default still resolve to a safe
-    per-machine directory under the data dir."""
-    rp = (node.remote_path or "").strip()
-    if rp and rp != "/":
-        return rp.rstrip("/")
+def _default_local_deploy_path() -> str:
+    """The always-writable per-machine deploy dir under the data dir."""
     base = os.getenv("WATCHTOWER_DATA_DIR")
     root = Path(base).expanduser() if base else (Path.home() / ".watchtower")
     return str(root / "deployments" / "this-pc")
+
+
+def _is_writable_dir(path: str) -> bool:
+    """Can the WatchTower process actually create + write under *path*?
+    Tries to mkdir -p and write a probe file. Returns False on any OSError
+    (permission denied, read-only fs, …)."""
+    try:
+        p = Path(path)
+        p.mkdir(parents=True, exist_ok=True)
+        probe = p / ".watchtower-write-probe"
+        probe.write_text("ok", encoding="utf-8")
+        probe.unlink()
+        return True
+    except OSError:
+        return False
+
+
+def _local_deploy_path(node: OrgNode) -> str:
+    """Effective deploy directory for a local node.
+
+    Defends against two real failures seen with legacy local nodes (registered
+    before this_pc.py set sane defaults):
+      1. Empty / "/" remote_path → would make rsync --delete + the container
+         bind-mount target the filesystem root.
+      2. A non-empty but UNWRITABLE path (e.g. /usr/local/var/watchtower/agent
+         from an old "agent" node) → rsync fails with EACCES "Permission
+         denied", which is the 'simple deployment doesn't work' report.
+
+    In both cases we fall back to a safe, always-writable directory under the
+    data dir. A configured path that exists-or-can-be-created AND is writable is
+    honoured as-is."""
+    rp = (node.remote_path or "").strip()
+    if rp and rp != "/" and _is_writable_dir(rp):
+        return rp.rstrip("/")
+    if rp and rp != "/":
+        logger.warning(
+            "local node remote_path %r is not writable — falling back to the "
+            "data-dir deploy path", rp,
+        )
+    return _default_local_deploy_path()
 
 
 def _is_local_node(node: OrgNode) -> bool:
@@ -1728,18 +1762,15 @@ def check_ssh_connectivity(node: OrgNode) -> tuple[bool, str]:
     Returns (success, message).
     """
     if _is_local_node(node):
-        path = node.remote_path or ""
-        if not path:
-            return True, "Local node registered (no remote_path set)"
-        try:
-            p = Path(path)
-            p.mkdir(parents=True, exist_ok=True)
-            probe = p / ".watchtower-write-probe"
-            probe.write_text("ok", encoding="utf-8")
-            probe.unlink()
+        # Report on the path the deploy will ACTUALLY use — _local_deploy_path
+        # falls back to a writable data-dir path when the configured one is
+        # empty or unwritable, so the health check matches deploy behaviour
+        # instead of failing on a legacy /usr/local/var path the deploy would
+        # have transparently worked around.
+        path = _local_deploy_path(node)
+        if _is_writable_dir(path):
             return True, f"Local node ready ({path} writable)"
-        except OSError as exc:
-            return False, f"Local node {path} not writable: {exc}"
+        return False, f"Local node {path} not writable"
 
     ssh_opts = ["-p", str(node.port), "-o", "StrictHostKeyChecking=accept-new",
                 "-o", "ConnectTimeout=5", "-o", "BatchMode=yes"]
