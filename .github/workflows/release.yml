@@ -333,10 +333,32 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
+
+          # ── macOS code signing + notarization (opt-in via secrets) ──────────
+          # When the Developer-ID cert (CSC_LINK) is configured as a repo
+          # secret, sign + notarize so updates are seamless and Gatekeeper
+          # doesn't warn. When it's absent (forks, or before signing is set
+          # up), fall back to the existing UNSIGNED build — CSC_IDENTITY_
+          # AUTO_DISCOVERY=false stops electron-builder from attempting a
+          # failing ad-hoc local sign. notarize defaults to false in
+          # package.json; we flip it on here only when creds exist.
+          EXTRA_ARGS=""
+          if [ "${RUNNER_OS}" = "macOS" ]; then
+            if [ -n "${CSC_LINK:-}" ] && [ -n "${APPLE_TEAM_ID:-}" ]; then
+              echo "::notice::macOS signing cert present — building SIGNED + NOTARIZED"
+              # Enables notarytool (reads APPLE_ID / APPLE_APP_SPECIFIC_PASSWORD
+              # from env) and binds it to the team.
+              EXTRA_ARGS="-c.mac.notarize.teamId=${APPLE_TEAM_ID}"
+            else
+              echo "::warning::No macOS signing cert (CSC_LINK) — building UNSIGNED"
+              export CSC_IDENTITY_AUTO_DISCOVERY=false
+            fi
+          fi
+
           attempts=3
           for i in $(seq 1 $attempts); do
             echo "::group::electron-builder attempt $i/$attempts"
-            if npm --prefix desktop run dist -- ${{ matrix.eb_args }} --publish always 2>&1 | tee /tmp/eb.log; then
+            if npm --prefix desktop run dist -- ${{ matrix.eb_args }} $EXTRA_ARGS --publish always 2>&1 | tee /tmp/eb.log; then
               echo "::endgroup::"
               exit 0
             fi
@@ -356,6 +378,14 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # Ensure electron-builder finds the pre-built frontend
           WEB_DIST: ${{ github.workspace }}/web/dist
+          # macOS signing secrets — empty when not configured, which triggers
+          # the unsigned fallback above. CSC_LINK = base64 of the Developer-ID
+          # .p12; CSC_KEY_PASSWORD = its password. APPLE_* = notarization creds.
+          CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
 
       # ── Smoke test (Linux x64 only): launch the AppImage headless,
       # confirm the bundled launcher resolves a Python with the watchtower
