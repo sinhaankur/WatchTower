@@ -9,6 +9,34 @@ Curated, human-friendly history of WatchTower releases. Auto-generated GitHub Re
 
 ---
 
+## 1.17.0 — Plug-and-play setup, a calmer redesign, and control-plane HA
+
+The biggest theme is **plug-and-play**: turning "a PC into a server + database" should take clicks, not copy-pasted shell commands. This release also restyles the whole app to a calmer, more professional look and lays the groundwork for high-availability control planes.
+
+**Plug-and-play — server**
+- **Use this PC as a server**: one click registers the local machine as a deploy target (no SSH, no host/key fields), and deploys to it actually run locally — build, rsync, and container start all happen on this machine.
+- **One-click tool install**: install Podman / nginx / cloudflared / tailscale via the host package manager with a button and live progress, instead of copying shell commands. Falls back to the copy-paste recipe when an unattended install isn't possible.
+- **Network discovery**: machines on your Tailnet are surfaced as deploy-target candidates; "Add" pre-fills the server form.
+- **Guided SSH setup**: WatchTower manages a deploy keypair for you and gives a copy-paste one-liner to authorize it on the remote — no manual key handling.
+
+**Plug-and-play — database**
+- **One-click create + auto-wire**: creating a managed database can inject its connection string straight into a project's deploy environment in the same step.
+- **Auto-backup on create**: opt into a daily backup schedule at create time so data is protected from day one.
+- **Test connection + copy**: confirm a database is reachable right after creating it.
+- **Adopt existing databases**: detects database containers already running on the host and lets you connect them in one click.
+
+**Calmer, professional redesign**
+- Retired the neo-brutalist look (heavy black borders, hard drop-shadows, loud red/yellow) for a restrained palette — soft borders, gentle shadows, an indigo accent — applied app-wide through design tokens. Red is now reserved for destructive actions.
+
+**Control-plane high availability (foundation)**
+- WatchTower now detects other devices on your account that are also running WatchTower and lets you pair one as a **standby** control plane (one click, you approve). The standby periodically pulls the primary's state over your (encrypted) Tailnet and keeps a recent warm snapshot. Automatic failover/promotion is a planned follow-up — this release establishes the topology and the state sync.
+
+**Lighter + safer**
+- **Lean by default**: heavy, situational dependencies (SSH-deploy, the LLM agent, the durable queue) moved to optional install extras, so a minimal install is smaller. Full-feature targets (Docker image, desktop bundle) still include everything.
+- **Security/reliability fixes**: a guard against an unsafe wildcard CORS origin with credentials, and a fix for Alembic silently disabling WatchTower's loggers on startup (dropped log lines).
+
+---
+
 ## 1.16.3 — Go Live, deployment insight, and self-service ops
 
 - **Go Live**: take a project from deployed to globally reachable in one guided action — runs it as a container, attaches a domain, makes it public via Cloudflare DNS *or* a one-click Cloudflare Tunnel (no public IP needed), and turns on autonomous monitoring. Each step reports its own status, and anything that can't run automatically degrades to clear guided instructions instead of failing silently.
