@@ -1635,21 +1635,36 @@ def _resolve_output_path(db: Session, project: Project, repo_dir: Path) -> Path:
         cfg = db.query(NetlifeLikeConfig).filter_by(project_id=project.id).first()
         out_dir = cfg.output_dir if cfg else "dist"
         candidate = repo_dir / out_dir
-        # Hand-coded static site path: if there's no build, the repo root
-        # IS the output. The default `dist` won't exist; rsync would
-        # fail with "(l)stat: No such file or directory". Detect this by
-        # checking for an index.html at the root and no build output —
-        # then ship the repo dir itself.
-        if not candidate.is_dir():
-            has_index = (repo_dir / "index.html").is_file()
-            if has_index:
-                return repo_dir
+        if candidate.is_dir():
+            return candidate
+
+        # The configured output dir (default `dist`) doesn't exist. Rather than
+        # return a missing path — which makes rsync fail with
+        # "(l)stat: No such file or directory" (the portfolio-test failure) —
+        # auto-detect where the build actually landed. Different frameworks use
+        # different output dirs: Next.js static export → `out/`, CRA → `build/`,
+        # Vite → `dist/`, Nuxt → `.output/public/`, plain static → repo root.
+        # We pick the first candidate that exists AND contains an index.html.
+        for cand_name in ("out", "build", "dist", "public", ".output/public", "_site"):
+            cand = repo_dir / cand_name
+            if (cand / "index.html").is_file():
+                return cand
+        # Last resort: a hand-coded static site whose index.html is at the root
+        # (no build step) — ship the repo dir itself.
+        if (repo_dir / "index.html").is_file():
+            return repo_dir
+        # Nothing detected — fall back to the configured candidate so the
+        # error message names the dir the user expected.
         return candidate
     if project.use_case == UseCaseType.VERCEL_LIKE:
-        candidate = repo_dir / ".next"
-        if not candidate.is_dir() and (repo_dir / "index.html").is_file():
+        # SSR/Next: prefer the build dir, but a Next.js `output: "export"`
+        # project emits a static `out/` (no `.next` server) — detect that too.
+        for cand_name in (".next", "out", "build", "dist"):
+            if (repo_dir / cand_name).is_dir():
+                return repo_dir / cand_name
+        if (repo_dir / "index.html").is_file():
             return repo_dir
-        return candidate
+        return repo_dir / ".next"
     # Docker: deploy whole repo
     return repo_dir
 

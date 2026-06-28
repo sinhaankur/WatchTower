@@ -232,6 +232,57 @@ class TestResolveOutputPath:
         result = _resolve_output_path(db, project, tmp_path)
         assert result == tmp_path
 
+    def test_netlify_autodetects_nextjs_out_dir(self, db, project, tmp_path):
+        """Regression (portfolio-test): a Static Site whose build emits `out/`
+        (Next.js static export) — NOT the default `dist/` — must be detected,
+        not rsync a missing dist/ and fail."""
+        project.use_case = UseCaseType.NETLIFY_LIKE
+        db.commit()
+        out = tmp_path / "out"
+        out.mkdir()
+        (out / "index.html").write_text("<html></html>")
+        result = _resolve_output_path(db, project, tmp_path)
+        assert result == out
+
+    def test_netlify_autodetects_build_dir(self, db, project, tmp_path):
+        """CRA-style `build/` is detected when `dist/` is absent."""
+        project.use_case = UseCaseType.NETLIFY_LIKE
+        db.commit()
+        build = tmp_path / "build"
+        build.mkdir()
+        (build / "index.html").write_text("<html></html>")
+        result = _resolve_output_path(db, project, tmp_path)
+        assert result == build
+
+    def test_netlify_configured_dir_wins_when_present(self, db, project, tmp_path):
+        """An explicitly-configured output dir that EXISTS is used as-is, even
+        if other candidates also exist."""
+        project.use_case = UseCaseType.NETLIFY_LIKE
+        db.add(NetlifeLikeConfig(project_id=project.id, output_dir="public"))
+        db.commit()
+        (tmp_path / "public").mkdir()
+        (tmp_path / "out").mkdir()  # decoy — must NOT be picked over configured
+        result = _resolve_output_path(db, project, tmp_path)
+        assert result == tmp_path / "public"
+
+    def test_netlify_root_index_when_no_build(self, db, project, tmp_path):
+        """Hand-coded static site: index.html at the repo root, no build dir."""
+        project.use_case = UseCaseType.NETLIFY_LIKE
+        db.commit()
+        (tmp_path / "index.html").write_text("<html></html>")
+        result = _resolve_output_path(db, project, tmp_path)
+        assert result == tmp_path
+
+    def test_vercel_autodetects_out_for_static_export(self, db, project, tmp_path):
+        """Next.js `output: export` emits `out/` (no .next server). Detect it."""
+        project.use_case = UseCaseType.VERCEL_LIKE
+        db.commit()
+        out = tmp_path / "out"
+        out.mkdir()
+        (out / "index.html").write_text("<html></html>")
+        result = _resolve_output_path(db, project, tmp_path)
+        assert result == out
+
 
 # ---------------------------------------------------------------------------
 # _load_env_vars
