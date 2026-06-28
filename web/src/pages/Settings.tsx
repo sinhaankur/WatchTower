@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import apiClient from '@/lib/api';
 import AIAutonomyCard from '@/components/AIAutonomyCard';
 import DiagnosticsCard from '@/components/DiagnosticsCard';
+import OrgWebhooksCard from '@/components/OrgWebhooksCard';
 import {
   useVSCodeStatus,
   useUpdateCheck,
@@ -768,6 +769,9 @@ const Settings = () => {
 
         {/* LLM connection + autonomous self-heal + intervention queue */}
         <AIAutonomyCard />
+
+        {/* Installation-wide Slack/Discord webhooks (control-plane etc.) */}
+        <OrgWebhooksCard />
 
         {/* Subsystem diagnostics — first stop for "why doesn't X work?" */}
         <DiagnosticsCard />
