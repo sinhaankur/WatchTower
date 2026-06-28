@@ -423,3 +423,92 @@ jobs:
             fi
           done
           exit 1
+
+      # ── macOS manifest race fix ─────────────────────────────────────────────
+      # The two macOS matrix entries (--mac --arm64 and --mac --x64) each
+      # generate their OWN single-arch latest-mac.yml and both --publish to the
+      # same release, racing to overwrite each other. Whichever finishes last
+      # wins, so the published latest-mac.yml lists only ONE arch — and
+      # electron-updater on the other arch never sees an update (this silently
+      # broke Mac auto-update through >=1.16.3). Upload each arch's manifest as
+      # an artifact so the merge-mac-manifest job can combine them.
+      - name: Upload mac manifest artifact (for merge)
+        if: matrix.os == 'macos-14'
+        uses: actions/upload-artifact@v4
+        with:
+          name: mac-manifest-${{ contains(matrix.eb_args, 'arm64') && 'arm64' || 'x64' }}
+          path: desktop/dist/latest-mac.yml
+          if-no-files-found: error
+
+  # ── Merge the two per-arch macOS manifests into one ─────────────────────────
+  # Runs after the desktop matrix. Downloads the arm64 + x64 latest-mac.yml
+  # artifacts, merges their `files:` lists into a single manifest that lists
+  # BOTH arches, and re-uploads it to the release — overwriting whichever
+  # single-arch manifest won the publish race. electron-updater then matches
+  # the running Mac's arch from the combined list (see MacUpdater.js).
+  merge-mac-manifest:
+    name: Merge macOS update manifest
+    needs: build-desktop
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download arm64 manifest
+        uses: actions/download-artifact@v4
+        with:
+          name: mac-manifest-arm64
+          path: manifests/arm64
+      - name: Download x64 manifest
+        uses: actions/download-artifact@v4
+        with:
+          name: mac-manifest-x64
+          path: manifests/x64
+      - name: Merge manifests
+        run: |
+          python3 - <<'PY'
+          import sys
+          try:
+              import yaml
+          except ImportError:
+              import subprocess
+              subprocess.check_call([sys.executable, "-m", "pip", "install", "-q", "pyyaml"])
+              import yaml
+
+          arm = yaml.safe_load(open("manifests/arm64/latest-mac.yml"))
+          x64 = yaml.safe_load(open("manifests/x64/latest-mac.yml"))
+
+          # Combine file lists, de-duplicating by url. Keep arm64 entries first
+          # so the top-level path (the updater's fallback) is the arm64 zip —
+          # the dominant Mac platform.
+          seen, files = set(), []
+          for src in (arm, x64):
+              for f in src.get("files", []):
+                  if f["url"] not in seen:
+                      seen.add(f["url"])
+                      files.append(f)
+
+          # Top-level path/sha512 point at the arm64 zip.
+          arm_zip = next(f for f in files if f["url"].endswith(".zip") and "arm64" in f["url"])
+          merged = {
+              "version": arm["version"],
+              "files": files,
+              "path": arm_zip["url"],
+              "sha512": arm_zip["sha512"],
+              "releaseDate": arm.get("releaseDate") or x64.get("releaseDate"),
+          }
+          with open("latest-mac.yml", "w") as fh:
+              yaml.safe_dump(merged, fh, default_flow_style=False, sort_keys=False)
+
+          urls = [f["url"] for f in files]
+          assert any("arm64" in u for u in urls), "merged manifest missing arm64"
+          assert any("x64" in u for u in urls), "merged manifest missing x64"
+          print("Merged latest-mac.yml lists:", urls)
+          PY
+          cat latest-mac.yml
+      - name: Upload merged manifest to release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          echo "Re-uploading merged latest-mac.yml to release $TAG"
+          gh release upload "$TAG" latest-mac.yml --clobber --repo "${GITHUB_REPOSITORY}"

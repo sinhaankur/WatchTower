@@ -50,6 +50,26 @@ for f in latest-mac.yml latest-linux.yml latest.yml; do
   fi
 done
 
+# latest-mac.yml MUST list BOTH arm64 and x64. The two macOS matrix jobs each
+# emit a single-arch latest-mac.yml and race to overwrite each other on the
+# release; if only one survives, the OTHER arch's electron-updater never sees an
+# update (silently broke Mac auto-update through 1.16.x). The merge-mac-manifest
+# CI job combines them — this asserts the published result actually did.
+if echo "$ASSET_NAMES" | grep -qx "latest-mac.yml"; then
+  MAC_YML="$WORK_DIR/latest-mac.yml"
+  if gh release download "$TAG" -p "latest-mac.yml" -O "$MAC_YML" --clobber >/dev/null 2>&1; then
+    HAS_ARM=$(grep -c "mac-arm64.zip" "$MAC_YML" || true)
+    HAS_X64=$(grep -c "mac-x64.zip" "$MAC_YML" || true)
+    if [ "$HAS_ARM" -ge 1 ] && [ "$HAS_X64" -ge 1 ]; then
+      PASS "latest-mac.yml lists both arm64 + x64 (auto-update works on both Macs)"
+    else
+      FAIL "latest-mac.yml is single-arch (arm64=$HAS_ARM x64=$HAS_X64) — one Mac arch can't auto-update. The merge-mac-manifest job must run/succeed."
+    fi
+  else
+    WARN "Could not download latest-mac.yml to inspect its arch coverage."
+  fi
+fi
+
 # Asset count sanity. A complete release ships ~27 files (DMGs + zips +
 # blockmaps + AppImages + debs + EXEs + latest-*.yml). Allow ±2 for
 # minor variations.
