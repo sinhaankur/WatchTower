@@ -323,7 +323,35 @@ jobs:
       - name: Build & publish installers
         # --publish always: electron-builder uploads each artifact to the
         # already-created GitHub Release for this tag.
-        run: npm --prefix desktop run dist -- ${{ matrix.eb_args }} --publish always
+        #
+        # Retry wrapper: GitHub's macOS runners intermittently fail DMG
+        # creation with `hdiutil: ... Device not configured` (the disk-image
+        # subsystem flaking under load). It hit 1.17.0 and 1.17.1 on the x64
+        # DMG. The build is deterministic, so a retry clears it — auto-retry
+        # up to 3x instead of needing a manual re-run every release. Bash on
+        # all platforms (GitHub runners have bash, incl. windows-latest).
+        shell: bash
+        run: |
+          set -o pipefail
+          attempts=3
+          for i in $(seq 1 $attempts); do
+            echo "::group::electron-builder attempt $i/$attempts"
+            if npm --prefix desktop run dist -- ${{ matrix.eb_args }} --publish always 2>&1 | tee /tmp/eb.log; then
+              echo "::endgroup::"
+              exit 0
+            fi
+            echo "::endgroup::"
+            # Only retry the known-transient hdiutil flake; fail fast on real errors.
+            if grep -qiE "hdiutil.*(Device not configured|Resource busy|failed)" /tmp/eb.log && [ "$i" -lt "$attempts" ]; then
+              echo "::warning::Transient hdiutil failure on attempt $i — retrying in 15s"
+              sleep 15
+              continue
+            fi
+            echo "::error::electron-builder failed (attempt $i) — not a known-transient error, aborting"
+            exit 1
+          done
+          echo "::error::electron-builder still failing after $attempts attempts"
+          exit 1
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # Ensure electron-builder finds the pre-built frontend
@@ -449,24 +477,30 @@ jobs:
   merge-mac-manifest:
     name: Merge macOS update manifest
     needs: build-desktop
+    # always(): run even if a desktop matrix leg failed. A flaky DMG failure
+    # both breaks the manifest AND (without this) would skip the very job that
+    # repairs it. We merge whatever arch manifests DID build.
+    if: always()
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
       - name: Download arm64 manifest
         uses: actions/download-artifact@v4
+        continue-on-error: true   # arch may have failed to build; merge handles absence
         with:
           name: mac-manifest-arm64
           path: manifests/arm64
       - name: Download x64 manifest
         uses: actions/download-artifact@v4
+        continue-on-error: true
         with:
           name: mac-manifest-x64
           path: manifests/x64
       - name: Merge manifests
         run: |
           python3 - <<'PY'
-          import sys
+          import os, sys
           try:
               import yaml
           except ImportError:
@@ -474,35 +508,52 @@ jobs:
               subprocess.check_call([sys.executable, "-m", "pip", "install", "-q", "pyyaml"])
               import yaml
 
-          arm = yaml.safe_load(open("manifests/arm64/latest-mac.yml"))
-          x64 = yaml.safe_load(open("manifests/x64/latest-mac.yml"))
+          def load(p):
+              return yaml.safe_load(open(p)) if os.path.exists(p) else None
 
-          # Combine file lists, de-duplicating by url. Keep arm64 entries first
-          # so the top-level path (the updater's fallback) is the arm64 zip —
-          # the dominant Mac platform.
+          arm = load("manifests/arm64/latest-mac.yml")
+          x64 = load("manifests/x64/latest-mac.yml")
+          present = [m for m in (arm, x64) if m]
+          if not present:
+              # Neither arch built — nothing to publish. Fail loudly: a release
+              # with no mac manifest at all is a real problem worth a red run.
+              print("::error::No macOS manifest artifacts found — both mac builds failed.")
+              sys.exit(1)
+
+          # Combine file lists (arm64 first so the top-level fallback is arm64),
+          # de-duplicating by url. Tolerates one arch being absent.
           seen, files = set(), []
           for src in (arm, x64):
+              if not src:
+                  continue
               for f in src.get("files", []):
                   if f["url"] not in seen:
                       seen.add(f["url"])
                       files.append(f)
 
-          # Top-level path/sha512 point at the arm64 zip.
-          arm_zip = next(f for f in files if f["url"].endswith(".zip") and "arm64" in f["url"])
+          # Prefer an arm64 zip for the top-level path; fall back to whatever
+          # zip exists if only x64 built.
+          zips = [f for f in files if f["url"].endswith(".zip")]
+          top = next((f for f in zips if "arm64" in f["url"]), zips[0] if zips else files[0])
           merged = {
-              "version": arm["version"],
+              "version": present[0]["version"],
               "files": files,
-              "path": arm_zip["url"],
-              "sha512": arm_zip["sha512"],
-              "releaseDate": arm.get("releaseDate") or x64.get("releaseDate"),
+              "path": top["url"],
+              "sha512": top["sha512"],
+              "releaseDate": (arm or x64).get("releaseDate"),
           }
           with open("latest-mac.yml", "w") as fh:
               yaml.safe_dump(merged, fh, default_flow_style=False, sort_keys=False)
 
           urls = [f["url"] for f in files]
-          assert any("arm64" in u for u in urls), "merged manifest missing arm64"
-          assert any("x64" in u for u in urls), "merged manifest missing x64"
+          has_arm = any("arm64" in u for u in urls)
+          has_x64 = any("x64" in u for u in urls)
           print("Merged latest-mac.yml lists:", urls)
+          if not (has_arm and has_x64):
+              # One arch is missing — publish what we have so SOME Macs update,
+              # but warn so it's visible and verify-release.sh will flag it.
+              print(f"::warning::latest-mac.yml is single-arch (arm64={has_arm} x64={has_x64}). "
+                    f"Re-run the failed macOS build to get full coverage.")
           PY
           cat latest-mac.yml
       - name: Upload merged manifest to release
