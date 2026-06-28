@@ -515,6 +515,16 @@ async def control_plane_pair(
         extra={"role": role, "peer_host": peer_host, "peer_name": body.peer_name},
     )
     db.commit()
+    if org_id is not None:
+        try:
+            from watchtower.notifier import notify_org
+            notify_org(
+                db, org_id,
+                f"🔗 Control-plane paired: this node is now **{role}**, "
+                f"linked with **{body.peer_name or peer_host}**.",
+            )
+        except Exception:  # noqa: BLE001 - notify must not fail the pairing
+            pass
     return _read_cp_pairing(db)
 
 
@@ -543,6 +553,13 @@ async def control_plane_unpair(
         request=request,
     )
     db.commit()
+    try:
+        from watchtower.api import enterprise
+        from watchtower.notifier import notify_org
+        _u, org, _m = enterprise._ensure_user_org_member(db, current_user)
+        notify_org(db, org.id, "🔓 Control-plane unpaired — this node is now standalone.")
+    except Exception:  # noqa: BLE001 - notify must not fail the unpair
+        pass
     return _read_cp_pairing(db)
 
 
