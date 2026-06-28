@@ -358,6 +358,10 @@ async def discover_nodes(
 _ROLE_KEY = "control_plane.role"           # standalone | primary | standby
 _PEER_HOST_KEY = "control_plane.peer_host"
 _PEER_NAME_KEY = "control_plane.peer_name"
+_PEER_PORT_KEY = "control_plane.peer_port"
+_PEER_TOKEN_KEY = "control_plane.peer_token"   # secret: primary's API token (standby pulls with it)
+_LAST_SYNC_KEY = "control_plane.last_synced_at"
+_LAST_SYNC_ERROR_KEY = "control_plane.last_sync_error"
 _VALID_ROLES = {"standalone", "primary", "standby"}
 
 
@@ -368,6 +372,11 @@ def _read_cp_pairing(db: Session) -> Dict[str, Any]:
         "role": role if role in _VALID_ROLES else "standalone",
         "peer_host": get_setting(db, _PEER_HOST_KEY),
         "peer_name": get_setting(db, _PEER_NAME_KEY),
+        "peer_port": int(get_setting(db, _PEER_PORT_KEY) or _WATCHTOWER_PORT),
+        # Never echo the token; just whether one is stored (so standby can sync).
+        "has_peer_token": bool(get_setting(db, _PEER_TOKEN_KEY)),
+        "last_synced_at": get_setting(db, _LAST_SYNC_KEY),
+        "last_sync_error": get_setting(db, _LAST_SYNC_ERROR_KEY),
     }
 
 
@@ -375,6 +384,10 @@ class CpPairRequest(BaseModel):
     role: str            # the role to assign THIS node: 'primary' or 'standby'
     peer_host: str       # the other node's host/IP (must run WatchTower)
     peer_name: Optional[str] = None
+    peer_port: Optional[int] = None
+    # When THIS node is the standby, it needs the primary's API token to pull
+    # the primary's state export. Stored Fernet-encrypted, never echoed back.
+    peer_token: Optional[str] = None
 
 
 @router.get("/control-plane")
@@ -382,8 +395,57 @@ async def control_plane_status(
     db: Session = Depends(get_db),
     current_user: dict = Depends(util.get_current_user),
 ) -> Dict[str, Any]:
-    """This node's control-plane role + paired peer (if any)."""
-    return _read_cp_pairing(db)
+    """This node's control-plane role + paired peer + standby snapshot facts."""
+    out = _read_cp_pairing(db)
+    try:
+        from watchtower import control_plane_sync
+        out.update(control_plane_sync.snapshot_status())
+    except Exception:  # noqa: BLE001 - snapshot facts are a nicety
+        pass
+    return out
+
+
+@router.post("/control-plane/sync-now")
+async def control_plane_sync_now(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(util.get_current_user),
+) -> Dict[str, Any]:
+    """On-demand pull of the primary's state snapshot (standby only).
+
+    Admin-gated. Returns the sync result + refreshed status. The scheduled tick
+    does this automatically; this is the 'don't wait for the next tick' button.
+    """
+    from watchtower.api.runtime import _user_can_manage_org_secrets
+    if not _user_can_manage_org_secrets(db, current_user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Syncing control-plane state requires can_manage_team permission.",
+        )
+    pairing = _read_cp_pairing(db)
+    if pairing["role"] != "standby":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Only a standby can pull state from the primary.",
+        )
+    from watchtower import control_plane_sync
+    ok, message = control_plane_sync.sync_now()
+    audit_log.record_for_user(
+        db, current_user,
+        action="control_plane.sync",
+        entity_type="control_plane",
+        request=request,
+        extra={"ok": ok},
+    )
+    # sync_now committed its own settings; re-read for fresh status.
+    db.expire_all()
+    result = _read_cp_pairing(db)
+    try:
+        from watchtower import control_plane_sync as cps
+        result.update(cps.snapshot_status())
+    except Exception:  # noqa: BLE001
+        pass
+    return {"ok": ok, "message": message, "status": result}
 
 
 @router.post("/control-plane/pair")
@@ -430,6 +492,12 @@ async def control_plane_pair(
     set_setting(db, _ROLE_KEY, role, user_id=user_id)
     set_setting(db, _PEER_HOST_KEY, peer_host, user_id=user_id)
     set_setting(db, _PEER_NAME_KEY, body.peer_name or peer_host, user_id=user_id)
+    set_setting(db, _PEER_PORT_KEY, str(body.peer_port or _WATCHTOWER_PORT), user_id=user_id)
+    if body.peer_token:
+        set_setting(db, _PEER_TOKEN_KEY, body.peer_token, secret=True, user_id=user_id)
+    # New pairing invalidates any prior sync state.
+    set_setting(db, _LAST_SYNC_KEY, None)
+    set_setting(db, _LAST_SYNC_ERROR_KEY, None)
 
     org_id = None
     try:
@@ -465,9 +533,9 @@ async def control_plane_unpair(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Changing control-plane pairing requires can_manage_team permission.",
         )
-    set_setting(db, _ROLE_KEY, None)
-    set_setting(db, _PEER_HOST_KEY, None)
-    set_setting(db, _PEER_NAME_KEY, None)
+    for k in (_ROLE_KEY, _PEER_HOST_KEY, _PEER_NAME_KEY, _PEER_PORT_KEY,
+              _PEER_TOKEN_KEY, _LAST_SYNC_KEY, _LAST_SYNC_ERROR_KEY):
+        set_setting(db, k, None)
     audit_log.record_for_user(
         db, current_user,
         action="control_plane.unpair",

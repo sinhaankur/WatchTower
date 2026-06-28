@@ -915,6 +915,13 @@ export type ControlPlaneStatus = {
   role: 'standalone' | 'primary' | 'standby';
   peer_host: string | null;
   peer_name: string | null;
+  peer_port?: number;
+  has_peer_token?: boolean;
+  last_synced_at?: string | null;
+  last_sync_error?: string | null;
+  snapshot_present?: boolean;
+  snapshot_bytes?: number | null;
+  snapshot_mtime?: string | null;
 };
 
 export function useControlPlane() {
@@ -928,7 +935,11 @@ export function useControlPlane() {
 
 export function usePairControlPlane() {
   const qc = useQueryClient();
-  return useMutation<ControlPlaneStatus, unknown, { role: 'primary' | 'standby'; peer_host: string; peer_name?: string }>({
+  return useMutation<
+    ControlPlaneStatus,
+    unknown,
+    { role: 'primary' | 'standby'; peer_host: string; peer_name?: string; peer_port?: number; peer_token?: string }
+  >({
     mutationFn: async (body) =>
       (await apiClient.post<ControlPlaneStatus>('/this-pc/control-plane/pair', body)).data,
     onSuccess: () => { void qc.invalidateQueries({ queryKey: ['this-pc', 'control-plane'] }); },
@@ -940,6 +951,17 @@ export function useUnpairControlPlane() {
   return useMutation<ControlPlaneStatus, unknown, void>({
     mutationFn: async () =>
       (await apiClient.post<ControlPlaneStatus>('/this-pc/control-plane/unpair')).data,
+    onSuccess: () => { void qc.invalidateQueries({ queryKey: ['this-pc', 'control-plane'] }); },
+  });
+}
+
+export function useSyncControlPlane() {
+  const qc = useQueryClient();
+  return useMutation<{ ok: boolean; message: string; status: ControlPlaneStatus }, unknown, void>({
+    mutationFn: async () =>
+      (await apiClient.post<{ ok: boolean; message: string; status: ControlPlaneStatus }>(
+        '/this-pc/control-plane/sync-now',
+      )).data,
     onSuccess: () => { void qc.invalidateQueries({ queryKey: ['this-pc', 'control-plane'] }); },
   });
 }

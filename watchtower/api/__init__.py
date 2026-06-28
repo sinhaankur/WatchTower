@@ -297,6 +297,19 @@ async def lifespan(_app: FastAPI):
         logger.exception("backup-scheduler: failed to start — continuing without it")
         stop_backup_scheduler = None  # type: ignore[assignment]
 
+    # Control-plane standby sync — pulls the primary's state snapshot when this
+    # node is paired as a standby. No-op (just ticks + skips) when standalone or
+    # primary. WATCHTOWER_CP_SYNC_DISABLE=true skips entirely.
+    try:
+        from watchtower.control_plane_sync import (
+            start_scheduler as start_cp_sync,
+            stop_scheduler as stop_cp_sync,
+        )
+        start_cp_sync()
+    except Exception:
+        logger.exception("control-plane sync: failed to start — continuing without it")
+        stop_cp_sync = None  # type: ignore[assignment]
+
     yield
 
     if stop_scheduler is not None:
@@ -314,6 +327,11 @@ async def lifespan(_app: FastAPI):
             stop_backup_scheduler()
         except Exception:
             logger.exception("backup-scheduler: failed to stop cleanly")
+    if stop_cp_sync is not None:
+        try:
+            stop_cp_sync()
+        except Exception:
+            logger.exception("control-plane sync: failed to stop cleanly")
     logger.info("Shutting down WatchTower API")
 
 

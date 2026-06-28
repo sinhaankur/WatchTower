@@ -4,7 +4,18 @@ import {
   useControlPlane,
   usePairControlPlane,
   useUnpairControlPlane,
+  useSyncControlPlane,
 } from '@/hooks/queries';
+
+function fmtAge(iso: string | null | undefined): string {
+  if (!iso) return 'never';
+  const then = new Date(iso).getTime();
+  if (Number.isNaN(then)) return 'unknown';
+  const secs = Math.max(0, Math.round((Date.now() - then) / 1000));
+  if (secs < 60) return `${secs}s ago`;
+  if (secs < 3600) return `${Math.round(secs / 60)}m ago`;
+  return `${Math.round(secs / 3600)}h ago`;
+}
 
 /**
  * Lists machines on this Tailnet as one-click deploy-target candidates, and
@@ -23,6 +34,7 @@ export default function DiscoverNodesCard({
   const { data: cp } = useControlPlane();
   const pair = usePairControlPlane();
   const unpair = useUnpairControlPlane();
+  const syncNow = useSyncControlPlane();
   const [pairError, setPairError] = useState<string | null>(null);
 
   const peers = data?.peers ?? [];
@@ -55,20 +67,39 @@ export default function DiscoverNodesCard({
 
       {/* Control-plane HA status banner */}
       {cp && cp.role !== 'standalone' && (
-        <div className="mb-3 flex items-center gap-2 rounded-md border border-border-soft bg-surface-soft px-3 py-2 text-xs">
-          <span className="inline-flex items-center gap-1.5 font-medium text-foreground">
-            <span className="inline-block w-1.5 h-1.5 rounded-full bg-primary" />
-            This node is {cp.role}
-          </span>
-          {cp.peer_name && <span className="text-muted-foreground">· paired with {cp.peer_name}</span>}
-          <button
-            type="button"
-            onClick={() => unpair.mutate()}
-            disabled={unpair.isPending}
-            className="ml-auto text-muted-foreground hover:text-foreground underline disabled:opacity-50"
-          >
-            Unpair
-          </button>
+        <div className="mb-3 rounded-md border border-border-soft bg-surface-soft px-3 py-2 text-xs">
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 font-medium text-foreground">
+              <span className="inline-block w-1.5 h-1.5 rounded-full bg-primary" />
+              This node is {cp.role}
+            </span>
+            {cp.peer_name && <span className="text-muted-foreground">· paired with {cp.peer_name}</span>}
+            <button
+              type="button"
+              onClick={() => unpair.mutate()}
+              disabled={unpair.isPending}
+              className="ml-auto text-muted-foreground hover:text-foreground underline disabled:opacity-50"
+            >
+              Unpair
+            </button>
+          </div>
+          {/* Standby-only: snapshot sync state + manual pull */}
+          {cp.role === 'standby' && (
+            <div className="mt-2 flex items-center gap-2 pt-2 border-t border-border-soft">
+              <span className="text-muted-foreground">
+                State snapshot: {cp.snapshot_present ? `synced ${fmtAge(cp.last_synced_at)}` : 'none yet'}
+                {cp.last_sync_error && <span className="text-red-600"> · last error: {cp.last_sync_error}</span>}
+              </span>
+              <button
+                type="button"
+                onClick={() => syncNow.mutate()}
+                disabled={syncNow.isPending}
+                className="ml-auto px-2 py-0.5 rounded border border-border bg-card text-foreground hover:bg-muted transition-colors disabled:opacity-50"
+              >
+                {syncNow.isPending ? 'Syncing…' : 'Sync now'}
+              </button>
+            </div>
+          )}
         </div>
       )}
       {pairError && <p className="mb-2 text-[11px] text-red-600">{pairError}</p>}

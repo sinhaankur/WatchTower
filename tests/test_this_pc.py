@@ -172,7 +172,12 @@ def test_discover_nodes_flags_watchtower_peers(client: TestClient, monkeypatch):
 def test_control_plane_default_standalone(client: TestClient):
     r = client.get("/api/this-pc/control-plane")
     assert r.status_code == 200
-    assert r.json() == {"role": "standalone", "peer_host": None, "peer_name": None}
+    body = r.json()
+    assert body["role"] == "standalone"
+    assert body["peer_host"] is None
+    assert body["peer_name"] is None
+    assert body["has_peer_token"] is False
+    assert body["snapshot_present"] is False
 
 
 def test_control_plane_requires_auth(anon_client: TestClient):
@@ -223,10 +228,80 @@ def test_control_plane_unpair_resets_to_standalone(client: TestClient):
     _bootstrap_admin_cp(client)
     client.post("/api/this-pc/control-plane/pair", json={
         "role": "standby", "peer_host": "100.64.0.9", "peer_name": "main",
+        "peer_token": "primary-token-xyz",
     })
     r = client.post("/api/this-pc/control-plane/unpair")
     assert r.status_code == 200
-    assert r.json() == {"role": "standalone", "peer_host": None, "peer_name": None}
+    body = r.json()
+    assert body["role"] == "standalone"
+    assert body["peer_host"] is None
+    assert body["has_peer_token"] is False
+
+
+def test_control_plane_pair_stores_token_without_echoing(client: TestClient):
+    _bootstrap_admin_cp(client)
+    r = client.post("/api/this-pc/control-plane/pair", json={
+        "role": "standby", "peer_host": "100.64.0.2", "peer_token": "s3cr3t-token",
+    })
+    assert r.status_code == 200, r.text
+    body = r.json()
+    # The token is stored (has_peer_token) but never returned verbatim.
+    assert body["has_peer_token"] is True
+    assert "s3cr3t-token" not in r.text
+
+
+# ── Standby state sync ───────────────────────────────────────────────────────
+
+from watchtower import control_plane_sync as _cps  # noqa: E402
+
+
+def test_sync_now_skips_when_not_standby(client: TestClient, monkeypatch):
+    # Default standalone → sync is a no-op, never touches the network.
+    pulled = {"called": False}
+    monkeypatch.setattr(_cps, "_pull_once", lambda *a, **k: (pulled.update(called=True), (True, "x"))[1])
+    ok, msg = _cps.sync_now()
+    assert ok is False
+    assert "not a standby" in msg.lower()
+    assert pulled["called"] is False
+
+
+def test_sync_now_pulls_when_standby(client: TestClient, monkeypatch, tmp_path):
+    _bootstrap_admin_cp(client)
+    monkeypatch.setenv("WATCHTOWER_DATA_DIR", str(tmp_path))
+    client.post("/api/this-pc/control-plane/pair", json={
+        "role": "standby", "peer_host": "100.64.0.2", "peer_token": "tok",
+    })
+    # Mock the actual HTTP pull to succeed without a network call.
+    monkeypatch.setattr(_cps, "_pull_once", lambda host, port, token: (True, "Synced 123 bytes from primary."))
+    ok, msg = _cps.sync_now()
+    assert ok is True
+    assert "synced" in msg.lower()
+    # last_synced_at recorded.
+    status = client.get("/api/this-pc/control-plane").json()
+    assert status["last_synced_at"] is not None
+
+
+def test_sync_now_records_error_on_failure(client: TestClient, monkeypatch):
+    _bootstrap_admin_cp(client)
+    client.post("/api/this-pc/control-plane/pair", json={
+        "role": "standby", "peer_host": "100.64.0.2", "peer_token": "tok",
+    })
+    monkeypatch.setattr(_cps, "_pull_once", lambda *a, **k: (False, "Could not reach primary: timed out"))
+    ok, msg = _cps.sync_now()
+    assert ok is False
+    status = client.get("/api/this-pc/control-plane").json()
+    assert status["last_sync_error"] and "could not reach primary" in status["last_sync_error"].lower()
+
+
+def test_sync_now_endpoint_requires_standby(client: TestClient):
+    _bootstrap_admin_cp(client)
+    # standalone → 400, not allowed to pull.
+    r = client.post("/api/this-pc/control-plane/sync-now")
+    assert r.status_code == 400
+
+
+def test_sync_now_endpoint_requires_auth(anon_client: TestClient):
+    assert anon_client.post("/api/this-pc/control-plane/sync-now").status_code == 401
 
 
 def test_discover_nodes_flags_already_added(client: TestClient, monkeypatch):
