@@ -29,6 +29,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from watchtower.database import NodeStatus, OrgNode, get_db
@@ -233,6 +234,29 @@ def _serialize(node: OrgNode) -> Dict[str, Any]:
 # ── Tailnet node discovery ───────────────────────────────────────────────────
 
 
+# Default port the WatchTower API listens on. A peer answering /health here
+# with our service marker is a control-plane standby candidate.
+_WATCHTOWER_PORT = int(os.getenv("WATCHTOWER_PEER_PORT", "8000"))
+
+
+def _peer_runs_watchtower(ip: str) -> bool:
+    """Probe http://<ip>:<port>/health for the WatchTower service marker.
+
+    Short timeout, best-effort: a peer that doesn't answer or isn't WatchTower
+    just isn't a standby candidate. Never raises."""
+    import urllib.request
+
+    url = f"http://{ip}:{_WATCHTOWER_PORT}/health"
+    try:
+        with urllib.request.urlopen(url, timeout=2.0) as resp:  # noqa: S310 - tailnet IP, http on LAN
+            if resp.status != 200:
+                return False
+            body = resp.read(512).decode("utf-8", "ignore")
+        return "watchtower-api" in body
+    except Exception:  # noqa: BLE001 - unreachable / not-watchtower / timeout
+        return False
+
+
 def _discover_tailnet_peers() -> List[Dict[str, Any]]:
     """Parse `tailscale status --json` into reachable peer candidates.
 
@@ -272,12 +296,16 @@ def _discover_tailnet_peers() -> List[Dict[str, Any]]:
             continue
         dns = (p.get("DNSName") or "").rstrip(".")
         host_label = (p.get("HostName") or dns or ip)
+        online = bool(p.get("Online"))
         out.append({
             "hostname": host_label,
             "dns_name": dns or None,
             "ip": ip,
-            "online": bool(p.get("Online")),
+            "online": online,
             "os": p.get("OS") or None,
+            # Only probe online peers — flags those running WatchTower as
+            # control-plane standby candidates.
+            "runs_watchtower": _peer_runs_watchtower(ip) if online else False,
         })
     # Online peers first, then alphabetical — most-useful candidates on top.
     out.sort(key=lambda c: (not c["online"], c["hostname"].lower()))
@@ -317,6 +345,137 @@ async def discover_nodes(
         c["already_added"] = bool(candidates & known_hosts)
 
     return {"source": "tailscale", "peers": peers}
+
+
+# ── Control-plane HA pairing (primary / standby) ─────────────────────────────
+#
+# WatchTower can pair two control planes for failover: one PRIMARY, one
+# STANDBY. v1 is detect-and-record: we discover a peer running WatchTower and,
+# on operator approval, record the role + paired peer. This makes the topology
+# explicit and visible. Automated state replication + automatic failover
+# orchestration is a deliberate follow-up — we DON'T claim it here.
+
+_ROLE_KEY = "control_plane.role"           # standalone | primary | standby
+_PEER_HOST_KEY = "control_plane.peer_host"
+_PEER_NAME_KEY = "control_plane.peer_name"
+_VALID_ROLES = {"standalone", "primary", "standby"}
+
+
+def _read_cp_pairing(db: Session) -> Dict[str, Any]:
+    from watchtower.llm_settings import get_setting
+    role = get_setting(db, _ROLE_KEY) or "standalone"
+    return {
+        "role": role if role in _VALID_ROLES else "standalone",
+        "peer_host": get_setting(db, _PEER_HOST_KEY),
+        "peer_name": get_setting(db, _PEER_NAME_KEY),
+    }
+
+
+class CpPairRequest(BaseModel):
+    role: str            # the role to assign THIS node: 'primary' or 'standby'
+    peer_host: str       # the other node's host/IP (must run WatchTower)
+    peer_name: Optional[str] = None
+
+
+@router.get("/control-plane")
+async def control_plane_status(
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(util.get_current_user),
+) -> Dict[str, Any]:
+    """This node's control-plane role + paired peer (if any)."""
+    return _read_cp_pairing(db)
+
+
+@router.post("/control-plane/pair")
+async def control_plane_pair(
+    body: CpPairRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(util.get_current_user),
+) -> Dict[str, Any]:
+    """Record a primary/standby pairing with a discovered WatchTower peer.
+
+    Detect-and-suggest: the UI offers this after finding a peer running
+    WatchTower; the operator approves. Admin-gated (can_manage_team) since it
+    changes the installation's HA topology. Idempotent — re-pairing overwrites.
+    """
+    from watchtower.api.runtime import _user_can_manage_org_secrets
+    from watchtower.llm_settings import set_setting
+
+    if not _user_can_manage_org_secrets(db, current_user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Pairing control planes requires can_manage_team permission.",
+        )
+    role = (body.role or "").strip().lower()
+    if role not in {"primary", "standby"}:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="role must be 'primary' or 'standby'.",
+        )
+    peer_host = (body.peer_host or "").strip()
+    if not peer_host:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="peer_host is required.",
+        )
+
+    user_id = None
+    try:
+        from watchtower.api import enterprise
+        user_id = enterprise._current_user_uuid(current_user)
+    except Exception:  # noqa: BLE001
+        pass
+
+    set_setting(db, _ROLE_KEY, role, user_id=user_id)
+    set_setting(db, _PEER_HOST_KEY, peer_host, user_id=user_id)
+    set_setting(db, _PEER_NAME_KEY, body.peer_name or peer_host, user_id=user_id)
+
+    org_id = None
+    try:
+        from watchtower.api import enterprise
+        _u, org, _m = enterprise._ensure_user_org_member(db, current_user)
+        org_id = org.id
+    except Exception:  # noqa: BLE001
+        pass
+    audit_log.record_for_user(
+        db, current_user,
+        action="control_plane.pair",
+        entity_type="control_plane",
+        org_id=org_id,
+        request=request,
+        extra={"role": role, "peer_host": peer_host, "peer_name": body.peer_name},
+    )
+    db.commit()
+    return _read_cp_pairing(db)
+
+
+@router.post("/control-plane/unpair")
+async def control_plane_unpair(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(util.get_current_user),
+) -> Dict[str, Any]:
+    """Tear down the pairing — back to standalone. Admin-gated."""
+    from watchtower.api.runtime import _user_can_manage_org_secrets
+    from watchtower.llm_settings import set_setting
+
+    if not _user_can_manage_org_secrets(db, current_user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Changing control-plane pairing requires can_manage_team permission.",
+        )
+    set_setting(db, _ROLE_KEY, None)
+    set_setting(db, _PEER_HOST_KEY, None)
+    set_setting(db, _PEER_NAME_KEY, None)
+    audit_log.record_for_user(
+        db, current_user,
+        action="control_plane.unpair",
+        entity_type="control_plane",
+        request=request,
+    )
+    db.commit()
+    return _read_cp_pairing(db)
 
 
 # ── Guided SSH setup ─────────────────────────────────────────────────────────

@@ -908,7 +908,41 @@ export type TailnetPeer = {
   online: boolean;
   os: string | null;
   already_added: boolean;
+  runs_watchtower: boolean;
 };
+
+export type ControlPlaneStatus = {
+  role: 'standalone' | 'primary' | 'standby';
+  peer_host: string | null;
+  peer_name: string | null;
+};
+
+export function useControlPlane() {
+  return useQuery<ControlPlaneStatus>({
+    queryKey: ['this-pc', 'control-plane'],
+    queryFn: async () =>
+      (await apiClient.get<ControlPlaneStatus>('/this-pc/control-plane')).data,
+    staleTime: 30_000,
+  });
+}
+
+export function usePairControlPlane() {
+  const qc = useQueryClient();
+  return useMutation<ControlPlaneStatus, unknown, { role: 'primary' | 'standby'; peer_host: string; peer_name?: string }>({
+    mutationFn: async (body) =>
+      (await apiClient.post<ControlPlaneStatus>('/this-pc/control-plane/pair', body)).data,
+    onSuccess: () => { void qc.invalidateQueries({ queryKey: ['this-pc', 'control-plane'] }); },
+  });
+}
+
+export function useUnpairControlPlane() {
+  const qc = useQueryClient();
+  return useMutation<ControlPlaneStatus, unknown, void>({
+    mutationFn: async () =>
+      (await apiClient.post<ControlPlaneStatus>('/this-pc/control-plane/unpair')).data,
+    onSuccess: () => { void qc.invalidateQueries({ queryKey: ['this-pc', 'control-plane'] }); },
+  });
+}
 
 export function useDiscoverNodes() {
   return useQuery<{ source: string; peers: TailnetPeer[] }>({

@@ -149,6 +149,86 @@ def test_discover_nodes_lists_peers(client: TestClient, monkeypatch):
     assert bb["already_added"] is False
 
 
+def test_discover_nodes_flags_watchtower_peers(client: TestClient, monkeypatch):
+    """Online peers running WatchTower are flagged runs_watchtower=True so the
+    UI can offer control-plane standby pairing."""
+    monkeypatch.setattr("watchtower.tool_resolver.tailscale_binary", lambda: "/usr/bin/tailscale")
+    monkeypatch.setattr(
+        _this_pc.subprocess, "run",
+        lambda *a, **k: SimpleNamespace(returncode=0, stdout=_FAKE_TS_STATUS, stderr=""),
+    )
+    # build-box (100.64.0.2) runs WatchTower; old-laptop is offline (not probed).
+    monkeypatch.setattr(_this_pc, "_peer_runs_watchtower", lambda ip: ip == "100.64.0.2")
+    peers = client.get("/api/this-pc/discover-nodes").json()["peers"]
+    bb = next(p for p in peers if p["hostname"] == "build-box")
+    ol = next(p for p in peers if p["hostname"] == "old-laptop")
+    assert bb["runs_watchtower"] is True
+    assert ol["runs_watchtower"] is False  # offline → not probed
+
+
+# ── Control-plane pairing ────────────────────────────────────────────────────
+
+
+def test_control_plane_default_standalone(client: TestClient):
+    r = client.get("/api/this-pc/control-plane")
+    assert r.status_code == 200
+    assert r.json() == {"role": "standalone", "peer_host": None, "peer_name": None}
+
+
+def test_control_plane_requires_auth(anon_client: TestClient):
+    assert anon_client.get("/api/this-pc/control-plane").status_code == 401
+    assert anon_client.post("/api/this-pc/control-plane/pair", json={}).status_code == 401
+
+
+def _bootstrap_admin_cp(client: TestClient) -> None:
+    r = client.post("/api/projects", json={
+        "name": "cp-bootstrap", "use_case": "vercel_like",
+        "repo_url": "https://example.com/cp.git", "repo_branch": "main",
+    })
+    assert r.status_code == 201, r.text
+
+
+def test_control_plane_pair_records_role(client: TestClient):
+    _bootstrap_admin_cp(client)
+    r = client.post("/api/this-pc/control-plane/pair", json={
+        "role": "primary", "peer_host": "100.64.0.2", "peer_name": "build-box",
+    })
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["role"] == "primary"
+    assert body["peer_host"] == "100.64.0.2"
+    assert body["peer_name"] == "build-box"
+    # Persisted across a fresh read.
+    assert client.get("/api/this-pc/control-plane").json()["role"] == "primary"
+
+
+def test_control_plane_pair_rejects_bad_role(client: TestClient):
+    _bootstrap_admin_cp(client)
+    r = client.post("/api/this-pc/control-plane/pair", json={
+        "role": "leader", "peer_host": "100.64.0.2",
+    })
+    assert r.status_code == 422
+
+
+def test_control_plane_pair_requires_manage_team(client: TestClient):
+    from unittest.mock import patch
+    with patch("watchtower.api.runtime._user_can_manage_org_secrets", return_value=False):
+        r = client.post("/api/this-pc/control-plane/pair", json={
+            "role": "primary", "peer_host": "100.64.0.2",
+        })
+    assert r.status_code == 403
+
+
+def test_control_plane_unpair_resets_to_standalone(client: TestClient):
+    _bootstrap_admin_cp(client)
+    client.post("/api/this-pc/control-plane/pair", json={
+        "role": "standby", "peer_host": "100.64.0.9", "peer_name": "main",
+    })
+    r = client.post("/api/this-pc/control-plane/unpair")
+    assert r.status_code == 200
+    assert r.json() == {"role": "standalone", "peer_host": None, "peer_name": None}
+
+
 def test_discover_nodes_flags_already_added(client: TestClient, monkeypatch):
     """A peer whose IP matches a registered OrgNode is flagged already_added."""
     monkeypatch.setattr("watchtower.tool_resolver.tailscale_binary", lambda: "/usr/bin/tailscale")
