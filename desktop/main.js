@@ -386,7 +386,7 @@ function checkForAppUpdates(win) {
         title: 'WatchTower update ready',
         message: `Version ${info.version} is ready to install.`,
         detail: isMac
-          ? 'Click Restart and Install to apply now. If the restart fails to update (unsigned macOS builds occasionally fail to overwrite the app), use Download Manually to grab the installer from GitHub.'
+          ? 'Click Restart and Install — WatchTower will download the update, replace itself, and reopen automatically. (If anything goes wrong, Download Manually grabs the installer from GitHub.)'
           : 'Click Restart and Install to apply the update now.',
         buttons,
         defaultId: 0,
@@ -398,10 +398,24 @@ function checkForAppUpdates(win) {
           // Other platforms: trust electron-updater since they're either
           // signed (Windows NSIS) or use a different install model (Linux).
           if (isMac) {
+            // Show download progress so the ~140 MB DMG fetch doesn't look
+            // like the app froze. Drives the native dock progress bar (no
+            // extra window) and a lightweight tray tooltip — then clears it
+            // when the self-replace script takes over and the app quits.
+            const progWin = mainWindow && !mainWindow.isDestroyed() ? mainWindow : null;
+            const onProgress = (frac) => {
+              if (progWin) progWin.setProgressBar(frac > 0 && frac < 1 ? frac : -1);
+              try {
+                if (tray && !tray.isDestroyed?.()) {
+                  tray.setToolTip(`WatchTower — downloading update ${Math.round(frac * 100)}%`);
+                }
+              } catch { /* tray optional */ }
+            };
             try {
-              await applyMacUpdate(info.version, mainWindow);
+              await applyMacUpdate(info.version, mainWindow, onProgress);
             } catch (err) {
               console.warn('[WatchTower] applyMacUpdate failed:', err.message);
+              if (progWin) progWin.setProgressBar(-1);
               shell.openExternal(releaseUrl);
             }
             return;
