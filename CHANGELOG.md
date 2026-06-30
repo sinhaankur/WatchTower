@@ -9,6 +9,23 @@ Curated, human-friendly history of WatchTower releases. Auto-generated GitHub Re
 
 ---
 
+## 1.17.2 — Deploy reliability + richer notifications
+
+Fixes two real deploy failures and notifies you about more of what WatchTower is doing.
+
+**Deploy fixes**
+- **Auto-detect the build output folder.** A static site that built successfully but output to a non-`dist/` folder (e.g. Next.js's `out/`, Create-React-App's `build/`) failed at the deploy step with "No such file or directory". WatchTower now detects where the build actually landed — `out/`, `build/`, `dist/`, `public/`, and more — instead of assuming `dist/`.
+- **Local deploys survive a bad target path.** Deploying to "this PC" could fail with "Permission denied" if an older local node pointed at a directory the app can't write to. Local deploys now fall back to a safe, writable location automatically, and the "Test connection" check reports the path that will actually be used.
+
+**More notifications**
+- Slack/Discord webhooks now fire on **self-heal** events (auto-fix applied, or a failure queued for your attention) and **control-plane pairing**, not just deploy success/failure.
+- New **org-wide webhooks** (Settings → Org notifications) for installation-level alerts that aren't tied to a single project.
+
+**Under the hood**
+- macOS code-signing + notarization support is now wired (opt-in — see `docs/MAC_CODE_SIGNING.md`), and the release pipeline auto-retries the occasional flaky macOS DMG build.
+
+---
+
 ## 1.17.1 — Reliable macOS auto-update
 
 Fixes the long-standing "the app doesn't update itself" problem on macOS, and makes the update feel smooth.
