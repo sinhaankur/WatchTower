@@ -342,23 +342,38 @@ jobs:
           # AUTO_DISCOVERY=false stops electron-builder from attempting a
           # failing ad-hoc local sign. notarize defaults to false in
           # package.json; we flip it on here only when creds exist.
+          # IMPORTANT: never EXPORT an empty CSC_LINK. electron-builder reads
+          # CSC_LINK on ALL platforms (→ WIN_CSC_LINK on Windows) and an empty
+          # value makes it try to resolve "" as a cert path and fail the build
+          # everywhere. So the signing secrets arrive as step-scoped vars with a
+          # MAC_ prefix (MAC_CSC_LINK etc.), and we only promote them to the
+          # names electron-builder expects, on macOS, when actually present.
           EXTRA_ARGS=""
           if [ "${RUNNER_OS}" = "macOS" ]; then
-            if [ -n "${CSC_LINK:-}" ] && [ -n "${APPLE_TEAM_ID:-}" ]; then
+            if [ -n "${MAC_CSC_LINK:-}" ] && [ -n "${MAC_APPLE_TEAM_ID:-}" ]; then
               echo "::notice::macOS signing cert present — building SIGNED + NOTARIZED"
-              # Enables notarytool (reads APPLE_ID / APPLE_APP_SPECIFIC_PASSWORD
-              # from env) and binds it to the team.
-              EXTRA_ARGS="-c.mac.notarize.teamId=${APPLE_TEAM_ID}"
+              export CSC_LINK="${MAC_CSC_LINK}"
+              export CSC_KEY_PASSWORD="${MAC_CSC_KEY_PASSWORD}"
+              export APPLE_ID="${MAC_APPLE_ID}"
+              export APPLE_APP_SPECIFIC_PASSWORD="${MAC_APPLE_APP_SPECIFIC_PASSWORD}"
+              export APPLE_TEAM_ID="${MAC_APPLE_TEAM_ID}"
+              EXTRA_ARGS="-c.mac.notarize.teamId=${MAC_APPLE_TEAM_ID}"
             else
-              echo "::warning::No macOS signing cert (CSC_LINK) — building UNSIGNED"
+              echo "::warning::No macOS signing cert (MAC_CSC_LINK) — building UNSIGNED"
               export CSC_IDENTITY_AUTO_DISCOVERY=false
             fi
           fi
 
+          # Disable errexit inside the retry loop — a non-zero electron-builder
+          # exit is handled by the `if` below, not an abort. (GitHub runs bash
+          # steps with -e by default, which would otherwise kill the retry.)
+          set +e
           attempts=3
           for i in $(seq 1 $attempts); do
             echo "::group::electron-builder attempt $i/$attempts"
-            if npm --prefix desktop run dist -- ${{ matrix.eb_args }} $EXTRA_ARGS --publish always 2>&1 | tee /tmp/eb.log; then
+            npm --prefix desktop run dist -- ${{ matrix.eb_args }} $EXTRA_ARGS --publish always 2>&1 | tee /tmp/eb.log
+            rc=${PIPESTATUS[0]}
+            if [ "$rc" -eq 0 ]; then
               echo "::endgroup::"
               exit 0
             fi
@@ -378,14 +393,16 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # Ensure electron-builder finds the pre-built frontend
           WEB_DIST: ${{ github.workspace }}/web/dist
-          # macOS signing secrets — empty when not configured, which triggers
-          # the unsigned fallback above. CSC_LINK = base64 of the Developer-ID
-          # .p12; CSC_KEY_PASSWORD = its password. APPLE_* = notarization creds.
-          CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
-          CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          # macOS signing secrets, carried under MAC_-prefixed names so an EMPTY
+          # value can't be seen by electron-builder as CSC_LINK / WIN_CSC_LINK
+          # (which would break the build on every platform). The run step
+          # promotes them to electron-builder's expected names, on macOS, only
+          # when present. See docs/MAC_CODE_SIGNING.md for the secret list.
+          MAC_CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
+          MAC_CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
+          MAC_APPLE_ID: ${{ secrets.APPLE_ID }}
+          MAC_APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          MAC_APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
 
       # ── Smoke test (Linux x64 only): launch the AppImage headless,
       # confirm the bundled launcher resolves a Python with the watchtower
