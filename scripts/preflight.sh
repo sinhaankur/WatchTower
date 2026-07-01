@@ -99,6 +99,36 @@ else
   fi
 fi
 
+# Dependency-vulnerability gate. The CI "Security Scan" workflow fails the
+# build on any *fixable* HIGH/CRITICAL (Trivy, ignore-unfixed). Preflight
+# used to not check this, so form-data CVE-2026-12143 passed preflight and
+# only surfaced in CI after tagging. Mirror the CI posture here — a fixable
+# HIGH/CRITICAL in the SHIPPED (production) frontend deps blocks the release
+# before the tag. `--omit=dev` is deliberate: Trivy scans the deployed image,
+# so a vuln in eslint/vitest/vite (build-only, never shipped) is not a CI
+# gate and must not create a false preflight failure. `npm audit` needs no
+# Docker/Trivy, so it runs on any dev box in seconds.
+if [ -n "${SKIP_AUDIT:-}" ]; then
+  WARN "SKIP_AUDIT set — dependency audit skipped (NOT a stable release)"
+else
+  AUDIT_JSON="$(cd "$REPO_ROOT" && npm --prefix web audit --omit=dev --audit-level=high --json 2>/dev/null || true)"
+  # Count only vulnerabilities that have a fix available — matches Trivy's
+  # ignore-unfixed, so an unfixable upstream advisory doesn't block a release
+  # we can do nothing about. Falls back to 0 if jq/node parsing is unavailable.
+  FIXABLE="$(printf '%s' "$AUDIT_JSON" | node -e '
+    let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{
+      try{const a=JSON.parse(s).vulnerabilities||{};
+        let n=0;for(const v of Object.values(a)){
+          if((v.severity==="high"||v.severity==="critical")&&v.fixAvailable)n++;
+        }process.stdout.write(String(n));
+      }catch{process.stdout.write("0");}});' 2>/dev/null || echo 0)"
+  if [ "${FIXABLE:-0}" -gt 0 ]; then
+    FAIL "Frontend prod deps — $FIXABLE fixable HIGH/CRITICAL vuln(s) (run 'npm --prefix web audit --omit=dev --audit-level=high'); CI Security Scan will fail"
+  else
+    PASS "Frontend prod deps — no fixable HIGH/CRITICAL vulnerabilities"
+  fi
+fi
+
 # ──────────────────────────────────────────────────────────────────────────
 HEAD "3. Desktop pack (Mac arm64 — most common install target)"
 

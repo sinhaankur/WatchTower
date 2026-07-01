@@ -9,6 +9,16 @@ Curated, human-friendly history of WatchTower releases. Auto-generated GitHub Re
 
 ---
 
+## 1.17.4 — Crash-proofing + a security patch
+
+Hardening release: closes a class of page crash and patches a dependency vulnerability.
+
+- **No page can be blanked by a bad API response.** Every list-backed page (Templates, Remote Access, Databases, Containers, and more) now degrades to its normal empty state if the server returns an unexpected shape, instead of white-screening. Fixed at the data layer, so all 14 list views are covered at once.
+- **Security patch.** Updated a transitive dependency (`form-data`) to clear a HIGH-severity advisory (CVE-2026-12143). No user-facing behavior change.
+- **Tighter release gate.** The pre-release quality check now also scans shipped dependencies for known vulnerabilities, so a security issue is caught before a release is tagged rather than after — matching what CI enforces.
+
+---
+
 ## 1.17.3 — See what WatchTower fixed, and a cleaner dashboard
 
 This release makes WatchTower's headline feature — self-healing — visible, and cleans up the everyday flow.
