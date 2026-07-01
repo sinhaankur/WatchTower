@@ -349,55 +349,9 @@ const Dashboard = () => {
       <main className="px-4 sm:px-6 lg:px-8 py-6 space-y-6 max-w-6xl mx-auto w-full fade-in-up">
         {notice && <NoticeBanner notice={notice} />}
 
-        {/* What-is-WatchTower illustration. Dismiss-once: the user
-            sees it on first login (and after explicitly showing it
-            from a help link later), then it goes away so the dashboard
-            stays focused on their projects. localStorage key bumps
-            with the version so a redesigned illustration on a future
-            release surfaces itself again. */}
-        <SystemOverviewBanner />
-
-        {/* Hero / onboarding banner — quiet, professional */}
-        <section className="relative overflow-hidden rounded-lg border border-border bg-card p-6 shadow-retro">
-          <div className="relative flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-            <div className="min-w-0">
-              <p className="inline-flex items-center gap-1.5 text-[11px] uppercase tracking-[0.18em] text-muted-foreground font-semibold">
-                <span className="h-1.5 w-1.5 rounded-full bg-primary" /> WatchTower
-              </p>
-              <h2 className="text-2xl font-bold text-foreground mt-1.5 tracking-tight">Simple Infrastructure Control</h2>
-              <p className="text-sm text-muted-foreground mt-2 max-w-xl">
-                Manage hosts, deploy apps, connect databases, and keep containers up to date — all from one place.
-              </p>
-            </div>
-            <Link
-              to="/host-connect?tab=tools"
-              className="shrink-0 inline-flex items-center gap-2 rounded-md border border-border bg-card px-4 py-2 text-sm font-semibold text-foreground shadow-retro transition-all duration-fast ease-out-soft hover:bg-muted hover:shadow-retro-hover"
-            >
-              Host Connect →
-            </Link>
-          </div>
-          {/* Quick start steps — shown when offline / no projects */}
-          {(serverStatus !== 'online' || projects.length === 0) && !loading && (
-            <div className="mt-5 pt-5 border-t border-border-soft">
-              <p className="text-xs font-semibold text-foreground mb-3">Getting started</p>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                {[
-                  { step: '1', label: 'Set up tools', desc: 'Install Podman, Docker or Nginx on your server', to: '/host-connect?tab=tools' },
-                  { step: '2', label: 'Add a server', desc: 'Connect your infrastructure node to WatchTower', to: '/servers' },
-                  { step: '3', label: 'Deploy a project', desc: 'Use the Setup Wizard to launch your first app', to: '/setup' },
-                ].map(({ step, label, desc, to }) => (
-                  <Link key={step} to={to} className="flex items-start gap-3 p-3 rounded-md border border-border-soft bg-surface-soft hover:bg-muted hover:border-border transition-all">
-                    <span className="w-5 h-5 rounded-full bg-primary text-primary-foreground text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">{step}</span>
-                    <div>
-                      <p className="text-xs font-semibold text-foreground">{label}</p>
-                      <p className="text-[11px] text-muted-foreground mt-0.5">{desc}</p>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            </div>
-          )}
-        </section>
+        {/* DATA-FIRST: returning users see their stats immediately, not a
+            marketing hero. The onboarding hero + explainer moved to the
+            bottom and only show for new/empty installs. */}
 
         {/* Stats row */}
         <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
@@ -406,6 +360,51 @@ const Dashboard = () => {
           <StatCard label="Static Sites"   value={stats.static} sub="Netlify-style" />
           <StatCard label="Docker Apps"    value={stats.docker} sub="Container-based" />
         </div>
+
+        {/* Onboarding — only for new/empty installs. Once you have projects,
+            the dashboard leads with them, not the explainer. */}
+        {projects.length === 0 && !loading && (
+          <>
+            <SystemOverviewBanner />
+            <section className="relative overflow-hidden rounded-lg border border-border bg-card p-6 shadow-retro">
+              <div className="relative flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+                <div className="min-w-0">
+                  <p className="inline-flex items-center gap-1.5 text-[11px] uppercase tracking-[0.18em] text-muted-foreground font-semibold">
+                    <span className="h-1.5 w-1.5 rounded-full bg-primary" /> WatchTower
+                  </p>
+                  <h2 className="text-2xl font-bold text-foreground mt-1.5 tracking-tight">Simple Infrastructure Control</h2>
+                  <p className="text-sm text-muted-foreground mt-2 max-w-xl">
+                    Manage hosts, deploy apps, connect databases, and keep containers up to date — all from one place.
+                  </p>
+                </div>
+                <Link
+                  to="/host-connect?tab=tools"
+                  className="shrink-0 inline-flex items-center gap-2 rounded-md border border-border bg-card px-4 py-2 text-sm font-semibold text-foreground shadow-retro transition-all duration-fast ease-out-soft hover:bg-muted hover:shadow-retro-hover"
+                >
+                  Host Connect →
+                </Link>
+              </div>
+              <div className="mt-5 pt-5 border-t border-border-soft">
+                <p className="text-xs font-semibold text-foreground mb-3">Getting started</p>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  {[
+                    { step: '1', label: 'Set up tools', desc: 'Install Podman, Docker or Nginx on your server', to: '/host-connect?tab=tools' },
+                    { step: '2', label: 'Add a server', desc: 'Connect your infrastructure node to WatchTower', to: '/servers' },
+                    { step: '3', label: 'Deploy a project', desc: 'Use the Setup Wizard to launch your first app', to: '/setup' },
+                  ].map(({ step, label, desc, to }) => (
+                    <Link key={step} to={to} className="flex items-start gap-3 p-3 rounded-md border border-border-soft bg-surface-soft hover:bg-muted hover:border-border transition-all">
+                      <span className="w-5 h-5 rounded-full bg-primary text-primary-foreground text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">{step}</span>
+                      <div>
+                        <p className="text-xs font-semibold text-foreground">{label}</p>
+                        <p className="text-[11px] text-muted-foreground mt-0.5">{desc}</p>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            </section>
+          </>
+        )}
 
         {/* Runtime health + quick actions */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
