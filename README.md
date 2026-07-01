@@ -10,9 +10,25 @@
 </p>
 
 <p align="center">
-  <strong>Keep Podman containers current. Ship apps across your own nodes.</strong><br/>
-  Operator-facing tooling for container auto-updates, multi-node deployments, and guided host operations — without handing control to a hosted platform.
+  <strong>The self-hosting platform that fixes its own failures.</strong><br/>
+  Turn the computer you already own into a server that deploys your apps from GitHub, runs your databases, and — when a deploy breaks — diagnoses it and fixes it on its own. Rootless Podman, private over Tailscale, no VPS bill.
 </p>
+
+---
+
+### Why WatchTower is different
+
+Coolify, Dokploy, Umbrel, and CasaOS all let you self-host apps. **None of them fix a broken deploy for you.** WatchTower does.
+
+- 🩹 **Self-healing deploys** — when a deployment fails (port conflict, registry flake, OOM…), WatchTower classifies the cause, applies a fix, and retries — automatically. What it can't safely auto-fix, it queues for you with an AI root-cause analysis. Autonomy is a global switch (default off) with a thrash guardrail, so it never fixes recklessly.
+- 🖥️ **Your PC, not a rented VPS** — designed to run on the machine you already have. No monthly server bill.
+- 🔒 **Rootless & private by default** — Podman-first (no root Docker daemon), reachable over your own Tailscale tailnet — nothing exposed to the public internet.
+- 🗄️ **Batteries included** — one-click managed databases (Postgres/MySQL/Mongo/Redis) with auto-wired connection strings and scheduled backups, plus GitHub-push deploys and an app catalog.
+- 🔓 **Open-core** — Apache 2.0 + ELv2. Self-host it forever; no lock-in.
+
+> Different from [`containrrr/watchtower`](https://github.com/containrrr/watchtower) (a Docker image auto-updater). This WatchTower is a full self-hosted deploy + database + self-heal control plane for Podman.
+
+---
 
 
 ## Install the App (easiest)
@@ -179,12 +195,21 @@ Manage everything from the **Integrations** page: live connection status for the
 - **Use App Center** if you want WatchTower to behave like a compact deployment control plane for websites, APIs, previews, and multi-node rollouts.
 - **Use Host Connect / secure terminal flows** if the team needs guided host actions without opening an unrestricted shell path.
 
-## Why It Is Different
+## How WatchTower compares
 
-- **Explicit deploy flow:** operators can see app selection, artifact creation, sync, activation, and health verification as separate steps.
-- **Own-your-infrastructure model:** deploy to your own Linux nodes over SSH instead of handing control to a hosted platform.
-- **Consistent UX:** the desktop app, web UI, GitHub Pages docs, and architecture diagrams all explain the same product model.
-- **Desktop-first, AI-agent ready:** ships as a real Electron app with system-tray integration, native folder pickers, OS-level notifications, and a built-in agent surface — not a web app dressed up as a desktop one.
+|                                   | **WatchTower** | Coolify | Dokploy | Umbrel / CasaOS |
+| --------------------------------- | :------------: | :-----: | :-----: | :-------------: |
+| Deploy from GitHub                |       ✅       |    ✅    |    ✅    |   partial (app store) |
+| One-click managed databases       |       ✅       |    ✅    |    ✅    |       ✅        |
+| **Self-heals a failed deploy**    |     **✅**     |    ❌    |    ❌    |       ❌        |
+| Runs on your own PC (not a VPS)   |       ✅       | VPS-first | VPS-first |     ✅        |
+| Rootless (no root Docker daemon)  |   ✅ (Podman)  | ❌ (root Docker) | ❌ | ❌ (Docker) |
+| Private by default (Tailscale)    |    ✅ built-in |  add-on |  add-on |     add-on      |
+| Desktop app                       |       ✅       |    ❌    |    ❌    |       ❌        |
+
+The differentiator is the third row. Everyone lets you self-host apps; **only WatchTower diagnoses and fixes a broken deploy on its own** — apply-and-retry for the failures it recognizes (port conflicts, registry flakes), and an AI root-cause analysis + human-approval queue for the ones it can't. It's built to run unattended on the machine you already own, rootless, without exposing anything to the internet.
+
+*(Comparison reflects public feature sets as of mid-2026. WatchTower is younger than Coolify — it wins on the self-heal + rootless-PC angle, not on breadth or years of hardening.)*
 
 ---
 
