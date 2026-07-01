@@ -14,6 +14,15 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import apiClient from '@/lib/api';
 
+// Every list endpoint runs its response through this before it reaches a
+// component. A malformed payload — an error body, a proxy that wraps the
+// array, a 200 with the wrong shape — used to white-screen whichever page
+// did `data.map(...)`. Coercing to `[]` here means a bad response degrades
+// to an empty list (rendered as the page's empty state) instead of a crash.
+function asArray<T>(data: unknown): T[] {
+  return Array.isArray(data) ? (data as T[]) : [];
+}
+
 // ── Query keys ───────────────────────────────────────────────────────────────
 // Treat these as the public contract. Mutations invalidate by key prefix.
 
@@ -120,7 +129,7 @@ export type AuditEvent = {
 export function useAuditEvents(params: AuditQueryParams, enabled: boolean = true) {
   return useQuery<AuditEvent[]>({
     queryKey: queryKeys.audit(params),
-    queryFn: async () => (await apiClient.get<AuditEvent[]>('/audit', { params })).data,
+    queryFn: async () => asArray<AuditEvent>((await apiClient.get('/audit', { params })).data),
     enabled,
     staleTime: 10_000,
   });
@@ -160,7 +169,7 @@ export type ProjectListItem = {
 export function useProjects() {
   return useQuery<ProjectListItem[]>({
     queryKey: queryKeys.projects,
-    queryFn: async () => (await apiClient.get<ProjectListItem[]>('/projects')).data,
+    queryFn: async () => asArray<ProjectListItem>((await apiClient.get('/projects')).data),
     // Dashboard polls anyway; keep this short so manual refresh is cheap.
     staleTime: 5_000,
   });
@@ -203,7 +212,7 @@ export type ProjectRelation = {
 export function useProjectRelations(projectId: string | undefined) {
   return useQuery<ProjectRelation[]>({
     queryKey: projectId ? queryKeys.projectRelated(projectId) : ['project', 'disabled', 'related'],
-    queryFn: async () => (await apiClient.get<ProjectRelation[]>(`/projects/${projectId}/related`)).data,
+    queryFn: async () => asArray<ProjectRelation>((await apiClient.get(`/projects/${projectId}/related`)).data),
     enabled: !!projectId,
   });
 }
@@ -426,7 +435,7 @@ export function useRemoteAccessProviders() {
   return useQuery<RemoteAccessProvider[]>({
     queryKey: queryKeys.remoteAccessProviders,
     queryFn: async () =>
-      (await apiClient.get<RemoteAccessProvider[]>('/remote-access/providers')).data,
+      asArray<RemoteAccessProvider>((await apiClient.get('/remote-access/providers')).data),
     staleTime: 10_000,
     refetchOnWindowFocus: false,
   });
@@ -532,7 +541,7 @@ export function useManagedDbEngines() {
   return useQuery<ManagedDbEngine[]>({
     queryKey: queryKeys.managedDbEngines,
     queryFn: async () =>
-      (await apiClient.get<ManagedDbEngine[]>('/managed-databases/engines')).data,
+      asArray<ManagedDbEngine>((await apiClient.get('/managed-databases/engines')).data),
     staleTime: 60 * 60 * 1000,
   });
 }
@@ -541,7 +550,7 @@ export function useManagedDatabases() {
   return useQuery<ManagedDatabase[]>({
     queryKey: queryKeys.managedDatabases,
     queryFn: async () =>
-      (await apiClient.get<ManagedDatabase[]>('/managed-databases')).data,
+      asArray<ManagedDatabase>((await apiClient.get('/managed-databases')).data),
     staleTime: 5_000,
   });
 }
@@ -633,7 +642,7 @@ export function useManagedDbReplicas(primaryId: string, enabled: boolean = true)
   return useQuery<ManagedDbReplica[]>({
     queryKey: queryKeys.managedDbReplicas(primaryId),
     queryFn: async () =>
-      (await apiClient.get<ManagedDbReplica[]>(`/managed-databases/${primaryId}/replicas`)).data,
+      asArray<ManagedDbReplica>((await apiClient.get(`/managed-databases/${primaryId}/replicas`)).data),
     enabled,
     staleTime: 5_000,
   });
@@ -700,7 +709,7 @@ export function useManagedDbBackups(primaryId: string, enabled: boolean = true) 
   return useQuery<ManagedDbBackup[]>({
     queryKey: queryKeys.managedDbBackups(primaryId),
     queryFn: async () =>
-      (await apiClient.get<ManagedDbBackup[]>(`/managed-databases/${primaryId}/backups`)).data,
+      asArray<ManagedDbBackup>((await apiClient.get(`/managed-databases/${primaryId}/backups`)).data),
     enabled,
     staleTime: 10_000,
   });
@@ -869,7 +878,7 @@ export function useExternalDatabases() {
   return useQuery<ExternalDatabase[]>({
     queryKey: queryKeys.externalDatabases,
     queryFn: async () =>
-      (await apiClient.get<ExternalDatabase[]>('/external-databases')).data,
+      asArray<ExternalDatabase>((await apiClient.get('/external-databases')).data),
     staleTime: 10_000,
   });
 }
@@ -991,7 +1000,7 @@ export function useDiscoverLocalDatabases() {
   return useQuery<DiscoveredDb[]>({
     queryKey: ['external-databases', 'discover'],
     queryFn: async () =>
-      (await apiClient.get<DiscoveredDb[]>('/external-databases/discover')).data,
+      asArray<DiscoveredDb>((await apiClient.get('/external-databases/discover')).data),
     staleTime: 15_000,
   });
 }
@@ -1047,9 +1056,9 @@ export function useProjectDatabases(projectId: string | undefined) {
   return useQuery<ProjectDatabaseLink[]>({
     queryKey: projectId ? queryKeys.projectDatabases(projectId) : ['projects', 'disabled', 'databases'],
     queryFn: async () =>
-      (await apiClient.get<ProjectDatabaseLink[]>(
-        `/projects/${projectId}/databases`,
-      )).data,
+      asArray<ProjectDatabaseLink>(
+        (await apiClient.get(`/projects/${projectId}/databases`)).data,
+      ),
     enabled: !!projectId,
     staleTime: 10_000,
   });
@@ -1191,9 +1200,9 @@ export function useHealingActions(status?: string) {
   return useQuery<HealingAction[]>({
     queryKey: queryKeys.healingActions(status),
     queryFn: async () =>
-      (await apiClient.get<HealingAction[]>('/healing/actions', {
+      asArray<HealingAction>((await apiClient.get('/healing/actions', {
         params: status ? { status_filter: status } : {},
-      })).data,
+      })).data),
     refetchInterval: 60_000,
   });
 }
@@ -1316,7 +1325,7 @@ export function usePodmanStatus() {
 export function usePodmanContainers(enabled: boolean) {
   return useQuery<PodmanContainer[]>({
     queryKey: queryKeys.podmanContainers,
-    queryFn: async () => (await apiClient.get<PodmanContainer[]>('/podman/containers')).data,
+    queryFn: async () => asArray<PodmanContainer>((await apiClient.get('/podman/containers')).data),
     enabled,
     refetchInterval: 8_000,
     retry: false,
@@ -1326,7 +1335,7 @@ export function usePodmanContainers(enabled: boolean) {
 export function usePodmanPods(enabled: boolean) {
   return useQuery<PodmanPod[]>({
     queryKey: queryKeys.podmanPods,
-    queryFn: async () => (await apiClient.get<PodmanPod[]>('/podman/pods')).data,
+    queryFn: async () => asArray<PodmanPod>((await apiClient.get('/podman/pods')).data),
     enabled,
     refetchInterval: 10_000,
     retry: false,

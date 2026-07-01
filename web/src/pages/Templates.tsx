@@ -51,7 +51,8 @@ function TemplateCard({
 }) {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState(`my-${template.slug}`);
-  const placeholders = template.default_env_vars.filter((v) => v.placeholder);
+  const envVars = Array.isArray(template.default_env_vars) ? template.default_env_vars : [];
+  const placeholders = envVars.filter((v) => v.placeholder);
   const validName = slugifyName(name).length >= 2;
 
   return (
@@ -81,8 +82,8 @@ function TemplateCard({
           Repo: <a href={template.repo_url} target="_blank" rel="noopener noreferrer" className="font-mono text-slate-700 hover:text-slate-900 underline-offset-2 hover:underline">{template.repo_url.replace('https://github.com/', '')}</a>
         </p>
         {template.memory_hint_mb && <p>Memory hint: {template.memory_hint_mb} MB</p>}
-        {template.default_env_vars.length > 0 && (
-          <p>Pre-fills {template.default_env_vars.length} env var{template.default_env_vars.length === 1 ? '' : 's'}{placeholders.length > 0 && `, ${placeholders.length} need${placeholders.length === 1 ? 's' : ''} your input`}</p>
+        {envVars.length > 0 && (
+          <p>Pre-fills {envVars.length} env var{envVars.length === 1 ? '' : 's'}{placeholders.length > 0 && `, ${placeholders.length} need${placeholders.length === 1 ? 's' : ''} your input`}</p>
         )}
       </div>
 
@@ -183,7 +184,19 @@ export default function Templates() {
     let cancelled = false;
     void apiClient
       .get('/templates')
-      .then(r => { if (!cancelled) setTemplates(r.data.templates); })
+      .then(r => {
+        if (cancelled) return;
+        // Tolerate both response shapes ({ templates: [...] } and a bare
+        // array) and never hand a non-array to setState — a malformed
+        // payload used to white-screen the page at `.filter`/`.map`.
+        const payload = r.data;
+        const list = Array.isArray(payload)
+          ? payload
+          : Array.isArray(payload?.templates)
+            ? payload.templates
+            : [];
+        setTemplates(list);
+      })
       .catch(e => {
         if (cancelled) return;
         const httpStatus = (e as { response?: { status?: number } })?.response?.status ?? 0;
