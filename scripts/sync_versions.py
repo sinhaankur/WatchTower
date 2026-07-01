@@ -48,6 +48,10 @@ DOCS_INDEX_PATTERNS = (
      r'\g<1>{version}\g<2>'),
     (re.compile(r'(⬇ Download v)[\d.]+(</a>)'),
      r'\g<1>{version}\g<2>'),
+    # JSON-LD structured data: keep softwareVersion current so search rich
+    # results don't advertise a stale version.
+    (re.compile(r'("softwareVersion":\s*")[\d.]+(")'),
+     r'\g<1>{version}\g<2>'),
 )
 
 
