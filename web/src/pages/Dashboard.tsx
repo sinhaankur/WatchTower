@@ -647,7 +647,7 @@ const Dashboard = () => {
             {[
               { n: 1, title: 'Start the server',  desc: 'Run ./scripts/dev-up.sh to launch the UI + API backend.' },
               { n: 2, title: 'Add a server',       desc: 'Go to Servers and connect a VPS via SSH to host resources.' },
-              { n: 3, title: 'Deploy a project',   desc: 'Click "+ New Resource", choose your app type and repo.' },
+              { n: 3, title: 'Deploy a project',   desc: 'Click "+ New Project", choose your app type and repo.' },
               { n: 4, title: 'Monitor & scale',    desc: 'Track containers, set up teams, and manage deployments.' },
             ].map(({ n, title, desc }) => (
               <div key={n} className="flex gap-3 p-4 rounded-lg bg-muted/30 border border-border">

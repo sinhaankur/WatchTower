@@ -482,13 +482,13 @@ export default function Layout({ children }: { children: ReactNode }) {
         <Link
           to="/setup"
           onClick={onNavClick}
-          title={rail ? 'New Resource' : undefined}
+          title={rail ? 'New Project' : undefined}
           className={`flex items-center justify-center gap-2 w-full ${
             rail ? 'py-2' : 'py-1.5 px-3'
           } rounded-md bg-primary hover:bg-primary/90 transition-colors text-primary-foreground text-[13px] font-semibold shadow-retro`}
         >
           <IconPlus />
-          {!rail && <>New Resource</>}
+          {!rail && <>New Project</>}
         </Link>
       </div>
 

@@ -1,9 +1,66 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link /*, useNavigate*/ } from 'react-router-dom';
 import axios from 'axios';
 import apiClient from '@/lib/api';
 import { trackEvent } from '@/lib/analytics';
 import EmptyState from '@/components/EmptyState';
+
+/**
+ * Overflow "⋯" menu for a project row. Keeps the primary actions (Deploy /
+ * Open / Details) visible and unclutters the row by tucking rarely-used
+ * actions (Clear cache, Delete) behind a single button. Click-outside closes.
+ */
+function RowMenu({
+  onClearCache,
+  onDelete,
+  clearing,
+}: {
+  onClearCache: () => void;
+  onDelete: () => void;
+  clearing: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!open) return;
+    const handle = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handle);
+    return () => document.removeEventListener('mousedown', handle);
+  }, [open]);
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="px-2 py-1.5 rounded-lg border border-border text-sm text-slate-500 hover:bg-slate-100 transition-colors leading-none"
+        title="More actions"
+        aria-haspopup="menu"
+        aria-expanded={open}
+      >
+        ⋯
+      </button>
+      {open && (
+        <div className="absolute right-0 top-full mt-1 z-20 w-44 rounded-lg border border-border bg-card shadow-md py-1 text-sm">
+          <button
+            onClick={() => { setOpen(false); onClearCache(); }}
+            disabled={clearing}
+            className="w-full text-left px-3 py-2 text-foreground hover:bg-muted transition-colors disabled:opacity-50"
+          >
+            🧹 Clear build cache
+          </button>
+          <button
+            onClick={() => { setOpen(false); onDelete(); }}
+            className="w-full text-left px-3 py-2 text-red-600 hover:bg-red-50 transition-colors"
+          >
+            ✕ Delete project
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
 
 type Project = {
   id: string;
@@ -109,7 +166,9 @@ const Applications = () => {
     setError('');
     try {
       const [projRes] = await Promise.all([apiClient.get('/projects')]);
-      const rows = (projRes.data as any[]) ?? [];
+      // Array-guard: a non-array body (error object, unexpected shape) must not
+      // reach rows.map and crash the page.
+      const rows: any[] = Array.isArray(projRes.data) ? projRes.data : [];
 
       // Fetch last deployment for each project in parallel
       const enriched: ProjectWithDeployment[] = await Promise.all(
@@ -264,7 +323,7 @@ const Applications = () => {
             to="/setup"
             className="px-3 sm:px-4 py-1.5 rounded-lg bg-primary hover:bg-primary/90 text-white text-xs sm:text-sm font-medium transition-colors border border-border shadow-retro"
           >
-            + Deploy App
+            + New Project
           </Link>
         </div>
       </header>
@@ -406,21 +465,11 @@ const Applications = () => {
                       >
                         Details
                       </Link>
-                      <button
-                        onClick={() => setConfirmCacheClear({ id: p.id, name: p.name })}
-                        disabled={cacheClearingId === p.id}
-                        className="px-2 py-1.5 rounded-lg border border-border text-xs text-slate-500 hover:text-amber-700 hover:border-amber-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                        title="Clear this app's build cache on this device"
-                      >
-                        {cacheClearingId === p.id ? '…' : '🧹 Cache'}
-                      </button>
-                      <button
-                        onClick={() => setConfirmDelete(p.id)}
-                        className="px-2 py-1.5 rounded-lg border border-border text-xs text-slate-400 hover:text-red-600 hover:border-red-300 transition-colors"
-                        title="Delete project"
-                      >
-                        ✕
-                      </button>
+                      <RowMenu
+                        clearing={cacheClearingId === p.id}
+                        onClearCache={() => setConfirmCacheClear({ id: p.id, name: p.name })}
+                        onDelete={() => setConfirmDelete(p.id)}
+                      />
                     </div>
                   </div>
 

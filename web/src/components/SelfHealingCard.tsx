@@ -50,12 +50,16 @@ function fmtWhen(iso: string | null): string {
 
 export default function SelfHealingCard() {
   const { data: actions, isLoading } = useHealingActions();
-  const items = (actions ?? []).slice(0, 5);
+  // Guard against a non-array response (error body, unexpected shape) — a bare
+  // `?? []` wouldn't, and `.slice`/`.filter` on an object would crash the whole
+  // Dashboard.
+  const list = Array.isArray(actions) ? actions : [];
+  const items = list.slice(0, 5);
 
   // Fresh install with no healing history — stay out of the way.
   if (isLoading || items.length === 0) return null;
 
-  const autoFixed = (actions ?? []).filter((a) => a.status === 'auto_applied' || a.status === 'approved').length;
+  const autoFixed = list.filter((a) => a.status === 'auto_applied' || a.status === 'approved').length;
 
   return (
     <div className="rounded-lg border border-border bg-card p-5 shadow-retro">
