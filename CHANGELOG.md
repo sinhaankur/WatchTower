@@ -9,6 +9,17 @@ Curated, human-friendly history of WatchTower releases. Auto-generated GitHub Re
 
 ---
 
+## 1.17.3 — See what WatchTower fixed, and a cleaner dashboard
+
+This release makes WatchTower's headline feature — self-healing — visible, and cleans up the everyday flow.
+
+- **Self-healing activity on the Dashboard.** WatchTower already watches your deploys and fixes what it can on its own; now you can *see* it. A new activity feed shows recent heals — "*api-service · Port conflict → reassigned to port 8081 → auto-fixed*" — with a running count of what it fixed for you and what needs your attention.
+- **Data-first dashboard.** Your projects and stats now lead; the explainer diagram and welcome hero only show on a fresh, empty install.
+- **Clearer, less cluttered UI.** One consistent "+ New Project" button everywhere (was a mix of "New Resource" / "Deploy App"), project rows lead with a prominent Deploy button and tuck the rest into a "⋯" menu, and the "Use this PC" card no longer appears twice on the Servers page.
+- **More resilient pages.** A single unexpected API response can no longer blank a whole page — Settings cards are individually error-isolated, and the Dashboard/Applications tolerate malformed data instead of crashing.
+
+---
+
 ## 1.17.2 — Deploy reliability + richer notifications
 
 Fixes two real deploy failures and notifies you about more of what WatchTower is doing.
