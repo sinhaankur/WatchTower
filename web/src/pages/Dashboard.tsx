@@ -4,6 +4,7 @@ import axios from 'axios';
 import apiClient from '@/lib/api';
 import useCountUp from '@/hooks/useCountUp';
 import SystemResourceMonitor from '@/components/SystemResourceMonitor';
+import SelfHealingCard from '@/components/SelfHealingCard';
 import { SystemDiagram } from '@/components/SectionDiagrams';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -360,6 +361,10 @@ const Dashboard = () => {
           <StatCard label="Static Sites"   value={stats.static} sub="Netlify-style" />
           <StatCard label="Docker Apps"    value={stats.docker} sub="Container-based" />
         </div>
+
+        {/* Self-healing activity — WatchTower's headline differentiator made
+            visible. Renders nothing until there's healing history. */}
+        <SelfHealingCard />
 
         {/* Onboarding — only for new/empty installs. Once you have projects,
             the dashboard leads with them, not the explainer. */}
