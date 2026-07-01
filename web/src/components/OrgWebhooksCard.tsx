@@ -32,7 +32,9 @@ export default function OrgWebhooksCard() {
     setLoading(true);
     try {
       const r = await apiClient.get<OrgWebhook[]>('/org-webhooks');
-      setHooks(r.data);
+      // Never let a non-array response (error body, unexpected shape) reach
+      // hooks.map — that would white-screen the Settings page.
+      setHooks(Array.isArray(r.data) ? r.data : []);
       setForbidden(false);
     } catch (err) {
       if (axios.isAxiosError(err) && err.response?.status === 403) setForbidden(true);

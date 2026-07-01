@@ -301,8 +301,10 @@ const Dashboard = () => {
     docker: projects.filter((p) => p.use_case === 'docker_platform').length,
   }), [projects]);
 
-  const containers = runtimeStatus?.podman.running_containers ?? 0;
-  const bgRunning  = runtimeStatus?.watchtower.background_process.running ?? false;
+  // Fully optional-chain: a malformed /runtime/status body (podman or
+  // watchtower missing) must not crash the dashboard's render/poll.
+  const containers = runtimeStatus?.podman?.running_containers ?? 0;
+  const bgRunning  = runtimeStatus?.watchtower?.background_process?.running ?? false;
 
   return (
     <div className="flex-1 overflow-auto bg-transparent">
@@ -400,7 +402,7 @@ const Dashboard = () => {
         {/* Stats row */}
         <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           <StatCard label="Total Projects" value={stats.total} sub={dataSource === 'server' ? 'from API' : 'local cache'} accent="text-primary" />
-          <StatCard label="Containers" value={containers} sub={runtimeStatus?.podman.installed ? `Podman ${runtimeStatus.podman.version ?? ''}` : 'Podman not detected'} />
+          <StatCard label="Containers" value={containers} sub={runtimeStatus?.podman?.installed ? `Podman ${runtimeStatus?.podman?.version ?? ''}` : 'Podman not detected'} />
           <StatCard label="Static Sites"   value={stats.static} sub="Netlify-style" />
           <StatCard label="Docker Apps"    value={stats.docker} sub="Container-based" />
         </div>
@@ -422,20 +424,20 @@ const Dashboard = () => {
             {[
               {
                 label: 'Podman',
-                running: runtimeStatus?.podman.installed ?? false,
-                detail: runtimeStatus?.podman.version ?? 'Not detected',
+                running: runtimeStatus?.podman?.installed ?? false,
+                detail: runtimeStatus?.podman?.version ?? 'Not detected',
                 right: `${containers} running`,
               },
               {
                 label: 'WatchTower Updater',
                 running: bgRunning,
-                detail: bgRunning ? `Running · PID ${runtimeStatus?.watchtower.background_process.pid}` : 'Stopped',
+                detail: bgRunning ? `Running · PID ${runtimeStatus?.watchtower?.background_process.pid}` : 'Stopped',
                 right: '',
               },
               {
                 label: 'Systemd Service',
-                running: runtimeStatus?.watchtower.systemd_service === 'active',
-                detail: runtimeStatus?.watchtower.systemd_service ?? 'unknown',
+                running: runtimeStatus?.watchtower?.systemd_service === 'active',
+                detail: runtimeStatus?.watchtower?.systemd_service ?? 'unknown',
                 right: '',
               },
             ].map((row) => (
@@ -497,11 +499,11 @@ const Dashboard = () => {
         </div>
 
         {/* Monitored containers (if any) */}
-        {Array.isArray(runtimeStatus?.podman?.sample_containers) && runtimeStatus.podman.sample_containers.length > 0 && (
+        {Array.isArray(runtimeStatus?.podman?.sample_containers) && runtimeStatus?.podman?.sample_containers.length > 0 && (
           <div className="rounded-lg border border-border bg-card p-5">
             <h2 className="text-sm font-semibold text-foreground mb-3">Monitored Containers</h2>
             <div className="space-y-2">
-              {runtimeStatus.podman.sample_containers.map((c) => (
+              {runtimeStatus?.podman?.sample_containers.map((c) => (
                 <div key={c.name} className="flex items-center gap-3 p-3 rounded-lg bg-muted/40 hover:bg-muted/60 transition-colors">
                   <StatusDot running={c.state === 'running'} />
                   <div className="flex-1 min-w-0">

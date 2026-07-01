@@ -431,19 +431,6 @@ const Servers = () => {
           </div>
         )}
 
-        {/* Use This PC shortcut */}
-        <Link
-          to="/servers/local"
-          className="flex items-center gap-4 rounded-xl border border-blue-200 bg-blue-50 hover:border-blue-400 hover:bg-blue-100 px-5 py-4 transition-colors group"
-        >
-          <div className="w-10 h-10 rounded-xl bg-white border border-blue-200 flex items-center justify-center text-xl shrink-0">💻</div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-blue-900">Use this PC as a server</p>
-            <p className="text-xs text-blue-700 mt-0.5">Register your current machine as a local deployment node — no SSH setup needed.</p>
-          </div>
-          <span className="text-blue-400 group-hover:text-blue-600 text-lg transition-colors">→</span>
-        </Link>
-
         {/* Server list */}
         <div className="rounded-xl border border-border bg-card p-5">
           {/* Header row: count + health summary + search/filter */}

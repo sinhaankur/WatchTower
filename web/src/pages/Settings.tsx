@@ -5,6 +5,33 @@ import apiClient from '@/lib/api';
 import AIAutonomyCard from '@/components/AIAutonomyCard';
 import DiagnosticsCard from '@/components/DiagnosticsCard';
 import OrgWebhooksCard from '@/components/OrgWebhooksCard';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
+
+/**
+ * Isolate each Settings card: a bug in one card renders a small inline
+ * "section unavailable" notice instead of white-screening the whole page
+ * (the previous behaviour — one card's `X.map` crash took down all of Settings).
+ */
+function CardBoundary({ name, children }: { name: string; children: React.ReactNode }) {
+  return (
+    <ErrorBoundary
+      fallback={(_err, reset) => (
+        <div className="rounded-xl border border-red-200 bg-red-50 p-5 text-sm">
+          <p className="font-medium text-red-800">{name} couldn’t load.</p>
+          <p className="text-red-600 mt-1 text-xs">The rest of Settings is fine.</p>
+          <button
+            onClick={reset}
+            className="mt-3 px-3 py-1.5 rounded-md border border-red-300 bg-white text-red-700 text-xs font-medium hover:bg-red-100"
+          >
+            Retry
+          </button>
+        </div>
+      )}
+    >
+      {children}
+    </ErrorBoundary>
+  );
+}
 import {
   useVSCodeStatus,
   useUpdateCheck,
@@ -764,26 +791,15 @@ const Settings = () => {
 
       <main className="px-4 sm:px-6 lg:px-8 py-6 max-w-4xl mx-auto w-full space-y-4">
 
-        {/* WatchTower version + update check */}
-        <UpdateCheckCard />
-
-        {/* LLM connection + autonomous self-heal + intervention queue */}
-        <AIAutonomyCard />
-
-        {/* Installation-wide Slack/Discord webhooks (control-plane etc.) */}
-        <OrgWebhooksCard />
-
-        {/* Subsystem diagnostics — first stop for "why doesn't X work?" */}
-        <DiagnosticsCard />
-
-        {/* System dependencies + diagnostics */}
-        <SystemCard />
-
-        {/* Backup & restore for ~/.watchtower/ */}
-        <BackupCard />
-
-        {/* VS Code Integration — prominent card */}
-        <VSCodeCard />
+        {/* Each card is error-isolated: one failing card shows an inline
+            notice, not a blank Settings page. */}
+        <CardBoundary name="Updates"><UpdateCheckCard /></CardBoundary>
+        <CardBoundary name="AI & Autonomy"><AIAutonomyCard /></CardBoundary>
+        <CardBoundary name="Org notifications"><OrgWebhooksCard /></CardBoundary>
+        <CardBoundary name="Diagnostics"><DiagnosticsCard /></CardBoundary>
+        <CardBoundary name="System"><SystemCard /></CardBoundary>
+        <CardBoundary name="Backup & Restore"><BackupCard /></CardBoundary>
+        <CardBoundary name="VS Code"><VSCodeCard /></CardBoundary>
 
       </main>
     </div>

@@ -160,17 +160,20 @@ export default function AIAutonomyCard() {
         api_key: apiKey || undefined,
       });
       if (result.ok) {
-        setModels(result.models);
+        // Guard against a server that returns ok without a models array —
+        // otherwise `models.map` later crashes the whole Settings page.
+        const modelList = Array.isArray(result.models) ? result.models : [];
+        setModels(modelList);
         // Auto-pick the first model so "Test → Save" is a two-click flow
         // when the current model isn't served by this endpoint.
-        if (result.models.length > 0 && !result.models.includes(model)) {
-          setModel(result.models[0]);
+        if (modelList.length > 0 && !modelList.includes(model)) {
+          setModel(modelList[0]);
           setDirty(true);
         }
         setTestResult({
           ok: true,
-          msg: result.models.length > 0
-            ? `Connected — ${result.models.length} model${result.models.length === 1 ? '' : 's'} available`
+          msg: modelList.length > 0
+            ? `Connected — ${modelList.length} model${modelList.length === 1 ? '' : 's'} available`
             : 'Connected, but the server reported no models. Load one in your LLM app first.',
         });
       } else {
