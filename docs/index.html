@@ -3,7 +3,15 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>WatchTower Docs</title>
+  <title>WatchTower — The self-hosting platform that fixes its own failures</title>
+  <meta name="description" content="Self-hosted, open-source deploy platform for your own PC. Push from GitHub, run managed databases, and — when a deploy breaks — WatchTower diagnoses and fixes it automatically. Rootless Podman, private over Tailscale, no VPS. A Coolify / Dokploy / Umbrel alternative with self-healing.">
+  <meta name="keywords" content="self-hosted PaaS, Coolify alternative, Dokploy alternative, self-healing deployment, Podman deploy, Tailscale self-host, home server, deploy from GitHub, rootless container platform">
+  <!-- Open Graph / social preview -->
+  <meta property="og:title" content="WatchTower — the self-hosting platform that fixes its own failures">
+  <meta property="og:description" content="Deploy from GitHub to a PC you already own. When a deploy breaks, WatchTower diagnoses and fixes it on its own. Rootless Podman, private over Tailscale, no VPS bill.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://sinhaankur.github.io/WatchTower/">
+  <meta name="twitter:card" content="summary_large_image">
   <link rel="icon" type="image/x-icon" href="./favicon.ico">
   <link rel="icon" type="image/png" sizes="32x32" href="./favicon-32x32.png">
   <link rel="icon" type="image/svg+xml" href="./wt-logo.svg">
@@ -1080,7 +1088,7 @@
           <span class="brand-mark"><img src="./wt-logo.svg" alt="Wt logo"></span>
           <span class="brand-copy">
             <strong>WatchTower</strong>
-            <span>Deployment Control Plane</span>
+            <span>Self-healing self-hosting</span>
           </span>
         </a>
       </div>
@@ -1117,7 +1125,7 @@
       </nav>
 
       <div class="sidebar-footer">
-        <div>DevOps control plane for self-hosted infrastructure. No vendor lock-in.</div>
+        <div>Self-hosted deploy + database platform that fixes its own failures. Rootless Podman, private over Tailscale.</div>
         <div style="margin-top: 10px;"><a href="https://github.com/sinhaankur/WatchTower" target="_blank" rel="noopener">GitHub</a> · <a href="./viewer.html?doc=vercel_alternative">vs Vercel</a> · <a href="./viewer.html?doc=mesh">Mesh</a> · <a href="./viewer.html?doc=ha">HA</a></div>
       </div>
     </aside>
@@ -1125,74 +1133,100 @@
     <main class="main-shell">
       <header class="topbar">
         <div>
-          <h1>WatchTower Documentation</h1>
-          <p>Self-hosted deployment control plane for DevOps teams — eliminate Vercel/PaaS lock-in and own your infrastructure.</p>
+          <h1>WatchTower</h1>
+          <p>The self-hosting platform that fixes its own failures.</p>
         </div>
-        <div class="status-pill">v1.17.3 Production Ready</div>
+        <div class="status-pill">v1.17.3 · Open Source</div>
       </header>
 
       <div class="content">
         <section class="panel hero" id="overview">
-          <p class="eyebrow">WatchTower · Open Source DevOps Control Plane</p>
-          <h2>Ship apps to your servers. Own your infrastructure. Cut deployment costs by 60–80%.</h2>
+          <p class="eyebrow">Self-healing · Rootless Podman · Runs on your own PC</p>
+          <h2>Deploy from GitHub to a computer you already own — and when a deploy breaks, it fixes itself.</h2>
           <p>
-            WatchTower replaces Vercel, Netlify, and platform-as-a-service solutions by putting deployment control in DevOps hands. 
-            Register apps in one place, deploy to your own nodes via SSH, monitor containers in real time, and manage everything 
-            from a unified dashboard — without handing control to a vendor or paying $50+ per app.
+            Coolify, Dokploy, Umbrel, and CasaOS all let you self-host apps.
+            <strong>None of them fix a broken deploy for you.</strong>
+            WatchTower classifies the failure (port conflict, registry flake, out-of-memory…),
+            applies a fix, and retries — automatically. What it can't safely auto-fix, it queues
+            for you with an AI root-cause analysis. No VPS bill, nothing exposed to the internet.
           </p>
           <div class="chip-row">
-            <span class="chip">Multi-node SSH deployments (HA + failover)</span>
-            <span class="chip">Podman + Docker runtimes (rootless by default)</span>
-            <span class="chip">Integration stack (Nginx, Tailscale, Cloudflare, Coolify)</span>
-            <span class="chip">Auto-restart watchdog (survives reboots)</span>
-            <span class="chip">Desktop app + Browser + Headless API</span>
-            <span class="chip">Cost: ~$5–20/month vs $60+ on Vercel</span>
+            <span class="chip">🩹 Self-healing deploys (auto-fix + retry)</span>
+            <span class="chip">🖥️ Your own PC — no VPS</span>
+            <span class="chip">🔒 Rootless Podman (no root Docker daemon)</span>
+            <span class="chip">🔐 Private over Tailscale by default</span>
+            <span class="chip">🗄️ One-click databases + scheduled backups</span>
+            <span class="chip">🔓 Open-core (Apache 2.0 + ELv2)</span>
           </div>
           <div class="actions">
             <a class="primary-button" href="https://github.com/sinhaankur/WatchTower/releases/latest" target="_blank" rel="noopener">⬇ Download v1.17.3</a>
             <a class="secondary-button" href="https://github.com/sinhaankur/WatchTower" target="_blank" rel="noopener">Star on GitHub</a>
-            <a class="secondary-button" href="./viewer.html?doc=vercel_alternative">Why WatchTower (vs Vercel)</a>
           </div>
         </section>
 
         <section class="stats" id="modes">
           <article class="stat-card panel">
-            <p class="label">Deployment Model</p>
-            <p class="value">Vercel Alternative</p>
-            <p class="meta">Self-hosted, multi-node, 60–80% cost savings. Preview slots, blue-green deploys, auto-rollback on health checks.</p>
+            <p class="label">The difference</p>
+            <p class="value">It self-heals</p>
+            <p class="meta">A deploy fails → WatchTower diagnoses the cause → applies a fix → redeploys, on its own. The one thing no other self-hosting platform does.</p>
           </article>
           <article class="stat-card panel">
-            <p class="label">CI/CD Integration</p>
-            <p class="value">GitHub webhooks + API</p>
-            <p class="meta">Push to main → GitHub → WatchTower API → Auto-build → Auto-deploy. Or use the CLI for manual control.</p>
+            <p class="label">Where it runs</p>
+            <p class="value">Your own PC</p>
+            <p class="meta">Built for the machine you already have — not a rented VPS. No monthly server bill. Rootless Podman, not a root Docker daemon.</p>
           </article>
           <article class="stat-card panel">
-            <p class="label">Infrastructure Stack</p>
-            <p class="value">6-tool integration</p>
-            <p class="meta">Podman → Nginx → Tailscale → Cloudflare → Coolify → WatchTower Watchdog. All on your servers.</p>
+            <p class="label">Batteries included</p>
+            <p class="value">Deploy + DB + Backup</p>
+            <p class="meta">Push from GitHub, one-click managed databases with auto-wired connection strings, scheduled backups, an app catalog — all in one place.</p>
           </article>
           <article class="stat-card panel">
-            <p class="label">High Availability</p>
-            <p class="value">HA + Mesh Topology</p>
-            <p class="meta">Primary + standby nodes. Auto-restart on reboot (watchdog). Encrypted inter-node comms (Tailscale). Zero downtime deploys.</p>
+            <p class="label">Private by default</p>
+            <p class="value">Tailscale built-in</p>
+            <p class="meta">Reach your server from anywhere over your own encrypted tailnet. No port-forwarding, nothing exposed to the public internet.</p>
           </article>
         </section>
 
-        <section class="explain-grid" aria-label="DevOps workflow">
+        <!-- How WatchTower compares -->
+        <section class="panel" style="overflow-x:auto;">
+          <h2 style="margin-top:0;">How WatchTower compares</h2>
+          <table style="width:100%; border-collapse:collapse; font-size:0.92rem;">
+            <thead>
+              <tr style="text-align:left; border-bottom:2px solid rgba(255,255,255,0.15);">
+                <th style="padding:0.5rem 0.75rem;"></th>
+                <th style="padding:0.5rem 0.75rem;">WatchTower</th>
+                <th style="padding:0.5rem 0.75rem;">Coolify</th>
+                <th style="padding:0.5rem 0.75rem;">Dokploy</th>
+                <th style="padding:0.5rem 0.75rem;">Umbrel / CasaOS</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr style="border-bottom:1px solid rgba(255,255,255,0.08);"><td style="padding:0.4rem 0.75rem;">Deploy from GitHub</td><td>✅</td><td>✅</td><td>✅</td><td>partial</td></tr>
+              <tr style="border-bottom:1px solid rgba(255,255,255,0.08);"><td style="padding:0.4rem 0.75rem;">One-click databases</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td></tr>
+              <tr style="border-bottom:1px solid rgba(255,255,255,0.08); font-weight:700;"><td style="padding:0.4rem 0.75rem;">Self-heals a failed deploy</td><td>✅</td><td>❌</td><td>❌</td><td>❌</td></tr>
+              <tr style="border-bottom:1px solid rgba(255,255,255,0.08);"><td style="padding:0.4rem 0.75rem;">Runs on your own PC (not a VPS)</td><td>✅</td><td>VPS-first</td><td>VPS-first</td><td>✅</td></tr>
+              <tr style="border-bottom:1px solid rgba(255,255,255,0.08);"><td style="padding:0.4rem 0.75rem;">Rootless (no root Docker daemon)</td><td>✅ Podman</td><td>❌</td><td>❌</td><td>❌</td></tr>
+              <tr><td style="padding:0.4rem 0.75rem;">Private by default (Tailscale)</td><td>✅ built-in</td><td>add-on</td><td>add-on</td><td>add-on</td></tr>
+            </tbody>
+          </table>
+          <p style="font-size:0.8rem; opacity:0.7; margin-bottom:0;">Reflects public feature sets as of mid-2026. WatchTower is younger than Coolify — it wins on the self-heal + rootless-PC angle, not on breadth.</p>
+        </section>
+
+        <section class="explain-grid" aria-label="How WatchTower is different">
           <article class="explain-card panel">
-            <p class="eyeline">Self-Hosted</p>
-            <h3>Own your infrastructure entirely</h3>
-            <p>Deploy to your own Linux nodes via SSH. No vendor lock-in, no surprise bills. Control where data lives. Use your existing Podman/Docker stack.</p>
+            <p class="eyeline">🩹 Self-healing</p>
+            <h3>Deploys that fix themselves</h3>
+            <p>When a deployment fails, WatchTower classifies the cause and — with autonomy on — applies a fix and retries. A thrash guardrail stops it from fixing recklessly; anything it can't safely handle waits in a human-approval queue with an AI root-cause analysis.</p>
           </article>
           <article class="explain-card panel">
-            <p class="eyeline">Autonomous</p>
-            <h3>Containers survive reboots</h3>
-            <p>WatchTower Watchdog automatically restarts all containers after server reboots or crashes. No manual intervention. Perfect for production.</p>
+            <p class="eyeline">🔒 Rootless &amp; private</p>
+            <h3>Safer by design</h3>
+            <p>Podman-first — no root Docker daemon to compromise — and reachable only over your own Tailscale tailnet. Nothing is exposed to the public internet unless you choose to.</p>
           </article>
           <article class="explain-card panel">
-            <p class="eyeline">Observable</p>
-            <h3>Single pane of glass</h3>
-            <p>Live deployment status, container health, node connectivity, and runtime integrations (Podman, Nginx, Tailscale, Cloudflare) all in one dashboard.</p>
+            <p class="eyeline">🖥️ Your own machine</p>
+            <h3>No VPS, no lock-in</h3>
+            <p>Runs on the PC you already own. Open-core (Apache 2.0 + ELv2) — self-host it forever, own your data, no surprise bills.</p>
           </article>
         </section>
 
