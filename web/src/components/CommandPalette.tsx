@@ -26,15 +26,24 @@ type Item = {
   to: string;
 };
 
+// Keep labels in sync with NAV_GROUPS in Layout.tsx — a palette entry
+// that says "Services" while the sidebar says "Catalog" reads as two
+// different destinations. Hints carry the old names so muscle-memory
+// searches still match.
 const NAV_ITEMS: Item[] = [
   { id: 'nav:dashboard',     label: 'Dashboard',         group: 'Navigate', to: '/' },
   { id: 'nav:applications',  label: 'Applications',      group: 'Navigate', to: '/applications' },
+  { id: 'nav:templates',     label: 'Templates',         group: 'Navigate', to: '/templates' },
+  { id: 'nav:catalog',       label: 'Catalog',           group: 'Navigate', hint: 'services, self-hostable apps', to: '/services' },
   { id: 'nav:servers',       label: 'Servers',           group: 'Navigate', to: '/servers' },
-  { id: 'nav:services',      label: 'Services',          group: 'Navigate', to: '/services' },
+  { id: 'nav:databases',     label: 'Databases',         group: 'Navigate', hint: 'managed databases', to: '/managed-databases' },
+  { id: 'nav:containers',    label: 'Containers',        group: 'Navigate', hint: 'local podman containers', to: '/local-containers' },
   { id: 'nav:integrations',  label: 'Integrations',      group: 'Navigate', to: '/integrations' },
+  { id: 'nav:remote-access', label: 'Remote Access',     group: 'Navigate', hint: 'tailscale, expose', to: '/remote-access' },
   { id: 'nav:team',          label: 'Team',              group: 'Navigate', to: '/team' },
   { id: 'nav:audit',         label: 'Audit Log',         group: 'Navigate', to: '/audit' },
   { id: 'nav:settings',      label: 'Settings',          group: 'Navigate', to: '/settings' },
+  { id: 'nav:account',       label: 'Account',           group: 'Navigate', to: '/account' },
   { id: 'nav:report-bug',    label: 'Report Bug',        group: 'Navigate', to: '/report-bug' },
   { id: 'nav:setup',         label: 'New Project',       group: 'Navigate', hint: 'wizard', to: '/setup' },
 ];

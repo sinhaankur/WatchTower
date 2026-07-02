@@ -41,9 +41,10 @@ npm --prefix web install
 npm --prefix web run dev          # Vite dev server on 5222, proxies /api → :8000
 npm --prefix web run build        # tsc --noEmit + vite build → web/dist
 npm --prefix web run lint         # eslint, --max-warnings 0
+npm --prefix web test             # vitest run — page smoke tests (src/test/)
 ```
 
-There is no `web/test` script — frontend has no automated tests. `npm run build` runs `tsc --noEmit` first, so a typecheck failure breaks the build.
+`npm run build` runs `tsc --noEmit` first, so a typecheck failure breaks the build.
 
 ### Tests
 

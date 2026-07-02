@@ -2,7 +2,6 @@ import { ReactNode, useState, useEffect, type ReactElement } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import BrandLogo from './BrandLogo';
 import TitleBar from './TitleBar';
-import { PageTransition } from './PageTransition';
 import { useUpdateCheck, useActiveDeploymentCount, useHealingConfig, useSelfUpdateStatus, useSelfUpdate } from '@/hooks/queries';
 import { CommandPalette, openCommandPalette } from './CommandPalette';
 import { UserMenu } from './UserMenu';
@@ -709,7 +708,10 @@ export default function Layout({ children }: { children: ReactNode }) {
           </div>
 
           <UpdateBanner />
-          <PageTransition>{children}</PageTransition>
+          {/* No PageTransition here — withChrome() in App.tsx already wraps
+              every page in one; nesting them compounds the fade (opacity
+              multiplies) and doubles the slide distance on every nav. */}
+          {children}
           <CommandPalette />
         </div>
       </div>
