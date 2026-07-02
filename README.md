@@ -14,10 +14,11 @@
 </p>
 
 <p align="center">
-  <strong>The self-hosting platform that fixes its own failures.</strong><br/>
-  Turn the computer you already own into a server that deploys your apps from GitHub,
-  runs your databases, and — when a deploy breaks — diagnoses it and fixes it on its own.<br/>
-  Rootless Podman · private over Tailscale · no VPS bill.
+  <strong>Turn a computer you already own into your personal cloud.</strong><br/>
+  Point WatchTower at your GitHub repo and your website is live — database, backups,
+  and a private URL included — on hardware you control, for $0/month.<br/>
+  When something breaks, it <em>fixes itself</em> — or tells you exactly what's missing and how to fix it.<br/>
+  Rootless Podman · private over Tailscale · built for people, not DevOps teams.
 </p>
 
 <p align="center">
@@ -162,8 +163,11 @@ See [LICENSING.md](LICENSING.md) for the full breakdown.
 
 Use of a running installation is governed by the [Terms of Use](legal/TERMS_OF_USE.md), [Acceptable Use Policy](legal/ACCEPTABLE_USE.md), and [Privacy Policy](legal/PRIVACY.md) — accepted in-app at first login. WatchTower is self-hosted: your data stays on your machine and there is no vendor telemetry.
 
-## Support
+## Feedback & support
 
+**Trying WatchTower? Tell us where it fights you.** Every report — confusing screen, unexplained error, missing feature — directly shapes what gets built next.
+
+- 💬 [Start a discussion](https://github.com/sinhaankur/WatchTower/discussions) — questions, ideas, show-and-tell
 - 🐛 [Report an issue](https://github.com/sinhaankur/WatchTower/issues)
 - 🌐 [Website & docs](https://sinhaankur.github.io/WatchTower/)
 - ♥ [Sponsor the project](https://github.com/sponsors/sinhaankur)
