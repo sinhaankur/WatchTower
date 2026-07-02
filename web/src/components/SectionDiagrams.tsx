@@ -39,7 +39,7 @@ type NodeProps = {
 
 const VARIANT_FILL: Record<NonNullable<NodeProps['variant']>, string> = {
   default: '#f8fafc',   // slate-50
-  accent: '#eef2ff',    // indigo-50 (brand primary)
+  accent: '#fef2f2',    // red-50 (brand primary)
   standby: '#fffbeb',   // amber-50
   success: '#ecfdf5',   // emerald-50
   external: '#f5f3ff',  // violet-50
@@ -48,7 +48,7 @@ const VARIANT_FILL: Record<NonNullable<NodeProps['variant']>, string> = {
 
 const VARIANT_STROKE: Record<NonNullable<NodeProps['variant']>, string> = {
   default: '#e2e8f0',   // slate-200 (softer)
-  accent: '#a5b4fc',    // indigo-300 (brand primary)
+  accent: '#fca5a5',    // red-300 (brand primary)
   standby: '#fcd34d',   // amber-300
   success: '#6ee7b7',   // emerald-300
   external: '#c4b5fd',  // violet-300

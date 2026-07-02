@@ -8,7 +8,7 @@
   <meta name="keywords" content="self-hosted PaaS, Coolify alternative, Dokploy alternative, self-healing deployment, Podman deploy, Tailscale self-host, home server, deploy from GitHub, rootless container platform, CasaOS alternative, Umbrel alternative, open source PaaS, homelab deploy tool">
   <meta name="author" content="Ankur Sinha">
   <meta name="robots" content="index, follow, max-image-preview:large">
-  <meta name="theme-color" content="#fafaf8">
+  <meta name="theme-color" content="#fffdf8">
   <link rel="canonical" href="https://sinhaankur.github.io/WatchTower/">
 
   <!-- Open Graph / social preview -->
@@ -66,16 +66,17 @@
   <style>
     /* ── Design language ──────────────────────────────────────────────
        One story, told top to bottom. Big confident type, one idea per
-       viewport, quiet chrome. Palette matches the app's current calm
-       indigo system; the yellow Wt monogram stays the only loud thing. */
+       viewport, quiet chrome. Brand palette: yellow, red, and white —
+       the Wt monogram colors — on a warm-white page. Matches the app's
+       token system (brand red primary, brand yellow secondary). */
     :root {
-      --bg: #fafaf8;
-      --bg-soft: #f3f4f1;
+      --bg: #fffdf8;
+      --bg-soft: #faf5e9;
       --ink: #0f172a;
-      --ink-dim: #55607a;
-      --line: #e5e7e0;
-      --accent: #4f46e5;
-      --accent-ink: #3730a3;
+      --ink-dim: #5c6472;
+      --line: #ece5d6;
+      --accent: #b91c1c;
+      --accent-ink: #7f1d1d;
       --brand-yellow: #fde68a;
       --brand-red: #b91c1c;
       --dark: #0f172a;
@@ -127,10 +128,16 @@
       position: sticky;
       top: 0;
       z-index: 50;
-      background: rgba(250, 250, 248, 0.86);
+      background: rgba(255, 253, 248, 0.88);
       backdrop-filter: blur(12px);
       border-bottom: 1px solid var(--line);
     }
+
+    /* Brand mark — the Wt monogram (yellow square, dark border, red Wt),
+       inlined so it always renders and matches the app's BrandLogo. */
+    .wt-mark { display: block; }
+    .wt-mark-sm { width: 30px; height: 30px; }
+    .wt-mark-lg { width: 64px; height: 64px; filter: drop-shadow(3px 3px 0 rgba(15, 23, 42, 0.9)); }
     .nav-inner {
       display: flex;
       align-items: center;
@@ -183,7 +190,7 @@
     .btn-primary:hover {
       background: var(--accent-ink);
       transform: translateY(-1px);
-      box-shadow: 0 8px 24px rgba(79, 70, 229, 0.28);
+      box-shadow: 0 8px 24px rgba(185, 28, 28, 0.28);
     }
     .btn-ghost {
       border: 1.5px solid var(--line);
@@ -215,6 +222,11 @@
       max-width: 15ch;
     }
     .hero h1 .flip { color: var(--accent); }
+    /* Yellow-marker highlight — the brand yellow doing real work. */
+    .hero h1 .mark {
+      background: linear-gradient(transparent 58%, var(--brand-yellow) 58%, var(--brand-yellow) 94%, transparent 94%);
+    }
+    .hero-brand { margin: 0 0 26px; }
     .hero .sub {
       font-size: clamp(1.1rem, 2vw, 1.3rem);
       color: var(--ink-dim);
@@ -309,7 +321,7 @@
       padding: 90px 0;
       margin: 0 16px;
     }
-    .heal .kicker { color: #a5b4fc; }
+    .heal .kicker { color: var(--brand-yellow); }
     .heal .headline { color: #fff; }
     .heal .lede { color: var(--dark-dim); }
     .heal-flow {
@@ -404,7 +416,7 @@
     .compare tbody tr:last-child td { border-bottom: none; }
     .compare td:first-child { color: var(--ink-dim); }
     .compare .win { font-weight: 800; }
-    .compare .win td { background: rgba(79, 70, 229, 0.05); color: var(--ink); }
+    .compare .win td { background: rgba(185, 28, 28, 0.05); color: var(--ink); }
     .footnote { font-size: 0.8rem; color: var(--ink-dim); margin-top: 14px; }
 
     /* ── Pricing teaser ───────────────────────────────────────────── */
@@ -509,7 +521,10 @@
   <header class="nav">
     <div class="nav-inner">
       <a class="brand" href="#top">
-        <img src="./wt-logo.svg" alt="Wt logo">
+        <svg class="wt-mark wt-mark-sm" viewBox="0 0 64 64" role="img" aria-label="Wt logo">
+          <rect x="4" y="4" width="56" height="56" rx="12" fill="#fde68a" stroke="#0f172a" stroke-width="4"/>
+          <text x="32" y="42" text-anchor="middle" font-family="'DM Sans', system-ui, sans-serif" font-size="26" font-weight="800" fill="#b91c1c">Wt</text>
+        </svg>
         <span>WatchTower</span>
       </a>
       <nav class="nav-links" aria-label="Site">
@@ -527,8 +542,14 @@
   <main id="top">
     <div class="wrap">
       <section class="hero" style="padding-bottom: 70px;">
-        <p class="eyebrow reveal">Open source · Runs on your own PC</p>
-        <h1 class="reveal" style="--d:60ms;">Deploy from GitHub to a computer <span class="flip">you already own.</span></h1>
+        <div class="hero-brand reveal">
+          <svg class="wt-mark wt-mark-lg" viewBox="0 0 64 64" role="img" aria-label="WatchTower logo">
+            <rect x="4" y="4" width="56" height="56" rx="12" fill="#fde68a" stroke="#0f172a" stroke-width="4"/>
+            <text x="32" y="42" text-anchor="middle" font-family="'DM Sans', system-ui, sans-serif" font-size="26" font-weight="800" fill="#b91c1c">Wt</text>
+          </svg>
+        </div>
+        <p class="eyebrow reveal" style="--d:30ms;">Open source · Runs on your own PC</p>
+        <h1 class="reveal" style="--d:60ms;">Deploy from GitHub to a computer <span class="mark">you already own.</span></h1>
         <p class="sub reveal" style="--d:120ms;">
           Websites, apps, and databases on the machine you already have — no VPS bill,
           nothing exposed to the internet. <strong>And when a deploy breaks, WatchTower
@@ -778,6 +799,13 @@
   <!-- ── Footer ──────────────────────────────────────────────────── -->
   <footer>
     <div class="wrap">
+      <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 30px;">
+        <svg class="wt-mark wt-mark-sm" viewBox="0 0 64 64" role="img" aria-label="Wt logo">
+          <rect x="4" y="4" width="56" height="56" rx="12" fill="#fde68a" stroke="#0f172a" stroke-width="4"/>
+          <text x="32" y="42" text-anchor="middle" font-family="'DM Sans', system-ui, sans-serif" font-size="26" font-weight="800" fill="#b91c1c">Wt</text>
+        </svg>
+        <strong style="color: var(--ink); letter-spacing: -0.01em;">WatchTower</strong>
+      </div>
       <div class="foot-grid">
         <div class="foot-col">
           <h4>Product</h4>
