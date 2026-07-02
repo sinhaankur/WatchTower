@@ -60,6 +60,37 @@ def _require_bin() -> str:
     return bin_
 
 
+_CONN_ERR_MARKERS = (
+    "cannot connect to podman",
+    "connection refused",
+    "connect: no such file or directory",
+    "vm does not exist",
+    "machine is not running",
+    "podman machine init",
+    "dial unix",
+)
+
+
+def _friendly_error(err: str, fallback: str) -> str:
+    """Translate raw podman stderr into something a person can act on.
+
+    The most common raw failure by far is "Cannot connect to Podman …
+    connection refused" — which just means the Podman machine/VM isn't
+    running (the default state on macOS/Windows after a reboot). Saying
+    that, plus how to start it, instead of echoing socket errors is the
+    difference between a fixable moment and a dead end.
+    """
+    text = (err or fallback).strip()
+    low = text.lower()
+    if any(marker in low for marker in _CONN_ERR_MARKERS):
+        return (
+            "Podman is installed but not running. Start it with the "
+            "'Start Podman' button on the Containers page, or run "
+            "`podman machine start` in a terminal, then retry."
+        )
+    return text
+
+
 def _validate_name(name: str, what: str = "name") -> str:
     if not _NAME_RE.match(name or ""):
         raise PodmanError(
@@ -159,7 +190,7 @@ def list_containers() -> List[Dict[str, Any]]:
     bin_ = _require_bin()
     rc, out, err = _run([bin_, "ps", "-a", "--format", "json"], timeout=30.0)
     if rc != 0:
-        raise PodmanError((err or "podman ps failed").strip()[:300])
+        raise PodmanError(_friendly_error(err, "podman ps failed")[:300])
     try:
         raw = json.loads(out) if out.strip() else []
     except json.JSONDecodeError:
@@ -240,7 +271,7 @@ def create_container(
     # this in a worker thread so the event loop isn't blocked.
     rc, out, err = _run(args, timeout=300.0)
     if rc != 0:
-        raise PodmanError((err or "podman run failed").strip()[:500])
+        raise PodmanError(_friendly_error(err, "podman run failed")[:500])
     return {"id": out.strip()[:12], "name": name}
 
 
@@ -260,7 +291,7 @@ def container_action(name: str, action: str) -> None:
         raise PodmanError(f"Unknown action {action!r}.")
     rc, _out, err = _run([bin_, *verb, name], timeout=60.0)
     if rc != 0:
-        raise PodmanError((err or f"podman {action} failed").strip()[:300])
+        raise PodmanError(_friendly_error(err, f"podman {action} failed")[:300])
 
 
 def container_logs(name: str, tail: int = 200) -> str:
@@ -269,7 +300,7 @@ def container_logs(name: str, tail: int = 200) -> str:
     tail = max(1, min(int(tail), 2000))
     rc, out, err = _run([bin_, "logs", "--tail", str(tail), name], timeout=30.0)
     if rc != 0:
-        raise PodmanError((err or "podman logs failed").strip()[:300])
+        raise PodmanError(_friendly_error(err, "podman logs failed")[:300])
     # podman writes container stderr to stderr — users want both streams.
     return (out + err)[-64 * 1024:]
 
@@ -281,7 +312,7 @@ def list_pods() -> List[Dict[str, Any]]:
     bin_ = _require_bin()
     rc, out, err = _run([bin_, "pod", "ps", "--format", "json"], timeout=30.0)
     if rc != 0:
-        raise PodmanError((err or "podman pod ps failed").strip()[:300])
+        raise PodmanError(_friendly_error(err, "podman pod ps failed")[:300])
     try:
         raw = json.loads(out) if out.strip() else []
     except json.JSONDecodeError:
@@ -329,7 +360,7 @@ def create_pod(
         args += ["-p", f"{host}:{ctr}"]
     rc, out, err = _run(args, timeout=60.0)
     if rc != 0:
-        raise PodmanError((err or "podman pod create failed").strip()[:300])
+        raise PodmanError(_friendly_error(err, "podman pod create failed")[:300])
     return {"id": out.strip()[:12], "name": name}
 
 
@@ -349,4 +380,4 @@ def pod_action(name: str, action: str) -> None:
         raise PodmanError(f"Unknown action {action!r}.")
     rc, _out, err = _run([bin_, *verb, name], timeout=120.0)
     if rc != 0:
-        raise PodmanError((err or f"podman pod {action} failed").strip()[:300])
+        raise PodmanError(_friendly_error(err, f"podman pod {action} failed")[:300])

@@ -267,6 +267,25 @@ export default function Templates() {
       </header>
 
       <main className="px-4 sm:px-6 lg:px-8 py-6 max-w-6xl mx-auto w-full">
+        {/* How a template connects — users saw cards but not the chain
+            (template → project → deploy → Applications), so "Use" felt
+            like a mystery button. Three steps, always visible, cheap. */}
+        <div className="rounded-xl border border-border bg-card px-4 py-3 mb-6 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-0 text-xs text-slate-600">
+          <div className="flex items-center gap-2 sm:flex-1">
+            <span className="w-5 h-5 rounded-full bg-secondary text-secondary-foreground font-bold flex items-center justify-center shrink-0">1</span>
+            <span><strong className="text-slate-900">Pick a template.</strong> Each is a known-good recipe: repo, env vars, config.</span>
+          </div>
+          <span className="hidden sm:block text-slate-300 px-3" aria-hidden>→</span>
+          <div className="flex items-center gap-2 sm:flex-1">
+            <span className="w-5 h-5 rounded-full bg-secondary text-secondary-foreground font-bold flex items-center justify-center shrink-0">2</span>
+            <span><strong className="text-slate-900">We create your project</strong> with everything pre-wired — you land on its page to review.</span>
+          </div>
+          <span className="hidden sm:block text-slate-300 px-3" aria-hidden>→</span>
+          <div className="flex items-center gap-2 sm:flex-1">
+            <span className="w-5 h-5 rounded-full bg-secondary text-secondary-foreground font-bold flex items-center justify-center shrink-0">3</span>
+            <span><strong className="text-slate-900">Hit Deploy.</strong> It runs on your machine and shows up under <Link to="/applications" className="underline font-medium text-primary">Applications</Link>.</span>
+          </div>
+        </div>
         {error && (
           <div className={`rounded-lg p-3 mb-4 text-xs flex items-center justify-between gap-3 ${
             error.status === 401

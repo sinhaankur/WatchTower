@@ -2653,7 +2653,7 @@ function fetchLatestReleaseTag() {
 
 async function launch() {
   createSplash();
-  setSplashStatus('Checking environment', 5);
+  setSplashStatus('Getting things ready', 5);
 
   const backendHealthUrl = `http://${HOST}:${BACKEND_PORT}/health`;
 
@@ -2663,9 +2663,9 @@ async function launch() {
   // slow disk. The default 45s was too tight: users on SD-card-backed
   // Pis or HDD-backed laptops would hit a timeout on first launch only.
   try {
-    setSplashStatus('Looking for an existing backend', 10);
+    setSplashStatus('Checking for a running copy', 10);
     await waitForUrl(backendHealthUrl, 1200);
-    setSplashStatus('Backend already running', 70);
+    setSplashStatus('Found it — connecting', 70);
   } catch {
     // Port-in-use auto-fallback: if 8000 is taken (Docker Desktop,
     // jupyter, leftover WatchTower from a crashed prior run), probe
@@ -2703,12 +2703,12 @@ async function launch() {
       BACKEND_PORT = chosenPort;
       setSplashStatus(`Port ${BACKEND_PORT_DEFAULT} was busy — using port ${chosenPort} instead`, 20);
     }
-    setSplashStatus('Starting WatchTower backend', 25);
+    setSplashStatus('Starting the engine', 25);
     await startBackend();
-    setSplashStatus('Loading database (this can take up to 90s on first launch)', 50);
+    setSplashStatus('Preparing your data — first launch can take a minute', 50);
     // Re-derive the URL since BACKEND_PORT may have just changed.
     await waitForUrl(`http://${HOST}:${BACKEND_PORT}/health`, 120000);
-    setSplashStatus('Backend ready', 80);
+    setSplashStatus('Almost there', 80);
   }
 
   // The FastAPI backend already serves the React SPA from web/dist
@@ -2737,7 +2737,7 @@ async function launch() {
     }
   }
 
-  setSplashStatus('Loading interface', 90);
+  setSplashStatus('Opening your dashboard', 90);
   const win = createMainWindow();
 
   // Helper: close splash and show the main window (idempotent).
