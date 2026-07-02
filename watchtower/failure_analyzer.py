@@ -33,6 +33,7 @@ class FailureKind(str, enum.Enum):
     PORT_IN_USE = "port_in_use"
     MISSING_ENV_VAR = "missing_env_var"
     PACKAGE_NOT_FOUND = "package_not_found"
+    BUILD_ERROR = "build_error"
     BUILD_OOM = "build_oom"
     PERMISSION_DENIED = "permission_denied"
     DISK_FULL = "disk_full"
@@ -170,6 +171,38 @@ def _fix_build_oom(match: re.Match) -> FailureDiagnosis:
             auto_applicable=False,
         ),
         matched_text=match.group(0),
+    )
+
+
+def _fix_build_error(match: re.Match) -> FailureDiagnosis:
+    g = match.groupdict()
+    file = g.get("file")
+    line = g.get("line")
+    msg = (g.get("msg") or "").strip()
+    location = f"{file}:{line}" if file and line else (file or None)
+    cause = (
+        f"The build failed on a code error in {location}: {msg}"
+        if location and msg
+        else f"The build failed on a code error: {msg}"
+        if msg
+        else "The build failed on a compile/type error in the project's source code."
+    )
+    fix = FailureFix(
+        description=(
+            (f"Fix the error in {location}, " if location else "Fix the error shown in the build log, ")
+            + "then redeploy (for GitHub projects: commit + push; for "
+            "local-path projects: just save and hit Deploy). This is an "
+            "error in your code, not in WatchTower or the deploy target — "
+            "the same failure will reproduce locally with your build command."
+        ),
+        auto_applicable=False,
+    )
+    return FailureDiagnosis(
+        kind=FailureKind.BUILD_ERROR,
+        cause=cause,
+        fix=fix,
+        matched_text=match.group(0),
+        extracted={k: v for k, v in {"file": file, "line": line, "message": msg or None}.items() if v},
     )
 
 
@@ -483,6 +516,31 @@ PATTERNS: list[tuple[FailureKind, re.Pattern, Callable[[re.Match], FailureDiagno
         lambda m: _fix_package_not_found(_normalize_pkg_match(m)),
     ),
     (
+        # Compile/type errors in the user's own code. Placed after
+        # PACKAGE_NOT_FOUND and MISSING_ENV_VAR so a "Cannot find module"
+        # or env KeyError keeps its more actionable class; before
+        # PERMISSION_DENIED because that regex is generic enough to
+        # false-positive on error messages that merely mention it.
+        FailureKind.BUILD_ERROR,
+        re.compile(
+            # Next.js / tsc --pretty: "./path/file.tsx:633:16\nType error: msg"
+            r"(?P<file>[^\s:]+\.(?:tsx|ts|jsx|js|mts|cts)):(?P<line>\d+):\d+\s*\n\s*Type error:\s*(?P<msg>[^\n]+)"
+            # tsc plain: "path/file.ts(12,34): error TS1234: msg"
+            r"|(?P<file2>[^\s()]+\.(?:tsx|ts|jsx|js))\((?P<line2>\d+),\d+\):\s*error TS\d+:\s*(?P<msg2>[^\n]+)"
+            # Go compiler: "path/file.go:12:5: undefined: Foo"
+            r"|(?P<file5>[^\s:]+\.go):(?P<line5>\d+):\d+:\s*(?P<msg5>(?:undefined|cannot use|syntax error|missing|too many|not enough)[^\n]*)"
+            # Rust: "error[E0308]: msg" (+ optional "--> src/file.rs:5:9")
+            r"|error\[E\d+\]:\s*(?P<msg6>[^\n]+)(?:\n[^\n]*-->\s*(?P<file6>[^\s:]+):(?P<line6>\d+))?"
+            # esbuild / vite: "✘ [ERROR] msg"
+            r"|✘ \[ERROR\]\s*(?P<msg7>[^\n]+)"
+            # Location-less fallbacks, still clearly compile-time
+            r"|Type error:\s*(?P<msg3>[^\n]+)"
+            r"|SyntaxError:\s*(?P<msg4>[^\n]+)",
+            re.IGNORECASE,
+        ),
+        lambda m: _fix_build_error(_normalize_build_error_match(m)),
+    ),
+    (
         FailureKind.PERMISSION_DENIED,
         re.compile(
             r"permission denied(?:[:\s]+(?P<target>[/\w.\-]+))?"
@@ -529,6 +587,24 @@ def _normalize_target_match(m: re.Match) -> re.Match:
     return m
 
 
+def _normalize_build_error_match(m: re.Match) -> re.Match:
+    g = m.groupdict()
+    overlay = {}
+    file = g.get("file") or g.get("file2") or g.get("file5") or g.get("file6")
+    line = g.get("line") or g.get("line2") or g.get("line5") or g.get("line6")
+    msg = (
+        g.get("msg") or g.get("msg2") or g.get("msg3") or g.get("msg4")
+        or g.get("msg5") or g.get("msg6") or g.get("msg7")
+    )
+    if file and not g.get("file"):
+        overlay["file"] = file
+    if line and not g.get("line"):
+        overlay["line"] = line
+    if msg and not g.get("msg"):
+        overlay["msg"] = msg
+    return _RewrittenMatch(m, overlay) if overlay else m
+
+
 class _RewrittenMatch:
     """Tiny match-like wrapper that overlays additional groupdict keys.
 
@@ -553,6 +629,12 @@ class _RewrittenMatch:
         return d
 
 
+# Terminal color/style escape sequences. Build tools (Next.js, cargo,
+# esbuild) embed these mid-line, which breaks file:line extraction —
+# "\x1b[31m./file.tsx\x1b[0m:633" is not "[^\s:]+:\d+" until stripped.
+_ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
+
+
 def classify_failure(log_excerpt: str) -> FailureDiagnosis:
     """Classify a failed deployment's log excerpt.
 
@@ -563,8 +645,12 @@ def classify_failure(log_excerpt: str) -> FailureDiagnosis:
     The excerpt is searched with ``re.search`` (not ``match``) so the
     pattern can fire anywhere in the text. Callers should pass the
     last few hundred lines — that's where the actionable error usually
-    is, and limiting input keeps regex cost bounded.
+    is, and limiting input keeps regex cost bounded. ANSI color codes
+    are stripped before matching.
     """
+
+    if log_excerpt:
+        log_excerpt = _ANSI_RE.sub("", log_excerpt)
 
     if not log_excerpt:
         return FailureDiagnosis(

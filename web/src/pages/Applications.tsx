@@ -148,6 +148,10 @@ const Applications = () => {
   // a "Live at http://localhost:XXXX" pill on the card without making
   // users click into the detail page to discover the URL.
   const [localRunUrls, setLocalRunUrls] = useState<Record<string, string>>({});
+  // Per-project failure diagnosis (from /deployments/{id}/diagnose) so a
+  // "failed" card explains itself inline instead of making the user hunt
+  // through Details → logs to learn what went wrong.
+  const [diagnoses, setDiagnoses] = useState<Record<string, { cause: string; kind: string }>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
@@ -208,6 +212,27 @@ const Applications = () => {
       );
       const dedup = deduplicateProjects(enriched);
       setProjects(dedup);
+
+      // Fire-and-forget: fetch a structured diagnosis for every project
+      // whose latest deploy failed. The card renders the cause inline —
+      // pattern-matched server-side (no LLM cost), so this is cheap.
+      void Promise.allSettled(
+        dedup
+          .filter((p) => p.lastDeployment?.status.toLowerCase() === 'failed')
+          .map((p) =>
+            apiClient
+              .get<{ kind?: string; cause?: string }>(`/projects/deployments/${p.lastDeployment!.id}/diagnose`)
+              .then((r) => {
+                const cause = r?.data?.cause;
+                if (typeof cause === 'string' && cause) {
+                  setDiagnoses((prev) => ({ ...prev, [p.id]: { cause, kind: r.data?.kind ?? 'unknown' } }));
+                }
+              })
+              .catch(() => {
+                /* diagnosis is an enhancement — the failed badge still shows */
+              }),
+          ),
+      );
 
       // Fire-and-forget: probe each project's Run Locally status.
       // We don't await before showing the list because the URL only
@@ -385,7 +410,13 @@ const Applications = () => {
                           {meta.label}
                         </span>
                         {p.lastDeployment && (
-                          <Badge status={p.lastDeployment.status} />
+                          <Link
+                            to={`/deployments/${p.lastDeployment.id}`}
+                            title="View this deployment's log"
+                            className="hover:opacity-75 transition-opacity"
+                          >
+                            <Badge status={p.lastDeployment.status} />
+                          </Link>
                         )}
                         {!p.lastDeployment && (
                           <span className="text-[11px] px-2 py-0.5 rounded-full border border-slate-200 bg-slate-50 text-slate-500 font-medium">
@@ -393,6 +424,22 @@ const Applications = () => {
                           </span>
                         )}
                       </div>
+                      {/* Inline failure diagnosis — the answer to "it failed,
+                          now what?" belongs on the card, not two clicks away. */}
+                      {p.lastDeployment?.status.toLowerCase() === 'failed' && diagnoses[p.id] && (
+                        <div className="mt-2 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-900">
+                          <span className="shrink-0" aria-hidden>⚠</span>
+                          <span className="min-w-0">
+                            {diagnoses[p.id].cause}{' '}
+                            <Link
+                              to={`/deployments/${p.lastDeployment.id}`}
+                              className="font-semibold underline whitespace-nowrap hover:text-red-700"
+                            >
+                              View log →
+                            </Link>
+                          </span>
+                        </div>
+                      )}
                       <div className="mt-1.5 flex items-center gap-3 text-xs text-slate-500 flex-wrap">
                         {p.repo_url && /^https?:\/\//i.test(p.repo_url) ? (
                           <a
