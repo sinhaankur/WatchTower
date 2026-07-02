@@ -34,6 +34,7 @@ class FailureKind(str, enum.Enum):
     MISSING_ENV_VAR = "missing_env_var"
     PACKAGE_NOT_FOUND = "package_not_found"
     BUILD_ERROR = "build_error"
+    ARTIFACT_MISSING = "artifact_missing"
     BUILD_OOM = "build_oom"
     PERMISSION_DENIED = "permission_denied"
     DISK_FULL = "disk_full"
@@ -171,6 +172,36 @@ def _fix_build_oom(match: re.Match) -> FailureDiagnosis:
             auto_applicable=False,
         ),
         matched_text=match.group(0),
+    )
+
+
+def _fix_artifact_missing(match: re.Match) -> FailureDiagnosis:
+    g = match.groupdict()
+    path = g.get("apath")
+    # The tail of the path is the publish dir the project promised
+    # ("dist", "build", "out") — that's the thing to surface.
+    folder = path.rstrip("/").rsplit("/", 1)[-1] if path else None
+    cause = (
+        f"The build finished but produced no '{folder}/' folder to deploy."
+        if folder
+        else "The build finished but the expected output folder doesn't exist."
+    )
+    fix = FailureFix(
+        description=(
+            "The project's publish directory doesn't match what the build "
+            "actually outputs. Common defaults: Vite/most bundlers → 'dist/', "
+            "Create React App → 'build/', Next.js → '.next/' (or 'out/' with "
+            "`output: \"export\"`). Check your framework's output folder and "
+            "set the project's publish directory to match, then redeploy."
+        ),
+        auto_applicable=False,
+    )
+    return FailureDiagnosis(
+        kind=FailureKind.ARTIFACT_MISSING,
+        cause=cause,
+        fix=fix,
+        matched_text=match.group(0),
+        extracted={k: v for k, v in {"path": path, "folder": folder}.items() if v},
     )
 
 
@@ -516,6 +547,21 @@ PATTERNS: list[tuple[FailureKind, re.Pattern, Callable[[re.Match], FailureDiagno
         lambda m: _fix_package_not_found(_normalize_pkg_match(m)),
     ),
     (
+        # Deploy-stage: build succeeded but the promised publish dir was
+        # never created — rsync fails stat'ing it. Almost always a
+        # publish-directory mismatch (Next.js '.next' vs configured
+        # 'dist'). Hit the same real installation three times before it
+        # got its own class.
+        FailureKind.ARTIFACT_MISSING,
+        re.compile(
+            r"rsync\(?\d*\)?:?\s*error:?\s*(?P<apath>[^\s:]+)[:\s]+\(l\)stat: No such file or directory"
+            r"|rsync: (?:\[sender\] )?change_dir .* failed: No such file or directory"
+            r"|cannot stat local path (?P<apath2>[^\s:]+): No such file",
+            re.IGNORECASE,
+        ),
+        lambda m: _fix_artifact_missing(_normalize_artifact_match(m)),
+    ),
+    (
         # Compile/type errors in the user's own code. Placed after
         # PACKAGE_NOT_FOUND and MISSING_ENV_VAR so a "Cannot find module"
         # or env KeyError keeps its more actionable class; before
@@ -584,6 +630,14 @@ def _normalize_target_match(m: re.Match) -> re.Match:
     chosen = g.get("target") or g.get("target2")
     if chosen and not g.get("target"):
         return _RewrittenMatch(m, {"target": chosen})
+    return m
+
+
+def _normalize_artifact_match(m: re.Match) -> re.Match:
+    g = m.groupdict()
+    chosen = g.get("apath") or g.get("apath2")
+    if chosen and not g.get("apath"):
+        return _RewrittenMatch(m, {"apath": chosen})
     return m
 
 

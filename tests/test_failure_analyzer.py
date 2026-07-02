@@ -271,6 +271,25 @@ def test_build_error_python_syntax_error():
     assert d.kind == FailureKind.BUILD_ERROR
 
 
+def test_artifact_missing_rsync_lstat():
+    # Verbatim shape from a real installation (portfolio-test, hit 3×):
+    # the build succeeded but the configured publish dir was never
+    # produced, so the deploy-stage rsync fails stat'ing it.
+    log = (
+        "[127.0.0.1] [rsync] → /tmp/watchtower-portfolio-test/ (local)\n"
+        "[127.0.0.1] [rsync] rsync(31665): error: /tmp/watchtower-builds/b7d1/repo/dist/: (l)stat: No such file or directory\n"
+        "[WatchTower] ❌ Deploy failed on 1/1 node(s)\n"
+    )
+    d = classify_failure(log)
+    assert d.kind == FailureKind.ARTIFACT_MISSING
+    assert d.extracted["folder"] == "dist"
+    assert "'dist/'" in d.cause
+    # The fix must teach the publish-dir concept, naming the common
+    # framework outputs so the user can self-serve the correction.
+    assert "publish directory" in d.fix.description
+    assert "Next.js" in d.fix.description
+
+
 def test_package_not_found_beats_build_error():
     # "Cannot find module" is technically a build failure, but the
     # missing-package class has the more actionable fix (add the dep),
