@@ -271,6 +271,42 @@ def test_build_error_python_syntax_error():
     assert d.kind == FailureKind.BUILD_ERROR
 
 
+def test_tool_missing_bash_command_not_found():
+    log = "[WatchTower] Running build: pnpm install && pnpm build\n/bin/bash: line 1: pnpm: command not found\n[WatchTower] ❌ Build command failed: exit code 127\n"
+    d = classify_failure(log)
+    assert d.kind == FailureKind.TOOL_MISSING
+    assert d.extracted["tool"] == "pnpm"
+    # The fix must name the exact install command — "what is missing and
+    # how to fix it" is the product's failure-UX contract.
+    assert "npm install -g pnpm" in d.fix.description
+    assert "Settings → System" in d.fix.description
+
+
+def test_tool_missing_node_spawn_enoent():
+    log = "Error: spawn podman ENOENT\n    at ChildProcess._handle.onexit"
+    d = classify_failure(log)
+    assert d.kind == FailureKind.TOOL_MISSING
+    assert d.extracted["tool"] == "podman"
+    assert "brew install podman" in d.fix.description
+
+
+def test_tool_missing_windows_not_recognized():
+    log = "'yarn' is not recognized as an internal or external command,\noperable program or batch file."
+    d = classify_failure(log)
+    assert d.kind == FailureKind.TOOL_MISSING
+    assert d.extracted["tool"] == "yarn"
+
+
+def test_tool_missing_unknown_tool_still_helpful():
+    log = "/bin/sh: 1: watchamacallit: not found"
+    d = classify_failure(log)
+    assert d.kind == FailureKind.TOOL_MISSING
+    assert d.extracted["tool"] == "watchamacallit"
+    # No canned install hint for unknown tools, but the diagnosis still
+    # points at the in-app installer surface.
+    assert "Settings → System" in d.fix.description
+
+
 def test_artifact_missing_rsync_lstat():
     # Verbatim shape from a real installation (portfolio-test, hit 3×):
     # the build succeeded but the configured publish dir was never

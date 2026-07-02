@@ -35,6 +35,7 @@ class FailureKind(str, enum.Enum):
     PACKAGE_NOT_FOUND = "package_not_found"
     BUILD_ERROR = "build_error"
     ARTIFACT_MISSING = "artifact_missing"
+    TOOL_MISSING = "tool_missing"
     BUILD_OOM = "build_oom"
     PERMISSION_DENIED = "permission_denied"
     DISK_FULL = "disk_full"
@@ -172,6 +173,56 @@ def _fix_build_oom(match: re.Match) -> FailureDiagnosis:
             auto_applicable=False,
         ),
         matched_text=match.group(0),
+    )
+
+
+# Known build tools → the one-liner that installs them. Keys are the
+# executable names as they appear in "command not found" errors. The
+# fallback for unknown tools still points at Settings → System, which
+# probes the machine and offers per-platform install commands.
+_TOOL_INSTALL_HINTS = {
+    "pnpm": "npm install -g pnpm  (or: corepack enable)",
+    "yarn": "corepack enable  (or: npm install -g yarn)",
+    "npm": "install Node.js 18+ — macOS: brew install node · Linux: sudo apt install nodejs npm · Windows: winget install OpenJS.NodeJS",
+    "node": "install Node.js 18+ — macOS: brew install node · Linux: sudo apt install nodejs npm · Windows: winget install OpenJS.NodeJS",
+    "python": "macOS: brew install python@3.12 · Linux: sudo apt install python3 · Windows: winget install Python.Python.3.12",
+    "python3": "macOS: brew install python@3.12 · Linux: sudo apt install python3 · Windows: winget install Python.Python.3.12",
+    "pip": "python3 -m ensurepip --upgrade",
+    "podman": "macOS: brew install podman · Linux: sudo apt install podman · Windows: winget install RedHat.Podman",
+    "docker": "WatchTower is Podman-first — macOS: brew install podman · Linux: sudo apt install podman",
+    "git": "macOS: xcode-select --install · Linux: sudo apt install git · Windows: winget install Git.Git",
+    "cargo": "curl https://sh.rustup.rs -sSf | sh",
+    "rustc": "curl https://sh.rustup.rs -sSf | sh",
+    "go": "macOS: brew install go · Linux: sudo apt install golang · Windows: winget install GoLang.Go",
+    "make": "macOS: xcode-select --install · Linux: sudo apt install build-essential",
+    "bun": "curl -fsSL https://bun.sh/install | bash",
+}
+
+
+def _fix_tool_missing(match: re.Match) -> FailureDiagnosis:
+    tool = (match.groupdict().get("tool") or "").strip().strip("'\"")
+    hint = _TOOL_INSTALL_HINTS.get(tool.lower())
+    cause = (
+        f"The build needs '{tool}' but it isn't installed on the machine that runs builds."
+        if tool
+        else "The build command needs a tool that isn't installed on the machine that runs builds."
+    )
+    fix = FailureFix(
+        description=(
+            (f"Install it: {hint}. " if hint else f"Install '{tool}' on the build machine. " if tool else "")
+            + "Settings → System also detects missing tools and shows "
+            "per-platform install commands (and can install some for you). "
+            "After installing, hit Deploy again — nothing else needs to change."
+        ),
+        command=hint,
+        auto_applicable=False,
+    )
+    return FailureDiagnosis(
+        kind=FailureKind.TOOL_MISSING,
+        cause=cause,
+        fix=fix,
+        matched_text=match.group(0),
+        extracted={"tool": tool} if tool else {},
     )
 
 
@@ -547,6 +598,26 @@ PATTERNS: list[tuple[FailureKind, re.Pattern, Callable[[re.Match], FailureDiagno
         lambda m: _fix_package_not_found(_normalize_pkg_match(m)),
     ),
     (
+        # A build *tool* is absent from the machine (pnpm, node, podman…).
+        # The single most beginner-hostile failure: the raw log says
+        # "command not found" and nothing else. Before PACKAGE_NOT_FOUND
+        # would never match these; before BUILD_ERROR so a shell error
+        # never reads as a code error.
+        FailureKind.TOOL_MISSING,
+        re.compile(
+            # bash/sh/zsh: "pnpm: command not found", "/bin/sh: 1: pnpm: not found"
+            r"(?:^|[:\s])(?P<tool>[\w.\-]+): (?:command )?not found"
+            # node child_process: "spawn pnpm ENOENT"
+            r"|spawn (?P<tool2>[\w.\-]+) ENOENT"
+            # Windows cmd: "'pnpm' is not recognized as an internal or external command"
+            r"|'(?P<tool3>[\w.\-]+)' is not recognized as an internal or external command"
+            # python subprocess: FileNotFoundError: [Errno 2] No such file or directory: 'pnpm'
+            r"|FileNotFoundError: \[Errno 2\] No such file or directory: '(?P<tool4>[\w.\-]+)'",
+            re.IGNORECASE | re.MULTILINE,
+        ),
+        lambda m: _fix_tool_missing(_normalize_tool_match(m)),
+    ),
+    (
         # Deploy-stage: build succeeded but the promised publish dir was
         # never created — rsync fails stat'ing it. Almost always a
         # publish-directory mismatch (Next.js '.next' vs configured
@@ -630,6 +701,14 @@ def _normalize_target_match(m: re.Match) -> re.Match:
     chosen = g.get("target") or g.get("target2")
     if chosen and not g.get("target"):
         return _RewrittenMatch(m, {"target": chosen})
+    return m
+
+
+def _normalize_tool_match(m: re.Match) -> re.Match:
+    g = m.groupdict()
+    chosen = g.get("tool") or g.get("tool2") or g.get("tool3") or g.get("tool4")
+    if chosen and not g.get("tool"):
+        return _RewrittenMatch(m, {"tool": chosen})
     return m
 
 
