@@ -65,6 +65,14 @@ if echo "$ASSET_NAMES" | grep -qx "latest-mac.yml"; then
     else
       FAIL "latest-mac.yml is single-arch (arm64=$HAS_ARM x64=$HAS_X64) — one Mac arch can't auto-update. The merge-mac-manifest job must run/succeed."
     fi
+    # Electron 43+ builds require macOS 12; without this field, updaters on
+    # older macOS download + install a build the OS refuses to launch. The
+    # merge-mac-manifest job injects it — assert it survived to the release.
+    if grep -q "minimumSystemVersion:" "$MAC_YML"; then
+      PASS "latest-mac.yml carries minimumSystemVersion (old-macOS installs are protected)"
+    else
+      FAIL "latest-mac.yml is missing minimumSystemVersion — macOS <12 users would auto-update into an app that can't launch."
+    fi
   else
     WARN "Could not download latest-mac.yml to inspect its arch coverage."
   fi

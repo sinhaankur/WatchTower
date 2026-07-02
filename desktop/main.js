@@ -238,6 +238,27 @@ if [ -z "$MOUNT_POINT" ] || [ ! -d "$MOUNT_POINT/WatchTower.app" ]; then
 fi
 echo "Mounted at $MOUNT_POINT"
 
+# Ground-truth OS guard: read the downloaded bundle's own minimum-macOS
+# requirement and refuse the swap if this machine can't run it. The
+# latest-mac.yml minimumSystemVersion field should stop us ever getting
+# here (electron-updater skips such updates), but that field is injected
+# by CI and a future Electron bump could forget to raise it — replacing
+# a working app with one Gatekeeper refuses to launch is the one failure
+# mode this script must never allow.
+NEW_MIN=$(/usr/libexec/PlistBuddy -c 'Print :LSMinimumSystemVersion' "$MOUNT_POINT/WatchTower.app/Contents/Info.plist" 2>/dev/null || echo "")
+OS_VER=$(sw_vers -productVersion)
+if [ -n "$NEW_MIN" ]; then
+  HIGHEST=$(printf '%s\\n%s\\n' "$NEW_MIN" "$OS_VER" | sort -V | tail -1)
+  if [ "$HIGHEST" = "$NEW_MIN" ] && [ "$NEW_MIN" != "$OS_VER" ]; then
+    echo "ERROR: update requires macOS $NEW_MIN but this Mac runs $OS_VER — keeping current version"
+    hdiutil detach "$MOUNT_POINT" 2>/dev/null || true
+    rm -f "${dmgPath}"
+    osascript -e "display notification \\"This update needs macOS $NEW_MIN or newer. Keeping your current version.\\" with title \\"WatchTower update skipped\\"" 2>/dev/null || true
+    open "${appPath}"
+    exit 1
+  fi
+fi
+
 # Replace /Applications/WatchTower.app. If the user installed via drag-drop
 # the .app is user-writable — we can rm/cp directly. If they used sudo cp
 # (root-owned), prompt for admin via osascript.
