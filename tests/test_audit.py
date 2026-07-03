@@ -225,13 +225,27 @@ def test_audit_read_is_free_preview(client: TestClient, monkeypatch):
     assert ed["features"]["audit-log"]["unlocked"] is True
 
 
-def test_other_pro_features_still_402_on_free_tier(client: TestClient, monkeypatch):
-    """The 402 contract still holds for features NOT in the free preview —
-    regression guard so un-gating audit-log didn't open the whole gate."""
+def test_gate_mechanism_still_works_when_not_previewed(client: TestClient, monkeypatch):
+    """2026-07-02: ALL pro features ship in the free preview (everything is
+    free during beta), so nothing 402s by default. This guards the gate
+    MECHANISM instead: with the preview set emptied, a pro feature must
+    lock again — proving re-gating at billing launch is a one-set change."""
     from watchtower.api import edition
 
     monkeypatch.delenv("WATCHTOWER_TIER", raising=False)
-    # team-rbac is gated but not previewed; confirm it still 402s.
-    assert "team-rbac" not in edition.FREE_PREVIEW_FEATURES
+    monkeypatch.setattr(edition, "FREE_PREVIEW_FEATURES", set())
     ed = client.get("/api/edition").json()
     assert ed["features"]["team-rbac"]["unlocked"] is False
+    assert ed["features"]["audit-log"]["unlocked"] is False
+
+
+def test_everything_unlocked_on_free_tier_during_beta(client: TestClient, monkeypatch):
+    """Product decision 2026-07-02: the whole application is free in beta —
+    every registered pro feature reports unlocked on the Free tier."""
+    from watchtower.api import edition
+
+    monkeypatch.delenv("WATCHTOWER_TIER", raising=False)
+    ed = client.get("/api/edition").json()
+    assert set(ed["features"]) == set(edition.PRO_FEATURES)
+    for key, feat in ed["features"].items():
+        assert feat["unlocked"] is True, f"{key} should be free during beta"
