@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import EmptyState from '@/components/EmptyState';
 import UseThisPcCard from '@/components/UseThisPcCard';
 import DiscoverNodesCard from '@/components/DiscoverNodesCard';
+import NetworkMap from '@/components/NetworkMap';
 import GuidedSshSetup from '@/components/GuidedSshSetup';
 import { Label } from '@/components/ui/label';
 import { StatusPill, nodeStatusTone } from '@/components/ui/status-pill';
@@ -481,6 +482,11 @@ const Servers = () => {
               </div>
             )}
           </div>
+
+          {/* Live topology — the "what is my network?" explanation view.
+              Only when there's something to draw; the zero-state below
+              already teaches the first step. */}
+          {nodes.length > 0 && <NetworkMap nodes={nodes} />}
 
           {nodes.length === 0 && !loading && (
             <div className="border border-dashed border-border rounded-xl px-6">
