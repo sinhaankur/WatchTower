@@ -92,7 +92,10 @@
 
     body {
       margin: 0;
-      background: var(--bg);
+      background:
+        radial-gradient(1100px 520px at 88% -5%, rgba(253, 230, 138, 0.38), transparent 62%),
+        radial-gradient(720px 420px at -8% 12%, rgba(185, 28, 28, 0.05), transparent 60%),
+        var(--bg);
       color: var(--ink);
       font-family: "DM Sans", system-ui, -apple-system, sans-serif;
       font-size: 17px;
@@ -246,6 +249,77 @@
     }
     .version-badge { color: var(--ink-dim); }
 
+    /* Two-column hero: copy left, real product right. */
+    .hero-grid {
+      display: grid;
+      grid-template-columns: 1.05fr 1fr;
+      gap: 48px;
+      align-items: center;
+    }
+    /* Two-col hero needs a tighter scale than the old full-width one —
+       clamp(…4.6rem) wrapped the headline to six cramped lines. */
+    .hero-grid h1 { font-size: clamp(2.3rem, 3.9vw, 3.4rem); max-width: 16ch; }
+    .hero-grid .sub { font-size: clamp(1.02rem, 1.6vw, 1.14rem); }
+    .hero-visual { position: relative; }
+    .hero-visual::before {
+      content: "";
+      position: absolute;
+      inset: -36px -48px;
+      background:
+        radial-gradient(60% 60% at 30% 20%, rgba(253, 230, 138, 0.55), transparent 70%),
+        radial-gradient(50% 50% at 80% 80%, rgba(185, 28, 28, 0.10), transparent 70%);
+      filter: blur(34px);
+      z-index: -1;
+    }
+    .browser-frame {
+      border-radius: 14px;
+      border: 1px solid var(--line);
+      background: #fff;
+      overflow: hidden;
+      box-shadow: 0 32px 80px -18px rgba(15, 23, 42, 0.28), 0 4px 16px rgba(15, 23, 42, 0.06);
+    }
+    .browser-bar {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 10px 14px;
+      background: var(--bg-soft);
+      border-bottom: 1px solid var(--line);
+    }
+    .browser-bar span { width: 10px; height: 10px; border-radius: 50%; }
+    .browser-bar span:nth-child(1) { background: #fca5a5; }
+    .browser-bar span:nth-child(2) { background: #fde68a; }
+    .browser-bar span:nth-child(3) { background: #a7f3d0; }
+    .browser-bar em {
+      font-style: normal;
+      font-family: "Space Mono", monospace;
+      font-size: 0.66rem;
+      color: var(--ink-dim);
+      margin-left: 10px;
+    }
+    .browser-frame img { display: block; width: 100%; height: auto; }
+    @media (max-width: 980px) {
+      .hero-grid { grid-template-columns: 1fr; gap: 40px; }
+      .hero-visual::before { inset: -20px; }
+    }
+
+    /* Real-screenshot card inside the dark self-heal band. */
+    .heal-shot {
+      background: #fff;
+      border-radius: 14px;
+      padding: 10px;
+      margin: 6px 0 14px;
+      box-shadow: 0 24px 70px rgba(0, 0, 0, 0.4);
+    }
+    .heal-shot img { display: block; width: 100%; height: auto; border-radius: 8px; }
+    .heal-shot-cap {
+      font-family: "Space Mono", monospace;
+      font-size: 0.72rem;
+      color: var(--dark-dim);
+      text-align: center;
+      margin: 0 0 44px;
+    }
+
     /* ── Section scaffolding ──────────────────────────────────────── */
     section { padding: 96px 0; }
     .kicker {
@@ -385,7 +459,14 @@
       transform: translateY(-3px);
       box-shadow: 0 14px 34px rgba(15, 23, 42, 0.07);
     }
-    .card .icon { font-size: 1.5rem; margin-bottom: 14px; display: block; }
+    .card .icon {
+      width: 42px; height: 42px;
+      border-radius: 11px;
+      background: rgba(253, 230, 138, 0.55);
+      display: flex; align-items: center; justify-content: center;
+      margin-bottom: 16px;
+    }
+    .card .icon svg { width: 21px; height: 21px; stroke: var(--brand-red); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
     .card h3 { margin: 0 0 8px; font-size: 1.08rem; font-weight: 800; letter-spacing: -0.015em; }
     .card p { margin: 0; color: var(--ink-dim); font-size: 0.93rem; }
 
@@ -541,7 +622,8 @@
   <!-- ── Hero ────────────────────────────────────────────────────── -->
   <main id="top">
     <div class="wrap">
-      <section class="hero" style="padding-bottom: 70px;">
+      <section class="hero hero-grid" style="padding-bottom: 70px;">
+        <div>
         <div class="hero-brand reveal">
           <svg class="wt-mark wt-mark-lg" viewBox="0 0 64 64" role="img" aria-label="WatchTower logo">
             <rect x="4" y="4" width="56" height="56" rx="12" fill="#fde68a" stroke="#0f172a" stroke-width="4"/>
@@ -565,6 +647,16 @@
           <span>macOS · Linux · Windows</span>
           <span>Rootless Podman</span>
         </p>
+        </div>
+
+        <div class="hero-visual reveal" style="--d:220ms;">
+          <div class="browser-frame">
+            <div class="browser-bar"><span></span><span></span><span></span><em>watchtower — running on your machine</em></div>
+            <img src="./screenshots/app-live.png" width="1600" height="819"
+                 alt="WatchTower's Applications page: my-portfolio and landing-page are live; analytics-api failed and the card explains why — a code error in src/routes/events.ts line 41 — with a View log link."
+                 fetchpriority="high">
+          </div>
+        </div>
       </section>
     </div>
 
@@ -645,6 +737,12 @@
           <span class="heal-node good"><span class="pulse-dot"></span>live again</span>
         </div>
 
+        <div class="heal-shot reveal" style="--d:220ms;">
+          <img src="./screenshots/self-heal-card.png" width="1400" height="233" loading="lazy"
+               alt="A real failed project card in WatchTower: 'The build failed on a code error in src/routes/events.ts:41: Cannot find name Tracker' with a View log link.">
+        </div>
+        <p class="heal-shot-cap reveal" style="--d:260ms;">not a mockup — a real failed deploy explaining itself</p>
+
         <div class="heal-grid">
           <article class="heal-card reveal">
             <h3>Diagnoses the cause</h3>
@@ -674,37 +772,37 @@
 
         <div class="grid">
           <article class="card reveal">
-            <span class="icon" aria-hidden="true">🗄️</span>
+            <span class="icon" aria-hidden="true"><svg viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg></span>
             <h3>Managed databases</h3>
             <p>Postgres, MySQL, MariaDB, Mongo, Redis — one click, auto-wired connection
             strings, scheduled backups.</p>
           </article>
           <article class="card reveal" style="--d:60ms;">
-            <span class="icon" aria-hidden="true">🔐</span>
+            <span class="icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span>
             <h3>Private by default</h3>
             <p>Reach your machine from anywhere over Tailscale. No port-forwarding,
             no open ports, nothing public until you say so.</p>
           </article>
           <article class="card reveal" style="--d:120ms;">
-            <span class="icon" aria-hidden="true">🧩</span>
+            <span class="icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></span>
             <h3>App catalog &amp; templates</h3>
             <p>Self-hostable apps and project templates, deployable in a click —
             plus your own repos.</p>
           </article>
           <article class="card reveal" style="--d:180ms;">
-            <span class="icon" aria-hidden="true">📦</span>
+            <span class="icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg></span>
             <h3>Container manager</h3>
             <p>Rootless Podman containers and pods, start to logs, from the same UI.
             No root Docker daemon on your machine.</p>
           </article>
           <article class="card reveal" style="--d:240ms;">
-            <span class="icon" aria-hidden="true">👥</span>
+            <span class="icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
             <h3>Team, roles &amp; audit log</h3>
             <p>GitHub sign-in, org roles, and an append-only record of who deployed
             what, when — SOC 2-style evidence built in.</p>
           </article>
           <article class="card reveal" style="--d:300ms;">
-            <span class="icon" aria-hidden="true">🤖</span>
+            <span class="icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="4" y="7" width="16" height="12" rx="3"/><circle cx="9" cy="13" r="1.2"/><circle cx="15" cy="13" r="1.2"/><path d="M12 7V4"/><circle cx="12" cy="3" r="1"/></svg></span>
             <h3>AI operator — bring your own model</h3>
             <p>Point it at Ollama, LM Studio, or any OpenAI-compatible endpoint.
             It can only do what you can do — no privilege escalation.</p>
