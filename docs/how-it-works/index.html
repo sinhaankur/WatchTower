@@ -6,7 +6,7 @@
   <title>How WatchTower works — architecture &amp; flow</title>
   <meta name="description" content="A walkthrough of how WatchTower deploys apps to your servers — from git push to running container, with no third-party cloud in the loop.">
   <meta name="robots" content="index, follow, max-image-preview:large">
-  <meta name="theme-color" content="#fbf6ea">
+  <meta name="theme-color" content="#fffdf8">
   <link rel="canonical" href="https://sinhaankur.github.io/WatchTower/how-it-works/">
   <meta property="og:site_name" content="WatchTower">
   <meta property="og:type" content="article">
@@ -16,11 +16,11 @@
   <meta property="og:image" content="https://sinhaankur.github.io/WatchTower/og-image.png">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:image" content="https://sinhaankur.github.io/WatchTower/og-image.png">
-  <link rel="icon" type="image/svg+xml" href="/wt-logo.svg">
+  <link rel="icon" type="image/svg+xml" href="../wt-logo.svg">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/_assets/site.css">
+  <link rel="stylesheet" href="../_assets/site.css">
   <style>
     .pipeline {
       display: grid;
@@ -29,11 +29,11 @@
       margin: 28px 0;
     }
     .stage {
-      border: 2px solid var(--wt-border);
+      border: 1px solid var(--wt-border);
       border-radius: 12px;
       padding: 16px;
       background: var(--wt-panel-soft);
-      box-shadow: 2px 2px 0 0 var(--wt-border);
+      box-shadow: 0 1px 3px rgba(15,23,42,0.06);
       display: flex;
       flex-direction: column;
       gap: 6px;
@@ -61,11 +61,11 @@
       margin-top: 16px;
     }
     .arch-card {
-      border: 2px solid var(--wt-border);
+      border: 1px solid var(--wt-border);
       border-radius: 12px;
       padding: 16px;
       background: var(--wt-panel);
-      box-shadow: 2px 2px 0 0 var(--wt-border);
+      box-shadow: 0 1px 3px rgba(15,23,42,0.06);
     }
     .arch-card h4 { margin: 0 0 8px; font-size: 0.95rem; }
     .arch-card p { font-size: 0.86rem; color: var(--wt-text-dim); margin: 0; }
@@ -75,16 +75,16 @@
 <div class="page-shell">
 
 <nav class="site-nav" aria-label="Site sections">
-  <a class="brand" href="/">
-    <span class="brand-mark"><img src="/wt-logo.svg" alt="WatchTower logo"></span>
+  <a class="brand" href="../">
+    <span class="brand-mark"><svg viewBox="0 0 64 64" role="img" aria-label="Wt logo"><rect x="4" y="4" width="56" height="56" rx="12" fill="#fde68a" stroke="#0f172a" stroke-width="4"/><text x="32" y="42" text-anchor="middle" font-family="'DM Sans', system-ui, sans-serif" font-size="26" font-weight="800" fill="#b91c1c">Wt</text></svg></span>
     <span>WatchTower</span>
   </a>
   <div class="nav-links">
-    <a class="nav-link" href="/">Home</a>
-    <a class="nav-link active" href="/how-it-works/">How it works</a>
-    <a class="nav-link" href="/pricing/">Pricing</a>
-    <a class="nav-link" href="/blog/">Blog</a>
-    <a class="nav-link" href="/viewer.html">Docs</a>
+    <a class="nav-link" href="../">Home</a>
+    <a class="nav-link active" href="../how-it-works/">How it works</a>
+    <a class="nav-link" href="../pricing/">Pricing</a>
+    <a class="nav-link" href="../blog/">Blog</a>
+    <a class="nav-link" href="../viewer.html">Docs</a>
   </div>
   <a class="nav-cta" href="https://github.com/sinhaankur/WatchTower" target="_blank" rel="noopener">⭐ GitHub</a>
 </nav>
@@ -173,6 +173,68 @@
   </section>
 
   <section class="panel">
+    <h2>Your machines form a private mesh</h2>
+    <p>Every computer you add — a laptop, a Mac mini, a Raspberry Pi, even a cloud box —
+    joins one encrypted Tailscale network. They all see each other; the internet sees
+    nothing until you say so.</p>
+    <svg viewBox="0 0 760 320" role="img" aria-label="Diagram: GitHub pushes into WatchTower on your laptop; your laptop, a Mac mini, a Raspberry Pi, and an optional cloud box are all connected to each other in an encrypted Tailscale mesh; going public via Cloudflare is optional." style="width:100%; height:auto; margin-top:10px; font-family:'DM Sans', system-ui, sans-serif;">
+      <defs>
+        <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#5c6472"/>
+        </marker>
+      </defs>
+      <!-- mesh links (drawn first, under nodes) -->
+      <g stroke="#d9b229" stroke-width="2" stroke-dasharray="6 5" fill="none" opacity="0.9">
+        <line x1="290" y1="120" x2="530" y2="90"/>
+        <line x1="290" y1="140" x2="530" y2="240"/>
+        <line x1="560" y1="115" x2="560" y2="215"/>
+        <line x1="290" y1="150" x2="380" y2="270"/>
+        <line x1="410" y1="280" x2="530" y2="250"/>
+      </g>
+      <text x="420" y="165" font-size="12" fill="#8a7a2e" text-anchor="middle" font-family="'Space Mono', monospace">encrypted tailscale mesh</text>
+
+      <!-- GitHub -->
+      <rect x="20" y="95" width="130" height="60" rx="12" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1.5"/>
+      <text x="85" y="121" font-size="14" font-weight="700" fill="#0f172a" text-anchor="middle">GitHub</text>
+      <text x="85" y="139" font-size="11" fill="#5c6472" text-anchor="middle">your repo</text>
+      <line x1="150" y1="125" x2="205" y2="125" stroke="#5c6472" stroke-width="2" marker-end="url(#arr)"/>
+      <text x="178" y="115" font-size="10" fill="#5c6472" text-anchor="middle" font-family="'Space Mono', monospace">push</text>
+
+      <!-- Your laptop (primary) -->
+      <rect x="210" y="85" width="150" height="80" rx="12" fill="#fde68a" stroke="#0f172a" stroke-width="2.5"/>
+      <text x="285" y="115" font-size="14" font-weight="800" fill="#0f172a" text-anchor="middle">Your laptop</text>
+      <text x="285" y="133" font-size="11" fill="#7a5b00" text-anchor="middle">runs WatchTower</text>
+      <text x="285" y="150" font-size="11" font-weight="700" fill="#b91c1c" text-anchor="middle">site live here</text>
+
+      <!-- Mac mini -->
+      <rect x="500" y="60" width="130" height="58" rx="12" fill="#ffffff" stroke="#ece5d6" stroke-width="1.5"/>
+      <text x="565" y="84" font-size="13" font-weight="700" fill="#0f172a" text-anchor="middle">Mac mini</text>
+      <text x="565" y="101" font-size="11" fill="#5c6472" text-anchor="middle">database node</text>
+
+      <!-- Cloud box -->
+      <rect x="500" y="212" width="130" height="58" rx="12" fill="#ffffff" stroke="#ece5d6" stroke-width="1.5"/>
+      <text x="565" y="236" font-size="13" font-weight="700" fill="#0f172a" text-anchor="middle">Cloud box</text>
+      <text x="565" y="253" font-size="11" fill="#5c6472" text-anchor="middle">optional standby</text>
+
+      <!-- Raspberry Pi -->
+      <rect x="330" y="252" width="130" height="58" rx="12" fill="#ffffff" stroke="#ece5d6" stroke-width="1.5"/>
+      <text x="395" y="276" font-size="13" font-weight="700" fill="#0f172a" text-anchor="middle">Raspberry Pi</text>
+      <text x="395" y="293" font-size="11" fill="#5c6472" text-anchor="middle">backups</text>
+
+      <!-- Public egress (optional) -->
+      <line x1="360" y1="112" x2="660" y2="35" stroke="#5c6472" stroke-width="2" stroke-dasharray="3 4" marker-end="url(#arr)"/>
+      <rect x="640" y="14" width="105" height="44" rx="10" fill="#fef2f2" stroke="#fca5a5" stroke-width="1.5"/>
+      <text x="692" y="32" font-size="12" font-weight="700" fill="#b91c1c" text-anchor="middle">Internet</text>
+      <text x="692" y="47" font-size="10" fill="#b91c1c" text-anchor="middle">via Cloudflare, opt-in</text>
+    </svg>
+    <div class="callout">
+      Deploy to any of them from one dashboard. Reach them from anywhere — coffee shop,
+      phone, office — with nothing port-forwarded and nothing exposed. Public is a
+      choice you make per project, not a default you have to defend.
+    </div>
+  </section>
+
+  <section class="panel">
     <h2>Try it in 60 seconds</h2>
     <pre><code># 1. clone and run
 git clone https://github.com/sinhaankur/WatchTower.git
@@ -186,7 +248,7 @@ cd WatchTower
 </code></pre>
     <div class="cta-row">
       <a class="cta-btn" href="https://github.com/sinhaankur/WatchTower/releases/latest" target="_blank" rel="noopener">Download desktop app</a>
-      <a class="cta-btn ghost" href="/viewer.html?doc=quick_reference">Read the docs</a>
+      <a class="cta-btn ghost" href="../viewer.html?doc=quick_reference">Read the docs</a>
     </div>
   </section>
 
