@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import apiClient from '@/lib/api';
+import { apiUrl, getAuthToken } from '@/lib/api';
 import { toast } from '@/lib/toast';
 import {
   usePodmanStatus,
@@ -37,6 +37,71 @@ const stateBadge = (state: string) => {
   if (s.includes('exited') || s.includes('stopped') || s.includes('created')) return 'text-slate-600 bg-slate-100 border-slate-200';
   return 'text-slate-600 bg-slate-100 border-slate-200';
 };
+
+/**
+ * Live-follow a container's logs over the SSE endpoint. Opened only while
+ * `active` is true; flipping it off (closing the panel or unmounting) aborts
+ * the fetch, which terminates the podman follower server-side. EventSource
+ * can't send the Authorization header, so we read the stream with fetch().
+ */
+function useContainerLogStream(name: string, active: boolean) {
+  const [lines, setLines] = useState<string[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [connected, setConnected] = useState(false);
+
+  useEffect(() => {
+    if (!active) return;
+    const ctrl = new AbortController();
+    setLines([]);
+    setError(null);
+
+    (async () => {
+      try {
+        const token = getAuthToken();
+        const res = await fetch(apiUrl(`/podman/containers/${encodeURIComponent(name)}/logs/stream`), {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+          signal: ctrl.signal,
+        });
+        if (!res.ok || !res.body) {
+          setError(`Could not open log stream (HTTP ${res.status}).`);
+          return;
+        }
+        setConnected(true);
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        // SSE frames are separated by a blank line; each frame is `data:` or
+        // `event: error` + `data:`. We parse incrementally as chunks arrive.
+        for (;;) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          let sep: number;
+          while ((sep = buffer.indexOf('\n\n')) !== -1) {
+            const frame = buffer.slice(0, sep);
+            buffer = buffer.slice(sep + 2);
+            const isError = frame.startsWith('event: error');
+            const data = frame
+              .split('\n')
+              .filter((l) => l.startsWith('data:'))
+              .map((l) => l.slice(5).replace(/^ /, ''))
+              .join('\n');
+            if (isError) setError(data);
+            else setLines((prev) => [...prev.slice(-2000), data]);
+          }
+        }
+      } catch {
+        if (!ctrl.signal.aborted) setError('Log stream disconnected.');
+      } finally {
+        setConnected(false);
+      }
+    })();
+
+    return () => ctrl.abort();
+  }, [name, active]);
+
+  return { lines, error, connected };
+}
 
 // ── Connection card ──────────────────────────────────────────────────────────
 
@@ -283,7 +348,7 @@ function CreatePodForm({ onDone }: { onDone: () => void }) {
 
 function ContainerRow({ c }: { c: PodmanContainer }) {
   const act = usePodmanContainerAction();
-  const [logs, setLogs] = useState<string | null>(null);
+  const [showLogPanel, setShowLogPanel] = useState(false);
 
   const run = (action: 'start' | 'stop' | 'restart' | 'remove') => {
     if (action === 'remove' && !window.confirm(`Remove container ${c.name}? This deletes it (volumes survive).`)) return;
@@ -291,16 +356,6 @@ function ContainerRow({ c }: { c: PodmanContainer }) {
       onSuccess: () => toast.success(`${c.name}: ${action} ok`),
       onError: (e) => toast.error(extractDetail(e, `${action} failed`)),
     });
-  };
-
-  const showLogs = async () => {
-    if (logs !== null) { setLogs(null); return; }
-    try {
-      const r = await apiClient.get<{ logs: string }>(`/podman/containers/${encodeURIComponent(c.name)}/logs`);
-      setLogs(r.data.logs || '(no output)');
-    } catch (e) {
-      toast.error(extractDetail(e, 'Could not fetch logs'));
-    }
   };
 
   const running = (c.state || '').toLowerCase().includes('running');
@@ -334,19 +389,62 @@ function ContainerRow({ c }: { c: PodmanContainer }) {
                   <button onClick={() => run('stop')} disabled={act.isPending} className="text-[11px] px-2 py-1 rounded border border-slate-300 hover:bg-slate-100 disabled:opacity-50">Stop</button>
                 </>
               : <button onClick={() => run('start')} disabled={act.isPending} className="text-[11px] px-2 py-1 rounded border border-emerald-300 text-emerald-700 hover:bg-emerald-50 disabled:opacity-50">Start</button>}
-            <button onClick={() => void showLogs()} className="text-[11px] px-2 py-1 rounded border border-slate-300 hover:bg-slate-100">Logs</button>
+            <button onClick={() => setShowLogPanel((v) => !v)} className={`text-[11px] px-2 py-1 rounded border ${showLogPanel ? 'border-slate-400 bg-slate-100' : 'border-slate-300 hover:bg-slate-100'}`}>Logs</button>
             <button onClick={() => run('remove')} disabled={act.isPending} className="text-[11px] px-2 py-1 rounded border border-red-300 text-red-700 hover:bg-red-50 disabled:opacity-50">Remove</button>
           </div>
         </td>
       </tr>
-      {logs !== null && (
+      {showLogPanel && (
         <tr>
           <td colSpan={5} className="px-4 pb-3">
-            <pre className="text-[10px] font-mono bg-slate-900 text-slate-100 rounded-lg p-3 max-h-64 overflow-auto whitespace-pre-wrap">{logs}</pre>
+            <LiveLogPanel name={c.name} />
           </td>
         </tr>
       )}
     </>
+  );
+}
+
+function LiveLogPanel({ name }: { name: string }) {
+  const { lines, error, connected } = useContainerLogStream(name, true);
+  const preRef = useRef<HTMLPreElement>(null);
+  const [stick, setStick] = useState(true);
+
+  // Auto-scroll to the newest line, but only while the user is already at the
+  // bottom — so scrolling up to read history isn't yanked back down.
+  useEffect(() => {
+    const el = preRef.current;
+    if (el && stick) el.scrollTop = el.scrollHeight;
+  }, [lines, stick]);
+
+  const onScroll = () => {
+    const el = preRef.current;
+    if (!el) return;
+    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 24;
+    setStick(atBottom);
+  };
+
+  return (
+    <div className="rounded-lg overflow-hidden border border-slate-800">
+      <div className="flex items-center justify-between bg-slate-800 px-3 py-1.5">
+        <span className="text-[10px] font-mono text-slate-300 flex items-center gap-1.5">
+          <span className={`inline-block w-1.5 h-1.5 rounded-full ${connected ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'}`} />
+          {connected ? 'live' : 'connecting…'} · {name}
+        </span>
+        {!stick && <span className="text-[10px] text-amber-400">paused — scroll down to resume</span>}
+      </div>
+      <pre
+        ref={preRef}
+        onScroll={onScroll}
+        className="text-[10px] font-mono bg-slate-900 text-slate-100 p-3 max-h-72 overflow-auto whitespace-pre-wrap"
+      >
+        {error
+          ? `⚠ ${error}`
+          : lines.length
+            ? lines.join('\n')
+            : '(waiting for output…)'}
+      </pre>
+    </div>
   );
 }
 

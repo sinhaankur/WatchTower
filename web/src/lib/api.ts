@@ -15,6 +15,19 @@ export const apiClient = axios.create({
   },
 });
 
+/** The bearer token the axios interceptor would attach, for callers (like
+ *  streaming fetch/SSE) that build requests outside axios. */
+export function getAuthToken(): string | undefined {
+  return localStorage.getItem('authToken') || API_TOKEN || DEV_FALLBACK_TOKEN;
+}
+
+/** Absolute URL for an API path, mirroring apiClient's baseURL. Use for
+ *  streaming endpoints consumed via fetch() rather than axios. */
+export function apiUrl(path: string): string {
+  const base = API_BASE_URL.replace(/\/$/, '');
+  return `${base}${path.startsWith('/') ? path : `/${path}`}`;
+}
+
 // Add authorization token if available
 apiClient.interceptors.request.use((config) => {
   const token = localStorage.getItem('authToken') || API_TOKEN || DEV_FALLBACK_TOKEN;

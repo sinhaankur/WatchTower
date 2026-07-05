@@ -24,7 +24,9 @@ from __future__ import annotations
 import json
 import logging
 import re
-from typing import Any, Dict, List, Optional
+import subprocess
+import time
+from typing import Any, Dict, Iterator, List, Optional
 
 # Deliberate reuse of the sibling module's private helpers — keeping one
 # resolution + subprocess shape across the whole local-runtime family.
@@ -303,6 +305,46 @@ def container_logs(name: str, tail: int = 200) -> str:
         raise PodmanError(_friendly_error(err, "podman logs failed")[:300])
     # podman writes container stderr to stderr — users want both streams.
     return (out + err)[-64 * 1024:]
+
+
+def stream_container_logs(
+    name: str, tail: int = 200, max_seconds: float = 3600.0
+) -> Iterator[str]:
+    """Yield container log lines live, following new output as it arrives.
+
+    Powers the Containers page's live-log view. Same argv-list, validated-name
+    safety as the rest of this module — the only difference from
+    ``container_logs`` is ``--follow``, so we manage the process ourselves
+    (``_run`` waits for exit, which never happens under ``--follow``).
+
+    Yields one decoded line at a time (newline stripped). ``max_seconds`` is a
+    hard ceiling so an idle follower can't pin a podman process forever; the
+    caller (or a disconnected client) closing the generator terminates the
+    child promptly via the ``finally`` block.
+    """
+    bin_ = _require_bin()
+    _validate_name(name, "container name")
+    tail = max(1, min(int(tail), 2000))
+    proc = subprocess.Popen(
+        [bin_, "logs", "--follow", "--tail", str(tail), name],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,  # merge stderr — users want both streams inline
+        text=True,
+        bufsize=1,  # line-buffered
+    )
+    deadline = time.monotonic() + max_seconds
+    try:
+        assert proc.stdout is not None
+        for line in proc.stdout:
+            yield line.rstrip("\n")
+            if time.monotonic() > deadline:
+                break
+    finally:
+        proc.terminate()
+        try:
+            proc.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            proc.kill()
 
 
 # ── Pods ─────────────────────────────────────────────────────────────────────

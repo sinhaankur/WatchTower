@@ -187,3 +187,68 @@ def test_podman_failure_maps_to_400_not_500(client, monkeypatch):
     r = client.get("/api/podman/containers")
     assert r.status_code == 400
     assert "socket" in r.json()["detail"]
+
+
+# ── Live log streaming ───────────────────────────────────────────────────────
+
+
+class _FakePopen:
+    """Stand-in for subprocess.Popen that replays canned log lines."""
+
+    def __init__(self, args, **kwargs):
+        self.args = args
+        self.stdout = iter(["line one\n", "line two\n"])
+        self.terminated = False
+
+    def terminate(self):
+        self.terminated = True
+
+    def wait(self, timeout=None):
+        return 0
+
+    def kill(self):  # pragma: no cover — only on wait timeout
+        pass
+
+
+def test_stream_container_logs_follows_and_yields_lines(monkeypatch):
+    monkeypatch.setattr(rt, "_podman_path", lambda: "/usr/bin/podman")
+    captured = {}
+
+    def fake_popen(args, **kwargs):
+        captured["args"] = args
+        return _FakePopen(args, **kwargs)
+
+    monkeypatch.setattr(rt.subprocess, "Popen", fake_popen)
+
+    lines = list(rt.stream_container_logs("web-1", tail=50))
+    assert lines == ["line one", "line two"]
+    # --follow is the whole point; tail is clamped and passed through.
+    assert "--follow" in captured["args"]
+    assert captured["args"][captured["args"].index("--tail") + 1] == "50"
+
+
+def test_stream_container_logs_rejects_bad_name(monkeypatch):
+    monkeypatch.setattr(rt, "_podman_path", lambda: "/usr/bin/podman")
+    with pytest.raises(rt.PodmanError):
+        list(rt.stream_container_logs("--privileged"))
+
+
+def test_logs_stream_endpoint_emits_sse(client, monkeypatch):
+    monkeypatch.setattr(rt, "_podman_path", lambda: "/usr/bin/podman")
+    monkeypatch.setattr(rt.subprocess, "Popen", lambda args, **kw: _FakePopen(args, **kw))
+
+    with client.stream("GET", "/api/podman/containers/web-1/logs/stream") as r:
+        assert r.status_code == 200
+        assert r.headers["content-type"].startswith("text/event-stream")
+        body = "".join(r.iter_text())
+    assert "data: line one" in body
+    assert "data: line two" in body
+
+
+def test_logs_stream_endpoint_surfaces_error_frame(client, monkeypatch):
+    monkeypatch.setattr(rt, "_podman_path", lambda: None)  # podman not installed
+    with client.stream("GET", "/api/podman/containers/web-1/logs/stream") as r:
+        assert r.status_code == 200
+        body = "".join(r.iter_text())
+    assert "event: error" in body
+    assert "not installed" in body

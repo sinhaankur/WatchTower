@@ -17,6 +17,7 @@ from uuid import UUID
 
 import anyio
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -174,6 +175,77 @@ async def container_logs(
 ) -> Dict[str, Any]:
     logs = await _call(rt.container_logs, name, tail)
     return {"name": name, "logs": logs}
+
+
+@router.get("/containers/{name}/logs/stream")
+async def container_logs_stream(
+    name: str,
+    tail: int = 200,
+    _user: dict = Depends(util.get_current_user),
+):
+    """Live-follow a container's logs as Server-Sent Events.
+
+    Each line arrives as a `data:` frame. The one-shot `/logs` endpoint above
+    stays for a quick snapshot; this is what the UI opens to watch a deploy or
+    a crash scroll in real time. Errors (podman down, bad name) come through as
+    a single `event: error` frame rather than an HTTP status, since the stream
+    has already begun by the time podman is invoked.
+    """
+
+    async def event_stream():
+        # Bridge the blocking, following generator onto the event loop by
+        # draining it in a worker thread and handing lines back through a
+        # memory stream — same "don't block the loop" discipline as _call.
+        send, receive = anyio.create_memory_object_stream(max_buffer_size=256)
+
+        async def pump():
+            try:
+                gen = rt.stream_container_logs(name, tail)
+                async for line in _aiter(gen):
+                    await send.send(("line", line))
+            except rt.PodmanError as exc:
+                await send.send(("error", str(exc)))
+            except Exception:  # noqa: BLE001 — surface as a clean stream error
+                logger.exception("log stream failed for %s", name)
+                await send.send(("error", "Log stream failed unexpectedly."))
+            finally:
+                await send.aclose()
+
+        async with anyio.create_task_group() as tg:
+            tg.start_soon(pump)
+            async with receive:
+                async for kind, payload in receive:
+                    if kind == "error":
+                        yield f"event: error\ndata: {payload}\n\n"
+                    else:
+                        yield f"data: {payload}\n\n"
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+async def _aiter(gen):
+    """Iterate a blocking generator without stalling the event loop.
+
+    Each ``next()`` is offloaded to a worker thread; StopIteration ends it.
+    """
+    sentinel = object()
+
+    def _next(it):
+        try:
+            return next(it)
+        except StopIteration:
+            return sentinel
+
+    it = iter(gen)
+    while True:
+        item = await anyio.to_thread.run_sync(_next, it)
+        if item is sentinel:
+            return
+        yield item
 
 
 # ── Pods ─────────────────────────────────────────────────────────────────────
