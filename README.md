@@ -36,15 +36,15 @@
 
 ---
 
-## Why WatchTower is different
+## Why WatchTower
 
-Coolify, Dokploy, Umbrel, and CasaOS all let you self-host apps. **None of them fix a broken deploy for you.** WatchTower does.
+Coolify, Dokploy, Umbrel, and CasaOS all let you self-host applications. **None of them repair a broken deployment for you.** WatchTower does.
 
-- 🩹 **Self-healing deploys** — when a deployment fails (port conflict, registry flake, OOM, compile error…), WatchTower classifies the cause, applies a fix, and retries — automatically. What it can't safely auto-fix, it queues for you with an AI root-cause analysis. Autonomy is a global switch (default off) with a thrash guardrail, so it never fixes recklessly.
-- 🖥️ **Your PC, not a rented VPS** — designed to run on the machine you already have. No monthly server bill.
-- 🔒 **Rootless & private by default** — Podman-first (no root Docker daemon), reachable over your own Tailscale tailnet — nothing exposed to the public internet.
-- 🗄️ **Batteries included** — one-click managed databases (Postgres/MySQL/MariaDB/Mongo/Redis) with auto-wired connection strings and scheduled backups, plus GitHub-push deploys and an app catalog.
-- 🔓 **Open-core** — Apache 2.0 + ELv2. Self-host it forever; no lock-in.
+- **Self-healing deployments** — when a deployment fails (port conflict, registry flake, out-of-memory, build error), WatchTower classifies the cause, applies a safe fix, and retries automatically. Anything it cannot fix safely is queued for your review with an AI-generated root-cause analysis.
+- **Your hardware, not a rented VPS** — designed to run on the machine you already own. No monthly server bill, no usage-based surprises.
+- **Rootless and private by default** — Podman-first (no root Docker daemon), reachable over your own Tailscale tailnet. Nothing is exposed to the public internet until you decide to go public.
+- **Batteries included** — one-click managed databases (Postgres, MySQL, MariaDB, MongoDB, Redis) with auto-wired connection strings and scheduled backups, plus GitHub push-to-deploy and an app catalog.
+- **Open-core, no lock-in** — Apache 2.0 + ELv2. Self-host it forever; your projects and data remain yours.
 
 > Different from [`containrrr/watchtower`](https://github.com/containrrr/watchtower) (a Docker image auto-updater). This WatchTower is a full self-hosted deploy + database + self-heal control plane for Podman.
 
@@ -103,6 +103,27 @@ Open `http://127.0.0.1:8000` and sign in with the token. HA setup: `deploy/docke
 | **Container manager** | Full rootless Podman container/pod management UI, plus the classic health-aware image auto-updater (`watchtower start`) |
 | **Team & governance** | GitHub sign-in, org roles, append-only audit log, encrypted secrets |
 
+## Trust
+
+WatchTower runs unattended on your own machine, so it is built to a standard where you don't have to take its behaviour on faith:
+
+- **No telemetry, ever.** WatchTower is fully self-hosted. Your code, data, and metrics never leave your hardware, and there is no phone-home of any kind.
+- **Secrets are encrypted at rest.** GitHub tokens, SSH keys, and LLM API keys are stored Fernet-encrypted — never in plaintext, never echoed back by the API, and never written to logs or audit records.
+- **Append-only audit log.** Every mutating action — project changes, deployments, environment-variable edits, automated fixes — records who did it, when, from which IP, and with which request ID, so any change can be traced end to end.
+- **Hardened by design.** Server-side requests are guarded against SSRF (private, loopback, and cloud-metadata addresses are blocked), static file serving is path-traversal-guarded, container commands never pass through a shell, and all user-supplied names are strictly validated.
+- **Auditable.** The entire codebase is public. Review it, fork it, or run it air-gapped. See [docs/SECURITY_HARDENING.md](docs/SECURITY_HARDENING.md) for the full hardening guide.
+
+## Control
+
+Automation is only useful if you hold the steering wheel:
+
+- **Autonomy is opt-in.** The self-healing auto-fix switch ships **off**. Until you enable it, every proposed fix waits in a human approval queue — nothing is applied behind your back.
+- **Guardrails on automation.** Even with autonomy on, auto-fixes are rate-limited per project; if a deployment keeps failing, WatchTower stops retrying and escalates to you instead of thrashing.
+- **The AI agent acts as you — no more.** Every agent action runs under your authenticated identity and permissions; there is no privilege escalation path. A read-only mode blocks destructive operations entirely.
+- **Bring your own LLM.** All AI features work with any OpenAI-compatible endpoint, including fully local ones (Ollama, LM Studio, llama.cpp). No cloud account is required, and nothing is sent to a provider you didn't configure.
+- **Your data is portable.** State lives in a standard SQLite database under `~/.watchtower/` (or your own Postgres). Built-in backup and export mean you can leave at any time with everything you brought.
+- **Kill switches.** The self-heal loop and the agent's destructive tools can each be disabled with a single environment variable, independent of the UI.
+
 ## How WatchTower compares
 
 |                                   | **WatchTower** | Coolify | Dokploy | Umbrel / CasaOS |
@@ -115,9 +136,9 @@ Open `http://127.0.0.1:8000` and sign in with the token. HA setup: `deploy/docke
 | Private by default (Tailscale)    |    ✅ built-in |  add-on |  add-on |     add-on      |
 | Desktop app                       |       ✅       |    ❌    |    ❌    |       ❌        |
 
-The differentiator is the third row. Everyone lets you self-host apps; **only WatchTower diagnoses and fixes a broken deploy on its own**. It's built to run unattended on the machine you already own, rootless, without exposing anything to the internet.
+The differentiator is the third row. Every tool in this table lets you self-host applications; **only WatchTower diagnoses and repairs a failed deployment on its own**. It is built to run unattended on the machine you already own — rootless, and without exposing anything to the internet.
 
-*(Comparison reflects public feature sets as of mid-2026. WatchTower is younger than Coolify — it wins on the self-heal + rootless-PC angle, not on breadth or years of hardening.)*
+*Comparison reflects public feature sets as of mid-2026. WatchTower is a younger project than Coolify — its strengths are self-healing and rootless operation on your own hardware, not breadth or years of hardening.*
 
 ## Docs & guides
 
@@ -165,12 +186,12 @@ Use of a running installation is governed by the [Terms of Use](legal/TERMS_OF_U
 
 ## Feedback & support
 
-**Trying WatchTower? Tell us where it fights you.** Every report — confusing screen, unexplained error, missing feature — directly shapes what gets built next.
+WatchTower is actively developed, and user reports directly shape the roadmap. If a screen is confusing, an error is unexplained, or a feature is missing, we want to hear about it.
 
-- 💬 [Start a discussion](https://github.com/sinhaankur/WatchTower/discussions) — questions, ideas, show-and-tell
-- 🐛 [Report an issue](https://github.com/sinhaankur/WatchTower/issues)
-- 🌐 [Website & docs](https://sinhaankur.github.io/WatchTower/)
-- ♥ [Sponsor the project](https://github.com/sponsors/sinhaankur)
+- [Discussions](https://github.com/sinhaankur/WatchTower/discussions) — questions, ideas, and show-and-tell
+- [Issues](https://github.com/sinhaankur/WatchTower/issues) — bug reports and feature requests
+- [Website & documentation](https://sinhaankur.github.io/WatchTower/)
+- [Sponsor the project](https://github.com/sponsors/sinhaankur)
 
 ---
 

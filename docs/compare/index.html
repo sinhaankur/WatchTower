@@ -1,0 +1,290 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WatchTower vs Coolify, Dokploy, Umbrel &amp; CasaOS — self-hosted deploy platforms compared</title>
+  <meta name="description" content="An honest comparison of WatchTower with Coolify, Dokploy, Umbrel, and CasaOS — and with cloud platforms like Vercel. Only WatchTower diagnoses and repairs a failed deployment on its own, rootless, on a computer you already own.">
+  <meta name="robots" content="index, follow, max-image-preview:large">
+  <meta name="theme-color" content="#fffdf8">
+  <link rel="canonical" href="https://sinhaankur.github.io/WatchTower/compare/">
+  <meta property="og:site_name" content="WatchTower">
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="WatchTower vs Coolify, Dokploy, Umbrel & CasaOS">
+  <meta property="og:description" content="Every self-hosting tool lets you deploy apps. Only WatchTower repairs a failed deployment on its own — rootless, private, on hardware you already own.">
+  <meta property="og:url" content="https://sinhaankur.github.io/WatchTower/compare/">
+  <meta property="og:image" content="https://sinhaankur.github.io/WatchTower/og-image.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="https://sinhaankur.github.io/WatchTower/og-image.png">
+  <link rel="icon" type="image/svg+xml" href="../wt-logo.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../_assets/site.css">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+      {
+        "@type": "Question",
+        "name": "Is WatchTower an alternative to Coolify or Dokploy?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Yes. Like Coolify and Dokploy, WatchTower is a self-hosted deployment platform with GitHub push-to-deploy and one-click managed databases. The differences: WatchTower diagnoses and repairs failed deployments on its own, runs rootless on Podman instead of a root Docker daemon, is designed for a computer you already own rather than a VPS, and is private by default over Tailscale."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Is this the same as containrrr/watchtower, the Docker image updater?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "No. containrrr/watchtower is a single-purpose Docker image auto-updater. This WatchTower (by Ankur Sinha) is a full self-hosted deployment platform for Podman: GitHub deploys, managed databases, private remote access over Tailscale, and self-healing deployments. It does include a health-aware container auto-updater as one of its features."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Can WatchTower replace Vercel or Netlify?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "For personal projects, portfolios, and small production sites, yes: you get push-to-deploy from GitHub, a database, backups, and a private or public URL — running on your own hardware for $0/month with no usage limits. What you give up is Vercel's global edge network; what you gain is full ownership of your code, data, and costs."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Do I need a VPS or cloud server to run WatchTower?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "No. WatchTower is designed to run on a computer you already own — a laptop, desktop, Mac mini, or Raspberry Pi. Remote access works over your own Tailscale network without exposing anything to the public internet. You can add a VPS later as an extra node if you want one."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Is WatchTower free and open source?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Yes. WatchTower is open-core: Apache 2.0 for the core, Elastic License 2.0 for the pro directory. Self-hosting, internal commercial use, forks, and contributions are free forever. There is no telemetry — your code and data never leave your hardware."
+        }
+      }
+    ]
+  }
+  </script>
+  <style>
+    .cmp-wrap { overflow-x: auto; margin: 20px 0 8px; }
+    table.cmp {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.92rem;
+      min-width: 640px;
+    }
+    table.cmp th, table.cmp td {
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--wt-border, #ece5d6);
+      text-align: center;
+    }
+    table.cmp th:first-child, table.cmp td:first-child {
+      text-align: left;
+    }
+    table.cmp thead th {
+      font-family: "Space Mono", ui-monospace, monospace;
+      font-size: 0.72rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--wt-text-dim, #5c6472);
+      background: var(--wt-panel-soft, #faf5e9);
+    }
+    table.cmp thead th.wt-col { color: #b91c1c; }
+    table.cmp tr.hl { background: rgba(253, 230, 138, 0.25); font-weight: 700; }
+    .yes { color: #10b981; font-weight: 700; }
+    .no  { color: #b91c1c; font-weight: 700; }
+    .dim { color: var(--wt-text-dim, #5c6472); }
+    .foot-note { font-size: 0.82rem; color: var(--wt-text-dim, #5c6472); margin-top: 10px; }
+    .faq-item { border-bottom: 1px solid var(--wt-border, #ece5d6); padding: 18px 0; }
+    .faq-item:last-child { border-bottom: none; }
+    .faq-item h3 { margin: 0 0 8px; font-size: 1.02rem; }
+    .faq-item p { margin: 0; color: var(--wt-text-dim, #5c6472); font-size: 0.94rem; }
+  </style>
+</head>
+<body>
+<div class="page-shell">
+
+<nav class="site-nav" aria-label="Site sections">
+  <a class="brand" href="../">
+    <span class="brand-mark"><svg viewBox="0 0 64 64" role="img" aria-label="Wt logo"><rect x="4" y="4" width="56" height="56" rx="12" fill="#fde68a" stroke="#0f172a" stroke-width="4"/><text x="32" y="42" text-anchor="middle" font-family="'DM Sans', system-ui, sans-serif" font-size="26" font-weight="800" fill="#b91c1c">Wt</text></svg></span>
+    <span>WatchTower</span>
+  </a>
+  <div class="nav-links">
+    <a class="nav-link" href="../">Home</a>
+    <a class="nav-link" href="../how-it-works/">How it works</a>
+    <a class="nav-link active" href="../compare/">Compare</a>
+    <a class="nav-link" href="../pricing/">Pricing</a>
+    <a class="nav-link" href="../blog/">Blog</a>
+    <a class="nav-link" href="../viewer.html">Docs</a>
+  </div>
+  <a class="nav-cta" href="https://github.com/sinhaankur/WatchTower" target="_blank" rel="noopener">⭐ GitHub</a>
+</nav>
+
+<main class="site-main">
+
+  <section class="site-hero">
+    <span class="eyebrow">Compare</span>
+    <h1>Every tool here lets you self-host.<br>Only one repairs a failed deploy.</h1>
+    <p class="lead">
+      An honest look at how WatchTower stacks up against Coolify, Dokploy, Umbrel,
+      and CasaOS — and when it can stand in for Vercel or Netlify.
+    </p>
+  </section>
+
+  <section class="panel">
+    <h2>WatchTower vs self-hosted platforms</h2>
+    <div class="cmp-wrap">
+      <table class="cmp">
+        <thead>
+          <tr>
+            <th></th>
+            <th class="wt-col">WatchTower</th>
+            <th>Coolify</th>
+            <th>Dokploy</th>
+            <th>Umbrel / CasaOS</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Deploy from GitHub</td>
+            <td class="yes">✅</td><td class="yes">✅</td><td class="yes">✅</td><td class="dim">partial (app store)</td>
+          </tr>
+          <tr>
+            <td>One-click managed databases</td>
+            <td class="yes">✅</td><td class="yes">✅</td><td class="yes">✅</td><td class="yes">✅</td>
+          </tr>
+          <tr class="hl">
+            <td>Self-heals a failed deploy</td>
+            <td class="yes">✅</td><td class="no">❌</td><td class="no">❌</td><td class="no">❌</td>
+          </tr>
+          <tr>
+            <td>AI root-cause analysis (bring your own local LLM)</td>
+            <td class="yes">✅</td><td class="no">❌</td><td class="no">❌</td><td class="no">❌</td>
+          </tr>
+          <tr>
+            <td>Built for your own PC (not a VPS)</td>
+            <td class="yes">✅</td><td class="dim">VPS-first</td><td class="dim">VPS-first</td><td class="yes">✅</td>
+          </tr>
+          <tr>
+            <td>Rootless (no root Docker daemon)</td>
+            <td class="yes">✅ Podman</td><td class="no">❌</td><td class="no">❌</td><td class="no">❌</td>
+          </tr>
+          <tr>
+            <td>Private by default (Tailscale)</td>
+            <td class="yes">✅ built-in</td><td class="dim">add-on</td><td class="dim">add-on</td><td class="dim">add-on</td>
+          </tr>
+          <tr>
+            <td>Desktop app (macOS / Linux / Windows)</td>
+            <td class="yes">✅</td><td class="no">❌</td><td class="no">❌</td><td class="no">❌</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="foot-note">
+      Reflects public feature sets as of mid-2026. WatchTower is a younger project than
+      Coolify — its strengths are self-healing and rootless operation on your own
+      hardware, not breadth or years of hardening.
+    </p>
+    <div class="callout">
+      The highlighted row is the point. When a deployment fails — port conflict,
+      registry flake, out-of-memory, build error — WatchTower classifies the cause,
+      applies a safe fix, and retries automatically. Everything it can't fix safely
+      is queued for you with a plain-language explanation of what's missing and how
+      to fix it. Autonomy ships <strong>off</strong> and is always your switch to flip.
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>When WatchTower replaces Vercel or Netlify</h2>
+    <p>
+      Cloud platforms are excellent at what they charge for. WatchTower makes a
+      different trade: your hardware, your data, your $0/month.
+    </p>
+    <div class="cmp-wrap">
+      <table class="cmp">
+        <thead>
+          <tr>
+            <th></th>
+            <th class="wt-col">WatchTower</th>
+            <th>Vercel / Netlify</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>Where your code runs</td><td>Hardware you own</td><td>Their cloud</td></tr>
+          <tr><td>Monthly cost</td><td>$0 — it's your electricity</td><td>Free tier, then usage-based</td></tr>
+          <tr><td>Databases &amp; backups</td><td>Included, on your machine</td><td>Paid add-ons / third party</td></tr>
+          <tr><td>Usage limits</td><td>None</td><td>Bandwidth, builds, seats</td></tr>
+          <tr><td>Your data</td><td>Never leaves your hardware</td><td>Lives in their infrastructure</td></tr>
+          <tr><td>Global edge network</td><td class="no">❌ (Cloudflare optional)</td><td class="yes">✅</td></tr>
+          <tr class="hl"><td>Fixes a failed deploy for you</td><td class="yes">✅</td><td class="no">❌</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="foot-note">
+      For a global audience at scale, use an edge platform. For your portfolio, your
+      side project, your small business site — the machine already on your desk is
+      enough, and it costs nothing.
+      <a href="https://github.com/sinhaankur/WatchTower/blob/main/docs/VERCEL_ALTERNATIVE.md">Full write-up →</a>
+    </p>
+  </section>
+
+  <section class="panel">
+    <h2>Frequently asked questions</h2>
+    <div class="faq-item">
+      <h3>Is this the same as containrrr/watchtower, the Docker image updater?</h3>
+      <p>No. That project is a single-purpose Docker image auto-updater. This WatchTower
+      is a full self-hosted deployment platform for Podman — GitHub deploys, managed
+      databases, private remote access, and self-healing — which happens to include a
+      health-aware container auto-updater as one feature.</p>
+    </div>
+    <div class="faq-item">
+      <h3>Do I need a VPS?</h3>
+      <p>No. WatchTower is designed for a computer you already own — laptop, desktop,
+      Mac mini, or Raspberry Pi. You can add a VPS later as an extra node, but it is
+      never required.</p>
+    </div>
+    <div class="faq-item">
+      <h3>Do I need to know Docker or the command line?</h3>
+      <p>No. Everything — deploys, databases, containers, remote access — is managed
+      from the desktop app or web dashboard. WatchTower installs the tools it needs
+      (like Podman) for you and explains, in plain language, anything that requires
+      your attention.</p>
+    </div>
+    <div class="faq-item">
+      <h3>Is it really free?</h3>
+      <p>Yes. The core is Apache 2.0 and free forever, including commercial self-hosting.
+      There is no telemetry, no account requirement, and no usage metering. A paid
+      commercial license exists only for resellers and OEM embedders.</p>
+    </div>
+    <div class="faq-item">
+      <h3>What happens when the AI can't fix a failure?</h3>
+      <p>It never guesses. Anything it can't fix safely lands in an approval queue with
+      a root-cause analysis and the exact fix, and waits for you. Auto-fixing is
+      rate-limited per project so it can never thrash.</p>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>See it for yourself</h2>
+    <pre><code>git clone https://github.com/sinhaankur/WatchTower.git
+cd WatchTower
+./run.sh</code></pre>
+    <div class="cta-row">
+      <a class="cta-btn" href="https://github.com/sinhaankur/WatchTower/releases/latest" target="_blank" rel="noopener">Download desktop app</a>
+      <a class="cta-btn ghost" href="../how-it-works/">See how it works</a>
+    </div>
+  </section>
+
+</main>
+
+<footer class="site-footer">
+  WatchTower — open-core (Apache 2.0 + ELv2). <a href="https://github.com/sinhaankur/WatchTower">Source on GitHub</a>.
+</footer>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,25 @@
+# WatchTower
+
+> WatchTower turns a computer you already own into your personal cloud. Point it at a GitHub repository and your website is live — with a managed database, backups, and a private URL — on hardware you control, for $0/month. When a deployment breaks, WatchTower diagnoses the cause, applies a safe fix, and retries on its own; anything it can't fix safely is queued for human approval with a plain-language root-cause analysis.
+
+Key facts:
+
+- Self-hosted deployment platform ("personal cloud" / PaaS) by Ankur Sinha. Not the same project as containrrr/watchtower (a Docker image auto-updater) — though this WatchTower includes a health-aware container auto-updater as one feature.
+- The defining feature is self-healing deployments: automatic failure classification, safe auto-fix and retry, and a human approval queue for everything else. Autonomy ships off by default and is rate-limited so it never thrashes.
+- Designed for beginners on hardware they already own (laptop, desktop, Mac mini, Raspberry Pi) — not VPS-first, no DevOps knowledge required. Desktop apps for macOS, Linux, and Windows; also runs from source or Docker.
+- Rootless by design: Podman-first, no root Docker daemon. Private by default: built-in Tailscale integration, nothing exposed to the public internet unless the user opts in (Cloudflare for going public).
+- One-click managed databases: Postgres, MySQL, MariaDB, MongoDB, Redis — auto-wired connection strings and scheduled backups.
+- AI features (chat agent, root-cause analysis) work with any OpenAI-compatible endpoint, including fully local LLMs (Ollama, LM Studio, llama.cpp). No cloud AI account required.
+- Open-core licensing: Apache 2.0 core + Elastic License 2.0 for the pro directory. Free forever for self-hosting, including internal commercial use. No telemetry — code and data never leave the user's hardware.
+- Alternatives it is compared against: Coolify, Dokploy, Umbrel, CasaOS (self-hosted); Vercel, Netlify (cloud).
+
+## Docs
+
+- [Homepage](https://sinhaankur.github.io/WatchTower/): overview, download links
+- [How it works](https://sinhaankur.github.io/WatchTower/how-it-works/): deploy pipeline and architecture
+- [Compare](https://sinhaankur.github.io/WatchTower/compare/): vs Coolify, Dokploy, Umbrel, CasaOS, Vercel
+- [Pricing](https://sinhaankur.github.io/WatchTower/pricing/): free core, commercial license
+- [README](https://github.com/sinhaankur/WatchTower/blob/main/README.md): full feature list, quick start, trust & control model
+- [Security hardening](https://github.com/sinhaankur/WatchTower/blob/main/docs/SECURITY_HARDENING.md): security model
+- [Vercel alternative write-up](https://github.com/sinhaankur/WatchTower/blob/main/docs/VERCEL_ALTERNATIVE.md)
+- [Releases](https://github.com/sinhaankur/WatchTower/releases): desktop installers (DMG, AppImage, deb, exe)
