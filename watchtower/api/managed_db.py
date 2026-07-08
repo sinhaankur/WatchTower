@@ -1834,6 +1834,18 @@ async def create_backup(
         },
     )
     db.commit()
+
+    # Off-host fan-out: copy this dump to every enabled backup destination
+    # (always-on peer over the tailnet, cloud/NAS folder). Best-effort — the
+    # local dump is already safe on disk, so a down peer must not fail the
+    # backup response. Records BackupCopy rows; PENDING/FAILED ones are
+    # retried on the scheduler tick.
+    try:
+        from watchtower import backup_shipper
+        backup_shipper.ship_backup(db, row)
+    except Exception:  # noqa: BLE001 - never let shipping break the endpoint
+        logger.exception("backup %s: off-host shipping raised", row.id)
+
     return _serialize_backup(row)
 
 

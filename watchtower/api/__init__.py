@@ -21,6 +21,7 @@ from watchtower.log_config import request_id_middleware, setup_logging
 from . import (
     agent,
     audit,
+    backup_destinations,
     builds,
     cloud_providers,
     cloudflare,
@@ -534,6 +535,7 @@ app.include_router(edition.router)
 app.include_router(local_runs.router)
 app.include_router(remote_access.router)
 app.include_router(managed_db.router)
+app.include_router(backup_destinations.router)
 app.include_router(external_db.router)
 app.include_router(project_db_links.router)
 from watchtower.api import diagnose  # noqa: E402

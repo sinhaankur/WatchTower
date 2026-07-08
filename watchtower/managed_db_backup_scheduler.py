@@ -81,6 +81,45 @@ def start_scheduler() -> None:
     _scheduler.start()
     logger.info("Backup scheduler started")
     _hydrate_jobs_from_db()
+    _register_copy_retry_sweep()
+
+
+def _register_copy_retry_sweep() -> None:
+    """Register the interval job that retries off-host backup copies which
+    were PENDING/FAILED (e.g. the peer was offline when the backup ran).
+
+    Interval is ``WATCHTOWER_BACKUP_COPY_RETRY_SECS`` (default 600s / 10min).
+    Kept separate from the per-DB cron jobs so an intermittently-reachable
+    destination catches up regardless of when the next backup is scheduled."""
+    if _scheduler is None:
+        return
+    try:
+        secs = max(int(os.getenv("WATCHTOWER_BACKUP_COPY_RETRY_SECS", "600")), 30)
+    except ValueError:
+        secs = 600
+    from apscheduler.triggers.interval import IntervalTrigger
+    _scheduler.add_job(
+        _sweep_pending_copies,
+        IntervalTrigger(seconds=secs),
+        id="backup-copy-retry-sweep",
+        replace_existing=True,
+        name="backup copy retry sweep",
+    )
+    logger.info("Backup scheduler: copy-retry sweep every %ds", secs)
+
+
+def _sweep_pending_copies() -> None:
+    """Interval-job body: retry stuck off-host copies. Own DB session; never
+    raises (would kill the APScheduler job)."""
+    try:
+        from watchtower import backup_shipper
+        from watchtower.database import SessionLocal
+        with SessionLocal() as db:
+            n = backup_shipper.retry_pending_copies(db)
+            if n:
+                logger.info("Backup scheduler: retried %d off-host copy(ies)", n)
+    except Exception:  # noqa: BLE001
+        logger.exception("Backup scheduler: copy-retry sweep failed")
 
 
 def stop_scheduler() -> None:
@@ -308,6 +347,15 @@ def _run_scheduled_backup(db_id: str) -> None:
         mdb.last_scheduled_backup_at = utcnow()
         db.commit()
         logger.info("Backup scheduler: db %s backed up successfully (%d bytes)", db_id, size)
+
+        # Off-host fan-out (peer over tailnet / cloud folder). Best-effort —
+        # a down destination can't fail the scheduled backup; PENDING/FAILED
+        # copies are retried on the next tick via _sweep_pending_copies.
+        try:
+            from watchtower import backup_shipper
+            backup_shipper.ship_backup(db, row)
+        except Exception:  # noqa: BLE001
+            logger.exception("Backup scheduler: off-host shipping raised for db %s", db_id)
 
         _prune_old_scheduled_backups(db, mdb)
 

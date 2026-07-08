@@ -1018,6 +1018,107 @@ class ManagedDatabaseBackup(Base):
     created_at = Column(DateTime, default=_utcnow)
 
     database = relationship("ManagedDatabase", back_populates="backups")
+    # Per-destination copies of this backup (peer / folder fan-out).
+    copies = relationship(
+        "BackupCopy",
+        back_populates="backup",
+        cascade="all, delete-orphan",
+    )
+
+
+class BackupDestinationKind(str, enum.Enum):
+    """Where an off-host backup copy lands.
+
+    * ``peer`` — rsync-over-SSH to a registered ``OrgNode`` over the
+      tailnet (the always-on Linux PC case). Uses the node's existing
+      host/user/port/ssh-key fields.
+    * ``folder`` — copy into a host-local directory path. Covers a
+      NAS mount OR a cloud-synced folder (Dropbox / Google Drive /
+      rclone mount) — anything that presents as a filesystem path.
+      Native cloud-API targets (real S3/GCS/B2 buckets with keys) are
+      a later ``kind='s3'`` that needs credential storage + an SDK.
+    """
+    PEER = "peer"
+    FOLDER = "folder"
+
+
+class BackupDestination(Base):
+    """An off-host target that every completed managed-DB backup is
+    auto-pushed to. Org-scoped (installation-wide, like org webhooks).
+
+    Fan-out model: a backup completes → we create one ``BackupCopy``
+    per *enabled* destination and ship the ``.dump`` to each. Adding a
+    destination here is the only step needed to start mirroring — no
+    per-database wiring.
+    """
+    __tablename__ = "backup_destinations"
+
+    id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    org_id = Column(Uuid(as_uuid=True), ForeignKey("organizations.id"), nullable=True, index=True)
+
+    kind = Column(Enum(BackupDestinationKind), nullable=False)
+    label = Column(String, nullable=True)          # human name, e.g. "Home Linux PC"
+    is_enabled = Column(Boolean, default=True, nullable=False)
+
+    # kind='peer': the destination node. Its host/user/port/ssh_key are
+    # reused for the rsync-over-SSH push.
+    node_id = Column(Uuid(as_uuid=True), ForeignKey("org_nodes.id"), nullable=True)
+    # Subdirectory under the node's home (peer) — dumps land here so the
+    # push is non-destructive and never touches the node's deploy path.
+    remote_subdir = Column(String, nullable=True, default="watchtower-backups")
+
+    # kind='folder': absolute host path we copy the dump into (a NAS
+    # mount or a cloud-synced folder).
+    folder_path = Column(String, nullable=True)
+
+    created_by_user_id = Column(Uuid(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    created_at = Column(DateTime, default=_utcnow)
+
+    node = relationship("OrgNode")
+    copies = relationship("BackupCopy", back_populates="destination")
+
+
+class BackupCopyStatus(str, enum.Enum):
+    PENDING = "pending"   # queued / dest was offline — retry sweep will pick it up
+    COPIED = "copied"     # file is on the destination
+    FAILED = "failed"     # last attempt errored — see message
+
+
+class BackupCopy(Base):
+    """One backup shipped (or attempted) to one destination.
+
+    Idempotency + retry anchor: unique on (backup_id, destination_id) so
+    a re-run of the shipper never double-creates a row. ``PENDING`` rows
+    are the retry queue the scheduler sweeps.
+    """
+    __tablename__ = "backup_copies"
+    __table_args__ = (
+        UniqueConstraint("backup_id", "destination_id", name="uq_backup_copy_backup_dest"),
+    )
+
+    id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    backup_id = Column(
+        Uuid(as_uuid=True),
+        ForeignKey("managed_database_backups.id"),
+        nullable=False,
+        index=True,
+    )
+    destination_id = Column(
+        Uuid(as_uuid=True),
+        ForeignKey("backup_destinations.id"),
+        nullable=False,
+        index=True,
+    )
+    status = Column(Enum(BackupCopyStatus), default=BackupCopyStatus.PENDING, nullable=False)
+    # Where the file ended up on the destination (remote path or folder path).
+    dest_path = Column(String, nullable=True)
+    message = Column(String, nullable=True)        # last error / status detail
+    attempts = Column(Integer, default=0, nullable=False)
+    created_at = Column(DateTime, default=_utcnow)
+    updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
+
+    backup = relationship("ManagedDatabaseBackup", back_populates="copies")
+    destination = relationship("BackupDestination", back_populates="copies")
 
 
 class PhotoBackupStatus(str, enum.Enum):

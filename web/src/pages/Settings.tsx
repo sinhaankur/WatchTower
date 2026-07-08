@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import apiClient from '@/lib/api';
 import AIAutonomyCard from '@/components/AIAutonomyCard';
+import BackupDestinationsCard from '@/components/BackupDestinationsCard';
 import DiagnosticsCard from '@/components/DiagnosticsCard';
 import OrgWebhooksCard from '@/components/OrgWebhooksCard';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
@@ -799,6 +800,7 @@ const Settings = () => {
         <CardBoundary name="Diagnostics"><DiagnosticsCard /></CardBoundary>
         <CardBoundary name="System"><SystemCard /></CardBoundary>
         <CardBoundary name="Backup & Restore"><BackupCard /></CardBoundary>
+        <CardBoundary name="Off-host backups"><BackupDestinationsCard /></CardBoundary>
         <CardBoundary name="VS Code"><VSCodeCard /></CardBoundary>
 
       </main>
