@@ -39,6 +39,8 @@ from watchtower.database import (
     ManagedDatabaseBackup,
     ManagedDatabaseReplica,
     ManagedDatabaseStatus,
+    Project,
+    ProjectDatabaseLink,
     ReplicaRole,
     ReplicaStatus,
     get_db,
@@ -230,6 +232,27 @@ class CreateRequest(BaseModel):
             "auto-pick a free port."
         ),
     )
+    # Plug-and-play one-click wiring: create the DB AND link it to a project
+    # so the connection string is auto-injected into that project's deploy
+    # environment — no separate "create link" step. Omit to skip linking.
+    link_project_id: Optional[str] = Field(
+        default=None,
+        description="If set, auto-wire this DB into the project's env on create.",
+    )
+    link_env_var_name: str = Field(
+        default="DATABASE_URL",
+        description="Env var the connection string is injected as when link_project_id is set.",
+    )
+    # Data-safety from day one: install a default daily backup schedule on
+    # create so the DB is protected without a separate setup step.
+    auto_backup: bool = Field(
+        default=False,
+        description="If true, set up a daily backup schedule on create.",
+    )
+    auto_backup_cron: str = Field(
+        default="0 3 * * *",  # 03:00 UTC daily — quiet hours, off-peak
+        description="Cron (UTC) for the auto-backup schedule when auto_backup is true.",
+    )
 
 
 def _validate_create_input(body: CreateRequest) -> None:
@@ -269,6 +292,11 @@ class CreateResponse(BaseModel):
     username: str
     password: str  # plaintext — once
     connection_string: str
+    # Populated when link_project_id was supplied and the auto-wire succeeded.
+    linked_project_id: Optional[str] = None
+    linked_env_var_name: Optional[str] = None
+    # Set to the active cron when auto_backup was requested and scheduled.
+    backup_schedule_cron: Optional[str] = None
 
 
 class ManagedDbResponse(BaseModel):
@@ -707,7 +735,37 @@ async def create_database(
             "port": row.port,
         },
     )
+
+    # Plug-and-play auto-wire: if a project was named, link the DB now so its
+    # connection string is injected into that project's deploy env (builder.py
+    # reads ProjectDatabaseLink at build time). Best-effort — a link failure
+    # must NOT roll back the successfully-created database.
+    linked_project_id: Optional[str] = None
+    linked_env_var_name: Optional[str] = None
+    if body.link_project_id:
+        linked_project_id, linked_env_var_name = _auto_link_to_project(
+            db, current_user, request, row, org_id,
+            body.link_project_id, body.link_env_var_name,
+        )
+
+    # Auto-backup: persist a default schedule on the row now. Validation is
+    # best-effort — a bad cron or unsupported engine just skips the schedule
+    # rather than failing the (already-created) database.
+    backup_schedule_cron: Optional[str] = None
+    if body.auto_backup:
+        backup_schedule_cron = _apply_auto_backup(
+            db, current_user, request, row, org_id, body.auto_backup_cron,
+        )
+
     db.commit()
+
+    # Register the live scheduler job AFTER commit so a saved schedule survives
+    # a scheduler hiccup (mirrors update_schedule's ordering).
+    if backup_schedule_cron:
+        try:
+            backup_scheduler.register_schedule(str(row.id), backup_schedule_cron)
+        except Exception:  # noqa: BLE001 — scheduler issue must not fail create
+            logger.exception("auto-backup: could not register scheduler job for %s", row.id)
 
     return CreateResponse(
         id=str(row.id),
@@ -721,6 +779,9 @@ async def create_database(
         username=row.username,
         password=password,
         connection_string=_conn_string(row, password),
+        linked_project_id=linked_project_id,
+        linked_env_var_name=linked_env_var_name,
+        backup_schedule_cron=backup_schedule_cron,
     )
 
 
@@ -902,6 +963,123 @@ async def import_database(
     db.commit()
 
     return _serialize(new_db)
+
+
+def _apply_auto_backup(
+    db: Session,
+    current_user: dict,
+    request: Request,
+    row: ManagedDatabase,
+    org_id,
+    cron: str,
+) -> Optional[str]:
+    """Persist a default backup schedule on *row*. Returns the cron on success,
+    None if the engine isn't supported or the cron is invalid (best-effort —
+    never raises out, so it can't fail an already-created database)."""
+    if row.engine not in backup.ENGINE_DUMP_FORMAT:
+        logger.info(
+            "auto-backup: engine %s not supported for scheduled backups; skipping",
+            row.engine,
+        )
+        return None
+    cron = (cron or "").strip()
+    try:
+        backup_scheduler.parse_cron_or_raise(cron)
+    except ValueError as exc:
+        logger.warning("auto-backup: invalid cron %r (%s); skipping", cron, exc)
+        return None
+
+    row.schedule_cron = cron
+    audit_log.record_for_user(
+        db, current_user,
+        action="managed_db.backup.schedule.update",
+        entity_type="managed_database",
+        entity_id=row.id,
+        org_id=org_id,
+        request=request,
+        extra={"name": row.name, "updated_fields": ["schedule_cron"], "auto_on_create": True},
+    )
+    return cron
+
+
+def _auto_link_to_project(
+    db: Session,
+    current_user: dict,
+    request: Request,
+    row: ManagedDatabase,
+    org_id,
+    project_id_raw: str,
+    env_var_name: str,
+) -> tuple[Optional[str], Optional[str]]:
+    """Create a ProjectDatabaseLink wiring *row* into the named project.
+
+    Returns (project_id, env_var_name) on success, (None, None) on any
+    recoverable problem (project not found, cross-org, env-var taken). The DB
+    itself is already created and committed-worthy; linking is additive, so we
+    never raise out of here — we just skip the link and let the UI show that
+    it wasn't wired.
+    """
+    try:
+        pid = util.to_uuid(project_id_raw)
+    except Exception:
+        logger.warning("auto-link: invalid project id %r", project_id_raw)
+        return None, None
+
+    project = db.query(Project).filter(Project.id == pid).first()
+    if not project:
+        logger.warning("auto-link: project %s not found", pid)
+        return None, None
+    if project.org_id != org_id:
+        logger.warning("auto-link: project %s is in a different org; refusing", pid)
+        return None, None
+
+    # Validate env var name (same rules as the standalone link endpoint).
+    name = (env_var_name or "DATABASE_URL").strip()
+    if not name or not (name[0].isalpha() or name[0] == "_") or not all(
+        c.isalnum() or c == "_" for c in name
+    ):
+        logger.warning("auto-link: invalid env var name %r", env_var_name)
+        return None, None
+
+    # Don't collide with an existing link on the same env var.
+    existing = db.query(ProjectDatabaseLink).filter(
+        ProjectDatabaseLink.project_id == project.id,
+        ProjectDatabaseLink.env_var_name == name,
+    ).first()
+    if existing:
+        logger.info(
+            "auto-link: project %s already has a link as %s; leaving it",
+            project.id, name,
+        )
+        return None, None
+
+    link = ProjectDatabaseLink(
+        project_id=project.id,
+        managed_database_id=row.id,
+        external_database_id=None,
+        env_var_name=name,
+        is_active=True,
+        notes="Auto-wired on database create",
+    )
+    db.add(link)
+    db.flush()
+    audit_log.record_for_user(
+        db, current_user,
+        action="project.database.link",
+        entity_type="project_database_link",
+        entity_id=link.id,
+        org_id=org_id,
+        request=request,
+        extra={
+            "project_id": str(project.id),
+            "project_name": project.name,
+            "database_kind": "managed",
+            "database_id": str(row.id),
+            "env_var_name": name,
+            "auto_wired": True,
+        },
+    )
+    return str(project.id), name
 
 
 @router.get("/{db_id}", response_model=ManagedDbResponse)
@@ -1889,6 +2067,41 @@ async def delete_backup(
     db.delete(row)
     db.commit()
     return {"ok": True, "id": str(backup_id)}
+
+
+# ── Test connection ─────────────────────────────────────────────────────────
+
+
+class TestConnectionResponse(BaseModel):
+    ok: bool
+    message: str
+
+
+@router.post("/{db_id}/test-connection", response_model=TestConnectionResponse)
+async def test_connection(
+    db_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(util.get_current_user),
+) -> TestConnectionResponse:
+    """Run a single authenticated probe against the database so the operator
+    can confirm it's reachable right after creating it. Decrypts the password
+    server-side and execs the engine's readiness check inside the container —
+    the plaintext never leaves the host."""
+    row = _get_or_404(db, db_id)
+    if row.status != ManagedDatabaseStatus.RUNNING:
+        return TestConnectionResponse(
+            ok=False,
+            message=f"Database is {row.status.value}, not running. Start it, then test again.",
+        )
+    password = util.decrypt_secret(row.password_encrypted)
+    ok, message = runtime.probe_connection(
+        container=row.container_name,
+        engine=row.engine,
+        db_user=row.username,
+        db_password=password,
+        db_name=row.database_name,
+    )
+    return TestConnectionResponse(ok=ok, message=message)
 
 
 # ── Schedule (v1.1: cron-driven scheduled backups) ──────────────────────────

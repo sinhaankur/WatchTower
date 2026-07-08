@@ -66,11 +66,15 @@ PRO_FEATURES: dict[str, dict[str, str]] = {
 
 
 # Features temporarily unlocked on the Free tier. Product decision
-# 2026-06-12: let everyone use the audit log for a few weeks so the
-# feature gets real usage before billing lands. Re-gate by removing the
-# key from this set — the route gate AND the UI lock both follow
-# automatically (the SPA reads `unlocked` from /api/edition).
-FREE_PREVIEW_FEATURES: set[str] = {"audit-log"}
+# 2026-07-02 product decision: EVERYTHING is free while WatchTower is
+# in beta — every Pro feature key ships in the preview set, so the
+# whole application is usable without a license and we collect real
+# usage across the entire surface before billing lands. When paid Pro
+# launches, re-gate by trimming this set — the route gates AND the UI
+# locks all follow automatically (the SPA reads `unlocked` from
+# /api/edition). The 402 mechanism itself stays regression-tested with
+# the set monkeypatched empty (tests/test_audit.py).
+FREE_PREVIEW_FEATURES: set[str] = set(PRO_FEATURES)
 
 
 def _feature_unlocked(feature_key: str) -> bool:

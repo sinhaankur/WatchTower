@@ -231,7 +231,7 @@ function ProviderCard({
           <button
             onClick={doEnable}
             disabled={busy}
-            className="px-3 py-1.5 rounded-lg bg-red-700 hover:bg-red-800 text-white text-xs font-medium border border-slate-800 shadow-[2px_2px_0_0_#1f2937] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="px-3 py-1.5 rounded-lg bg-primary hover:bg-primary/90 text-white text-xs font-medium border border-border shadow-retro disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {enable.isPending ? 'Enabling…' : `Enable ${provider.name}`}
           </button>

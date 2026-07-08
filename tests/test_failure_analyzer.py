@@ -200,6 +200,141 @@ def test_disk_full_beats_permission_denied_when_both_present():
     assert d.kind == FailureKind.DISK_FULL
 
 
+def test_build_error_nextjs_type_error_with_ansi_codes():
+    # Verbatim shape of a real failure (portfolio-test, 2026-07-02):
+    # Next.js 16 `next build` type-check failure, ANSI color codes and
+    # all. The classifier must strip the escapes and pull out file:line.
+    log = (
+        "✓ Compiled successfully in 4.0s\n"
+        "  Running TypeScript ...\n"
+        "Failed to type check.\n"
+        "\n"
+        "./components/universe-engine/index.tsx:633:16\n"
+        "Type error: 'React' refers to a UMD global, but the current file is a module. Consider adding an import instead.\n"
+        "\n"
+        "  \x1b[90m631 |\x1b[0m \x1b[90m */\x1b[0m\n"
+        "\x1b[31m\x1b[1m>\x1b[0m \x1b[90m633 |\x1b[0m   \x1b[36mconst\x1b[0m base = \x1b[33mReact\x1b[0m.useRef(...)\n"
+        "Next.js build worker exited with code: 1 and signal: null\n"
+        "[WatchTower] ❌ Build command failed: exit code 1\n"
+    )
+    d = classify_failure(log)
+    assert d.kind == FailureKind.BUILD_ERROR
+    assert d.extracted["file"] == "./components/universe-engine/index.tsx"
+    assert d.extracted["line"] == "633"
+    assert "UMD global" in d.extracted["message"]
+    assert "./components/universe-engine/index.tsx:633" in d.cause
+    assert d.fix.auto_applicable is False
+
+
+def test_build_error_tsc_plain_format():
+    log = "src/lib/api.ts(41,7): error TS2304: Cannot find name 'Requester'."
+    d = classify_failure(log)
+    assert d.kind == FailureKind.BUILD_ERROR
+    assert d.extracted["file"] == "src/lib/api.ts"
+    assert d.extracted["line"] == "41"
+
+
+def test_build_error_esbuild():
+    log = '✘ [ERROR] Expected ")" but found "{"\n\n    src/main.jsx:12:20:\n'
+    d = classify_failure(log)
+    assert d.kind == FailureKind.BUILD_ERROR
+    assert 'Expected ")"' in d.extracted["message"]
+
+
+def test_build_error_go_compile():
+    log = "# example.com/app\ncmd/server/main.go:27:14: undefined: NewRouter\n"
+    d = classify_failure(log)
+    assert d.kind == FailureKind.BUILD_ERROR
+    assert d.extracted["file"] == "cmd/server/main.go"
+    assert d.extracted["line"] == "27"
+
+
+def test_build_error_rust_with_location():
+    log = (
+        "error[E0308]: mismatched types\n"
+        " --> src/main.rs:5:9\n"
+        "  |\n"
+    )
+    d = classify_failure(log)
+    assert d.kind == FailureKind.BUILD_ERROR
+    assert d.extracted["file"] == "src/main.rs"
+    assert d.extracted["line"] == "5"
+
+
+def test_build_error_python_syntax_error():
+    log = (
+        '  File "/build/app/models.py", line 88\n'
+        "    def save(self:\n"
+        "SyntaxError: invalid syntax\n"
+    )
+    d = classify_failure(log)
+    assert d.kind == FailureKind.BUILD_ERROR
+
+
+def test_tool_missing_bash_command_not_found():
+    log = "[WatchTower] Running build: pnpm install && pnpm build\n/bin/bash: line 1: pnpm: command not found\n[WatchTower] ❌ Build command failed: exit code 127\n"
+    d = classify_failure(log)
+    assert d.kind == FailureKind.TOOL_MISSING
+    assert d.extracted["tool"] == "pnpm"
+    # The fix must name the exact install command — "what is missing and
+    # how to fix it" is the product's failure-UX contract.
+    assert "npm install -g pnpm" in d.fix.description
+    assert "Settings → System" in d.fix.description
+
+
+def test_tool_missing_node_spawn_enoent():
+    log = "Error: spawn podman ENOENT\n    at ChildProcess._handle.onexit"
+    d = classify_failure(log)
+    assert d.kind == FailureKind.TOOL_MISSING
+    assert d.extracted["tool"] == "podman"
+    assert "brew install podman" in d.fix.description
+
+
+def test_tool_missing_windows_not_recognized():
+    log = "'yarn' is not recognized as an internal or external command,\noperable program or batch file."
+    d = classify_failure(log)
+    assert d.kind == FailureKind.TOOL_MISSING
+    assert d.extracted["tool"] == "yarn"
+
+
+def test_tool_missing_unknown_tool_still_helpful():
+    log = "/bin/sh: 1: watchamacallit: not found"
+    d = classify_failure(log)
+    assert d.kind == FailureKind.TOOL_MISSING
+    assert d.extracted["tool"] == "watchamacallit"
+    # No canned install hint for unknown tools, but the diagnosis still
+    # points at the in-app installer surface.
+    assert "Settings → System" in d.fix.description
+
+
+def test_artifact_missing_rsync_lstat():
+    # Verbatim shape from a real installation (portfolio-test, hit 3×):
+    # the build succeeded but the configured publish dir was never
+    # produced, so the deploy-stage rsync fails stat'ing it.
+    log = (
+        "[127.0.0.1] [rsync] → /tmp/watchtower-portfolio-test/ (local)\n"
+        "[127.0.0.1] [rsync] rsync(31665): error: /tmp/watchtower-builds/b7d1/repo/dist/: (l)stat: No such file or directory\n"
+        "[WatchTower] ❌ Deploy failed on 1/1 node(s)\n"
+    )
+    d = classify_failure(log)
+    assert d.kind == FailureKind.ARTIFACT_MISSING
+    assert d.extracted["folder"] == "dist"
+    assert "'dist/'" in d.cause
+    # The fix must teach the publish-dir concept, naming the common
+    # framework outputs so the user can self-serve the correction.
+    assert "publish directory" in d.fix.description
+    assert "Next.js" in d.fix.description
+
+
+def test_package_not_found_beats_build_error():
+    # "Cannot find module" is technically a build failure, but the
+    # missing-package class has the more actionable fix (add the dep),
+    # so it must keep winning over the generic code-error class.
+    log = "Error: Cannot find module 'left-pad'\nType error: something downstream"
+    d = classify_failure(log)
+    assert d.kind == FailureKind.PACKAGE_NOT_FOUND
+
+
 def test_unknown_for_unmatched_log():
     log = "Build completed normally. Tagging image as v1.5.15. Pushing to registry..."
     d = classify_failure(log)

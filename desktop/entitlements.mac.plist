@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  macOS hardened-runtime entitlements for the WatchTower Electron app.
+
+  Required for Apple notarization (notarized apps MUST run under the hardened
+  runtime, which by default forbids the things Electron/V8 need). These are the
+  standard, minimal Electron entitlements:
+
+  - allow-jit / allow-unsigned-executable-memory / disable-library-validation:
+    V8 JITs JavaScript and Electron loads its own (separately-signed) frameworks
+    and the bundled Python; without these the app crashes on launch under
+    hardened runtime.
+  - inherit: child processes (the spawned Python backend, GPU/renderer helpers)
+    inherit the parent's entitlements instead of needing their own.
+
+  We do NOT request network-server/client sandbox entitlements: the app is not
+  App-Sandboxed (it's a developer tool that shells out to podman/ssh/git), and
+  Developer-ID notarization doesn't require the sandbox.
+-->
+<plist version="1.0">
+<dict>
+  <key>com.apple.security.cs.allow-jit</key>
+  <true/>
+  <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+  <true/>
+  <key>com.apple.security.cs.disable-library-validation</key>
+  <true/>
+  <key>com.apple.security.cs.allow-dyld-environment-variables</key>
+  <true/>
+  <key>com.apple.security.inherit</key>
+  <true/>
+</dict>
+</plist>

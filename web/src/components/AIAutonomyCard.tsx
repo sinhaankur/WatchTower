@@ -103,7 +103,7 @@ function InterventionRow({ action }: { action: HealingAction }) {
         <button
           onClick={() => void act('approve')}
           disabled={busyVerb !== null}
-          className="text-xs px-3 py-1 rounded-lg border border-slate-800 bg-amber-400 hover:bg-amber-500 text-slate-900 font-semibold shadow-[1px_1px_0_0_#1f2937] disabled:opacity-50"
+          className="text-xs px-3 py-1 rounded-lg border border-border bg-amber-400 hover:bg-amber-500 text-slate-900 font-semibold shadow-retro disabled:opacity-50"
         >
           {busyVerb === 'approve'
             ? 'Working…'
@@ -160,17 +160,20 @@ export default function AIAutonomyCard() {
         api_key: apiKey || undefined,
       });
       if (result.ok) {
-        setModels(result.models);
+        // Guard against a server that returns ok without a models array —
+        // otherwise `models.map` later crashes the whole Settings page.
+        const modelList = Array.isArray(result.models) ? result.models : [];
+        setModels(modelList);
         // Auto-pick the first model so "Test → Save" is a two-click flow
         // when the current model isn't served by this endpoint.
-        if (result.models.length > 0 && !result.models.includes(model)) {
-          setModel(result.models[0]);
+        if (modelList.length > 0 && !modelList.includes(model)) {
+          setModel(modelList[0]);
           setDirty(true);
         }
         setTestResult({
           ok: true,
-          msg: result.models.length > 0
-            ? `Connected — ${result.models.length} model${result.models.length === 1 ? '' : 's'} available`
+          msg: modelList.length > 0
+            ? `Connected — ${modelList.length} model${modelList.length === 1 ? '' : 's'} available`
             : 'Connected, but the server reported no models. Load one in your LLM app first.',
         });
       } else {
@@ -209,10 +212,10 @@ export default function AIAutonomyCard() {
   const pending = pendingActions ?? [];
 
   return (
-    <div className="rounded-xl border border-slate-800 bg-card p-5 shadow-[2px_2px_0_0_#1f2937]">
+    <div className="rounded-xl border border-border bg-card p-5 shadow-retro">
       {/* Header */}
       <div className="flex items-center gap-3 mb-4">
-        <div className="w-9 h-9 rounded-lg border border-slate-800 bg-purple-600 flex items-center justify-center shadow-[1px_1px_0_0_#1f2937]">
+        <div className="w-9 h-9 rounded-lg border border-border bg-purple-600 flex items-center justify-center shadow-retro">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M12 2a4 4 0 0 1 4 4c0 1.1-.45 2.1-1.17 2.83L12 12l-2.83-3.17A4 4 0 0 1 12 2z" />
             <circle cx="12" cy="17" r="5" />
@@ -249,7 +252,7 @@ export default function AIAutonomyCard() {
               }}
               className={`text-xs px-3 py-1 rounded-full border transition-colors ${
                 activePreset === p.id
-                  ? 'border-slate-800 bg-slate-900 text-white'
+                  ? 'border-border bg-slate-900 text-white'
                   : 'border-slate-300 text-slate-600 hover:border-slate-500 hover:text-slate-900'
               }`}
             >
@@ -315,7 +318,7 @@ export default function AIAutonomyCard() {
             <button
               onClick={() => void handleSave()}
               disabled={updateConfig.isPending || !dirty}
-              className="text-xs px-4 py-2 rounded-lg border border-slate-800 bg-amber-400 hover:bg-amber-500 text-slate-900 font-semibold shadow-[1px_1px_0_0_#1f2937] disabled:opacity-50"
+              className="text-xs px-4 py-2 rounded-lg border border-border bg-amber-400 hover:bg-amber-500 text-slate-900 font-semibold shadow-retro disabled:opacity-50"
             >
               {updateConfig.isPending ? 'Saving…' : 'Save'}
             </button>
@@ -415,12 +418,12 @@ export default function AIAutonomyCard() {
                 onError: (err) => toast.error(extractDetail(err, 'Could not update autonomy setting')),
               });
             }}
-            className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full border border-slate-800 transition-colors disabled:opacity-50 ${
-              autonomous ? 'bg-emerald-500' : 'bg-slate-300'
+            className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full border border-border transition-colors disabled:opacity-50 ${
+              autonomous ? 'bg-emerald-500' : 'bg-border'
             }`}
           >
             <span
-              className={`inline-block h-4 w-4 transform rounded-full bg-white border border-slate-800 transition-transform ${
+              className={`inline-block h-4 w-4 transform rounded-full bg-white border border-border transition-transform ${
                 autonomous ? 'translate-x-6' : 'translate-x-1'
               }`}
             />

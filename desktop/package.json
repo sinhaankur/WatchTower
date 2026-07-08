@@ -1,6 +1,6 @@
 {
   "name": "watchtower-desktop",
-  "version": "1.16.3",
+  "version": "1.17.4",
   "private": true,
   "description": "WatchTower Desktop",
   "author": {
@@ -20,11 +20,11 @@
     "dist": "electron-builder"
   },
   "dependencies": {
-    "electron-updater": "^6.3.9"
+    "electron-updater": "^6.8.9"
   },
   "devDependencies": {
-    "electron": "^31.7.7",
-    "electron-builder": "^24.13.3",
+    "electron": "^43.0.0",
+    "electron-builder": "^26.15.3",
     "icon-gen": "^5.0.0"
   },
   "build": {
@@ -79,7 +79,12 @@
         "dmg",
         "zip"
       ],
-      "category": "public.app-category.developer-tools"
+      "category": "public.app-category.developer-tools",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "entitlements.mac.plist",
+      "entitlementsInherit": "entitlements.mac.plist",
+      "notarize": false
     },
     "linux": {
       "maintainer": "The WatchTower Authors <opensource@sinhaankur.dev>",
@@ -90,9 +95,11 @@
       ],
       "category": "Development",
       "desktop": {
-        "Name": "WatchTower",
-        "Comment": "WatchTower deployment desktop",
-        "Categories": "Development;Utility;"
+        "entry": {
+          "Name": "WatchTower",
+          "Comment": "WatchTower deployment desktop",
+          "Categories": "Development;Utility;"
+        }
       }
     },
     "win": {

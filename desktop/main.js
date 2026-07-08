@@ -238,6 +238,27 @@ if [ -z "$MOUNT_POINT" ] || [ ! -d "$MOUNT_POINT/WatchTower.app" ]; then
 fi
 echo "Mounted at $MOUNT_POINT"
 
+# Ground-truth OS guard: read the downloaded bundle's own minimum-macOS
+# requirement and refuse the swap if this machine can't run it. The
+# latest-mac.yml minimumSystemVersion field should stop us ever getting
+# here (electron-updater skips such updates), but that field is injected
+# by CI and a future Electron bump could forget to raise it — replacing
+# a working app with one Gatekeeper refuses to launch is the one failure
+# mode this script must never allow.
+NEW_MIN=$(/usr/libexec/PlistBuddy -c 'Print :LSMinimumSystemVersion' "$MOUNT_POINT/WatchTower.app/Contents/Info.plist" 2>/dev/null || echo "")
+OS_VER=$(sw_vers -productVersion)
+if [ -n "$NEW_MIN" ]; then
+  HIGHEST=$(printf '%s\\n%s\\n' "$NEW_MIN" "$OS_VER" | sort -V | tail -1)
+  if [ "$HIGHEST" = "$NEW_MIN" ] && [ "$NEW_MIN" != "$OS_VER" ]; then
+    echo "ERROR: update requires macOS $NEW_MIN but this Mac runs $OS_VER — keeping current version"
+    hdiutil detach "$MOUNT_POINT" 2>/dev/null || true
+    rm -f "${dmgPath}"
+    osascript -e "display notification \\"This update needs macOS $NEW_MIN or newer. Keeping your current version.\\" with title \\"WatchTower update skipped\\"" 2>/dev/null || true
+    open "${appPath}"
+    exit 1
+  fi
+fi
+
 # Replace /Applications/WatchTower.app. If the user installed via drag-drop
 # the .app is user-writable — we can rm/cp directly. If they used sudo cp
 # (root-owned), prompt for admin via osascript.
@@ -386,7 +407,7 @@ function checkForAppUpdates(win) {
         title: 'WatchTower update ready',
         message: `Version ${info.version} is ready to install.`,
         detail: isMac
-          ? 'Click Restart and Install to apply now. If the restart fails to update (unsigned macOS builds occasionally fail to overwrite the app), use Download Manually to grab the installer from GitHub.'
+          ? 'Click Restart and Install — WatchTower will download the update, replace itself, and reopen automatically. (If anything goes wrong, Download Manually grabs the installer from GitHub.)'
           : 'Click Restart and Install to apply the update now.',
         buttons,
         defaultId: 0,
@@ -398,10 +419,24 @@ function checkForAppUpdates(win) {
           // Other platforms: trust electron-updater since they're either
           // signed (Windows NSIS) or use a different install model (Linux).
           if (isMac) {
+            // Show download progress so the ~140 MB DMG fetch doesn't look
+            // like the app froze. Drives the native dock progress bar (no
+            // extra window) and a lightweight tray tooltip — then clears it
+            // when the self-replace script takes over and the app quits.
+            const progWin = mainWindow && !mainWindow.isDestroyed() ? mainWindow : null;
+            const onProgress = (frac) => {
+              if (progWin) progWin.setProgressBar(frac > 0 && frac < 1 ? frac : -1);
+              try {
+                if (tray && !tray.isDestroyed?.()) {
+                  tray.setToolTip(`WatchTower — downloading update ${Math.round(frac * 100)}%`);
+                }
+              } catch { /* tray optional */ }
+            };
             try {
-              await applyMacUpdate(info.version, mainWindow);
+              await applyMacUpdate(info.version, mainWindow, onProgress);
             } catch (err) {
               console.warn('[WatchTower] applyMacUpdate failed:', err.message);
+              if (progWin) progWin.setProgressBar(-1);
               shell.openExternal(releaseUrl);
             }
             return;
@@ -2618,7 +2653,7 @@ function fetchLatestReleaseTag() {
 
 async function launch() {
   createSplash();
-  setSplashStatus('Checking environment', 5);
+  setSplashStatus('Getting things ready', 5);
 
   const backendHealthUrl = `http://${HOST}:${BACKEND_PORT}/health`;
 
@@ -2628,9 +2663,9 @@ async function launch() {
   // slow disk. The default 45s was too tight: users on SD-card-backed
   // Pis or HDD-backed laptops would hit a timeout on first launch only.
   try {
-    setSplashStatus('Looking for an existing backend', 10);
+    setSplashStatus('Checking for a running copy', 10);
     await waitForUrl(backendHealthUrl, 1200);
-    setSplashStatus('Backend already running', 70);
+    setSplashStatus('Found it — connecting', 70);
   } catch {
     // Port-in-use auto-fallback: if 8000 is taken (Docker Desktop,
     // jupyter, leftover WatchTower from a crashed prior run), probe
@@ -2668,12 +2703,12 @@ async function launch() {
       BACKEND_PORT = chosenPort;
       setSplashStatus(`Port ${BACKEND_PORT_DEFAULT} was busy — using port ${chosenPort} instead`, 20);
     }
-    setSplashStatus('Starting WatchTower backend', 25);
+    setSplashStatus('Starting the engine', 25);
     await startBackend();
-    setSplashStatus('Loading database (this can take up to 90s on first launch)', 50);
+    setSplashStatus('Preparing your data — first launch can take a minute', 50);
     // Re-derive the URL since BACKEND_PORT may have just changed.
     await waitForUrl(`http://${HOST}:${BACKEND_PORT}/health`, 120000);
-    setSplashStatus('Backend ready', 80);
+    setSplashStatus('Almost there', 80);
   }
 
   // The FastAPI backend already serves the React SPA from web/dist
@@ -2702,7 +2737,7 @@ async function launch() {
     }
   }
 
-  setSplashStatus('Loading interface', 90);
+  setSplashStatus('Opening your dashboard', 90);
   const win = createMainWindow();
 
   // Helper: close splash and show the main window (idempotent).

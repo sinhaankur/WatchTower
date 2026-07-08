@@ -20,6 +20,7 @@ import {
 import {
   type BackupSchedule,
   type DetectedDatabase,
+  type DiscoveredDb,
   type ExternalDatabase,
   type ManagedDatabase,
   type ManagedDatabaseCreateResponse,
@@ -28,6 +29,7 @@ import {
   useAddReplica,
   useTailscalePeers,
   type TailscalePeer,
+  useDiscoverLocalDatabases,
   useBackupSchedule,
   useCreateBackup,
   useImportDatabase,
@@ -50,8 +52,10 @@ import {
   useRevealExternalDatabase,
   useRevealManagedDatabase,
   useScanDatabases,
+  useProjects,
   useStartManagedDatabase,
   useStopManagedDatabase,
+  useTestManagedDbConnection,
 } from '@/hooks/queries';
 
 type Tab = 'managed' | 'external';
@@ -92,7 +96,7 @@ export default function ManagedDatabases() {
             <button
               onClick={() => setShowCreate(true)}
               disabled={!runtime?.available}
-              className="px-3 sm:px-4 py-1.5 rounded-lg bg-red-700 hover:bg-red-800 text-white text-xs sm:text-sm font-medium transition-colors border border-slate-800 shadow-[2px_2px_0_0_#1f2937] disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-3 sm:px-4 py-1.5 rounded-lg bg-primary hover:bg-primary/90 text-white text-xs sm:text-sm font-medium transition-colors border border-border shadow-retro disabled:opacity-50 disabled:cursor-not-allowed"
               title={runtime?.available ? '' : 'Install Podman or Docker first'}
             >
               + New Database
@@ -100,7 +104,7 @@ export default function ManagedDatabases() {
           ) : (
             <button
               onClick={() => setShowCreateExternal(true)}
-              className="px-3 sm:px-4 py-1.5 rounded-lg bg-red-700 hover:bg-red-800 text-white text-xs sm:text-sm font-medium transition-colors border border-slate-800 shadow-[2px_2px_0_0_#1f2937]"
+              className="px-3 sm:px-4 py-1.5 rounded-lg bg-primary hover:bg-primary/90 text-white text-xs sm:text-sm font-medium transition-colors border border-border shadow-retro"
             >
               + Connect External
             </button>
@@ -172,7 +176,7 @@ function TabButton({
       onClick={onClick}
       className={`px-4 py-2 text-xs font-medium transition-colors border-b-2 -mb-px ${
         active
-          ? 'border-red-700 text-red-700'
+          ? 'border-primary text-red-700'
           : 'border-transparent text-slate-600 hover:text-slate-900'
       }`}
     >
@@ -462,7 +466,7 @@ function ExternalDatabaseCard({ db }: { db: ExternalDatabase }) {
                 del.mutate(db.id, { onError: handleErr });
               }}
               disabled={del.isPending}
-              className="px-3 py-1 rounded-md bg-red-700 hover:bg-red-800 text-white text-xs font-medium disabled:opacity-50"
+              className="px-3 py-1 rounded-md bg-primary hover:bg-primary/90 text-white text-xs font-medium disabled:opacity-50"
             >
               {del.isPending ? 'Removing…' : 'Confirm remove'}
             </button>
@@ -520,7 +524,7 @@ function ExternalCredentialsModal({
       <div className="mt-5 flex items-center justify-end">
         <button
           onClick={onClose}
-          className="px-4 py-1.5 rounded-lg bg-red-700 hover:bg-red-800 text-white text-xs font-medium border border-slate-800 shadow-[2px_2px_0_0_#1f2937]"
+          className="px-4 py-1.5 rounded-lg bg-primary hover:bg-primary/90 text-white text-xs font-medium border border-border shadow-retro"
         >
           Done
         </button>
@@ -531,6 +535,7 @@ function ExternalCredentialsModal({
 
 function CreateExternalModal({ onClose }: { onClose: () => void }) {
   const { data: engines } = useManagedDbEngines();
+  const { data: discovered } = useDiscoverLocalDatabases();
   const [name, setName] = useState('');
   const [engineId, setEngineId] = useState('postgres');
   const [host, setHost] = useState('');
@@ -579,12 +584,52 @@ function CreateExternalModal({ onClose }: { onClose: () => void }) {
     );
   };
 
+  // Pre-fill the form from a discovered local DB container — the user then
+  // just adds the password and saves.
+  const adopt = (d: DiscoveredDb) => {
+    setName(d.container_name);
+    onEngineChange(d.engine);
+    setHost(d.suggested_host || '127.0.0.1');
+    if (d.suggested_port) setPort(d.suggested_port);
+    if (d.suggested_username) setUsername(d.suggested_username);
+    setUseTls(false); // local containers are plaintext on loopback
+  };
+
+  const adoptable = (discovered ?? []).filter((d) => !d.already_connected);
+
   return (
     <Modal onClose={onClose}>
       <h2 className="text-base font-semibold text-slate-900">Connect external database</h2>
       <p className="text-xs text-slate-600 mt-1">
         Point WatchTower at a database you already run. Credentials are encrypted at rest.
       </p>
+
+      {adoptable.length > 0 && (
+        <div className="mt-3 rounded-lg border border-border-soft bg-surface-soft p-3">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-2">
+            Found on this PC
+          </p>
+          <div className="space-y-1.5">
+            {adoptable.map((d) => (
+              <div key={d.container_id} className="flex items-center gap-2 text-xs">
+                <span className={`inline-block w-1.5 h-1.5 rounded-full shrink-0 ${d.state === 'running' ? 'bg-emerald-500' : 'bg-slate-400'}`} />
+                <span className="font-mono text-foreground truncate">{d.container_name}</span>
+                <span className="text-muted-foreground">· {d.engine}{d.suggested_port ? ` :${d.suggested_port}` : ''}</span>
+                <button
+                  type="button"
+                  onClick={() => adopt(d)}
+                  className="ml-auto px-2 py-0.5 rounded border border-border bg-card text-foreground hover:bg-muted transition-colors shrink-0"
+                >
+                  Adopt
+                </button>
+              </div>
+            ))}
+          </div>
+          <p className="text-[10px] text-muted-foreground mt-2">
+            Adopt pre-fills the form — just add the password and save.
+          </p>
+        </div>
+      )}
 
       <div className="mt-4 space-y-3">
         <Field label="Name">
@@ -694,7 +739,7 @@ function CreateExternalModal({ onClose }: { onClose: () => void }) {
         <button
           onClick={submit}
           disabled={create.isPending}
-          className="px-4 py-1.5 rounded-lg bg-red-700 hover:bg-red-800 text-white text-xs font-medium border border-slate-800 shadow-[2px_2px_0_0_#1f2937] disabled:opacity-50"
+          className="px-4 py-1.5 rounded-lg bg-primary hover:bg-primary/90 text-white text-xs font-medium border border-border shadow-retro disabled:opacity-50"
         >
           {create.isPending ? 'Saving…' : 'Save connection'}
         </button>
@@ -755,7 +800,7 @@ function DatabaseCard({ db }: { db: ManagedDatabase }) {
               start.mutate(db.id, { onError: handleErr });
             }}
             disabled={busy}
-            className="px-3 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-medium border border-slate-800 shadow-[2px_2px_0_0_#1f2937] disabled:opacity-50"
+            className="px-3 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-medium border border-border shadow-retro disabled:opacity-50"
           >
             Start
           </button>
@@ -820,7 +865,7 @@ function DatabaseCard({ db }: { db: ManagedDatabase }) {
                 );
               }}
               disabled={del.isPending}
-              className="px-3 py-1 rounded-md bg-red-700 hover:bg-red-800 text-white text-xs font-medium disabled:opacity-50"
+              className="px-3 py-1 rounded-md bg-primary hover:bg-primary/90 text-white text-xs font-medium disabled:opacity-50"
             >
               {del.isPending ? 'Deleting…' : 'Confirm delete'}
             </button>
@@ -1008,9 +1053,9 @@ function ReplicasSection({ primaryDb }: { primaryDb: ManagedDatabase }) {
               Postgres streaming replication — local pod on this PC, or remote machine via Tailscale.
             </p>
             <button
-              onClick={() => setShowAddModal(true)}
-              disabled={primaryDb.status !== 'running'}
-              className="px-3 py-1 rounded-md bg-red-700 hover:bg-red-800 text-white text-[11px] font-medium border border-slate-800 shadow-[2px_2px_0_0_#1f2937] disabled:opacity-50 disabled:cursor-not-allowed"
+              onClick={onAdd}
+              disabled={add.isPending || primaryDb.status !== 'running'}
+              className="px-3 py-1 rounded-md bg-primary hover:bg-primary/90 text-white text-[11px] font-medium border border-border shadow-retro disabled:opacity-50 disabled:cursor-not-allowed"
               title={primaryDb.status !== 'running' ? 'Primary must be running' : ''}
             >
               + Add standby
@@ -1164,7 +1209,7 @@ function ReplicaRow({
                 });
               }}
               disabled={busy}
-              className="px-2 py-1 rounded-md bg-red-700 hover:bg-red-800 text-white text-[11px] font-medium disabled:opacity-50"
+              className="px-2 py-1 rounded-md bg-primary hover:bg-primary/90 text-white text-[11px] font-medium disabled:opacity-50"
             >
               {remove.isPending ? 'Removing…' : 'Confirm remove'}
             </button>
@@ -1272,7 +1317,7 @@ function BackupsSection({ primaryDb }: { primaryDb: ManagedDatabase }) {
             <button
               onClick={onCreate}
               disabled={create.isPending || primaryDb.status !== 'running'}
-              className="px-3 py-1.5 rounded-md bg-red-700 hover:bg-red-800 text-white text-[11px] font-medium border border-slate-800 shadow-[2px_2px_0_0_#1f2937] disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+              className="px-3 py-1.5 rounded-md bg-primary hover:bg-primary/90 text-white text-[11px] font-medium border border-border shadow-retro disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
               title={primaryDb.status !== 'running' ? 'Database must be running' : ''}
             >
               {create.isPending ? 'Backing up…' : 'Backup now'}
@@ -1389,7 +1434,7 @@ function BackupRow({
               });
             }}
             disabled={busy}
-            className="px-2 py-1 rounded-md bg-red-700 hover:bg-red-800 text-white text-[11px] font-medium disabled:opacity-50"
+            className="px-2 py-1 rounded-md bg-primary hover:bg-primary/90 text-white text-[11px] font-medium disabled:opacity-50"
           >
             {del.isPending ? 'Deleting…' : 'Confirm'}
           </button>
@@ -1784,11 +1829,15 @@ function CreateModal({
   onCreated: (resp: ManagedDatabaseCreateResponse) => void;
 }) {
   const { data: engines } = useManagedDbEngines();
+  const { data: projects } = useProjects();
   const [name, setName] = useState('');
   const [engineId, setEngineId] = useState<string>('postgres');
   const [version, setVersion] = useState<string>('16');
   const [databaseName, setDatabaseName] = useState('appdb');
   const [username, setUsername] = useState('watchtower');
+  const [linkProjectId, setLinkProjectId] = useState<string>('');
+  const [linkEnvVar, setLinkEnvVar] = useState<string>('DATABASE_URL');
+  const [autoBackup, setAutoBackup] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
   const create = useCreateManagedDatabase();
@@ -1821,6 +1870,12 @@ function CreateModal({
         version,
         database_name: isRedis ? 'appdb' : databaseName,
         username: isRedis ? 'watchtower' : username,
+        // Plug-and-play: when a project is chosen, wire the connection
+        // string straight into its deploy env as link_env_var_name.
+        link_project_id: linkProjectId || undefined,
+        link_env_var_name: linkProjectId ? (linkEnvVar.trim() || 'DATABASE_URL') : undefined,
+        // Data safety: protect the DB from day one with a daily backup.
+        auto_backup: autoBackup,
       },
       {
         onSuccess: onCreated,
@@ -1902,6 +1957,53 @@ function CreateModal({
             Redis only uses a password for authentication — no database name or username needed.
           </p>
         )}
+
+        {/* Plug-and-play: optionally wire the connection string straight into
+            a project's deploy env so there's no separate "link" step. */}
+        <div className="pt-1 border-t border-border-soft">
+          <Field
+            label="Connect to a project (optional)"
+            hint="Auto-injects the connection string into that project's deploy environment."
+          >
+            <select
+              value={linkProjectId}
+              onChange={(e) => setLinkProjectId(e.target.value)}
+              className="w-full rounded-lg border border-border bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+            >
+              <option value="">Don't connect — just create the database</option>
+              {(projects ?? []).map((p) => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+          </Field>
+          {linkProjectId && (
+            <div className="mt-2">
+              <Field label="Inject as env var" hint="The project reads this on deploy.">
+                <input
+                  value={linkEnvVar}
+                  onChange={(e) => setLinkEnvVar(e.target.value)}
+                  placeholder="DATABASE_URL"
+                  className="w-full rounded-lg border border-border bg-white px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-ring"
+                />
+              </Field>
+            </div>
+          )}
+        </div>
+
+        {/* Data safety: default a daily backup on so the DB is protected from
+            day one. Off by hand if the user really wants no backups. */}
+        <label className="flex items-start gap-2.5 pt-1 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={autoBackup}
+            onChange={(e) => setAutoBackup(e.target.checked)}
+            className="mt-0.5 h-4 w-4 rounded border-border accent-[hsl(var(--primary))]"
+          />
+          <span className="text-xs text-foreground">
+            Back up automatically
+            <span className="text-muted-foreground"> — daily at 03:00 UTC, keeping the last 7. You can change this later.</span>
+          </span>
+        </label>
       </div>
 
       {error && (
@@ -1921,7 +2023,7 @@ function CreateModal({
         <button
           onClick={submit}
           disabled={create.isPending}
-          className="px-4 py-1.5 rounded-lg bg-red-700 hover:bg-red-800 text-white text-xs font-medium border border-slate-800 shadow-[2px_2px_0_0_#1f2937] disabled:opacity-50"
+          className="px-4 py-1.5 rounded-lg bg-primary hover:bg-primary/90 text-white text-xs font-medium border border-border shadow-retro disabled:opacity-50"
         >
           {create.isPending ? 'Creating…' : 'Create database'}
         </button>
@@ -1940,6 +2042,8 @@ function CredentialsModal({
   onClose: () => void;
 }) {
   const [copied, setCopied] = useState<string | null>(null);
+  const test = useTestManagedDbConnection();
+  const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(null);
   const copy = async (text: string, key: string) => {
     try {
       await navigator.clipboard.writeText(text);
@@ -1948,6 +2052,14 @@ function CredentialsModal({
     } catch {
       /* ignore */
     }
+  };
+
+  const runTest = () => {
+    setTestResult(null);
+    test.mutate(response.id, {
+      onSuccess: (r) => setTestResult(r),
+      onError: () => setTestResult({ ok: false, message: 'Could not run the connection test.' }),
+    });
   };
 
   return (
@@ -1984,10 +2096,30 @@ function CredentialsModal({
         </div>
       </div>
 
-      <div className="mt-5 flex items-center justify-end">
+      {/* Test connection — confirms the DB is reachable right after create. */}
+      {testResult && (
+        <div
+          className={`mt-4 rounded-lg border px-3 py-2 text-xs ${
+            testResult.ok
+              ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+              : 'border-red-200 bg-red-50 text-red-700'
+          }`}
+        >
+          {testResult.ok ? '✓ ' : '✗ '}{testResult.message}
+        </div>
+      )}
+
+      <div className="mt-5 flex items-center justify-between gap-2">
+        <button
+          onClick={runTest}
+          disabled={test.isPending}
+          className="px-4 py-1.5 rounded-lg border border-border bg-white text-xs font-medium text-foreground hover:bg-muted transition-colors disabled:opacity-50"
+        >
+          {test.isPending ? 'Testing…' : 'Test connection'}
+        </button>
         <button
           onClick={onClose}
-          className="px-4 py-1.5 rounded-lg bg-red-700 hover:bg-red-800 text-white text-xs font-medium border border-slate-800 shadow-[2px_2px_0_0_#1f2937]"
+          className="px-4 py-1.5 rounded-lg bg-primary hover:bg-primary/90 text-white text-xs font-medium border border-border shadow-retro"
         >
           Done
         </button>

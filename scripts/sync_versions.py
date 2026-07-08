@@ -44,9 +44,15 @@ def update_package_json(path: Path, version: str) -> None:
 # download link itself uses /releases/latest (auto-resolves), so only the
 # display strings need to track the release tag.
 DOCS_INDEX_PATTERNS = (
-    (re.compile(r'(<div class="status-pill">v)[\d.]+(\s+Production Ready</div>)'),
+    # Hero meta badge: <span class="version-badge">v1.2.3 · Open Source</span>
+    (re.compile(r'(<span class="version-badge">v)[\d.]+( · Open Source</span>)'),
      r'\g<1>{version}\g<2>'),
-    (re.compile(r'(⬇ Download v)[\d.]+(</a>)'),
+    # Download buttons (hero + final CTA): >Download v1.2.3</a>
+    (re.compile(r'(Download v)[\d.]+(</a>)'),
+     r'\g<1>{version}\g<2>'),
+    # JSON-LD structured data: keep softwareVersion current so search rich
+    # results don't advertise a stale version.
+    (re.compile(r'("softwareVersion":\s*")[\d.]+(")'),
      r'\g<1>{version}\g<2>'),
 )
 

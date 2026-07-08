@@ -2940,3 +2940,81 @@ async def system_metrics(_current_user: dict = Depends(util.get_current_user)):
             "label": "WatchTower API",
         },
     }
+
+
+# ── One-click tool install ───────────────────────────────────────────────────
+
+
+class ToolInstallStatus(BaseModel):
+    tool: str
+    can_install: bool
+    reason: Optional[str] = None
+    last_run: dict[str, Any]
+
+
+@router.get("/tools/{tool}/install/status", response_model=ToolInstallStatus)
+async def tool_install_status(
+    tool: str,
+    _current_user: dict = Depends(util.get_current_user),
+) -> ToolInstallStatus:
+    """Whether *tool* can be installed in one click here, plus the last run's
+    state so the UI can show progress/result and fall back to copy-paste
+    recipes when unattended install isn't possible."""
+    from watchtower import tool_installer
+    ok, reason = tool_installer.can_install(tool)
+    return ToolInstallStatus(
+        tool=tool,
+        can_install=ok,
+        reason=reason,
+        last_run=tool_installer.read_state(tool),
+    )
+
+
+@router.post("/tools/{tool}/install")
+async def tool_install(
+    tool: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(util.get_current_user),
+):
+    """Install *tool* via the host package manager as a detached background
+    job. Returns immediately; poll GET .../install/status for progress.
+
+    Admin-gated (can_manage_team) — installing software on the host is an
+    operator action. Argv is a fixed allowlist (no user input), never a shell.
+    """
+    if not _user_can_manage_org_secrets(db, current_user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Installing tools requires can_manage_team permission.",
+        )
+
+    from watchtower import tool_installer
+    try:
+        state = tool_installer.start_install(tool)
+    except ValueError as exc:
+        # not auto-installable, or already running
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+    try:
+        from watchtower.api import audit as audit_log
+        from watchtower.api.enterprise import _ensure_user_org_member
+        org_id = None
+        try:
+            _u, org, _m = _ensure_user_org_member(db, current_user)
+            org_id = org.id
+        except Exception:  # noqa: BLE001
+            pass
+        audit_log.record_for_user(
+            db, current_user,
+            action="runtime.tool_install",
+            entity_type="runtime",
+            org_id=org_id,
+            request=request,
+            extra={"tool": tool},
+        )
+        db.commit()
+    except Exception:  # noqa: BLE001 - never block the install on audit
+        logger.exception("tool-install: audit log write failed (continuing)")
+
+    return {"started": True, "tool": tool, "last_run": state}

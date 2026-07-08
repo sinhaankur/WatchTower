@@ -14,6 +14,15 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import apiClient from '@/lib/api';
 
+// Every list endpoint runs its response through this before it reaches a
+// component. A malformed payload — an error body, a proxy that wraps the
+// array, a 200 with the wrong shape — used to white-screen whichever page
+// did `data.map(...)`. Coercing to `[]` here means a bad response degrades
+// to an empty list (rendered as the page's empty state) instead of a crash.
+function asArray<T>(data: unknown): T[] {
+  return Array.isArray(data) ? (data as T[]) : [];
+}
+
 // ── Query keys ───────────────────────────────────────────────────────────────
 // Treat these as the public contract. Mutations invalidate by key prefix.
 
@@ -123,7 +132,7 @@ export type AuditEvent = {
 export function useAuditEvents(params: AuditQueryParams, enabled: boolean = true) {
   return useQuery<AuditEvent[]>({
     queryKey: queryKeys.audit(params),
-    queryFn: async () => (await apiClient.get<AuditEvent[]>('/audit', { params })).data,
+    queryFn: async () => asArray<AuditEvent>((await apiClient.get('/audit', { params })).data),
     enabled,
     staleTime: 10_000,
   });
@@ -163,7 +172,7 @@ export type ProjectListItem = {
 export function useProjects() {
   return useQuery<ProjectListItem[]>({
     queryKey: queryKeys.projects,
-    queryFn: async () => (await apiClient.get<ProjectListItem[]>('/projects')).data,
+    queryFn: async () => asArray<ProjectListItem>((await apiClient.get('/projects')).data),
     // Dashboard polls anyway; keep this short so manual refresh is cheap.
     staleTime: 5_000,
   });
@@ -206,7 +215,7 @@ export type ProjectRelation = {
 export function useProjectRelations(projectId: string | undefined) {
   return useQuery<ProjectRelation[]>({
     queryKey: projectId ? queryKeys.projectRelated(projectId) : ['project', 'disabled', 'related'],
-    queryFn: async () => (await apiClient.get<ProjectRelation[]>(`/projects/${projectId}/related`)).data,
+    queryFn: async () => asArray<ProjectRelation>((await apiClient.get(`/projects/${projectId}/related`)).data),
     enabled: !!projectId,
   });
 }
@@ -429,7 +438,7 @@ export function useRemoteAccessProviders() {
   return useQuery<RemoteAccessProvider[]>({
     queryKey: queryKeys.remoteAccessProviders,
     queryFn: async () =>
-      (await apiClient.get<RemoteAccessProvider[]>('/remote-access/providers')).data,
+      asArray<RemoteAccessProvider>((await apiClient.get('/remote-access/providers')).data),
     staleTime: 10_000,
     refetchOnWindowFocus: false,
   });
@@ -498,11 +507,20 @@ export type ManagedDatabaseCreateInput = {
   version?: string;
   database_name?: string;
   username?: string;
+  // Plug-and-play: auto-wire the new DB into a project's deploy env on create.
+  link_project_id?: string;
+  link_env_var_name?: string;
+  // Data safety: install a default daily backup schedule on create.
+  auto_backup?: boolean;
+  auto_backup_cron?: string;
 };
 
 export type ManagedDatabaseCreateResponse = ManagedDatabase & {
   password: string;
   connection_string: string;
+  linked_project_id?: string | null;
+  linked_env_var_name?: string | null;
+  backup_schedule_cron?: string | null;
 };
 
 export type ManagedDbRuntime = {
@@ -532,7 +550,7 @@ export function useManagedDbEngines() {
   return useQuery<ManagedDbEngine[]>({
     queryKey: queryKeys.managedDbEngines,
     queryFn: async () =>
-      (await apiClient.get<ManagedDbEngine[]>('/managed-databases/engines')).data,
+      asArray<ManagedDbEngine>((await apiClient.get('/managed-databases/engines')).data),
     staleTime: 60 * 60 * 1000,
   });
 }
@@ -574,7 +592,7 @@ export function useManagedDatabases() {
   return useQuery<ManagedDatabase[]>({
     queryKey: queryKeys.managedDatabases,
     queryFn: async () =>
-      (await apiClient.get<ManagedDatabase[]>('/managed-databases')).data,
+      asArray<ManagedDatabase>((await apiClient.get('/managed-databases')).data),
     staleTime: 5_000,
   });
 }
@@ -587,6 +605,15 @@ export function useCreateManagedDatabase() {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: queryKeys.managedDatabases });
     },
+  });
+}
+
+export type TestConnectionResult = { ok: boolean; message: string };
+
+export function useTestManagedDbConnection() {
+  return useMutation<TestConnectionResult, unknown, string>({
+    mutationFn: async (dbId) =>
+      (await apiClient.post<TestConnectionResult>(`/managed-databases/${dbId}/test-connection`)).data,
   });
 }
 
@@ -684,7 +711,7 @@ export function useManagedDbReplicas(primaryId: string, enabled: boolean = true)
   return useQuery<ManagedDbReplica[]>({
     queryKey: queryKeys.managedDbReplicas(primaryId),
     queryFn: async () =>
-      (await apiClient.get<ManagedDbReplica[]>(`/managed-databases/${primaryId}/replicas`)).data,
+      asArray<ManagedDbReplica>((await apiClient.get(`/managed-databases/${primaryId}/replicas`)).data),
     enabled,
     staleTime: 5_000,
   });
@@ -761,7 +788,7 @@ export function useManagedDbBackups(primaryId: string, enabled: boolean = true) 
   return useQuery<ManagedDbBackup[]>({
     queryKey: queryKeys.managedDbBackups(primaryId),
     queryFn: async () =>
-      (await apiClient.get<ManagedDbBackup[]>(`/managed-databases/${primaryId}/backups`)).data,
+      asArray<ManagedDbBackup>((await apiClient.get(`/managed-databases/${primaryId}/backups`)).data),
     enabled,
     staleTime: 10_000,
   });
@@ -930,7 +957,7 @@ export function useExternalDatabases() {
   return useQuery<ExternalDatabase[]>({
     queryKey: queryKeys.externalDatabases,
     queryFn: async () =>
-      (await apiClient.get<ExternalDatabase[]>('/external-databases')).data,
+      asArray<ExternalDatabase>((await apiClient.get('/external-databases')).data),
     staleTime: 10_000,
   });
 }
@@ -943,6 +970,117 @@ export function useCreateExternalDatabase() {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: queryKeys.externalDatabases });
     },
+  });
+}
+
+export type ManagedSshKey = {
+  public_key: string;
+  private_key_path: string;
+  authorize_command: string;
+};
+
+export function useManagedSshKey(enabled: boolean = true) {
+  return useQuery<ManagedSshKey>({
+    queryKey: ['this-pc', 'ssh-key'],
+    queryFn: async () =>
+      (await apiClient.get<ManagedSshKey>('/this-pc/ssh-key')).data,
+    enabled,
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+export type TailnetPeer = {
+  hostname: string;
+  dns_name: string | null;
+  ip: string;
+  online: boolean;
+  os: string | null;
+  already_added: boolean;
+  runs_watchtower: boolean;
+};
+
+export type ControlPlaneStatus = {
+  role: 'standalone' | 'primary' | 'standby';
+  peer_host: string | null;
+  peer_name: string | null;
+  peer_port?: number;
+  has_peer_token?: boolean;
+  last_synced_at?: string | null;
+  last_sync_error?: string | null;
+  snapshot_present?: boolean;
+  snapshot_bytes?: number | null;
+  snapshot_mtime?: string | null;
+};
+
+export function useControlPlane() {
+  return useQuery<ControlPlaneStatus>({
+    queryKey: ['this-pc', 'control-plane'],
+    queryFn: async () =>
+      (await apiClient.get<ControlPlaneStatus>('/this-pc/control-plane')).data,
+    staleTime: 30_000,
+  });
+}
+
+export function usePairControlPlane() {
+  const qc = useQueryClient();
+  return useMutation<
+    ControlPlaneStatus,
+    unknown,
+    { role: 'primary' | 'standby'; peer_host: string; peer_name?: string; peer_port?: number; peer_token?: string }
+  >({
+    mutationFn: async (body) =>
+      (await apiClient.post<ControlPlaneStatus>('/this-pc/control-plane/pair', body)).data,
+    onSuccess: () => { void qc.invalidateQueries({ queryKey: ['this-pc', 'control-plane'] }); },
+  });
+}
+
+export function useUnpairControlPlane() {
+  const qc = useQueryClient();
+  return useMutation<ControlPlaneStatus, unknown, void>({
+    mutationFn: async () =>
+      (await apiClient.post<ControlPlaneStatus>('/this-pc/control-plane/unpair')).data,
+    onSuccess: () => { void qc.invalidateQueries({ queryKey: ['this-pc', 'control-plane'] }); },
+  });
+}
+
+export function useSyncControlPlane() {
+  const qc = useQueryClient();
+  return useMutation<{ ok: boolean; message: string; status: ControlPlaneStatus }, unknown, void>({
+    mutationFn: async () =>
+      (await apiClient.post<{ ok: boolean; message: string; status: ControlPlaneStatus }>(
+        '/this-pc/control-plane/sync-now',
+      )).data,
+    onSuccess: () => { void qc.invalidateQueries({ queryKey: ['this-pc', 'control-plane'] }); },
+  });
+}
+
+export function useDiscoverNodes() {
+  return useQuery<{ source: string; peers: TailnetPeer[] }>({
+    queryKey: ['this-pc', 'discover-nodes'],
+    queryFn: async () =>
+      (await apiClient.get<{ source: string; peers: TailnetPeer[] }>('/this-pc/discover-nodes')).data,
+    staleTime: 15_000,
+  });
+}
+
+export type DiscoveredDb = {
+  container_id: string;
+  container_name: string;
+  image: string;
+  engine: string;
+  suggested_host: string;
+  suggested_port: number | null;
+  suggested_username: string;
+  state: string;
+  already_connected: boolean;
+};
+
+export function useDiscoverLocalDatabases() {
+  return useQuery<DiscoveredDb[]>({
+    queryKey: ['external-databases', 'discover'],
+    queryFn: async () =>
+      asArray<DiscoveredDb>((await apiClient.get('/external-databases/discover')).data),
+    staleTime: 15_000,
   });
 }
 
@@ -997,9 +1135,9 @@ export function useProjectDatabases(projectId: string | undefined) {
   return useQuery<ProjectDatabaseLink[]>({
     queryKey: projectId ? queryKeys.projectDatabases(projectId) : ['projects', 'disabled', 'databases'],
     queryFn: async () =>
-      (await apiClient.get<ProjectDatabaseLink[]>(
-        `/projects/${projectId}/databases`,
-      )).data,
+      asArray<ProjectDatabaseLink>(
+        (await apiClient.get(`/projects/${projectId}/databases`)).data,
+      ),
     enabled: !!projectId,
     staleTime: 10_000,
   });
@@ -1141,9 +1279,9 @@ export function useHealingActions(status?: string) {
   return useQuery<HealingAction[]>({
     queryKey: queryKeys.healingActions(status),
     queryFn: async () =>
-      (await apiClient.get<HealingAction[]>('/healing/actions', {
+      asArray<HealingAction>((await apiClient.get('/healing/actions', {
         params: status ? { status_filter: status } : {},
-      })).data,
+      })).data),
     refetchInterval: 60_000,
   });
 }
@@ -1266,7 +1404,7 @@ export function usePodmanStatus() {
 export function usePodmanContainers(enabled: boolean) {
   return useQuery<PodmanContainer[]>({
     queryKey: queryKeys.podmanContainers,
-    queryFn: async () => (await apiClient.get<PodmanContainer[]>('/podman/containers')).data,
+    queryFn: async () => asArray<PodmanContainer>((await apiClient.get('/podman/containers')).data),
     enabled,
     refetchInterval: 8_000,
     retry: false,
@@ -1276,7 +1414,7 @@ export function usePodmanContainers(enabled: boolean) {
 export function usePodmanPods(enabled: boolean) {
   return useQuery<PodmanPod[]>({
     queryKey: queryKeys.podmanPods,
-    queryFn: async () => (await apiClient.get<PodmanPod[]>('/podman/pods')).data,
+    queryFn: async () => asArray<PodmanPod>((await apiClient.get('/podman/pods')).data),
     enabled,
     refetchInterval: 10_000,
     retry: false,

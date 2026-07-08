@@ -627,7 +627,9 @@ async def _run_static_container_on_node(
         return False, msg
 
     cname = _container_name(project)
-    remote_path = node.remote_path.rstrip("/")
+    # Use the local-safe path for local nodes (handles empty remote_path);
+    # for SSH nodes this is just node.remote_path.rstrip("/") as before.
+    remote_path = _local_deploy_path(node) if _is_local_node(node) else node.remote_path.rstrip("/")
     # `:ro,z` keeps SELinux-enforcing hosts (Fedora/RHEL) happy — the `z`
     # relabels the bind source so the container can read it. On systems
     # without SELinux it's a no-op. `--restart=always` covers Podman
@@ -1336,7 +1338,60 @@ def _own_hostname() -> str:
         return ""
 
 
+def _default_local_deploy_path() -> str:
+    """The always-writable per-machine deploy dir under the data dir."""
+    base = os.getenv("WATCHTOWER_DATA_DIR")
+    root = Path(base).expanduser() if base else (Path.home() / ".watchtower")
+    return str(root / "deployments" / "this-pc")
+
+
+def _is_writable_dir(path: str) -> bool:
+    """Can the WatchTower process actually create + write under *path*?
+    Tries to mkdir -p and write a probe file. Returns False on any OSError
+    (permission denied, read-only fs, …)."""
+    try:
+        p = Path(path)
+        p.mkdir(parents=True, exist_ok=True)
+        probe = p / ".watchtower-write-probe"
+        probe.write_text("ok", encoding="utf-8")
+        probe.unlink()
+        return True
+    except OSError:
+        return False
+
+
+def _local_deploy_path(node: OrgNode) -> str:
+    """Effective deploy directory for a local node.
+
+    Defends against two real failures seen with legacy local nodes (registered
+    before this_pc.py set sane defaults):
+      1. Empty / "/" remote_path → would make rsync --delete + the container
+         bind-mount target the filesystem root.
+      2. A non-empty but UNWRITABLE path (e.g. /usr/local/var/watchtower/agent
+         from an old "agent" node) → rsync fails with EACCES "Permission
+         denied", which is the 'simple deployment doesn't work' report.
+
+    In both cases we fall back to a safe, always-writable directory under the
+    data dir. A configured path that exists-or-can-be-created AND is writable is
+    honoured as-is."""
+    rp = (node.remote_path or "").strip()
+    if rp and rp != "/" and _is_writable_dir(rp):
+        return rp.rstrip("/")
+    if rp and rp != "/":
+        logger.warning(
+            "local node remote_path %r is not writable — falling back to the "
+            "data-dir deploy path", rp,
+        )
+    return _default_local_deploy_path()
+
+
 def _is_local_node(node: OrgNode) -> bool:
+    # Authoritative marker first: the one-click "Use this PC" flow registers
+    # the node with provider="local" (see watchtower/api/this_pc.py). That's
+    # an explicit operator declaration, more reliable than host-string
+    # heuristics — and it's how a local node deploys without SSH.
+    if (getattr(node, "provider", None) or "").strip().lower() == "local":
+        return True
     host = (node.host or "").strip().lower()
     if host in _LOCALHOST_HOSTS:
         return True
@@ -1360,7 +1415,7 @@ async def _rsync_to_node(
     # missing directory ("No such file or directory") obscures the real
     # issue when a user just registered a fresh local node.
     if _is_local_node(node):
-        dest = f"{node.remote_path.rstrip('/')}/"
+        dest = f"{_local_deploy_path(node)}/"
         try:
             Path(dest).mkdir(parents=True, exist_ok=True)
         except OSError as exc:
@@ -1429,7 +1484,7 @@ async def _ssh_run(
     # ssh. The cwd is set to remote_path so relative paths in the script
     # resolve where the deployed files live.
     if _is_local_node(node):
-        cwd = node.remote_path or None
+        cwd = _local_deploy_path(node) or None
         if cwd:
             try:
                 Path(cwd).mkdir(parents=True, exist_ok=True)
@@ -1614,21 +1669,36 @@ def _resolve_output_path(db: Session, project: Project, repo_dir: Path) -> Path:
         cfg = db.query(NetlifeLikeConfig).filter_by(project_id=project.id).first()
         out_dir = cfg.output_dir if cfg else "dist"
         candidate = repo_dir / out_dir
-        # Hand-coded static site path: if there's no build, the repo root
-        # IS the output. The default `dist` won't exist; rsync would
-        # fail with "(l)stat: No such file or directory". Detect this by
-        # checking for an index.html at the root and no build output —
-        # then ship the repo dir itself.
-        if not candidate.is_dir():
-            has_index = (repo_dir / "index.html").is_file()
-            if has_index:
-                return repo_dir
+        if candidate.is_dir():
+            return candidate
+
+        # The configured output dir (default `dist`) doesn't exist. Rather than
+        # return a missing path — which makes rsync fail with
+        # "(l)stat: No such file or directory" (the portfolio-test failure) —
+        # auto-detect where the build actually landed. Different frameworks use
+        # different output dirs: Next.js static export → `out/`, CRA → `build/`,
+        # Vite → `dist/`, Nuxt → `.output/public/`, plain static → repo root.
+        # We pick the first candidate that exists AND contains an index.html.
+        for cand_name in ("out", "build", "dist", "public", ".output/public", "_site"):
+            cand = repo_dir / cand_name
+            if (cand / "index.html").is_file():
+                return cand
+        # Last resort: a hand-coded static site whose index.html is at the root
+        # (no build step) — ship the repo dir itself.
+        if (repo_dir / "index.html").is_file():
+            return repo_dir
+        # Nothing detected — fall back to the configured candidate so the
+        # error message names the dir the user expected.
         return candidate
     if project.use_case == UseCaseType.VERCEL_LIKE:
-        candidate = repo_dir / ".next"
-        if not candidate.is_dir() and (repo_dir / "index.html").is_file():
+        # SSR/Next: prefer the build dir, but a Next.js `output: "export"`
+        # project emits a static `out/` (no `.next` server) — detect that too.
+        for cand_name in (".next", "out", "build", "dist"):
+            if (repo_dir / cand_name).is_dir():
+                return repo_dir / cand_name
+        if (repo_dir / "index.html").is_file():
             return repo_dir
-        return candidate
+        return repo_dir / ".next"
     # Docker: deploy whole repo
     return repo_dir
 
@@ -1658,43 +1728,20 @@ async def _send_notifications(
     deployment: Deployment,
     success: bool,
 ) -> None:
-    """Fire-and-forget notification webhooks (Discord + Slack)."""
-    from watchtower.database import NotificationWebhook  # imported lazily
-    try:
-        hooks = db.query(NotificationWebhook).filter_by(
-            project_id=project.id, is_active=True
-        ).all()
-    except Exception:
-        return  # table may not exist yet
+    """Fire-and-forget notification webhooks (Discord + Slack) for a deploy.
 
-    if not hooks:
-        return
-
+    Delegates the actual send to watchtower.notifier (the shared dispatcher) so
+    every event source posts through one code path.
+    """
     status_text = "✅ Deployment succeeded" if success else "❌ Deployment failed"
+    commit = (deployment.commit_sha or "")[:8]
     message = (
         f"{status_text}\n"
         f"**Project:** {project.name}\n"
-        f"**Branch:** {deployment.branch}  |  `{deployment.commit_sha[:8]}`"
+        f"**Branch:** {deployment.branch}  |  `{commit}`"
     )
-
-    for hook in hooks:
-        try:
-            payload: dict
-            if hook.provider == "slack":
-                payload = {"text": message.replace("**", "*")}
-            else:  # discord
-                payload = {"content": message}
-            data = _json.dumps(payload).encode("utf-8")
-            req = urllib.request.Request(
-                hook.url,
-                data=data,
-                headers={"Content-Type": "application/json"},
-                method="POST",
-            )
-            with urllib.request.urlopen(req, timeout=10):
-                pass
-        except Exception as exc:
-            logger.warning("Notification webhook failed (%s): %s", hook.url[:40], exc)
+    from watchtower.notifier import notify_project
+    notify_project(db, project.id, message)
 
 
 # ---------------------------------------------------------------------------
@@ -1715,18 +1762,15 @@ def check_ssh_connectivity(node: OrgNode) -> tuple[bool, str]:
     Returns (success, message).
     """
     if _is_local_node(node):
-        path = node.remote_path or ""
-        if not path:
-            return True, "Local node registered (no remote_path set)"
-        try:
-            p = Path(path)
-            p.mkdir(parents=True, exist_ok=True)
-            probe = p / ".watchtower-write-probe"
-            probe.write_text("ok", encoding="utf-8")
-            probe.unlink()
+        # Report on the path the deploy will ACTUALLY use — _local_deploy_path
+        # falls back to a writable data-dir path when the configured one is
+        # empty or unwritable, so the health check matches deploy behaviour
+        # instead of failing on a legacy /usr/local/var path the deploy would
+        # have transparently worked around.
+        path = _local_deploy_path(node)
+        if _is_writable_dir(path):
             return True, f"Local node ready ({path} writable)"
-        except OSError as exc:
-            return False, f"Local node {path} not writable: {exc}"
+        return False, f"Local node {path} not writable"
 
     ssh_opts = ["-p", str(node.port), "-o", "StrictHostKeyChecking=accept-new",
                 "-o", "ConnectTimeout=5", "-o", "BatchMode=yes"]

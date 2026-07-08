@@ -5,11 +5,22 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Pricing — WatchTower</title>
   <meta name="description" content="WatchTower is open-core. Free forever for the deploy/run-locally/integrations core. Pro tier adds team RBAC, audit log, HA failover, SSO, and priority support.">
-  <link rel="icon" type="image/svg+xml" href="/wt-logo.svg">
+  <meta name="robots" content="index, follow, max-image-preview:large">
+  <meta name="theme-color" content="#fffdf8">
+  <link rel="canonical" href="https://sinhaankur.github.io/WatchTower/pricing/">
+  <meta property="og:site_name" content="WatchTower">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Pricing — WatchTower">
+  <meta property="og:description" content="Open-core. Free forever for the deploy core; Pro adds team RBAC, audit log, HA failover, and SSO.">
+  <meta property="og:url" content="https://sinhaankur.github.io/WatchTower/pricing/">
+  <meta property="og:image" content="https://sinhaankur.github.io/WatchTower/og-image.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="https://sinhaankur.github.io/WatchTower/og-image.png">
+  <link rel="icon" type="image/svg+xml" href="../wt-logo.svg">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/_assets/site.css">
+  <link rel="stylesheet" href="../_assets/site.css">
   <style>
     .tier-grid {
       display: grid;
@@ -18,7 +29,7 @@
       margin-top: 28px;
     }
     .tier {
-      border: 2px solid var(--wt-border);
+      border: 1px solid var(--wt-border);
       border-radius: 16px;
       padding: 28px;
       background: var(--wt-panel);
@@ -75,16 +86,16 @@
 <div class="page-shell">
 
 <nav class="site-nav" aria-label="Site sections">
-  <a class="brand" href="/">
-    <span class="brand-mark"><img src="/wt-logo.svg" alt="WatchTower logo"></span>
+  <a class="brand" href="../">
+    <span class="brand-mark"><svg viewBox="0 0 64 64" role="img" aria-label="Wt logo"><rect x="4" y="4" width="56" height="56" rx="12" fill="#fde68a" stroke="#0f172a" stroke-width="4"/><text x="32" y="42" text-anchor="middle" font-family="'DM Sans', system-ui, sans-serif" font-size="26" font-weight="800" fill="#b91c1c">Wt</text></svg></span>
     <span>WatchTower</span>
   </a>
   <div class="nav-links">
-    <a class="nav-link" href="/">Home</a>
-    <a class="nav-link" href="/how-it-works/">How it works</a>
-    <a class="nav-link active" href="/pricing/">Pricing</a>
-    <a class="nav-link" href="/blog/">Blog</a>
-    <a class="nav-link" href="/viewer.html">Docs</a>
+    <a class="nav-link" href="../">Home</a>
+    <a class="nav-link" href="../how-it-works/">How it works</a>
+    <a class="nav-link active" href="../pricing/">Pricing</a>
+    <a class="nav-link" href="../blog/">Blog</a>
+    <a class="nav-link" href="../viewer.html">Docs</a>
   </div>
   <a class="nav-cta" href="https://github.com/sinhaankur/WatchTower" target="_blank" rel="noopener">⭐ GitHub</a>
 </nav>
@@ -110,20 +121,20 @@
       <ul>
         <li><span class="check">✓</span><div><span class="feat-name">All deploy + build features</span><span class="feat-desc">Git-push deploys, multi-node SSH, container update daemon, templates, webhooks, queues.</span></div></li>
         <li><span class="check">✓</span><div><span class="feat-name">Single-user installs</span><span class="feat-desc">Personal infra, homelabs, side projects.</span></div></li>
-        <li><span class="check">✓</span><div><span class="feat-name">All integrations</span><span class="feat-desc">Cloudflare, Tailscale, GitHub OAuth + Device Flow, SMTP, LLM agent.</span></div></li>
+        <li><span class="check">✓</span><div><span class="feat-name">All integrations</span><span class="feat-desc">Cloudflare, Tailscale, GitHub OAuth + Device Flow, Slack/Discord notifications, LLM agent.</span></div></li>
         <li><span class="check">✓</span><div><span class="feat-name">Self-host on your hardware</span><span class="feat-desc">No data leaves your servers. SQLite or Postgres backend.</span></div></li>
         <li><span class="check">✓</span><div><span class="feat-name">Community support</span><span class="feat-desc">GitHub Issues + Discussions.</span></div></li>
       </ul>
       <div class="footer-cta">
         <a class="cta-btn" href="https://github.com/sinhaankur/WatchTower/releases/latest" target="_blank" rel="noopener">Download</a>
-        <a class="cta-btn ghost" href="/how-it-works/">See how it works</a>
+        <a class="cta-btn ghost" href="../how-it-works/">See how it works</a>
       </div>
     </div>
 
     <div class="tier featured">
       <span class="tier-label">For teams</span>
       <h2>Pro</h2>
-      <p class="price">Coming soon <span>· launching with billing</span></p>
+      <p class="price">Free in beta <span>· everything unlocked today</span></p>
       <ul>
         <li><span class="check">✓</span><div><span class="feat-name">Everything in Free</span><span class="feat-desc">All Free features included.</span></div></li>
         <li><span class="check">✓</span><div><span class="feat-name">Audit Log</span><span class="feat-desc">See every who-did-what — project create, deploy trigger, env-var change. SOC 2 / ISO 27001 evidence.</span></div></li>
@@ -132,7 +143,10 @@
         <li><span class="check">✓</span><div><span class="feat-name">SSO (SAML / OIDC)</span><span class="feat-desc">Okta, Google Workspace, Azure AD, any SAML 2.0 / OIDC. SCIM-driven offboarding.</span></div></li>
         <li><span class="check">✓</span><div><span class="feat-name">Priority Email Support</span><span class="feat-desc">Direct email with response SLA. Migration + HA architecture review.</span></div></li>
       </ul>
+      <p style="font-size: 0.82rem; color: var(--wt-text-dim); margin: 0 0 14px;">While WatchTower is in beta, every Pro feature is enabled on the free tier —
+        use it all, tell us what's worth paying for. Paid plans arrive with billing; self-hosting the core stays free forever.</p>
       <div class="footer-cta">
+        <a class="cta-btn" href="https://github.com/sinhaankur/WatchTower/releases/latest" target="_blank" rel="noopener">Use it free now</a>
         <a class="cta-btn ghost" href="https://github.com/sinhaankur/WatchTower/discussions" target="_blank" rel="noopener">Get notified at launch</a>
       </div>
     </div>
@@ -149,8 +163,9 @@
         <li><span class="check">✓</span><div><span class="feat-name">Written contract + warranty</span><span class="feat-desc">Defined SLA, support response targets, liability terms — what your legal team will ask for. See <a href="https://github.com/sinhaankur/WatchTower/blob/main/LICENSE-COMMERCIAL.md">the template</a>.</span></div></li>
         <li><span class="check">✓</span><div><span class="feat-name">Direct vendor support</span><span class="feat-desc">Maintainer-direct channel. Architecture review for HA + migration assistance included.</span></div></li>
       </ul>
+      <p style="font-size: 0.82rem; color: var(--wt-text-dim); margin: 0 0 14px;">Write to <strong style="color: var(--wt-text); user-select: all;">opensource@sinhaankur.dev</strong> with subject "Commercial License Inquiry", or open a private discussion.</p>
       <div class="footer-cta">
-        <a class="cta-btn" href="mailto:opensource@sinhaankur.dev?subject=Commercial%20License%20Inquiry">Email opensource@sinhaankur.dev</a>
+        <a class="cta-btn" href="https://github.com/sinhaankur/WatchTower/discussions/new?category=general&title=Commercial%20License%20Inquiry" target="_blank" rel="noopener">Start the conversation</a>
         <a class="cta-btn ghost" href="https://github.com/sinhaankur/WatchTower/blob/main/LICENSE-COMMERCIAL.md" target="_blank" rel="noopener">Read the license template</a>
       </div>
     </div>

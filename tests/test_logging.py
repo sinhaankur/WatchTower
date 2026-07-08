@@ -141,3 +141,25 @@ def test_get_request_id_is_empty_outside_a_request():
     """Sanity: outside any HTTP request the contextvar default applies."""
     # No bind_request_id() call → empty.
     assert get_request_id() == ""
+
+
+# ── Alembic must not silence our loggers ─────────────────────────────────────
+
+def test_watchtower_loggers_survive_alembic_migration():
+    """Regression: init_db() runs alembic migrations at app-import time, which
+    calls alembic/env.py:fileConfig(). Python's fileConfig() defaults
+    disable_existing_loggers=True, which would silence every watchtower.*
+    logger created beforehand for the rest of the process — a silent log-line
+    drop. env.py passes disable_existing_loggers=False; assert that holds.
+
+    Importing watchtower.api (done transitively by conftest) has already run
+    init_db(), so by the time this test runs the migration has happened. The
+    logger must still be enabled.
+    """
+    import watchtower.api  # noqa: F401  (ensures init_db has run)
+
+    for name in ("watchtower.api", "watchtower", "watchtower.builder"):
+        assert logging.getLogger(name).disabled is False, (
+            f"{name} was disabled — alembic fileConfig() likely lost "
+            "disable_existing_loggers=False (see alembic/env.py)"
+        )

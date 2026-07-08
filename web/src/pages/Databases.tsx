@@ -20,7 +20,7 @@ const Databases = () => (
         <p className="text-xs text-slate-600 mt-0.5 hidden sm:block">Deploy and manage self-hosted databases</p>
       </div>
       <Link to="/host-connect?tab=database"
-        className="px-3 sm:px-4 py-1.5 rounded-lg bg-red-700 hover:bg-red-800 text-white text-xs sm:text-sm font-medium transition-colors border border-slate-800 shadow-[2px_2px_0_0_#1f2937]">
+        className="px-3 sm:px-4 py-1.5 rounded-lg bg-primary hover:bg-primary/90 text-white text-xs sm:text-sm font-medium transition-colors border border-border shadow-retro">
         Setup Guide
       </Link>
     </header>

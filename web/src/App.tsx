@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, type ReactElement } from 'react';
+import { lazy, Suspense, useEffect, useLayoutEffect, type ReactElement } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { trackPageView } from '@/lib/analytics';
 import { QueryClientProvider, QueryClient, MutationCache, QueryCache } from '@tanstack/react-query';
@@ -110,6 +110,20 @@ function RequireAuth({ children }: { children: ReactElement }) {
 }
 
 /**
+ * Per-route browser-tab title. Without this every tab, history entry,
+ * and analytics page_view reads the same static index.html title, so
+ * users with three WatchTower tabs open can't tell them apart.
+ * useLayoutEffect (not useEffect) so the title is set before
+ * RouteTracker's passive effect snapshots document.title for GA.
+ */
+function PageTitle({ name }: { name: string }) {
+  useLayoutEffect(() => {
+    document.title = name === 'Dashboard' ? 'WatchTower' : `${name} · WatchTower`;
+  }, [name]);
+  return null;
+}
+
+/**
  * Wrap a page in:
  *   - per-route error boundary (failures stay scoped to this page)
  *   - the auth gate (redirects to /login if no token)
@@ -127,7 +141,10 @@ function withChrome(pageName: string, element: ReactElement, opts: { bare?: bool
   const wrapped = opts.bare ? animated : <Layout>{animated}</Layout>;
   return (
     <RequireAuth>
-      <RouteErrorBoundary pageName={pageName}>{wrapped}</RouteErrorBoundary>
+      <RouteErrorBoundary pageName={pageName}>
+        <PageTitle name={pageName} />
+        {wrapped}
+      </RouteErrorBoundary>
     </RequireAuth>
   );
 }
@@ -145,7 +162,7 @@ function App() {
         <RouteTracker />
         <Suspense fallback={<RouteFallback />}>
           <Routes>
-            <Route path="/login" element={<Login />} />
+            <Route path="/login" element={<><PageTitle name="Sign in" /><Login /></>} />
             <Route path="/oauth/github/login/callback" element={<GitHubLoginCallback />} />
 
             {/* Pages with shared sidebar layout */}

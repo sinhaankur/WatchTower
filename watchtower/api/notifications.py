@@ -209,3 +209,93 @@ async def test_webhook(
             ok=False,
             detail=f"Unexpected error: {e}",
         )
+
+
+# ── Org-scoped webhooks ───────────────────────────────────────────────────────
+#
+# Installation-wide notifications (not tied to a single project) — e.g.
+# control-plane pair/unpair/failover via notifier.notify_org. These hooks have
+# project_id NULL and an org_id, and only an org admin (can_manage_team) can
+# manage them since they're an installation-level concern.
+
+org_webhook_router = APIRouter(prefix="/api/org-webhooks", tags=["Notifications"])
+
+
+def _validate_webhook_shape(provider: str, url: str) -> str:
+    """Validate provider + a cheap URL shape check. Returns the normalised
+    provider, raises 422 on bad input (clearer than the upstream's 404/401)."""
+    p = (provider or "").lower().strip()
+    if p not in {"slack", "discord"}:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY,
+                            detail="provider must be 'slack' or 'discord'")
+    if p == "slack" and not url.startswith("https://hooks.slack.com/services/"):
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY,
+                            detail="Slack webhook URLs start with https://hooks.slack.com/services/...")
+    if p == "discord" and "discord.com/api/webhooks" not in url:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY,
+                            detail="Discord webhook URLs contain discord.com/api/webhooks")
+    return p
+
+
+def _require_org_admin(db: Session, current_user: dict):
+    """Resolve the caller's org and require can_manage_team. Returns the org."""
+    from watchtower.api.enterprise import _ensure_user_org_member
+    _user, org, member = _ensure_user_org_member(db, current_user)
+    if not member or not getattr(member, "can_manage_team", False):
+        raise HTTPException(status.HTTP_403_FORBIDDEN,
+                            detail="Managing installation-wide webhooks requires can_manage_team permission.")
+    return org
+
+
+@org_webhook_router.get("", response_model=List[WebhookResponse])
+async def list_org_webhooks(
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(util.get_current_user),
+):
+    org = _require_org_admin(db, current_user)
+    return (
+        db.query(NotificationWebhook)
+        .filter(NotificationWebhook.org_id == org.id,
+                NotificationWebhook.project_id.is_(None))
+        .all()
+    )
+
+
+@org_webhook_router.post("", response_model=WebhookResponse, status_code=status.HTTP_201_CREATED)
+async def create_org_webhook(
+    data: WebhookCreate,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(util.get_current_user),
+):
+    org = _require_org_admin(db, current_user)
+    provider = _validate_webhook_shape(data.provider, data.url)
+    hook = NotificationWebhook(
+        project_id=None,
+        org_id=org.id,
+        provider=provider,
+        url=data.url,
+        label=data.label,
+    )
+    db.add(hook)
+    db.commit()
+    db.refresh(hook)
+    return hook
+
+
+@org_webhook_router.delete("/{webhook_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_org_webhook(
+    webhook_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(util.get_current_user),
+):
+    org = _require_org_admin(db, current_user)
+    hook = db.query(NotificationWebhook).filter(
+        NotificationWebhook.id == webhook_id,
+        NotificationWebhook.org_id == org.id,
+        NotificationWebhook.project_id.is_(None),
+    ).first()
+    if not hook:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Webhook not found")
+    db.delete(hook)
+    db.commit()
+    return None

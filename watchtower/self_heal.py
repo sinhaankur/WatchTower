@@ -261,6 +261,15 @@ async def _heal_deployment(db: Session, deployment: Deployment) -> None:
                 "self-heal: auto-fixed %s on project %s — retry deployment %s queued",
                 diagnosis.kind.value, project.id, retry.id,
             )
+            try:
+                from watchtower.notifier import notify_project
+                notify_project(
+                    db, project.id,
+                    f"🔧 Self-heal auto-fixed **{project.name}**\n"
+                    f"Issue: {diagnosis.kind.value} — applied a fix and queued a retry deploy.",
+                )
+            except Exception:  # noqa: BLE001 - notify must not break the heal loop
+                pass
             return
         except Exception as exc:  # noqa: BLE001 — a failed fix becomes a human task
             db.rollback()
@@ -280,6 +289,16 @@ async def _heal_deployment(db: Session, deployment: Deployment) -> None:
         "self-heal: deployment %s (%s) queued for human intervention",
         deployment.id, diagnosis.kind.value,
     )
+    try:
+        from watchtower.notifier import notify_project
+        notify_project(
+            db, project.id,
+            f"⚠️ **{project.name}** needs attention\n"
+            f"A failed deploy ({diagnosis.kind.value}) couldn't be auto-fixed — "
+            f"review it in Settings → AI & Autonomy.",
+        )
+    except Exception:  # noqa: BLE001 - notify must not break the heal loop
+        pass
 
 
 async def tick() -> int:

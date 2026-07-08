@@ -50,9 +50,15 @@ COPY --from=web-builder /web/dist /app/web/dist
 # mount means a code-only change re-runs the install step against an
 # already-warm wheel cache instead of redownloading every dep over the
 # network. The cache itself never lands in the final image.
+#
+# `[all]` pulls every optional extra (fabric/openai/redis/rq). The image is
+# the full-feature deployment target — it runs the RQ worker service, does
+# SSH deploys, and powers the AI agent — so unlike a lean PyPI install it
+# wants everything. (PyPI / pipx consumers get the lean default; see
+# pyproject.toml [project.optional-dependencies].)
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install --upgrade pip \
-    && pip install .
+    && pip install '.[all]'
 
 EXPOSE 8000
 

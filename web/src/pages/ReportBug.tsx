@@ -174,7 +174,7 @@ function ReportBug() {
         style={{ borderColor: 'hsl(var(--border-soft))' }}
       >
         <div className="max-w-4xl mx-auto w-full flex items-start gap-3">
-          <div className="w-10 h-10 rounded-lg border border-slate-800 bg-red-700 text-white flex items-center justify-center shadow-[2px_2px_0_0_#1f2937]">
+          <div className="w-10 h-10 rounded-lg border border-border bg-primary text-white flex items-center justify-center shadow-retro">
             <IconBug />
           </div>
           <div>
@@ -187,7 +187,7 @@ function ReportBug() {
       </header>
 
       <main className="px-4 sm:px-6 lg:px-8 py-6 max-w-4xl mx-auto w-full space-y-4">
-        <section className="rounded-xl border border-slate-800 bg-white p-5 shadow-[2px_2px_0_0_#1f2937] space-y-4">
+        <section className="rounded-xl border border-border bg-white p-5 shadow-retro space-y-4">
           <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-[11px] text-slate-600">
             <p className="font-medium text-slate-800">Before submitting</p>
             <div className="mt-2 space-y-1.5">
@@ -218,7 +218,7 @@ function ReportBug() {
               <select
                 value={area}
                 onChange={(e) => setArea(e.target.value as Area)}
-                className="mt-1 w-full text-sm px-3 py-2 rounded-lg border border-slate-300 focus:border-slate-800 focus:outline-none bg-white"
+                className="mt-1 w-full text-sm px-3 py-2 rounded-lg border border-slate-300 focus:border-border focus:outline-none bg-white"
               >
                 {AREAS.map((option) => (
                   <option key={option} value={option}>{option}</option>
@@ -231,7 +231,7 @@ function ReportBug() {
               <select
                 value={severity}
                 onChange={(e) => setSeverity(e.target.value as Severity)}
-                className="mt-1 w-full text-sm px-3 py-2 rounded-lg border border-slate-300 focus:border-slate-800 focus:outline-none bg-white"
+                className="mt-1 w-full text-sm px-3 py-2 rounded-lg border border-slate-300 focus:border-border focus:outline-none bg-white"
               >
                 {SEVERITIES.map((option) => (
                   <option key={option} value={option}>{option}</option>
@@ -245,7 +245,7 @@ function ReportBug() {
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="Example: Auto-update restarts repeatedly after install"
-                className="mt-1 w-full text-sm px-3 py-2 rounded-lg border border-slate-300 focus:border-slate-800 focus:outline-none"
+                className="mt-1 w-full text-sm px-3 py-2 rounded-lg border border-slate-300 focus:border-border focus:outline-none"
               />
             </label>
 
@@ -256,7 +256,7 @@ function ReportBug() {
                 onChange={(e) => setWhatHappened(e.target.value)}
                 rows={4}
                 placeholder="What did you see?"
-                className="mt-1 w-full text-sm px-3 py-2 rounded-lg border border-slate-300 focus:border-slate-800 focus:outline-none resize-y"
+                className="mt-1 w-full text-sm px-3 py-2 rounded-lg border border-slate-300 focus:border-border focus:outline-none resize-y"
               />
             </label>
 
@@ -267,7 +267,7 @@ function ReportBug() {
                 onChange={(e) => setExpected(e.target.value)}
                 rows={4}
                 placeholder="What should have happened instead?"
-                className="mt-1 w-full text-sm px-3 py-2 rounded-lg border border-slate-300 focus:border-slate-800 focus:outline-none resize-y"
+                className="mt-1 w-full text-sm px-3 py-2 rounded-lg border border-slate-300 focus:border-border focus:outline-none resize-y"
               />
             </label>
 
@@ -278,7 +278,7 @@ function ReportBug() {
                 onChange={(e) => setReproduce(e.target.value)}
                 rows={4}
                 placeholder="1. Open Settings\n2. Click Update\n3. App restarts twice"
-                className="mt-1 w-full text-sm px-3 py-2 rounded-lg border border-slate-300 focus:border-slate-800 focus:outline-none resize-y"
+                className="mt-1 w-full text-sm px-3 py-2 rounded-lg border border-slate-300 focus:border-border focus:outline-none resize-y"
               />
             </label>
           </div>
@@ -307,7 +307,7 @@ function ReportBug() {
               type="button"
               onClick={() => void handleSend()}
               disabled={sending || !canSubmit}
-              className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-slate-800 bg-red-700 hover:bg-red-800 text-white font-semibold shadow-[1px_1px_0_0_#1f2937] disabled:opacity-60"
+              className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-border bg-primary hover:bg-primary/90 text-white font-semibold shadow-retro disabled:opacity-60"
             >
               <IconMail />
               {sending ? 'Opening…' : 'Open Mail Report'}

@@ -33,6 +33,9 @@ class FailureKind(str, enum.Enum):
     PORT_IN_USE = "port_in_use"
     MISSING_ENV_VAR = "missing_env_var"
     PACKAGE_NOT_FOUND = "package_not_found"
+    BUILD_ERROR = "build_error"
+    ARTIFACT_MISSING = "artifact_missing"
+    TOOL_MISSING = "tool_missing"
     BUILD_OOM = "build_oom"
     PERMISSION_DENIED = "permission_denied"
     DISK_FULL = "disk_full"
@@ -170,6 +173,118 @@ def _fix_build_oom(match: re.Match) -> FailureDiagnosis:
             auto_applicable=False,
         ),
         matched_text=match.group(0),
+    )
+
+
+# Known build tools → the one-liner that installs them. Keys are the
+# executable names as they appear in "command not found" errors. The
+# fallback for unknown tools still points at Settings → System, which
+# probes the machine and offers per-platform install commands.
+_TOOL_INSTALL_HINTS = {
+    "pnpm": "npm install -g pnpm  (or: corepack enable)",
+    "yarn": "corepack enable  (or: npm install -g yarn)",
+    "npm": "install Node.js 18+ — macOS: brew install node · Linux: sudo apt install nodejs npm · Windows: winget install OpenJS.NodeJS",
+    "node": "install Node.js 18+ — macOS: brew install node · Linux: sudo apt install nodejs npm · Windows: winget install OpenJS.NodeJS",
+    "python": "macOS: brew install python@3.12 · Linux: sudo apt install python3 · Windows: winget install Python.Python.3.12",
+    "python3": "macOS: brew install python@3.12 · Linux: sudo apt install python3 · Windows: winget install Python.Python.3.12",
+    "pip": "python3 -m ensurepip --upgrade",
+    "podman": "macOS: brew install podman · Linux: sudo apt install podman · Windows: winget install RedHat.Podman",
+    "docker": "WatchTower is Podman-first — macOS: brew install podman · Linux: sudo apt install podman",
+    "git": "macOS: xcode-select --install · Linux: sudo apt install git · Windows: winget install Git.Git",
+    "cargo": "curl https://sh.rustup.rs -sSf | sh",
+    "rustc": "curl https://sh.rustup.rs -sSf | sh",
+    "go": "macOS: brew install go · Linux: sudo apt install golang · Windows: winget install GoLang.Go",
+    "make": "macOS: xcode-select --install · Linux: sudo apt install build-essential",
+    "bun": "curl -fsSL https://bun.sh/install | bash",
+}
+
+
+def _fix_tool_missing(match: re.Match) -> FailureDiagnosis:
+    tool = (match.groupdict().get("tool") or "").strip().strip("'\"")
+    hint = _TOOL_INSTALL_HINTS.get(tool.lower())
+    cause = (
+        f"The build needs '{tool}' but it isn't installed on the machine that runs builds."
+        if tool
+        else "The build command needs a tool that isn't installed on the machine that runs builds."
+    )
+    fix = FailureFix(
+        description=(
+            (f"Install it: {hint}. " if hint else f"Install '{tool}' on the build machine. " if tool else "")
+            + "Settings → System also detects missing tools and shows "
+            "per-platform install commands (and can install some for you). "
+            "After installing, hit Deploy again — nothing else needs to change."
+        ),
+        command=hint,
+        auto_applicable=False,
+    )
+    return FailureDiagnosis(
+        kind=FailureKind.TOOL_MISSING,
+        cause=cause,
+        fix=fix,
+        matched_text=match.group(0),
+        extracted={"tool": tool} if tool else {},
+    )
+
+
+def _fix_artifact_missing(match: re.Match) -> FailureDiagnosis:
+    g = match.groupdict()
+    path = g.get("apath")
+    # The tail of the path is the publish dir the project promised
+    # ("dist", "build", "out") — that's the thing to surface.
+    folder = path.rstrip("/").rsplit("/", 1)[-1] if path else None
+    cause = (
+        f"The build finished but produced no '{folder}/' folder to deploy."
+        if folder
+        else "The build finished but the expected output folder doesn't exist."
+    )
+    fix = FailureFix(
+        description=(
+            "The project's publish directory doesn't match what the build "
+            "actually outputs. Common defaults: Vite/most bundlers → 'dist/', "
+            "Create React App → 'build/', Next.js → '.next/' (or 'out/' with "
+            "`output: \"export\"`). Check your framework's output folder and "
+            "set the project's publish directory to match, then redeploy."
+        ),
+        auto_applicable=False,
+    )
+    return FailureDiagnosis(
+        kind=FailureKind.ARTIFACT_MISSING,
+        cause=cause,
+        fix=fix,
+        matched_text=match.group(0),
+        extracted={k: v for k, v in {"path": path, "folder": folder}.items() if v},
+    )
+
+
+def _fix_build_error(match: re.Match) -> FailureDiagnosis:
+    g = match.groupdict()
+    file = g.get("file")
+    line = g.get("line")
+    msg = (g.get("msg") or "").strip()
+    location = f"{file}:{line}" if file and line else (file or None)
+    cause = (
+        f"The build failed on a code error in {location}: {msg}"
+        if location and msg
+        else f"The build failed on a code error: {msg}"
+        if msg
+        else "The build failed on a compile/type error in the project's source code."
+    )
+    fix = FailureFix(
+        description=(
+            (f"Fix the error in {location}, " if location else "Fix the error shown in the build log, ")
+            + "then redeploy (for GitHub projects: commit + push; for "
+            "local-path projects: just save and hit Deploy). This is an "
+            "error in your code, not in WatchTower or the deploy target — "
+            "the same failure will reproduce locally with your build command."
+        ),
+        auto_applicable=False,
+    )
+    return FailureDiagnosis(
+        kind=FailureKind.BUILD_ERROR,
+        cause=cause,
+        fix=fix,
+        matched_text=match.group(0),
+        extracted={k: v for k, v in {"file": file, "line": line, "message": msg or None}.items() if v},
     )
 
 
@@ -483,6 +598,66 @@ PATTERNS: list[tuple[FailureKind, re.Pattern, Callable[[re.Match], FailureDiagno
         lambda m: _fix_package_not_found(_normalize_pkg_match(m)),
     ),
     (
+        # A build *tool* is absent from the machine (pnpm, node, podman…).
+        # The single most beginner-hostile failure: the raw log says
+        # "command not found" and nothing else. Before PACKAGE_NOT_FOUND
+        # would never match these; before BUILD_ERROR so a shell error
+        # never reads as a code error.
+        FailureKind.TOOL_MISSING,
+        re.compile(
+            # bash/sh/zsh: "pnpm: command not found", "/bin/sh: 1: pnpm: not found"
+            r"(?:^|[:\s])(?P<tool>[\w.\-]+): (?:command )?not found"
+            # node child_process: "spawn pnpm ENOENT"
+            r"|spawn (?P<tool2>[\w.\-]+) ENOENT"
+            # Windows cmd: "'pnpm' is not recognized as an internal or external command"
+            r"|'(?P<tool3>[\w.\-]+)' is not recognized as an internal or external command"
+            # python subprocess: FileNotFoundError: [Errno 2] No such file or directory: 'pnpm'
+            r"|FileNotFoundError: \[Errno 2\] No such file or directory: '(?P<tool4>[\w.\-]+)'",
+            re.IGNORECASE | re.MULTILINE,
+        ),
+        lambda m: _fix_tool_missing(_normalize_tool_match(m)),
+    ),
+    (
+        # Deploy-stage: build succeeded but the promised publish dir was
+        # never created — rsync fails stat'ing it. Almost always a
+        # publish-directory mismatch (Next.js '.next' vs configured
+        # 'dist'). Hit the same real installation three times before it
+        # got its own class.
+        FailureKind.ARTIFACT_MISSING,
+        re.compile(
+            r"rsync\(?\d*\)?:?\s*error:?\s*(?P<apath>[^\s:]+)[:\s]+\(l\)stat: No such file or directory"
+            r"|rsync: (?:\[sender\] )?change_dir .* failed: No such file or directory"
+            r"|cannot stat local path (?P<apath2>[^\s:]+): No such file",
+            re.IGNORECASE,
+        ),
+        lambda m: _fix_artifact_missing(_normalize_artifact_match(m)),
+    ),
+    (
+        # Compile/type errors in the user's own code. Placed after
+        # PACKAGE_NOT_FOUND and MISSING_ENV_VAR so a "Cannot find module"
+        # or env KeyError keeps its more actionable class; before
+        # PERMISSION_DENIED because that regex is generic enough to
+        # false-positive on error messages that merely mention it.
+        FailureKind.BUILD_ERROR,
+        re.compile(
+            # Next.js / tsc --pretty: "./path/file.tsx:633:16\nType error: msg"
+            r"(?P<file>[^\s:]+\.(?:tsx|ts|jsx|js|mts|cts)):(?P<line>\d+):\d+\s*\n\s*Type error:\s*(?P<msg>[^\n]+)"
+            # tsc plain: "path/file.ts(12,34): error TS1234: msg"
+            r"|(?P<file2>[^\s()]+\.(?:tsx|ts|jsx|js))\((?P<line2>\d+),\d+\):\s*error TS\d+:\s*(?P<msg2>[^\n]+)"
+            # Go compiler: "path/file.go:12:5: undefined: Foo"
+            r"|(?P<file5>[^\s:]+\.go):(?P<line5>\d+):\d+:\s*(?P<msg5>(?:undefined|cannot use|syntax error|missing|too many|not enough)[^\n]*)"
+            # Rust: "error[E0308]: msg" (+ optional "--> src/file.rs:5:9")
+            r"|error\[E\d+\]:\s*(?P<msg6>[^\n]+)(?:\n[^\n]*-->\s*(?P<file6>[^\s:]+):(?P<line6>\d+))?"
+            # esbuild / vite: "✘ [ERROR] msg"
+            r"|✘ \[ERROR\]\s*(?P<msg7>[^\n]+)"
+            # Location-less fallbacks, still clearly compile-time
+            r"|Type error:\s*(?P<msg3>[^\n]+)"
+            r"|SyntaxError:\s*(?P<msg4>[^\n]+)",
+            re.IGNORECASE,
+        ),
+        lambda m: _fix_build_error(_normalize_build_error_match(m)),
+    ),
+    (
         FailureKind.PERMISSION_DENIED,
         re.compile(
             r"permission denied(?:[:\s]+(?P<target>[/\w.\-]+))?"
@@ -529,6 +704,40 @@ def _normalize_target_match(m: re.Match) -> re.Match:
     return m
 
 
+def _normalize_tool_match(m: re.Match) -> re.Match:
+    g = m.groupdict()
+    chosen = g.get("tool") or g.get("tool2") or g.get("tool3") or g.get("tool4")
+    if chosen and not g.get("tool"):
+        return _RewrittenMatch(m, {"tool": chosen})
+    return m
+
+
+def _normalize_artifact_match(m: re.Match) -> re.Match:
+    g = m.groupdict()
+    chosen = g.get("apath") or g.get("apath2")
+    if chosen and not g.get("apath"):
+        return _RewrittenMatch(m, {"apath": chosen})
+    return m
+
+
+def _normalize_build_error_match(m: re.Match) -> re.Match:
+    g = m.groupdict()
+    overlay = {}
+    file = g.get("file") or g.get("file2") or g.get("file5") or g.get("file6")
+    line = g.get("line") or g.get("line2") or g.get("line5") or g.get("line6")
+    msg = (
+        g.get("msg") or g.get("msg2") or g.get("msg3") or g.get("msg4")
+        or g.get("msg5") or g.get("msg6") or g.get("msg7")
+    )
+    if file and not g.get("file"):
+        overlay["file"] = file
+    if line and not g.get("line"):
+        overlay["line"] = line
+    if msg and not g.get("msg"):
+        overlay["msg"] = msg
+    return _RewrittenMatch(m, overlay) if overlay else m
+
+
 class _RewrittenMatch:
     """Tiny match-like wrapper that overlays additional groupdict keys.
 
@@ -553,6 +762,12 @@ class _RewrittenMatch:
         return d
 
 
+# Terminal color/style escape sequences. Build tools (Next.js, cargo,
+# esbuild) embed these mid-line, which breaks file:line extraction —
+# "\x1b[31m./file.tsx\x1b[0m:633" is not "[^\s:]+:\d+" until stripped.
+_ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
+
+
 def classify_failure(log_excerpt: str) -> FailureDiagnosis:
     """Classify a failed deployment's log excerpt.
 
@@ -563,8 +778,12 @@ def classify_failure(log_excerpt: str) -> FailureDiagnosis:
     The excerpt is searched with ``re.search`` (not ``match``) so the
     pattern can fire anywhere in the text. Callers should pass the
     last few hundred lines — that's where the actionable error usually
-    is, and limiting input keeps regex cost bounded.
+    is, and limiting input keeps regex cost bounded. ANSI color codes
+    are stripped before matching.
     """
+
+    if log_excerpt:
+        log_excerpt = _ANSI_RE.sub("", log_excerpt)
 
     if not log_excerpt:
         return FailureDiagnosis(

@@ -384,7 +384,7 @@ const TeamManagement = () => {
                 <Label htmlFor="invite_role">Role</Label>
                 <select id="invite_role" value={role}
                   onChange={(e) => setRole(e.target.value as TeamMember['role'])}
-                  className="mt-1.5 w-full border border-slate-800 rounded-md h-10 px-3 text-sm bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-red-700 focus:ring-offset-2">
+                  className="mt-1.5 w-full border border-border rounded-md h-10 px-3 text-sm bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-red-700 focus:ring-offset-2">
                   <option value="developer">Developer — can create projects & deploy</option>
                   <option value="viewer">Viewer — read-only access</option>
                   <option value="admin">Admin — manage nodes, team & deployments</option>
@@ -393,7 +393,7 @@ const TeamManagement = () => {
               </div>
               <Button onClick={() => void inviteMember()}
                 disabled={inviting || offlineMode || !orgId || !email.trim() || !canManageTeam}
-                className="w-full rounded-lg border border-slate-800 bg-amber-400 hover:bg-amber-500 text-slate-900 font-semibold shadow-[1px_1px_0_0_#1f2937] disabled:opacity-40 disabled:shadow-none">
+                className="w-full rounded-lg border border-border bg-amber-400 hover:bg-amber-500 text-slate-900 font-semibold shadow-retro disabled:opacity-40 disabled:shadow-none">
                 {inviting ? 'Sending invite…' : offlineMode ? 'Server offline' : !canManageTeam ? 'No permission to invite' : 'Send Invite'}
               </Button>
               {!email.trim() && !inviting && (
@@ -428,7 +428,7 @@ const TeamManagement = () => {
               <div className="flex flex-col gap-2">
                 <Button onClick={() => void startOAuth('github_com')}
                   disabled={loading || !orgId || offlineMode}
-                  className="w-full rounded-lg border border-slate-800 bg-amber-400 hover:bg-amber-500 text-slate-900 font-semibold shadow-[1px_1px_0_0_#1f2937] disabled:opacity-40 disabled:shadow-none text-sm">
+                  className="w-full rounded-lg border border-border bg-amber-400 hover:bg-amber-500 text-slate-900 font-semibold shadow-retro disabled:opacity-40 disabled:shadow-none text-sm">
                   Connect GitHub.com App
                 </Button>
                 <Button onClick={() => void startOAuth('github_enterprise')}

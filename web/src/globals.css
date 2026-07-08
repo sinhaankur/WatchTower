@@ -4,43 +4,48 @@
 
 @layer base {
   :root {
-    /* Retro-inspired palette with high contrast and clean readability */
-    --background: 45 22% 96%;
-    --foreground: 0 0% 9%;
-    --card: 0 0% 100%;
-    --card-foreground: 0 0% 9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 9%;
-    --muted: 45 14% 90%;
-    --muted-foreground: 0 0% 30%;
-    --accent: 216 85% 45%;
-    --accent-foreground: 0 0% 100%;
-    --destructive: 0 78% 54%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 16%;
-    --input: 0 0% 16%;
-    --primary: 0 85% 45%;
-    --primary-foreground: 0 0% 100%;
-    --ring: 0 85% 45%;
-    --secondary: 50 100% 55%;
-    --secondary-foreground: 0 0% 10%;
-    --sidebar: 45 18% 93%;
-    --sidebar-border: 0 0% 16%;
     /*
-     * Soft border / soft surface for places where the hard slate-800
-     * `--border` is too loud — sidebar dividers, page-header bands,
-     * inline pills. Warm-cream tone so the app reads as one palette.
-     * If you want the cool blue-gray that the sidebar polish branch
-     * shipped with, swap these two lines back to:
-     *   --border-soft:  214 32% 88%;
-     *   --surface-soft: 210 60% 99%;
+     * Brand palette — yellow, red, and white (the Wt monogram colors),
+     * carried by the calm structure from the 2026-06 redesign: soft
+     * borders, layered shadows, generous whitespace. Primary is the
+     * brand red, secondary is the brand yellow, surfaces are warm white.
+     * Destructive stays a brighter red than primary so delete actions
+     * still read hotter than ordinary buttons. Everything in the app
+     * sources these tokens, so the whole UI moves together.
      */
-    --border-soft:  45 14% 84%;
-    --surface-soft: 45 30% 98%;
-    /* Archetype-level motion + shadow tokens */
-    --shadow: 4px 4px 0 0 hsl(0 0% 0% / 1);
-    --shadow-hover: 6px 6px 0 0 hsl(0 0% 0% / 1);
-    --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+    --background: 40 33% 99%;        /* warm white — brand "white" */
+    --foreground: 222 24% 16%;       /* slate-900-ish, softer than pure black */
+    --card: 0 0% 100%;
+    --card-foreground: 222 24% 16%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 24% 16%;
+    --muted: 45 25% 96%;
+    --muted-foreground: 215 16% 47%; /* slate-500 — for secondary text */
+    --accent: 0 74% 45%;             /* brand red */
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 84% 57%;        /* hotter than primary — delete ≠ act */
+    --destructive-foreground: 0 0% 100%;
+    --border: 40 14% 88%;            /* soft warm border */
+    --input: 40 14% 85%;
+    --primary: 0 74% 42%;            /* brand red (#b91c1c family) */
+    --primary-foreground: 0 0% 100%;
+    --ring: 0 74% 46%;
+    --secondary: 48 96% 89%;         /* brand yellow chip (amber-100) */
+    --secondary-foreground: 22 78% 26%;
+    --sidebar: 45 45% 98%;
+    --sidebar-border: 40 15% 90%;
+    /* Even softer border / surface for dividers, header bands, inline pills. */
+    --border-soft:  40 18% 92%;
+    --surface-soft: 45 40% 99%;
+    /* Corner radius scale — primitives derive md/sm from this. */
+    --radius: 0.625rem;
+    /*
+     * Soft, layered shadows (replaces the hard 4px offset). Two-stop ambient
+     * + key shadow reads as gentle elevation, the modern SaaS look.
+     */
+    --shadow: 0 1px 2px 0 hsl(222 24% 16% / 0.04), 0 1px 3px 0 hsl(222 24% 16% / 0.08);
+    --shadow-hover: 0 4px 8px -2px hsl(222 24% 16% / 0.10), 0 2px 4px -2px hsl(222 24% 16% / 0.06);
+    --ease-spring: cubic-bezier(0.34, 1.3, 0.64, 1);
     --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
     --dur-fast: 140ms;
     --dur-base: 240ms;

@@ -51,15 +51,16 @@ function TemplateCard({
 }) {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState(`my-${template.slug}`);
-  const placeholders = template.default_env_vars.filter((v) => v.placeholder);
+  const envVars = Array.isArray(template.default_env_vars) ? template.default_env_vars : [];
+  const placeholders = envVars.filter((v) => v.placeholder);
   const validName = slugifyName(name).length >= 2;
 
   return (
     <article
-      className="anim-fade-in-up rounded-xl border border-slate-800 bg-card p-4 shadow-[2px_2px_0_0_#1f2937] flex flex-col gap-3 transition-shadow hover:shadow-[3px_3px_0_0_#1f2937]"
+      className="anim-fade-in-up rounded-xl border border-border bg-card p-4 shadow-retro flex flex-col gap-3 transition-shadow hover:shadow-retro"
     >
       <div className="flex items-start gap-3">
-        <div className="w-9 h-9 rounded-lg border border-slate-800 bg-amber-100 flex items-center justify-center text-[11px] font-mono font-bold text-slate-900 shadow-[1px_1px_0_0_#1f2937] uppercase">
+        <div className="w-9 h-9 rounded-lg border border-border bg-amber-100 flex items-center justify-center text-[11px] font-mono font-bold text-slate-900 shadow-retro uppercase">
           {template.slug.slice(0, 2)}
         </div>
         <div className="flex-1 min-w-0">
@@ -81,8 +82,8 @@ function TemplateCard({
           Repo: <a href={template.repo_url} target="_blank" rel="noopener noreferrer" className="font-mono text-slate-700 hover:text-slate-900 underline-offset-2 hover:underline">{template.repo_url.replace('https://github.com/', '')}</a>
         </p>
         {template.memory_hint_mb && <p>Memory hint: {template.memory_hint_mb} MB</p>}
-        {template.default_env_vars.length > 0 && (
-          <p>Pre-fills {template.default_env_vars.length} env var{template.default_env_vars.length === 1 ? '' : 's'}{placeholders.length > 0 && `, ${placeholders.length} need${placeholders.length === 1 ? 's' : ''} your input`}</p>
+        {envVars.length > 0 && (
+          <p>Pre-fills {envVars.length} env var{envVars.length === 1 ? '' : 's'}{placeholders.length > 0 && `, ${placeholders.length} need${placeholders.length === 1 ? 's' : ''} your input`}</p>
         )}
       </div>
 
@@ -104,7 +105,7 @@ function TemplateCard({
               value={name}
               onChange={(e) => setName(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter' && validName && !creating) onCreate(slugifyName(name)); }}
-              className="mt-1 w-full text-xs font-mono rounded border border-slate-300 px-2 py-1.5 focus:border-slate-800 focus:outline-none"
+              className="mt-1 w-full text-xs font-mono rounded border border-slate-300 px-2 py-1.5 focus:border-border focus:outline-none"
             />
             {name && !validName && (
               <span className="text-[10px] text-red-600">Name needs at least 2 letters/digits.</span>
@@ -129,7 +130,7 @@ function TemplateCard({
             <button
               onClick={() => onCreate(slugifyName(name))}
               disabled={creating || !validName}
-              className="flex-1 text-xs px-3 py-1.5 rounded-lg border border-slate-800 bg-amber-400 hover:bg-amber-500 text-slate-900 font-semibold shadow-[1px_1px_0_0_#1f2937] disabled:opacity-50 disabled:cursor-wait"
+              className="flex-1 text-xs px-3 py-1.5 rounded-lg border border-border bg-amber-400 hover:bg-amber-500 text-slate-900 font-semibold shadow-retro disabled:opacity-50 disabled:cursor-wait"
             >
               {creating ? 'Creating…' : 'Create project →'}
             </button>
@@ -146,7 +147,7 @@ function TemplateCard({
         <div className="flex items-center gap-2 pt-1 mt-auto">
           <button
             onClick={() => setOpen(true)}
-            className="flex-1 text-xs px-3 py-1.5 rounded-lg border border-slate-800 bg-amber-400 hover:bg-amber-500 text-slate-900 font-semibold shadow-[1px_1px_0_0_#1f2937]"
+            className="flex-1 text-xs px-3 py-1.5 rounded-lg border border-border bg-amber-400 hover:bg-amber-500 text-slate-900 font-semibold shadow-retro"
           >
             Use this template
           </button>
@@ -183,7 +184,19 @@ export default function Templates() {
     let cancelled = false;
     void apiClient
       .get('/templates')
-      .then(r => { if (!cancelled) setTemplates(r.data.templates); })
+      .then(r => {
+        if (cancelled) return;
+        // Tolerate both response shapes ({ templates: [...] } and a bare
+        // array) and never hand a non-array to setState — a malformed
+        // payload used to white-screen the page at `.filter`/`.map`.
+        const payload = r.data;
+        const list = Array.isArray(payload)
+          ? payload
+          : Array.isArray(payload?.templates)
+            ? payload.templates
+            : [];
+        setTemplates(list);
+      })
       .catch(e => {
         if (cancelled) return;
         const httpStatus = (e as { response?: { status?: number } })?.response?.status ?? 0;
@@ -249,11 +262,30 @@ export default function Templates() {
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
           placeholder="Filter…"
-          className="text-xs px-3 py-1.5 rounded border border-slate-300 focus:border-slate-800 focus:outline-none w-48"
+          className="text-xs px-3 py-1.5 rounded border border-slate-300 focus:border-border focus:outline-none w-48"
         />
       </header>
 
       <main className="px-4 sm:px-6 lg:px-8 py-6 max-w-6xl mx-auto w-full">
+        {/* How a template connects — users saw cards but not the chain
+            (template → project → deploy → Applications), so "Use" felt
+            like a mystery button. Three steps, always visible, cheap. */}
+        <div className="rounded-xl border border-border bg-card px-4 py-3 mb-6 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-0 text-xs text-slate-600">
+          <div className="flex items-center gap-2 sm:flex-1">
+            <span className="w-5 h-5 rounded-full bg-secondary text-secondary-foreground font-bold flex items-center justify-center shrink-0">1</span>
+            <span><strong className="text-slate-900">Pick a template.</strong> Each is a known-good recipe: repo, env vars, config.</span>
+          </div>
+          <span className="hidden sm:block text-slate-300 px-3" aria-hidden>→</span>
+          <div className="flex items-center gap-2 sm:flex-1">
+            <span className="w-5 h-5 rounded-full bg-secondary text-secondary-foreground font-bold flex items-center justify-center shrink-0">2</span>
+            <span><strong className="text-slate-900">We create your project</strong> with everything pre-wired — you land on its page to review.</span>
+          </div>
+          <span className="hidden sm:block text-slate-300 px-3" aria-hidden>→</span>
+          <div className="flex items-center gap-2 sm:flex-1">
+            <span className="w-5 h-5 rounded-full bg-secondary text-secondary-foreground font-bold flex items-center justify-center shrink-0">3</span>
+            <span><strong className="text-slate-900">Hit Deploy.</strong> It runs on your machine and shows up under <Link to="/applications" className="underline font-medium text-primary">Applications</Link>.</span>
+          </div>
+        </div>
         {error && (
           <div className={`rounded-lg p-3 mb-4 text-xs flex items-center justify-between gap-3 ${
             error.status === 401

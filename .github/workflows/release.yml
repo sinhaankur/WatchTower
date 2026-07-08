@@ -323,11 +323,86 @@ jobs:
       - name: Build & publish installers
         # --publish always: electron-builder uploads each artifact to the
         # already-created GitHub Release for this tag.
-        run: npm --prefix desktop run dist -- ${{ matrix.eb_args }} --publish always
+        #
+        # Retry wrapper: GitHub's macOS runners intermittently fail DMG
+        # creation with `hdiutil: ... Device not configured` (the disk-image
+        # subsystem flaking under load). It hit 1.17.0 and 1.17.1 on the x64
+        # DMG. The build is deterministic, so a retry clears it — auto-retry
+        # up to 3x instead of needing a manual re-run every release. Bash on
+        # all platforms (GitHub runners have bash, incl. windows-latest).
+        shell: bash
+        run: |
+          set -o pipefail
+
+          # ── macOS code signing + notarization (opt-in via secrets) ──────────
+          # When the Developer-ID cert (CSC_LINK) is configured as a repo
+          # secret, sign + notarize so updates are seamless and Gatekeeper
+          # doesn't warn. When it's absent (forks, or before signing is set
+          # up), fall back to the existing UNSIGNED build — CSC_IDENTITY_
+          # AUTO_DISCOVERY=false stops electron-builder from attempting a
+          # failing ad-hoc local sign. notarize defaults to false in
+          # package.json; we flip it on here only when creds exist.
+          # IMPORTANT: never EXPORT an empty CSC_LINK. electron-builder reads
+          # CSC_LINK on ALL platforms (→ WIN_CSC_LINK on Windows) and an empty
+          # value makes it try to resolve "" as a cert path and fail the build
+          # everywhere. So the signing secrets arrive as step-scoped vars with a
+          # MAC_ prefix (MAC_CSC_LINK etc.), and we only promote them to the
+          # names electron-builder expects, on macOS, when actually present.
+          EXTRA_ARGS=""
+          if [ "${RUNNER_OS}" = "macOS" ]; then
+            if [ -n "${MAC_CSC_LINK:-}" ] && [ -n "${MAC_APPLE_TEAM_ID:-}" ]; then
+              echo "::notice::macOS signing cert present — building SIGNED + NOTARIZED"
+              export CSC_LINK="${MAC_CSC_LINK}"
+              export CSC_KEY_PASSWORD="${MAC_CSC_KEY_PASSWORD}"
+              export APPLE_ID="${MAC_APPLE_ID}"
+              export APPLE_APP_SPECIFIC_PASSWORD="${MAC_APPLE_APP_SPECIFIC_PASSWORD}"
+              export APPLE_TEAM_ID="${MAC_APPLE_TEAM_ID}"
+              EXTRA_ARGS="-c.mac.notarize.teamId=${MAC_APPLE_TEAM_ID}"
+            else
+              echo "::warning::No macOS signing cert (MAC_CSC_LINK) — building UNSIGNED"
+              export CSC_IDENTITY_AUTO_DISCOVERY=false
+            fi
+          fi
+
+          # Disable errexit inside the retry loop — a non-zero electron-builder
+          # exit is handled by the `if` below, not an abort. (GitHub runs bash
+          # steps with -e by default, which would otherwise kill the retry.)
+          set +e
+          attempts=3
+          for i in $(seq 1 $attempts); do
+            echo "::group::electron-builder attempt $i/$attempts"
+            npm --prefix desktop run dist -- ${{ matrix.eb_args }} $EXTRA_ARGS --publish always 2>&1 | tee /tmp/eb.log
+            rc=${PIPESTATUS[0]}
+            if [ "$rc" -eq 0 ]; then
+              echo "::endgroup::"
+              exit 0
+            fi
+            echo "::endgroup::"
+            # Only retry the known-transient hdiutil flake; fail fast on real errors.
+            if grep -qiE "hdiutil.*(Device not configured|Resource busy|failed)" /tmp/eb.log && [ "$i" -lt "$attempts" ]; then
+              echo "::warning::Transient hdiutil failure on attempt $i — retrying in 15s"
+              sleep 15
+              continue
+            fi
+            echo "::error::electron-builder failed (attempt $i) — not a known-transient error, aborting"
+            exit 1
+          done
+          echo "::error::electron-builder still failing after $attempts attempts"
+          exit 1
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # Ensure electron-builder finds the pre-built frontend
           WEB_DIST: ${{ github.workspace }}/web/dist
+          # macOS signing secrets, carried under MAC_-prefixed names so an EMPTY
+          # value can't be seen by electron-builder as CSC_LINK / WIN_CSC_LINK
+          # (which would break the build on every platform). The run step
+          # promotes them to electron-builder's expected names, on macOS, only
+          # when present. See docs/MAC_CODE_SIGNING.md for the secret list.
+          MAC_CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
+          MAC_CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
+          MAC_APPLE_ID: ${{ secrets.APPLE_ID }}
+          MAC_APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          MAC_APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
 
       # ── Smoke test (Linux x64 only): launch the AppImage headless,
       # confirm the bundled launcher resolves a Python with the watchtower
@@ -423,3 +498,123 @@ jobs:
             fi
           done
           exit 1
+
+      # ── macOS manifest race fix ─────────────────────────────────────────────
+      # The two macOS matrix entries (--mac --arm64 and --mac --x64) each
+      # generate their OWN single-arch latest-mac.yml and both --publish to the
+      # same release, racing to overwrite each other. Whichever finishes last
+      # wins, so the published latest-mac.yml lists only ONE arch — and
+      # electron-updater on the other arch never sees an update (this silently
+      # broke Mac auto-update through >=1.16.3). Upload each arch's manifest as
+      # an artifact so the merge-mac-manifest job can combine them.
+      - name: Upload mac manifest artifact (for merge)
+        if: matrix.os == 'macos-14'
+        uses: actions/upload-artifact@v4
+        with:
+          name: mac-manifest-${{ contains(matrix.eb_args, 'arm64') && 'arm64' || 'x64' }}
+          path: desktop/dist/latest-mac.yml
+          if-no-files-found: error
+
+  # ── Merge the two per-arch macOS manifests into one ─────────────────────────
+  # Runs after the desktop matrix. Downloads the arm64 + x64 latest-mac.yml
+  # artifacts, merges their `files:` lists into a single manifest that lists
+  # BOTH arches, and re-uploads it to the release — overwriting whichever
+  # single-arch manifest won the publish race. electron-updater then matches
+  # the running Mac's arch from the combined list (see MacUpdater.js).
+  merge-mac-manifest:
+    name: Merge macOS update manifest
+    needs: build-desktop
+    # always(): run even if a desktop matrix leg failed. A flaky DMG failure
+    # both breaks the manifest AND (without this) would skip the very job that
+    # repairs it. We merge whatever arch manifests DID build.
+    if: always()
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download arm64 manifest
+        uses: actions/download-artifact@v4
+        continue-on-error: true   # arch may have failed to build; merge handles absence
+        with:
+          name: mac-manifest-arm64
+          path: manifests/arm64
+      - name: Download x64 manifest
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: mac-manifest-x64
+          path: manifests/x64
+      - name: Merge manifests
+        run: |
+          python3 - <<'PY'
+          import os, sys
+          try:
+              import yaml
+          except ImportError:
+              import subprocess
+              subprocess.check_call([sys.executable, "-m", "pip", "install", "-q", "pyyaml"])
+              import yaml
+
+          def load(p):
+              return yaml.safe_load(open(p)) if os.path.exists(p) else None
+
+          arm = load("manifests/arm64/latest-mac.yml")
+          x64 = load("manifests/x64/latest-mac.yml")
+          present = [m for m in (arm, x64) if m]
+          if not present:
+              # Neither arch built — nothing to publish. Fail loudly: a release
+              # with no mac manifest at all is a real problem worth a red run.
+              print("::error::No macOS manifest artifacts found — both mac builds failed.")
+              sys.exit(1)
+
+          # Combine file lists (arm64 first so the top-level fallback is arm64),
+          # de-duplicating by url. Tolerates one arch being absent.
+          seen, files = set(), []
+          for src in (arm, x64):
+              if not src:
+                  continue
+              for f in src.get("files", []):
+                  if f["url"] not in seen:
+                      seen.add(f["url"])
+                      files.append(f)
+
+          # Prefer an arm64 zip for the top-level path; fall back to whatever
+          # zip exists if only x64 built.
+          zips = [f for f in files if f["url"].endswith(".zip")]
+          top = next((f for f in zips if "arm64" in f["url"]), zips[0] if zips else files[0])
+          merged = {
+              "version": present[0]["version"],
+              "files": files,
+              "path": top["url"],
+              "sha512": top["sha512"],
+              "releaseDate": (arm or x64).get("releaseDate"),
+              # Electron 43 raised the app's floor to macOS 12 (Monterey).
+              # electron-updater >= 6.8 (shipped in every 1.17.x install)
+              # reads this field and reports "no update" on older systems
+              # instead of replacing a working app with one that won't
+              # launch. electron-builder doesn't emit it (its releaseInfo
+              # schema rejects the key), so it's injected here. Keep in
+              # sync with the packed app's LSMinimumSystemVersion.
+              "minimumSystemVersion": "12.0",
+          }
+          with open("latest-mac.yml", "w") as fh:
+              yaml.safe_dump(merged, fh, default_flow_style=False, sort_keys=False)
+
+          urls = [f["url"] for f in files]
+          has_arm = any("arm64" in u for u in urls)
+          has_x64 = any("x64" in u for u in urls)
+          print("Merged latest-mac.yml lists:", urls)
+          if not (has_arm and has_x64):
+              # One arch is missing — publish what we have so SOME Macs update,
+              # but warn so it's visible and verify-release.sh will flag it.
+              print(f"::warning::latest-mac.yml is single-arch (arm64={has_arm} x64={has_x64}). "
+                    f"Re-run the failed macOS build to get full coverage.")
+          PY
+          cat latest-mac.yml
+      - name: Upload merged manifest to release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          echo "Re-uploading merged latest-mac.yml to release $TAG"
+          gh release upload "$TAG" latest-mac.yml --clobber --repo "${GITHUB_REPOSITORY}"

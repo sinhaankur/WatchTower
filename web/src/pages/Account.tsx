@@ -59,7 +59,7 @@ export default function Account() {
       </header>
 
       {/* Profile card */}
-      <section className="rounded-xl border border-slate-800 bg-white shadow-[2px_2px_0_0_#1f2937] mb-6">
+      <section className="rounded-xl border border-border bg-white shadow-retro mb-6">
         <div className="flex items-start gap-4 p-5">
           {me?.avatar_url ? (
             <img
@@ -102,7 +102,7 @@ export default function Account() {
       </section>
 
       {/* Organization & role */}
-      <section className="rounded-xl border border-slate-800 bg-white shadow-[2px_2px_0_0_#1f2937] mb-6">
+      <section className="rounded-xl border border-border bg-white shadow-retro mb-6">
         <div className="px-5 py-4 border-b border-slate-200">
           <h2 className="text-sm font-semibold text-slate-900">Organization</h2>
           <p className="mt-0.5 text-xs text-slate-500">
@@ -124,7 +124,7 @@ export default function Account() {
       </section>
 
       {/* Session security */}
-      <section className="rounded-xl border border-slate-800 bg-white shadow-[2px_2px_0_0_#1f2937] mb-6">
+      <section className="rounded-xl border border-border bg-white shadow-retro mb-6">
         <div className="px-5 py-4 border-b border-slate-200">
           <h2 className="text-sm font-semibold text-slate-900">Session</h2>
           <p className="mt-0.5 text-xs text-slate-500">

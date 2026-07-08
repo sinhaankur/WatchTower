@@ -1,9 +1,66 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link /*, useNavigate*/ } from 'react-router-dom';
 import axios from 'axios';
 import apiClient from '@/lib/api';
 import { trackEvent } from '@/lib/analytics';
 import EmptyState from '@/components/EmptyState';
+
+/**
+ * Overflow "⋯" menu for a project row. Keeps the primary actions (Deploy /
+ * Open / Details) visible and unclutters the row by tucking rarely-used
+ * actions (Clear cache, Delete) behind a single button. Click-outside closes.
+ */
+function RowMenu({
+  onClearCache,
+  onDelete,
+  clearing,
+}: {
+  onClearCache: () => void;
+  onDelete: () => void;
+  clearing: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!open) return;
+    const handle = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handle);
+    return () => document.removeEventListener('mousedown', handle);
+  }, [open]);
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="px-2 py-1.5 rounded-lg border border-border text-sm text-slate-500 hover:bg-slate-100 transition-colors leading-none"
+        title="More actions"
+        aria-haspopup="menu"
+        aria-expanded={open}
+      >
+        ⋯
+      </button>
+      {open && (
+        <div className="absolute right-0 top-full mt-1 z-20 w-44 rounded-lg border border-border bg-card shadow-md py-1 text-sm">
+          <button
+            onClick={() => { setOpen(false); onClearCache(); }}
+            disabled={clearing}
+            className="w-full text-left px-3 py-2 text-foreground hover:bg-muted transition-colors disabled:opacity-50"
+          >
+            🧹 Clear build cache
+          </button>
+          <button
+            onClick={() => { setOpen(false); onDelete(); }}
+            className="w-full text-left px-3 py-2 text-red-600 hover:bg-red-50 transition-colors"
+          >
+            ✕ Delete project
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
 
 type Project = {
   id: string;
@@ -91,6 +148,10 @@ const Applications = () => {
   // a "Live at http://localhost:XXXX" pill on the card without making
   // users click into the detail page to discover the URL.
   const [localRunUrls, setLocalRunUrls] = useState<Record<string, string>>({});
+  // Per-project failure diagnosis (from /deployments/{id}/diagnose) so a
+  // "failed" card explains itself inline instead of making the user hunt
+  // through Details → logs to learn what went wrong.
+  const [diagnoses, setDiagnoses] = useState<Record<string, { cause: string; kind: string }>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
@@ -109,7 +170,9 @@ const Applications = () => {
     setError('');
     try {
       const [projRes] = await Promise.all([apiClient.get('/projects')]);
-      const rows = (projRes.data as any[]) ?? [];
+      // Array-guard: a non-array body (error object, unexpected shape) must not
+      // reach rows.map and crash the page.
+      const rows: any[] = Array.isArray(projRes.data) ? projRes.data : [];
 
       // Fetch last deployment for each project in parallel
       const enriched: ProjectWithDeployment[] = await Promise.all(
@@ -149,6 +212,27 @@ const Applications = () => {
       );
       const dedup = deduplicateProjects(enriched);
       setProjects(dedup);
+
+      // Fire-and-forget: fetch a structured diagnosis for every project
+      // whose latest deploy failed. The card renders the cause inline —
+      // pattern-matched server-side (no LLM cost), so this is cheap.
+      void Promise.allSettled(
+        dedup
+          .filter((p) => p.lastDeployment?.status.toLowerCase() === 'failed')
+          .map((p) =>
+            apiClient
+              .get<{ kind?: string; cause?: string }>(`/projects/deployments/${p.lastDeployment!.id}/diagnose`)
+              .then((r) => {
+                const cause = r?.data?.cause;
+                if (typeof cause === 'string' && cause) {
+                  setDiagnoses((prev) => ({ ...prev, [p.id]: { cause, kind: r.data?.kind ?? 'unknown' } }));
+                }
+              })
+              .catch(() => {
+                /* diagnosis is an enhancement — the failed badge still shows */
+              }),
+          ),
+      );
 
       // Fire-and-forget: probe each project's Run Locally status.
       // We don't await before showing the list because the URL only
@@ -262,9 +346,9 @@ const Applications = () => {
           </button>
           <Link
             to="/setup"
-            className="px-3 sm:px-4 py-1.5 rounded-lg bg-red-700 hover:bg-red-800 text-white text-xs sm:text-sm font-medium transition-colors border border-slate-800 shadow-[2px_2px_0_0_#1f2937]"
+            className="px-3 sm:px-4 py-1.5 rounded-lg bg-primary hover:bg-primary/90 text-white text-xs sm:text-sm font-medium transition-colors border border-border shadow-retro"
           >
-            + Deploy App
+            + New Project
           </Link>
         </div>
       </header>
@@ -326,7 +410,13 @@ const Applications = () => {
                           {meta.label}
                         </span>
                         {p.lastDeployment && (
-                          <Badge status={p.lastDeployment.status} />
+                          <Link
+                            to={`/deployments/${p.lastDeployment.id}`}
+                            title="View this deployment's log"
+                            className="hover:opacity-75 transition-opacity"
+                          >
+                            <Badge status={p.lastDeployment.status} />
+                          </Link>
                         )}
                         {!p.lastDeployment && (
                           <span className="text-[11px] px-2 py-0.5 rounded-full border border-slate-200 bg-slate-50 text-slate-500 font-medium">
@@ -334,6 +424,22 @@ const Applications = () => {
                           </span>
                         )}
                       </div>
+                      {/* Inline failure diagnosis — the answer to "it failed,
+                          now what?" belongs on the card, not two clicks away. */}
+                      {p.lastDeployment?.status.toLowerCase() === 'failed' && diagnoses[p.id] && (
+                        <div className="mt-2 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-900">
+                          <span className="shrink-0" aria-hidden>⚠</span>
+                          <span className="min-w-0">
+                            {diagnoses[p.id].cause}{' '}
+                            <Link
+                              to={`/deployments/${p.lastDeployment.id}`}
+                              className="font-semibold underline whitespace-nowrap hover:text-red-700"
+                            >
+                              View log →
+                            </Link>
+                          </span>
+                        </div>
+                      )}
                       <div className="mt-1.5 flex items-center gap-3 text-xs text-slate-500 flex-wrap">
                         {p.repo_url && /^https?:\/\//i.test(p.repo_url) ? (
                           <a
@@ -391,7 +497,7 @@ const Applications = () => {
                       <button
                         onClick={() => void triggerDeploy(p.id, p.repo_branch)}
                         disabled={isDeploying || inProgress}
-                        className="px-3 py-1.5 rounded-lg bg-red-700 hover:bg-red-800 text-white text-xs font-medium transition-colors border border-slate-800 shadow-[1px_1px_0_0_#1f2937] disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="px-3 py-1.5 rounded-lg bg-primary hover:bg-primary/90 text-white text-xs font-medium transition-colors border border-border shadow-retro disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         {isDeploying || inProgress ? (
                           <span className="inline-flex items-center gap-1">
@@ -406,21 +512,11 @@ const Applications = () => {
                       >
                         Details
                       </Link>
-                      <button
-                        onClick={() => setConfirmCacheClear({ id: p.id, name: p.name })}
-                        disabled={cacheClearingId === p.id}
-                        className="px-2 py-1.5 rounded-lg border border-border text-xs text-slate-500 hover:text-amber-700 hover:border-amber-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                        title="Clear this app's build cache on this device"
-                      >
-                        {cacheClearingId === p.id ? '…' : '🧹 Cache'}
-                      </button>
-                      <button
-                        onClick={() => setConfirmDelete(p.id)}
-                        className="px-2 py-1.5 rounded-lg border border-border text-xs text-slate-400 hover:text-red-600 hover:border-red-300 transition-colors"
-                        title="Delete project"
-                      >
-                        ✕
-                      </button>
+                      <RowMenu
+                        clearing={cacheClearingId === p.id}
+                        onClearCache={() => setConfirmCacheClear({ id: p.id, name: p.name })}
+                        onDelete={() => setConfirmDelete(p.id)}
+                      />
                     </div>
                   </div>
 
@@ -450,7 +546,7 @@ const Applications = () => {
                       → Add Server First
                     </Link>
                     <Link to="/setup"
-                      className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-red-700 hover:bg-red-800 text-white text-sm transition-colors border border-slate-800 shadow-[2px_2px_0_0_#1f2937]">
+                      className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary hover:bg-primary/90 text-white text-sm transition-colors border border-border shadow-retro">
                       Setup Wizard →
                     </Link>
                   </>
@@ -527,7 +623,7 @@ const Applications = () => {
               </button>
               <button
                 onClick={() => void deleteProject(confirmDelete)}
-                className="px-4 py-2 rounded-lg bg-red-700 hover:bg-red-800 text-white text-sm font-medium transition-colors"
+                className="px-4 py-2 rounded-lg bg-primary hover:bg-primary/90 text-white text-sm font-medium transition-colors"
               >
                 Delete
               </button>

@@ -347,6 +347,33 @@ export default function DeploymentDetail() {
 
 // ── Build log viewer (live WS streaming, mirrors ProjectDetail's pattern) ─────
 
+// Terminal color escapes render as literal "[31m" garbage in a <pre>;
+// strip them for display. (The backend stores the raw log.)
+// eslint-disable-next-line no-control-regex
+const ANSI_RE = /\x1b\[[0-9;]*m/g;
+
+// Lines that carry the actual failure. Highlighted so a user scanning a
+// long build log lands on the error without reading npm's life story.
+const ERROR_LINE_RE = /\berror\b|✗|❌|failed to|Type error:|SyntaxError:|Traceback|exit code [1-9]/i;
+
+function LogLines({ text }: { text: string }) {
+  return (
+    <>
+      {text.split('\n').map((line, i) =>
+        ERROR_LINE_RE.test(line) ? (
+          <span key={i} className="block bg-red-950/60 text-red-200 -mx-4 px-4">
+            {line || ' '}
+          </span>
+        ) : (
+          <span key={i} className="block">
+            {line || ' '}
+          </span>
+        ),
+      )}
+    </>
+  );
+}
+
 function BuildLogViewer({ build, active }: { build: Build | null; active: boolean }) {
   const [log, setLog] = useState('');
   const preRef = useRef<HTMLPreElement>(null);
@@ -404,7 +431,7 @@ function BuildLogViewer({ build, active }: { build: Build | null; active: boolea
       </div>
       {build ? (
         <pre ref={preRef} className="m-0 p-4 text-xs font-mono leading-relaxed bg-slate-950 text-slate-100 overflow-auto max-h-[28rem] whitespace-pre-wrap">
-          {log || 'No output yet.'}
+          {log ? <LogLines text={log.replace(ANSI_RE, '')} /> : 'No output yet.'}
         </pre>
       ) : (
         <p className="p-4 text-sm text-muted-foreground">No build for this deployment yet.</p>

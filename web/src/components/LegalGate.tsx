@@ -112,7 +112,7 @@ export default function LegalGate({ children }: { children: ReactElement }) {
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-50 flex items-center justify-center p-4">
-      <div className="w-full max-w-2xl max-h-[90vh] flex flex-col rounded-xl border border-slate-800 bg-white shadow-[3px_3px_0_0_#1f2937]">
+      <div className="w-full max-w-2xl max-h-[90vh] flex flex-col rounded-xl border border-border bg-white shadow-retro">
         <div className="px-5 py-4 border-b border-slate-200 flex items-center gap-3">
           <BrandLogo size="sm" />
           <div>
@@ -159,7 +159,7 @@ export default function LegalGate({ children }: { children: ReactElement }) {
             <button
               onClick={() => void handleAccept()}
               disabled={!agreed || !docs || accept.isPending}
-              className="text-xs px-5 py-2 rounded-lg border border-slate-800 bg-amber-400 hover:bg-amber-500 text-slate-900 font-semibold shadow-[1px_1px_0_0_#1f2937] disabled:opacity-50 disabled:cursor-not-allowed"
+              className="text-xs px-5 py-2 rounded-lg border border-border bg-amber-400 hover:bg-amber-500 text-slate-900 font-semibold shadow-retro disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {accept.isPending ? 'Recording…' : 'I agree — continue'}
             </button>

@@ -9,6 +9,82 @@ Curated, human-friendly history of WatchTower releases. Auto-generated GitHub Re
 
 ---
 
+## 1.17.4 — Crash-proofing + a security patch
+
+Hardening release: closes a class of page crash and patches a dependency vulnerability.
+
+- **No page can be blanked by a bad API response.** Every list-backed page (Templates, Remote Access, Databases, Containers, and more) now degrades to its normal empty state if the server returns an unexpected shape, instead of white-screening. Fixed at the data layer, so all 14 list views are covered at once.
+- **Security patch.** Updated a transitive dependency (`form-data`) to clear a HIGH-severity advisory (CVE-2026-12143). No user-facing behavior change.
+- **Tighter release gate.** The pre-release quality check now also scans shipped dependencies for known vulnerabilities, so a security issue is caught before a release is tagged rather than after — matching what CI enforces.
+
+---
+
+## 1.17.3 — See what WatchTower fixed, and a cleaner dashboard
+
+This release makes WatchTower's headline feature — self-healing — visible, and cleans up the everyday flow.
+
+- **Self-healing activity on the Dashboard.** WatchTower already watches your deploys and fixes what it can on its own; now you can *see* it. A new activity feed shows recent heals — "*api-service · Port conflict → reassigned to port 8081 → auto-fixed*" — with a running count of what it fixed for you and what needs your attention.
+- **Data-first dashboard.** Your projects and stats now lead; the explainer diagram and welcome hero only show on a fresh, empty install.
+- **Clearer, less cluttered UI.** One consistent "+ New Project" button everywhere (was a mix of "New Resource" / "Deploy App"), project rows lead with a prominent Deploy button and tuck the rest into a "⋯" menu, and the "Use this PC" card no longer appears twice on the Servers page.
+- **More resilient pages.** A single unexpected API response can no longer blank a whole page — Settings cards are individually error-isolated, and the Dashboard/Applications tolerate malformed data instead of crashing.
+
+---
+
+## 1.17.2 — Deploy reliability + richer notifications
+
+Fixes two real deploy failures and notifies you about more of what WatchTower is doing.
+
+**Deploy fixes**
+- **Auto-detect the build output folder.** A static site that built successfully but output to a non-`dist/` folder (e.g. Next.js's `out/`, Create-React-App's `build/`) failed at the deploy step with "No such file or directory". WatchTower now detects where the build actually landed — `out/`, `build/`, `dist/`, `public/`, and more — instead of assuming `dist/`.
+- **Local deploys survive a bad target path.** Deploying to "this PC" could fail with "Permission denied" if an older local node pointed at a directory the app can't write to. Local deploys now fall back to a safe, writable location automatically, and the "Test connection" check reports the path that will actually be used.
+
+**More notifications**
+- Slack/Discord webhooks now fire on **self-heal** events (auto-fix applied, or a failure queued for your attention) and **control-plane pairing**, not just deploy success/failure.
+- New **org-wide webhooks** (Settings → Org notifications) for installation-level alerts that aren't tied to a single project.
+
+**Under the hood**
+- macOS code-signing + notarization support is now wired (opt-in — see `docs/MAC_CODE_SIGNING.md`), and the release pipeline auto-retries the occasional flaky macOS DMG build.
+
+---
+
+## 1.17.1 — Reliable macOS auto-update
+
+Fixes the long-standing "the app doesn't update itself" problem on macOS, and makes the update feel smooth.
+
+- **macOS auto-update actually works now.** The two Mac builds (Apple Silicon and Intel) were each publishing their own update manifest and overwriting each other, so one architecture never saw new versions. The release now publishes a single combined manifest that lists both — so every Mac gets updates. (Linux and Windows were unaffected.)
+- **Visible download progress.** Choosing "Restart and Install" on macOS now shows progress while the update downloads (dock progress bar + tray tooltip) instead of appearing frozen, then replaces the app and reopens automatically.
+- **Release safety net.** The post-release verifier now fails if the macOS update manifest is missing either architecture, so this class of bug can't ship again.
+
+---
+
+## 1.17.0 — Plug-and-play setup, a calmer redesign, and control-plane HA
+
+The biggest theme is **plug-and-play**: turning "a PC into a server + database" should take clicks, not copy-pasted shell commands. This release also restyles the whole app to a calmer, more professional look and lays the groundwork for high-availability control planes.
+
+**Plug-and-play — server**
+- **Use this PC as a server**: one click registers the local machine as a deploy target (no SSH, no host/key fields), and deploys to it actually run locally — build, rsync, and container start all happen on this machine.
+- **One-click tool install**: install Podman / nginx / cloudflared / tailscale via the host package manager with a button and live progress, instead of copying shell commands. Falls back to the copy-paste recipe when an unattended install isn't possible.
+- **Network discovery**: machines on your Tailnet are surfaced as deploy-target candidates; "Add" pre-fills the server form.
+- **Guided SSH setup**: WatchTower manages a deploy keypair for you and gives a copy-paste one-liner to authorize it on the remote — no manual key handling.
+
+**Plug-and-play — database**
+- **One-click create + auto-wire**: creating a managed database can inject its connection string straight into a project's deploy environment in the same step.
+- **Auto-backup on create**: opt into a daily backup schedule at create time so data is protected from day one.
+- **Test connection + copy**: confirm a database is reachable right after creating it.
+- **Adopt existing databases**: detects database containers already running on the host and lets you connect them in one click.
+
+**Calmer, professional redesign**
+- Retired the neo-brutalist look (heavy black borders, hard drop-shadows, loud red/yellow) for a restrained palette — soft borders, gentle shadows, an indigo accent — applied app-wide through design tokens. Red is now reserved for destructive actions.
+
+**Control-plane high availability (foundation)**
+- WatchTower now detects other devices on your account that are also running WatchTower and lets you pair one as a **standby** control plane (one click, you approve). The standby periodically pulls the primary's state over your (encrypted) Tailnet and keeps a recent warm snapshot. Automatic failover/promotion is a planned follow-up — this release establishes the topology and the state sync.
+
+**Lighter + safer**
+- **Lean by default**: heavy, situational dependencies (SSH-deploy, the LLM agent, the durable queue) moved to optional install extras, so a minimal install is smaller. Full-feature targets (Docker image, desktop bundle) still include everything.
+- **Security/reliability fixes**: a guard against an unsafe wildcard CORS origin with credentials, and a fix for Alembic silently disabling WatchTower's loggers on startup (dropped log lines).
+
+---
+
 ## 1.16.3 — Go Live, deployment insight, and self-service ops
 
 - **Go Live**: take a project from deployed to globally reachable in one guided action — runs it as a container, attaches a domain, makes it public via Cloudflare DNS *or* a one-click Cloudflare Tunnel (no public IP needed), and turns on autonomous monitoring. Each step reports its own status, and anything that can't run automatically degrades to clear guided instructions instead of failing silently.

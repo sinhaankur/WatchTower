@@ -20,9 +20,11 @@ from collections import deque
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from fabric import Connection
+if TYPE_CHECKING:  # fabric is an optional [ssh] extra; only typed here
+    from fabric import Connection
+
 from fastapi import FastAPI, Header, HTTPException
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
@@ -161,7 +163,20 @@ def rsync_to_node(source_path: Path, node: Node, ssh_key: str | None) -> None:
     run_cmd(rsync_cmd)
 
 
-def build_connection(node: Node, ssh_key: str | None) -> Connection:
+def build_connection(node: Node, ssh_key: str | None) -> "Connection":
+    # fabric (and its paramiko/invoke/bcrypt/pynacl chain) is an optional
+    # extra so a minimal "PC → server" install stays lean. Only the legacy
+    # JSON-file deploy path in this module needs it; the primary DB-path
+    # deploy runner (watchtower/builder.py) shells out to ssh/rsync and has
+    # no such dependency. Import lazily with an actionable error.
+    try:
+        from fabric import Connection
+    except ImportError as exc:  # pragma: no cover - exercised only without [ssh]
+        raise RuntimeError(
+            "SSH-based deploys require the optional 'ssh' extra. Install it "
+            "with: pip install 'watchtower-podman[ssh]'"
+        ) from exc
+
     connect_kwargs: dict[str, Any] = {}
     if ssh_key:
         connect_kwargs["key_filename"] = ssh_key

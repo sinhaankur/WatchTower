@@ -1,34 +1,68 @@
-import * as React from "react"
-import { cn } from "@/lib/utils"
+import * as React from 'react';
+import { Slot } from '@radix-ui/react-slot';
+import { cva, type VariantProps } from 'class-variance-authority';
+import { cn } from '@/lib/utils';
+
+/**
+ * Button — the WatchTower primitive (cva + Radix Slot).
+ *
+ * Calm, modern look: 1px borders, a subtle soft shadow that lifts gently on
+ * hover (no hard offset, no toy bounce). Every value comes from design tokens
+ * (`--primary`, `--border`, `--shadow`) so the whole app moves together when a
+ * token changes.
+ *
+ * `asChild` lets a router <Link>/<a> inherit button styling via Radix Slot.
+ * Variant names (default/outline/ghost/secondary/destructive/link) are
+ * preserved for drop-in compatibility with existing call sites.
+ */
+const buttonVariants = cva(
+  'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-semibold ring-offset-background transition-[transform,box-shadow,background-color,border-color] duration-fast ease-out-soft select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:size-4 [&_svg]:shrink-0',
+  {
+    variants: {
+      variant: {
+        default:
+          'bg-primary text-primary-foreground shadow-retro hover:bg-primary/90 hover:shadow-retro-hover',
+        secondary:
+          'border border-border bg-secondary text-secondary-foreground hover:bg-muted',
+        outline:
+          'border border-border bg-card text-foreground shadow-retro hover:bg-muted hover:shadow-retro-hover',
+        destructive:
+          'bg-destructive text-destructive-foreground shadow-retro hover:bg-destructive/90 hover:shadow-retro-hover',
+        ghost: 'text-foreground hover:bg-muted',
+        link: 'text-primary underline-offset-4 hover:underline',
+      },
+      size: {
+        default: 'h-10 px-4 py-2',
+        sm: 'h-8 px-3 text-xs',
+        lg: 'h-11 px-6 text-base',
+        icon: 'h-10 w-10',
+      },
+    },
+    defaultVariants: {
+      variant: 'default',
+      size: 'default',
+    },
+  },
+);
 
 export interface ButtonProps
-  extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'default' | 'outline' | 'ghost' | 'secondary'
+  extends React.ButtonHTMLAttributes<HTMLButtonElement>,
+    VariantProps<typeof buttonVariants> {
+  asChild?: boolean;
 }
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant = 'default', ...props }, ref) => {
-    const baseStyles = "inline-flex items-center justify-center whitespace-nowrap rounded-none text-sm font-bold ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 select-none"
-    // transition applied via inline style to use CSS custom property easing
-    const transitionStyle = { transition: 'transform var(--dur-fast, 140ms) var(--ease-spring, cubic-bezier(0.34,1.56,0.64,1)), box-shadow var(--dur-fast, 140ms) ease' }
-
-    const variantStyles = {
-      default: "border-2 border-slate-800 bg-red-700 text-white shadow-[4px_4px_0_0_#000] hover:shadow-[6px_6px_0_0_#000] hover:-translate-x-[2px] hover:-translate-y-[2px] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none",
-      outline: "border-2 border-slate-800 bg-white text-slate-800 shadow-[4px_4px_0_0_#000] hover:shadow-[6px_6px_0_0_#000] hover:-translate-x-[2px] hover:-translate-y-[2px] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none",
-      ghost: "text-slate-700 hover:bg-amber-50 hover:text-red-800",
-      secondary: "border-2 border-slate-800 bg-amber-300 text-slate-900 shadow-[4px_4px_0_0_#000] hover:shadow-[6px_6px_0_0_#000] hover:-translate-x-[2px] hover:-translate-y-[2px] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none",
-    }
-
+  ({ className, variant, size, asChild = false, ...props }, ref) => {
+    const Comp = asChild ? Slot : 'button';
     return (
-      <button
-        className={cn(baseStyles, variantStyles[variant], "h-10 px-4 py-2", className)}
-        style={variant !== 'ghost' ? transitionStyle : undefined}
-        ref={ref}
-        {...props}
-      />
-    )
-  }
-)
-Button.displayName = "Button"
+      <Comp className={cn(buttonVariants({ variant, size, className }))} ref={ref} {...props} />
+    );
+  },
+);
+Button.displayName = 'Button';
 
-export { Button }
+// buttonVariants is intentionally co-located (standard shadcn convention) so
+// consumers can compose the variants onto <Link>/<a>. The fast-refresh lint
+// only cares during HMR, which doesn't apply to this stable primitive.
+// eslint-disable-next-line react-refresh/only-export-components
+export { Button, buttonVariants };

@@ -255,6 +255,57 @@ def delete_pod(db_id: str, *, keep_volume: bool = False) -> None:
         _run([bin_, "volume", "rm", "-f", volume_name(db_id)], timeout=10.0)
 
 
+def _readiness_probe_cmd(
+    bin_: str, container: str, engine: str,
+    db_user: str, db_password: str, db_name: str,
+) -> list[str]:
+    """Per-engine 'is the server accepting auth-ed queries?' command, run via
+    `podman exec` inside the DB container. Shared by wait_for_db_ready (loops)
+    and probe_connection (single shot)."""
+    if engine == "postgres":
+        return [bin_, "exec", "-e", f"PGPASSWORD={db_password}",
+                container, "psql", "-U", db_user, "-d", db_name,
+                "-tA", "-c", "SELECT 1"]
+    if engine in ("mysql", "mariadb"):
+        client = "mariadb" if engine == "mariadb" else "mysql"
+        return [bin_, "exec", "-e", f"MYSQL_PWD={db_password}",
+                container, client, "-u", db_user, "-h", "127.0.0.1",
+                "--protocol=TCP", db_name, "-e", "SELECT 1"]
+    if engine == "mongodb":
+        return [bin_, "exec", container,
+                "mongosh", "-u", db_user, "-p", db_password,
+                "--authenticationDatabase", "admin",
+                "--quiet", "--eval", "db.runCommand({ping:1}).ok"]
+    if engine == "redis":
+        # Redis auth is password-only; AUTH then PING. -a leaks on ps inside
+        # the container only (single-tenant, our pod), acceptable here.
+        return [bin_, "exec", container,
+                "redis-cli", "-a", db_password, "ping"]
+    raise ManagedDbRuntimeError(f"probe: engine '{engine}' not supported")
+
+
+def probe_connection(
+    container: str, engine: str, db_user: str, db_password: str, db_name: str,
+) -> tuple[bool, str]:
+    """Single-shot connectivity test for the 'Test connection' button.
+
+    Returns (ok, message). Never raises — a missing runtime, unsupported
+    engine, or failed probe all come back as (False, <reason>) so the API can
+    surface a clean result either way.
+    """
+    bin_ = _podman_path()
+    if not bin_:
+        return False, "No container runtime found on this host."
+    try:
+        cmd = _readiness_probe_cmd(bin_, container, engine, db_user, db_password, db_name)
+    except ManagedDbRuntimeError as exc:
+        return False, str(exc)
+    rc, _out, err = _run(cmd, timeout=8.0)
+    if rc == 0:
+        return True, "Connected — the database accepted an authenticated query."
+    return False, (err.strip() or "Probe failed (the database did not respond).")[:300]
+
+
 def wait_for_db_ready(
     container: str, engine: str, db_user: str, db_password: str,
     db_name: str, *, timeout_s: int = 30,

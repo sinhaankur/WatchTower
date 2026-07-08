@@ -32,6 +32,12 @@ classifiers = [
 # to move. Anything imported by the runtime must appear here, otherwise
 # `pipx install watchtower-podman` produces a partial install that
 # crashes at first use (regression that bit 1.6.x — see CHANGELOG 1.6.3).
+# Lean by default. The goal is "turn a PC into a server + database" with a
+# minimal footprint — so heavy, situational dependencies (SSH-deploy via
+# fabric, the LLM agent via openai, the durable Redis/RQ queue) live in
+# optional-dependencies below, NOT here. Every package in this list is
+# imported on a normal API startup or the core deploy path; the optional
+# ones are lazy-imported and gated behind an actionable ImportError.
 dependencies = [
   # Core API
   "fastapi>=0.110.0",
@@ -49,13 +55,7 @@ dependencies = [
   "pyyaml>=6.0",
   "apscheduler>=3.10.0",
   "requests>=2.28.0",
-  "fabric>=3.2.0",
   "httpx>=0.25.0",
-  # Build queue (RQ + Redis); falls back to in-process when REDIS_URL unset
-  "redis>=5.0.0",
-  "rq>=1.16.0",
-  # LLM agent — talks to any OpenAI-compatible endpoint
-  "openai>=1.50.0",
   # Rate limiting
   "slowapi>=0.1.9",
   # Container update mode (Podman SDK has Linux wheels only)
@@ -74,12 +74,48 @@ watchtower-deploy = "watchtower.deploy_server:main"
 watchtower-package = "watchtower.package_builder:main"
 watchtower-mcp = "watchtower.mcp_server:main"
 
-# Optional dependency sets. `mcp` pulls in a newer starlette/pydantic
-# than the core API tolerates, so it's gated behind an extra — users
-# who want the MCP server install with `pip install
-# watchtower-podman[mcp]`. The default install stays compatible with
-# the rest of the stack.
+# Optional dependency sets — install only what a given deployment needs.
+#
+#   pip install watchtower-podman           # lean: API + DB + Podman + deploy
+#   pip install 'watchtower-podman[ssh]'     # + SSH/rsync deploys (fabric)
+#   pip install 'watchtower-podman[agent]'   # + LLM agent / self-heal (openai)
+#   pip install 'watchtower-podman[queue]'   # + durable build queue (redis/rq)
+#   pip install 'watchtower-podman[all]'     # everything (matches the dev clone)
+#
+# Each optional dependency is lazy-imported at the one call site that needs
+# it and raises an actionable error if the extra isn't installed, so a
+# minimal install never crashes on import — only when you actually reach for
+# a feature whose extra you skipped.
+#
+# `mcp` is separate because it pulls a newer starlette/pydantic than the core
+# API tolerates; it is deliberately NOT part of `all` for that reason.
 [project.optional-dependencies]
+# SSH-based deploys (legacy JSON-file path in watchtower/deploy_server.py).
+# The primary DB-path deploy runner uses plain ssh/rsync and needs none of
+# this; fabric drags in paramiko + invoke + bcrypt + pynacl.
+ssh = [
+  "fabric>=3.2.0",
+]
+# LLM-powered DevOps agent + autonomous self-heal. Talks to any
+# OpenAI-compatible endpoint; the SDK is only used to make those calls.
+agent = [
+  "openai>=1.50.0",
+]
+# Durable build queue. Without it, builds fall back to in-process FastAPI
+# BackgroundTasks (see watchtower/queue.py), which is fine for single-node
+# homelab installs — Redis/RQ matter for multi-worker production setups.
+queue = [
+  "redis>=5.0.0",
+  "rq>=1.16.0",
+]
+# Convenience: everything above. Matches the dev clone / Docker image, which
+# install requirements.txt (the full pinned set). Excludes `mcp` on purpose.
+all = [
+  "fabric>=3.2.0",
+  "openai>=1.50.0",
+  "redis>=5.0.0",
+  "rq>=1.16.0",
+]
 mcp = [
   "mcp>=1.0,<2.0",
 ]
