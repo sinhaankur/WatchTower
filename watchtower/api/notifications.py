@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 class WebhookCreate(BaseModel):
     url: str
-    provider: str = "discord"   # "discord" | "slack"
+    provider: str = "discord"   # "discord" | "slack" | "ntfy"
     label: Optional[str] = None
 
 
@@ -71,9 +71,9 @@ async def create_webhook(
 ):
     _get_project_or_404(db, project_id, util.canonical_user_id(db, current_user))
 
-    if data.provider not in ("discord", "slack"):
+    if data.provider not in ("discord", "slack", "ntfy"):
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                            detail="provider must be 'discord' or 'slack'")
+                            detail="provider must be 'discord', 'slack', or 'ntfy'")
 
     hook = NotificationWebhook(
         project_id=project_id,
@@ -142,10 +142,10 @@ async def test_webhook(
     project = _get_project_or_404(db, project_id, util.canonical_user_id(db, current_user))
 
     provider = (body.provider or "").lower().strip()
-    if provider not in {"slack", "discord"}:
+    if provider not in {"slack", "discord", "ntfy"}:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="provider must be 'slack' or 'discord'",
+            detail="provider must be 'slack', 'discord', or 'ntfy'",
         )
 
     url_str = str(body.url)
@@ -168,6 +168,15 @@ async def test_webhook(
                 "Copy the full URL from Channel Settings → Integrations → Webhooks."
             ),
         )
+    if provider == "ntfy" and not re.match(r"^https?://", url_str):
+        return WebhookTestResponse(
+            ok=False,
+            detail=(
+                "ntfy topic URLs look like `https://ntfy.sh/your-topic` (or "
+                "`https://ntfy.your-domain.com/your-topic` if you self-host). "
+                "Paste the full topic URL, including the topic name at the end."
+            ),
+        )
 
     label = body.label or "test"
     text = (
@@ -175,16 +184,28 @@ async def test_webhook(
         f"Project: {project.name}  ·  Webhook label: {label}\n"
         f"If you see this, the webhook is wired up correctly."
     )
-    payload = (
-        {"text": text} if provider == "slack" else {"content": text}
-    )
-    data = _json.dumps(payload).encode("utf-8")
-    req = urllib.request.Request(
-        url_str,
-        data=data,
-        headers={"Content-Type": "application/json"},
-        method="POST",
-    )
+    # ntfy speaks plain text with a Title header; slack/discord speak JSON.
+    if provider == "ntfy":
+        req = urllib.request.Request(
+            url_str,
+            data=text.encode("utf-8"),
+            headers={
+                "Content-Type": "text/plain; charset=utf-8",
+                "Title": "WatchTower test",
+            },
+            method="POST",
+        )
+    else:
+        payload = (
+            {"text": text} if provider == "slack" else {"content": text}
+        )
+        data = _json.dumps(payload).encode("utf-8")
+        req = urllib.request.Request(
+            url_str,
+            data=data,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
     try:
         with urllib.request.urlopen(req, timeout=10) as resp:
             return WebhookTestResponse(ok=True, status_code=resp.status)
@@ -225,15 +246,18 @@ def _validate_webhook_shape(provider: str, url: str) -> str:
     """Validate provider + a cheap URL shape check. Returns the normalised
     provider, raises 422 on bad input (clearer than the upstream's 404/401)."""
     p = (provider or "").lower().strip()
-    if p not in {"slack", "discord"}:
+    if p not in {"slack", "discord", "ntfy"}:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY,
-                            detail="provider must be 'slack' or 'discord'")
+                            detail="provider must be 'slack', 'discord', or 'ntfy'")
     if p == "slack" and not url.startswith("https://hooks.slack.com/services/"):
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY,
                             detail="Slack webhook URLs start with https://hooks.slack.com/services/...")
     if p == "discord" and "discord.com/api/webhooks" not in url:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY,
                             detail="Discord webhook URLs contain discord.com/api/webhooks")
+    if p == "ntfy" and not (url.startswith("http://") or url.startswith("https://")):
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY,
+                            detail="ntfy topic URLs look like https://ntfy.sh/your-topic")
     return p
 
 

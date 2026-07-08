@@ -2143,7 +2143,7 @@ function WebhooksTab({ projectId }: { projectId: string }) {
           </button>
         </div>
         <p className="text-xs text-muted-foreground mb-4">
-          Receive deploy success / failure notifications in Slack or Discord.
+          Receive deploy success / failure notifications in Slack, Discord, or ntfy.
         </p>
 
         {showGuide && provider === 'slack' && (
@@ -2168,6 +2168,16 @@ function WebhooksTab({ projectId }: { projectId: string }) {
             </ol>
           </div>
         )}
+        {showGuide && provider === 'ntfy' && (
+          <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 mb-4 text-xs text-emerald-900 space-y-2">
+            <p className="font-semibold">ntfy setup (~30 s, no account needed):</p>
+            <ol className="list-decimal pl-5 space-y-1">
+              <li>Install the <a href="https://ntfy.sh/" target="_blank" rel="noopener noreferrer" className="underline font-mono">ntfy</a> app (iOS/Android/desktop), or self-host your own server.</li>
+              <li>Subscribe to a topic — any name you like, e.g. <code className="font-mono">watchtower-alerts</code>. Pick something hard to guess: anyone who knows a public topic name can read it.</li>
+              <li>Paste the topic URL below (<code className="font-mono">https://ntfy.sh/watchtower-alerts</code>, or <code className="font-mono">https://ntfy.your-domain.com/…</code> if self-hosted), click <strong>Test</strong>, then <strong>Add</strong>.</li>
+            </ol>
+          </div>
+        )}
 
         {error && <p className="text-xs text-red-600 mb-3">{error}</p>}
         {testResult && (
@@ -2179,7 +2189,7 @@ function WebhooksTab({ projectId }: { projectId: string }) {
             }`}
           >
             {testResult.ok
-              ? `Test message delivered. Check the ${provider} channel — you should see "🦉 Test message from WatchTower".`
+              ? `Test message delivered. Check ${provider === 'ntfy' ? 'your ntfy topic' : `the ${provider} channel`} — you should see "🦉 Test message from WatchTower".`
               : (testResult.detail || 'Test failed.')}
           </div>
         )}
@@ -2192,11 +2202,12 @@ function WebhooksTab({ projectId }: { projectId: string }) {
           >
             <option value="slack">Slack</option>
             <option value="discord">Discord</option>
+            <option value="ntfy">ntfy</option>
           </select>
           <input
             value={url}
             onChange={e => { setUrl(e.target.value); setTestResult(null); }}
-            placeholder={provider === 'slack' ? 'https://hooks.slack.com/services/…' : 'https://discord.com/api/webhooks/…'}
+            placeholder={provider === 'slack' ? 'https://hooks.slack.com/services/…' : provider === 'discord' ? 'https://discord.com/api/webhooks/…' : 'https://ntfy.sh/your-topic'}
             className="flex-1 min-w-[280px] border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 bg-background font-mono text-[12px]"
           />
           <input

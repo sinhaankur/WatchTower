@@ -790,14 +790,14 @@ class CloudProviderCredential(Base):
 
 
 class NotificationWebhook(Base):
-    """Discord / Slack webhook for deployment notifications per project."""
+    """Discord / Slack / ntfy webhook for deployment notifications per project."""
     __tablename__ = "notification_webhooks"
 
     id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
     project_id = Column(Uuid(as_uuid=True), ForeignKey("projects.id"), nullable=True, index=True)
     org_id = Column(Uuid(as_uuid=True), ForeignKey("organizations.id"), nullable=True)
-    provider = Column(String, default="discord")   # "discord" | "slack"
-    url = Column(String)                            # Webhook URL
+    provider = Column(String, default="discord")   # "discord" | "slack" | "ntfy"
+    url = Column(String)                            # Webhook / ntfy topic URL
     label = Column(String, nullable=True)
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=_utcnow)

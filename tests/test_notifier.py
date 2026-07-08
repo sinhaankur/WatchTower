@@ -1,9 +1,10 @@
 """Central notification dispatcher (watchtower/notifier.py).
 
-Fires a project's (or org's) Slack/Discord webhooks on events. We mock the HTTP
-POST (_post) so no network is touched, and assert: active-only filtering, the
-correct per-provider payload shape, and best-effort behaviour (one bad hook
-doesn't stop the rest; nothing raises).
+Fires a project's (or org's) Slack/Discord/ntfy webhooks on events. We mock the
+HTTP send (_post / _post_ntfy / urlopen) so no network is touched, and assert:
+active-only filtering, the correct per-provider wire format (JSON for
+slack/discord, plain-text-with-Title for ntfy), and best-effort behaviour (one
+bad hook doesn't stop the rest; nothing raises).
 """
 from __future__ import annotations
 
@@ -60,6 +61,69 @@ def test_slack_payload_uses_text_and_single_star():
 def test_discord_payload_uses_content_and_double_star():
     p = notifier._payload_for("discord", "hello **bold**")
     assert p == {"content": "hello **bold**"}
+
+
+# ── ntfy send path ────────────────────────────────────────────────────────────
+
+
+def test_send_routes_ntfy_through_post_ntfy_not_post(monkeypatch):
+    """ntfy is plain-text-with-headers, not JSON — _send must call _post_ntfy
+    (and never build a slack/discord JSON body for it)."""
+    ntfy_calls = []
+    json_calls = []
+    monkeypatch.setattr(notifier, "_post_ntfy",
+                        lambda url, text, title=notifier.NTFY_DEFAULT_TITLE, timeout=10.0:
+                        ntfy_calls.append((url, text)))
+    monkeypatch.setattr(notifier, "_post",
+                        lambda url, payload, timeout=10.0: json_calls.append((url, payload)))
+
+    notifier._send("https://ntfy.sh/my-topic", "ntfy", "deploy **done**")
+    assert ntfy_calls == [("https://ntfy.sh/my-topic", "deploy **done**")]
+    assert json_calls == []  # no JSON body was built for ntfy
+
+
+def test_send_routes_slack_through_post_with_json(monkeypatch):
+    json_calls = []
+    monkeypatch.setattr(notifier, "_post",
+                        lambda url, payload, timeout=10.0: json_calls.append((url, payload)))
+    notifier._send("https://hooks.slack.com/services/x", "slack", "deploy **done**")
+    assert json_calls == [("https://hooks.slack.com/services/x", {"text": "deploy *done*"})]
+
+
+def test_post_ntfy_strips_markdown_and_sets_title(monkeypatch):
+    """The body reaches ntfy as plain text (no `*`/`**`) and the title rides in
+    the Title header."""
+    captured = {}
+
+    class _Resp:
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+
+    def fake_urlopen(req, timeout=10.0):
+        captured["url"] = req.full_url
+        captured["body"] = req.data.decode("utf-8")
+        captured["title"] = req.headers.get("Title")
+        captured["ctype"] = req.headers.get("Content-type")
+        return _Resp()
+
+    monkeypatch.setattr(notifier.urllib.request, "urlopen", fake_urlopen)
+    notifier._post_ntfy("https://ntfy.sh/topic", "deploy **done** *now*", title="WatchTower")
+    assert captured["url"] == "https://ntfy.sh/topic"
+    assert captured["body"] == "deploy done now"  # markdown stripped
+    assert captured["title"] == "WatchTower"
+    assert captured["ctype"].startswith("text/plain")
+
+
+def test_notify_project_dispatches_ntfy(project, db_session, monkeypatch):
+    """End-to-end: a project ntfy hook is sent to via the ntfy path."""
+    _add_hook(db_session, project.id, "ntfy", "https://ntfy.sh/watchtower")
+    ntfy_calls = []
+    monkeypatch.setattr(notifier, "_post_ntfy",
+                        lambda url, text, title=notifier.NTFY_DEFAULT_TITLE, timeout=10.0:
+                        ntfy_calls.append(url))
+    sent = notifier.notify_project(db_session, project.id, "deploy done")
+    assert sent == 1
+    assert ntfy_calls == ["https://ntfy.sh/watchtower"]
 
 
 # ── notify_project ────────────────────────────────────────────────────────────
