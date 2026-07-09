@@ -1,8 +1,13 @@
 """add backup_destinations and backup_copies
 
 Revision ID: df983087a51a
-Revises: 86eb92ce0a55
+Revises: 52e21baa63f8
 Create Date: 2026-07-08 02:00:37.230265
+
+Note: originally authored against down_revision 86eb92ce0a55, then re-pointed
+to 52e21baa63f8 (the Passwords-vault migration) when this branch was rebased
+onto origin/main — origin had added migrations off the same parent, which
+would have produced two Alembic heads. Re-pointing keeps a single linear chain.
 
 """
 from typing import Sequence, Union
@@ -13,7 +18,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision: str = 'df983087a51a'
-down_revision: Union[str, None] = '86eb92ce0a55'
+down_revision: Union[str, None] = '52e21baa63f8'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
