@@ -9,6 +9,16 @@ Curated, human-friendly history of WatchTower releases. Auto-generated GitHub Re
 
 ---
 
+## 1.18.0 — Photos & Passwords vaults
+
+Your personal cloud gains two per-user vaults alongside the database/server platform.
+
+- **Photos vault.** Back up your phone's photos to your own server: register a device to get a scoped upload token, then push photos (with automatic de-duplication by content, so re-syncing is free). Browse, download, and delete from `/api/photos`. Device-push is the approach that actually works — iCloud offers no library API and Google Photos' API can't read an existing library — so your phone stays in control of its own photos.
+- **Passwords vault.** A private, encrypted secrets store at `/api/passwords`. Values are encrypted at rest and only ever returned by an explicit reveal, which is written to the audit log by name (never the secret itself).
+- **Strictly private.** Both vaults are per-user; another account can't see, fetch, or delete your entries.
+
+---
+
 ## 1.17.4 — Crash-proofing + a security patch
 
 Hardening release: closes a class of page crash and patches a dependency vulnerability.
