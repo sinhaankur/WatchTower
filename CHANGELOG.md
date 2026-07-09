@@ -9,6 +9,16 @@ Curated, human-friendly history of WatchTower releases. Auto-generated GitHub Re
 
 ---
 
+## 1.19.0 — Off-host backups + ntfy notifications
+
+Two features that make WatchTower safer to rely on across the devices you already own.
+
+- **Off-host backups — your data survives a dead machine.** Register another computer on your network (over Tailscale) or a cloud/NAS folder as a backup destination, and every managed-database backup — scheduled and on-demand — automatically copies there. Works across macOS, Linux, and Windows on any chip: the transfer uses `rsync` when available and falls back to a pure-Python SSH path otherwise, so it "just works" with no extra install. If a destination is offline when a backup runs, WatchTower retries in the background. Free forever — off-host data safety is core, not a paid add-on. Set it up under Settings → Off-host backups.
+- **ntfy notifications.** Alongside Slack and Discord, you can now send deploy and self-heal alerts to [ntfy](https://ntfy.sh) — a simple, self-hostable push service with a mobile app and no account required. Add it per-project or installation-wide.
+- **Container logs stream live.** The Containers page now follows logs in real time instead of re-tailing on refresh.
+
+---
+
 ## 1.18.0 — Photos & Passwords vaults
 
 Your personal cloud gains two per-user vaults alongside the database/server platform.
