@@ -33,6 +33,8 @@ from . import (
     managed_db,
     me,
     notifications,
+    passwords,
+    photos,
     project_db_links,
     projects,
     remote_access,
@@ -526,6 +528,8 @@ app.include_router(me.router)
 app.include_router(templates.router)
 app.include_router(cloudflare.router)
 app.include_router(cloud_providers.router)
+app.include_router(photos.router)
+app.include_router(passwords.router)
 app.include_router(edition.router)
 app.include_router(local_runs.router)
 app.include_router(remote_access.router)

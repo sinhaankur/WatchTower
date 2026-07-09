@@ -1053,8 +1053,8 @@ function ReplicasSection({ primaryDb }: { primaryDb: ManagedDatabase }) {
               Postgres streaming replication — local pod on this PC, or remote machine via Tailscale.
             </p>
             <button
-              onClick={onAdd}
-              disabled={add.isPending || primaryDb.status !== 'running'}
+              onClick={() => setShowAddModal(true)}
+              disabled={primaryDb.status !== 'running'}
               className="px-3 py-1 rounded-md bg-primary hover:bg-primary/90 text-white text-[11px] font-medium border border-border shadow-retro disabled:opacity-50 disabled:cursor-not-allowed"
               title={primaryDb.status !== 'running' ? 'Primary must be running' : ''}
             >

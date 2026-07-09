@@ -42,6 +42,8 @@ dependencies = [
   # Core API
   "fastapi>=0.110.0",
   "uvicorn>=0.29.0",
+  # Multipart form parsing — required for photo-backup file uploads
+  "python-multipart>=0.0.9",
   "pydantic>=2.0.0",
   "pydantic-settings>=2.1.0",
   "python-dotenv>=1.0.0",

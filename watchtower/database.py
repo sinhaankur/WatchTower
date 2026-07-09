@@ -1020,6 +1020,116 @@ class ManagedDatabaseBackup(Base):
     database = relationship("ManagedDatabase", back_populates="backups")
 
 
+class PhotoBackupStatus(str, enum.Enum):
+    READY = "ready"      # bytes on disk, size + hash recorded
+    FAILED = "failed"    # write/verify failed — see status_message
+
+
+class PhotoBackupDevice(Base):
+    """A registered device (typically a phone) that can push photo backups.
+
+    Device-push is the only fully-viable photo source: iCloud has no
+    official library API and Google Photos' API (post-2025) can't read a
+    user's existing library, so the phone reads its own photos and POSTs
+    them here. Each device holds a long-lived token so the phone never
+    carries the operator's master ``WATCHTOWER_API_TOKEN``. We store only
+    the SHA-256 of the token (like a GitHub PAT) — the plaintext is shown
+    once at creation and never again. Scoped to a single user (the vault
+    is per-user by product decision).
+    """
+    __tablename__ = "photo_backup_devices"
+
+    id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(
+        Uuid(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True
+    )
+    label = Column(String, nullable=False)          # e.g. "Ankur's iPhone"
+    # SHA-256 hex of the bearer token. Unique so lookup on upload is a
+    # single indexed equality match; we never store the plaintext.
+    token_hash = Column(String, nullable=False, unique=True, index=True)
+    last_seen_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=_utcnow)
+
+
+class PhotoBackup(Base):
+    """A single photo/video backed up into a user's WatchTower vault.
+
+    Mirrors ``ManagedDatabaseBackup``: metadata in the DB, bytes on disk
+    under ``$WATCHTOWER_DATA_DIR/photo_backups/<user_id>/<file>``. Unlike DB
+    dumps, photos are accumulate-forever — there is deliberately NO
+    retention prune. Dedup is by ``(user_id, sha256)``: re-pushing the same
+    bytes (the common case when a phone re-syncs) collapses to a no-op
+    instead of a duplicate file.
+    """
+    __tablename__ = "photo_backups"
+
+    id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(
+        Uuid(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True
+    )
+    # Original filename from the device (informational; sanitised on write).
+    original_filename = Column(String, nullable=True)
+    content_type = Column(String, nullable=True)     # "image/jpeg", "video/mp4"
+    # Absolute host path to the stored file. Computed at write time so we
+    # can serve / delete without re-deriving it.
+    file_path = Column(String, nullable=False)
+    size_bytes = Column(Integer, nullable=True)
+    # Content hash — the dedup key within a user's vault.
+    sha256 = Column(String, nullable=False, index=True)
+    # When the photo was taken (EXIF/device), if the client supplied it.
+    captured_at = Column(DateTime, nullable=True)
+    # Origin. "device" (phone push) is the only live source in v1; the
+    # column exists so a future Google Picker / iCloud path can coexist
+    # without a migration (same reasoning as CloudProviderCredential.provider).
+    source = Column(String, nullable=False, default="device")
+    # Which device pushed it. Nullable: uploads made with a user-session
+    # token (e.g. the web UI) have no device.
+    device_id = Column(
+        Uuid(as_uuid=True),
+        ForeignKey("photo_backup_devices.id"),
+        nullable=True,
+        index=True,
+    )
+
+    status = Column(
+        Enum(PhotoBackupStatus), default=PhotoBackupStatus.READY, nullable=False
+    )
+    status_message = Column(String, nullable=True)
+
+    created_at = Column(DateTime, default=_utcnow)
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "sha256", name="uq_photo_backups_user_sha"),
+    )
+
+
+class PasswordEntry(Base):
+    """A single secret in a user's password vault (personal, per-user).
+
+    The secret itself is Fernet-encrypted at rest (``encrypt_secret``, same
+    as GitHub PATs / SSH keys) and is stored in ``secret_encrypted``. It is
+    NEVER returned by list/get — only by an explicit, audited ``/reveal``.
+    Everything else (name, username, url, notes, category) is plaintext
+    metadata so the vault is browsable without decrypting. Modeled on the
+    per-user photo vault (``PhotoBackup``).
+    """
+    __tablename__ = "password_entries"
+
+    id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(
+        Uuid(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True
+    )
+    name = Column(String, nullable=False)          # "GitHub", "Home WiFi"
+    username = Column(String, nullable=True)       # login / account identifier
+    url = Column(String, nullable=True)
+    notes = Column(Text, nullable=True)
+    category = Column(String, nullable=True)       # optional folder / tag
+    # Fernet ciphertext of the secret value — never the plaintext.
+    secret_encrypted = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=_utcnow)
+    updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
+
+
 class ExternalDatabase(Base):
     """A user-supplied connection to a database WatchTower does NOT manage.
 
