@@ -14,9 +14,10 @@
 </p>
 
 <p align="center">
-  <strong>Turn a computer you already own into your personal cloud.</strong><br/>
-  Point WatchTower at your GitHub repo and your website is live — database, backups,
-  and a private URL included — on hardware you control, for $0/month.<br/>
+  <strong>Turn the computers you already own into your personal cloud.</strong><br/>
+  Got a laptop or mini-PC gathering dust? Give it a job. Point WatchTower at your GitHub
+  repo and your website is live — database, backups, and a private URL included — on
+  hardware you control, for $0/month.<br/>
   When something breaks, it <em>fixes itself</em> — or tells you exactly what's missing and how to fix it.<br/>
   Rootless Podman · private over Tailscale · built for people, not DevOps teams.
 </p>
@@ -43,7 +44,7 @@ Coolify, Dokploy, Umbrel, and CasaOS all let you self-host applications. **None 
 - **Self-healing deployments** — when a deployment fails (port conflict, registry flake, out-of-memory, build error), WatchTower classifies the cause, applies a safe fix, and retries automatically. Anything it cannot fix safely is queued for your review with an AI-generated root-cause analysis.
 - **Your hardware, not a rented VPS** — designed to run on the machine you already own. No monthly server bill, no usage-based surprises.
 - **Rootless and private by default** — Podman-first (no root Docker daemon), reachable over your own Tailscale tailnet. Nothing is exposed to the public internet until you decide to go public.
-- **Batteries included** — one-click managed databases (Postgres, MySQL, MariaDB, MongoDB, Redis) with auto-wired connection strings and scheduled backups, plus GitHub push-to-deploy and an app catalog.
+- **Batteries included** — one-click managed databases (Postgres, MySQL, MariaDB, MongoDB, Redis) with auto-wired connection strings, scheduled backups, and off-host backup copies to another of your devices, plus GitHub push-to-deploy and an app catalog.
 - **Open-core, no lock-in** — Apache 2.0 + ELv2. Self-host it forever; your projects and data remain yours.
 
 > Different from [`containrrr/watchtower`](https://github.com/containrrr/watchtower) (a Docker image auto-updater). This WatchTower is a full self-hosted deploy + database + self-heal control plane for Podman.
@@ -76,10 +77,13 @@ cd WatchTower
 
 **Requirements:** Python 3.8+, Node 18+. Podman is optional and WatchTower offers to install it for you when needed.
 
-### No clone (pipx)
+### From PyPI (no clone)
+
+Published on [PyPI](https://pypi.org/project/watchtower-podman/) as `watchtower-podman`:
 
 ```bash
-pipx install watchtower-podman
+pipx install watchtower-podman   # isolated (recommended for a CLI)
+# or: pip install watchtower-podman
 watchtower-deploy serve --host 127.0.0.1 --port 8000
 ```
 
@@ -98,6 +102,7 @@ Open `http://127.0.0.1:8000` and sign in with the token. HA setup: `deploy/docke
 |---|---|
 | **Deploy from GitHub** | Push-to-deploy via webhooks, PR previews, rollbacks, build logs, deploy to this PC or remote nodes over SSH |
 | **Managed databases** | Postgres, MySQL, MariaDB, Mongo, Redis as rootless Podman pods — auto-wired `DATABASE_URL`, scheduled backups, adopt-existing |
+| **Off-host backups** | Every database backup auto-copies to another device on your network (over Tailscale) or a cloud/NAS folder, so your data survives a dead disk — across macOS, Linux & Windows |
 | **Self-healing** | Failure classifier + auto-fix-and-retry + human approval queue with AI root-cause analysis ([bring your own LLM](docs/TINY_LLM_GUIDE.md) — Ollama, LM Studio, any OpenAI-compatible endpoint) |
 | **Private remote access** | Built-in Tailscale integration — reach your server from anywhere, expose nothing; go public via Cloudflare when ready |
 | **Container manager** | Full rootless Podman container/pod management UI, plus the classic health-aware image auto-updater (`watchtower start`) |

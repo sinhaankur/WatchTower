@@ -88,7 +88,10 @@
     }
 
     * { box-sizing: border-box; }
-    html { scroll-behavior: smooth; }
+    /* scroll-padding-top keeps anchor jumps (#how, #self-healing, …) from
+       landing UNDER the sticky nav — without it the target heading scrolls to
+       y=0 and hides behind the header bar. Sized to nav height + breathing room. */
+    html { scroll-behavior: smooth; scroll-padding-top: 84px; }
 
     body {
       margin: 0;
@@ -249,6 +252,39 @@
     }
     .version-badge { color: var(--ink-dim); }
 
+    /* Copyable install line — the Python path (pip install …). Sits under the
+       hero buttons so the "it's on PyPI" install is one glance away. */
+    .install-line {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      margin-top: 18px;
+      padding: 10px 12px 10px 16px;
+      background: var(--dark);
+      border-radius: 10px;
+      font-family: "Space Mono", monospace;
+      font-size: 0.86rem;
+      color: var(--dark-ink);
+      max-width: 100%;
+      overflow-x: auto;
+      white-space: nowrap;
+    }
+    .install-line .prompt { color: var(--dark-dim); }
+    .install-line .cmd { color: #fff; }
+    .install-copy {
+      border: 1px solid rgba(148, 163, 184, 0.35);
+      background: transparent;
+      color: var(--dark-dim);
+      border-radius: 7px;
+      padding: 5px 11px;
+      font-family: "Space Mono", monospace;
+      font-size: 0.72rem;
+      cursor: pointer;
+      transition: color 150ms, border-color 150ms, background 150ms;
+    }
+    .install-copy:hover { color: #fff; border-color: rgba(148, 163, 184, 0.7); }
+    .install-copy.copied { color: var(--ok); border-color: rgba(16, 185, 129, 0.6); }
+
     /* Two-column hero: copy left, real product right. */
     .hero-grid {
       display: grid;
@@ -270,13 +306,33 @@
         radial-gradient(50% 50% at 80% 80%, rgba(185, 28, 28, 0.10), transparent 70%);
       filter: blur(34px);
       z-index: -1;
+      animation: glowDrift 14s ease-in-out infinite alternate;
+    }
+    @keyframes glowDrift {
+      0%   { transform: translate3d(0, 0, 0) scale(1); }
+      100% { transform: translate3d(14px, -12px, 0) scale(1.06); }
     }
     .browser-frame {
       border-radius: 14px;
       border: 1px solid var(--line);
       background: #fff;
       overflow: hidden;
-      box-shadow: 0 32px 80px -18px rgba(15, 23, 42, 0.28), 0 4px 16px rgba(15, 23, 42, 0.06);
+      /* Layered shadows = real depth: a tight contact shadow + a soft wide
+         ambient one. The subtle float makes the product feel alive. */
+      box-shadow:
+        0 1px 2px rgba(15, 23, 42, 0.06),
+        0 8px 20px -8px rgba(15, 23, 42, 0.14),
+        0 40px 90px -24px rgba(15, 23, 42, 0.30);
+      animation: frameFloat 7s ease-in-out infinite;
+      will-change: transform;
+    }
+    @keyframes frameFloat {
+      0%, 100% { transform: translateY(0); }
+      50%      { transform: translateY(-8px); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .hero-visual::before,
+      .browser-frame { animation: none; }
     }
     .browser-bar {
       display: flex;
@@ -303,6 +359,69 @@
       .hero-visual::before { inset: -20px; }
     }
 
+    /* ── Live self-heal ticker ────────────────────────────────────────
+       A small looping status pill under the hero browser frame that
+       animates the product's whole promise: a deploy fails, gets
+       diagnosed, fixed, and goes live — then loops. CSS-only; motion is
+       fully suppressed for prefers-reduced-motion (a static "live" state). */
+    .heal-ticker {
+      margin-top: 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 16px;
+      background: var(--dark);
+      border-radius: 12px;
+      font-family: "Space Mono", monospace;
+      font-size: 0.82rem;
+      color: var(--dark-ink);
+      box-shadow: 0 12px 30px -12px rgba(15, 23, 42, 0.4);
+      overflow: hidden;
+    }
+    .heal-ticker .tick-dot {
+      width: 9px; height: 9px; border-radius: 50%;
+      flex: none;
+      background: #fca5a5;
+      animation: tickDot 8s var(--ease-out) infinite;
+    }
+    .heal-ticker .tick-stage {
+      position: relative;
+      flex: 1;
+      height: 1.4em;
+      overflow: hidden;
+    }
+    .heal-ticker .tick-stage span {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      white-space: nowrap;
+      opacity: 0;
+      transform: translateY(6px);
+      animation: tickStage 8s var(--ease-out) infinite;
+    }
+    .heal-ticker .tick-stage span:nth-child(1) { animation-delay: 0s;  color: #fca5a5; }
+    .heal-ticker .tick-stage span:nth-child(2) { animation-delay: 2s;  color: var(--dark-ink); }
+    .heal-ticker .tick-stage span:nth-child(3) { animation-delay: 4s;  color: #fde68a; }
+    .heal-ticker .tick-stage span:nth-child(4) { animation-delay: 6s;  color: #6ee7b7; }
+    /* Each stage is visible for ~2s of the 8s loop (25% window). */
+    @keyframes tickStage {
+      0%      { opacity: 0; transform: translateY(6px); }
+      3%, 22% { opacity: 1; transform: none; }
+      25%,100%{ opacity: 0; transform: translateY(-6px); }
+    }
+    @keyframes tickDot {
+      0%, 24%   { background: #fca5a5; box-shadow: 0 0 0 0 rgba(248,113,113,0.5); }
+      25%, 49%  { background: #fca5a5; }
+      50%, 74%  { background: #fde68a; }
+      75%, 100% { background: #6ee7b7; box-shadow: 0 0 0 5px rgba(16,185,129,0); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .heal-ticker .tick-dot { animation: none; background: #6ee7b7; }
+      .heal-ticker .tick-stage span { animation: none; opacity: 0; transform: none; }
+      .heal-ticker .tick-stage span:nth-child(4) { opacity: 1; }  /* show "live again" */
+    }
+
     /* Real-screenshot card inside the dark self-heal band. */
     .heal-shot {
       background: #fff;
@@ -322,6 +441,9 @@
 
     /* ── Section scaffolding ──────────────────────────────────────── */
     section { padding: 96px 0; }
+    /* Belt-and-suspenders with scroll-padding-top above: any element that is
+       an anchor jump target clears the sticky nav on landing. */
+    [id] { scroll-margin-top: 84px; }
     .kicker {
       font-family: "Space Mono", monospace;
       font-size: 0.78rem;
@@ -453,11 +575,14 @@
       border: 1px solid var(--line);
       border-radius: var(--radius);
       padding: 30px;
-      transition: transform 200ms var(--ease-out), box-shadow 200ms;
+      transition: transform 240ms var(--ease-out), box-shadow 240ms var(--ease-out), border-color 240ms;
     }
     .card:hover {
-      transform: translateY(-3px);
-      box-shadow: 0 14px 34px rgba(15, 23, 42, 0.07);
+      transform: translateY(-4px);
+      border-color: rgba(185, 28, 28, 0.28);
+      box-shadow:
+        0 2px 4px rgba(15, 23, 42, 0.04),
+        0 20px 44px -16px rgba(15, 23, 42, 0.16);
     }
     .card .icon {
       width: 42px; height: 42px;
@@ -465,7 +590,9 @@
       background: rgba(253, 230, 138, 0.55);
       display: flex; align-items: center; justify-content: center;
       margin-bottom: 16px;
+      transition: transform 240ms var(--ease-out), background 240ms;
     }
+    .card:hover .icon { transform: scale(1.08) rotate(-3deg); background: rgba(253, 230, 138, 0.85); }
     .card .icon svg { width: 21px; height: 21px; stroke: var(--brand-red); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
     .card h3 { margin: 0 0 8px; font-size: 1.08rem; font-weight: 800; letter-spacing: -0.015em; }
     .card p { margin: 0; color: var(--ink-dim); font-size: 0.93rem; }
@@ -631,22 +758,27 @@
             <text x="32" y="42" text-anchor="middle" font-family="'DM Sans', system-ui, sans-serif" font-size="26" font-weight="800" fill="#b91c1c">Wt</text>
           </svg>
         </div>
-        <p class="eyebrow reveal" style="--d:30ms;">Open source · Runs on your own PC</p>
-        <h1 class="reveal" style="--d:60ms;">Turn the computer you already own into <span class="mark">your personal cloud.</span></h1>
+        <p class="eyebrow reveal" style="--d:30ms;">Open source · Runs on computers you already own</p>
+        <h1 class="reveal" style="--d:60ms;">Turn the computers you already own into <span class="mark">your personal cloud.</span></h1>
         <p class="sub reveal" style="--d:120ms;">
-          Point it at your GitHub repo and your website is live — database, backups,
-          and a private URL included, for $0/month. <strong>And when a deploy breaks,
-          WatchTower fixes it by itself.</strong>
+          Got a laptop or mini-PC gathering dust? Give it a job. Point WatchTower at
+          your GitHub repo and your website is live — database, backups, and a private
+          URL included, for $0/month. <strong>And when a deploy breaks, WatchTower fixes
+          it by itself.</strong>
         </p>
         <div class="hero-actions reveal" style="--d:180ms;">
           <a class="btn btn-primary" href="https://github.com/sinhaankur/WatchTower/releases/latest" target="_blank" rel="noopener">Download v1.18.0</a>
           <a class="btn btn-ghost" href="https://github.com/sinhaankur/WatchTower" target="_blank" rel="noopener">★ Star on GitHub</a>
         </div>
+        <div class="install-line reveal" style="--d:210ms;" role="group" aria-label="Install with pip">
+          <span><span class="prompt">$</span> <span class="cmd" id="pip-cmd">pip install watchtower-podman</span></span>
+          <button type="button" class="install-copy" id="pip-copy" aria-label="Copy pip install command">copy</button>
+        </div>
         <p class="hero-meta reveal" style="--d:240ms;">
           <span class="version-badge">v1.18.0 · Open Source</span>
           <span>Apache-2.0 + ELv2</span>
           <span>macOS · Linux · Windows</span>
-          <span>Rootless Podman</span>
+          <span>On PyPI · Rootless Podman</span>
         </p>
         </div>
 
@@ -656,6 +788,15 @@
             <img src="./screenshots/app-live.png" width="1600" height="819"
                  alt="WatchTower's Applications page: my-portfolio and landing-page are live; analytics-api failed and the card explains why — a code error in src/routes/events.ts line 41 — with a View log link."
                  fetchpriority="high">
+          </div>
+          <div class="heal-ticker" role="img" aria-label="A failed deploy is diagnosed, fixed, and back live — automatically.">
+            <span class="tick-dot" aria-hidden="true"></span>
+            <span class="tick-stage" aria-hidden="true">
+              <span>✗ deploy failed — port 8080 in use</span>
+              <span>◇ diagnosing… classified: port conflict</span>
+              <span>◆ fix applied — remapped port, retrying</span>
+              <span>✓ live again — healed in 12s, no human needed</span>
+            </span>
           </div>
         </div>
       </section>
@@ -676,11 +817,12 @@
             <span class="step-num" aria-hidden="true">01</span>
             <div>
               <h3>Install on the machine you have</h3>
-              <p>Download the app for Mac, Linux, or Windows. That spare laptop or
-              mini-PC in the drawer? That's your server now.</p>
+              <p>Download the desktop app for Mac, Linux, or Windows — or
+              <span class="mono">pip install watchtower-podman</span>. That spare laptop
+              or mini-PC in the drawer? That's your server now.</p>
             </div>
             <div class="step-visual" aria-hidden="true">
-              <span class="dim">$</span> git clone …/WatchTower &amp;&amp; ./run.sh<br>
+              <span class="dim">$</span> pip install watchtower-podman<br>
               <span class="ok">✓</span> Podman ready · backend up<br>
               <span class="ok">✓</span> Open http://127.0.0.1:8000
             </div>
@@ -784,6 +926,13 @@
             <p>Reach your machine from anywhere over Tailscale. No port-forwarding,
             no open ports, nothing public until you say so.</p>
           </article>
+          <article class="card reveal" style="--d:90ms;">
+            <span class="icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 7V5a1 1 0 0 1 1-1h5"/><path d="M20 7V5a1 1 0 0 0-1-1h-5"/><rect x="3" y="9" width="8" height="7" rx="1.5"/><rect x="13" y="9" width="8" height="7" rx="1.5"/><path d="M8 20h8"/></svg></span>
+            <h3>Off-host backups across your devices</h3>
+            <p>Every database backup auto-copies to another machine on your network
+            or a cloud folder — so your data survives a dead disk. Works across Mac,
+            Linux &amp; Windows.</p>
+          </article>
           <article class="card reveal" style="--d:120ms;">
             <span class="icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></span>
             <h3>App catalog &amp; templates</h3>
@@ -885,8 +1034,8 @@
     <!-- ── Final CTA ─────────────────────────────────────────────── -->
     <div class="wrap">
       <section class="cta-final">
-        <h2 class="reveal">Give your spare computer a job.</h2>
-        <p class="reveal" style="--d:60ms;">Download, sign in with GitHub, deploy. Free and open source.<br/>Trying it? <a href="https://github.com/sinhaankur/WatchTower/discussions" style="color: var(--accent); font-weight: 600;">Tell us where it fights you</a> — every report shapes the roadmap.</p>
+        <h2 class="reveal">Give your spare computers a job.</h2>
+        <p class="reveal" style="--d:60ms;">Download or <span class="mono">pip install watchtower-podman</span>, sign in with GitHub, deploy. Free and open source.<br/>Trying it? <a href="https://github.com/sinhaankur/WatchTower/discussions" style="color: var(--accent); font-weight: 600;">Tell us where it fights you</a> — every report shapes the roadmap.</p>
         <div class="hero-actions reveal" style="--d:120ms;">
           <a class="btn btn-primary" href="https://github.com/sinhaankur/WatchTower/releases/latest" target="_blank" rel="noopener">Download v1.18.0</a>
           <a class="btn btn-ghost" href="/WatchTower/how-it-works/">See how it works</a>
@@ -947,6 +1096,31 @@
       });
     }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
     document.querySelectorAll('.reveal').forEach((el) => io.observe(el));
+
+    // Copy the pip install command. Falls back gracefully if the Clipboard
+    // API is unavailable (older browsers / non-secure context).
+    const pipCopy = document.getElementById('pip-copy');
+    if (pipCopy) {
+      pipCopy.addEventListener('click', async () => {
+        const cmd = document.getElementById('pip-cmd')?.textContent || '';
+        try {
+          await navigator.clipboard.writeText(cmd);
+          pipCopy.textContent = 'copied ✓';
+          pipCopy.classList.add('copied');
+          setTimeout(() => {
+            pipCopy.textContent = 'copy';
+            pipCopy.classList.remove('copied');
+          }, 1800);
+        } catch {
+          // Clipboard blocked — select the text so the user can copy manually.
+          const range = document.createRange();
+          range.selectNodeContents(document.getElementById('pip-cmd'));
+          const sel = window.getSelection();
+          sel.removeAllRanges();
+          sel.addRange(range);
+        }
+      });
+    }
   </script>
 </body>
 </html>
