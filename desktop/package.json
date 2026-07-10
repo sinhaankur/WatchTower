@@ -7,7 +7,7 @@
     "name": "The WatchTower Authors",
     "email": "opensource@sinhaankur.dev"
   },
-  "homepage": "https://github.com/Node2-io/WatchTowerOps",
+  "homepage": "https://github.com/sinhaankur/WatchTower",
   "main": "main.js",
   "scripts": {
     "start": "node scripts/start-electron.js",
@@ -68,8 +68,8 @@
     "publish": [
       {
         "provider": "github",
-        "owner": "Node2-io",
-        "repo": "WatchTowerOps",
+        "owner": "sinhaankur",
+        "repo": "WatchTower",
         "releaseType": "release"
       }
     ],
