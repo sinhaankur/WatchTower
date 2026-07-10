@@ -188,6 +188,34 @@ pre code { background: none; border: none; padding: 0; }
 }
 .cta-btn.ghost:hover { border-color: var(--wt-text); box-shadow: none; }
 
+/* Download button — icon + two-line label, bigger tap target, clear affordance
+   that this is THE thing to click. Shared with the home page's inline styles. */
+.cta-btn.btn-download {
+  padding: 12px 26px;
+  gap: 12px;
+  box-shadow: 0 6px 20px rgba(185, 28, 28, 0.22);
+}
+.cta-btn.btn-download:hover { box-shadow: 0 10px 30px rgba(185, 28, 28, 0.34); }
+.btn-download .dl-icon { flex: none; }
+.btn-download .dl-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  line-height: 1.15;
+}
+.btn-download .dl-label { font-weight: 800; font-size: 1rem; }
+.btn-download .dl-sub {
+  font-weight: 600;
+  font-size: 0.72rem;
+  opacity: 0.82;
+  letter-spacing: 0.01em;
+}
+.btn-download:hover .dl-icon { animation: dl-bob 0.9s var(--wt-ease, ease) infinite; }
+@keyframes dl-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(2px); } }
+@media (prefers-reduced-motion: reduce) {
+  .btn-download:hover .dl-icon { animation: none; }
+}
+
 /* ── Footer ──────────────────────────────────────────────────────── */
 .site-footer {
   border-top: 1px solid var(--wt-border);
