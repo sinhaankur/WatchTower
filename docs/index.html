@@ -767,9 +767,12 @@
           it by itself.</strong>
         </p>
         <div class="hero-actions reveal" style="--d:180ms;">
-          <a class="btn btn-primary" href="https://github.com/sinhaankur/WatchTower/releases/latest" target="_blank" rel="noopener">Download v1.19.0</a>
+          <a class="btn btn-primary js-download" href="https://github.com/sinhaankur/WatchTower/releases/latest" target="_blank" rel="noopener">Download v1.19.0</a>
           <a class="btn btn-ghost" href="https://github.com/sinhaankur/WatchTower" target="_blank" rel="noopener">★ Star on GitHub</a>
         </div>
+        <p class="hero-otherplatforms reveal" style="--d:195ms; margin:.5rem 0 0; font-size:.85rem;">
+          <a class="js-download-all" href="https://github.com/sinhaankur/WatchTower/releases/latest" target="_blank" rel="noopener" style="color:var(--muted);">Other platforms &amp; older versions</a>
+        </p>
         <div class="install-line reveal" style="--d:210ms;" role="group" aria-label="Install with pip">
           <span><span class="prompt">$</span> <span class="cmd" id="pip-cmd">pip install watchtower-podman</span></span>
           <button type="button" class="install-copy" id="pip-copy" aria-label="Copy pip install command">copy</button>
@@ -1037,7 +1040,7 @@
         <h2 class="reveal">Give your spare computers a job.</h2>
         <p class="reveal" style="--d:60ms;">Download or <span class="mono">pip install watchtower-podman</span>, sign in with GitHub, deploy. Free and open source.<br/>Trying it? <a href="https://github.com/sinhaankur/WatchTower/discussions" style="color: var(--accent); font-weight: 600;">Tell us where it fights you</a> — every report shapes the roadmap.</p>
         <div class="hero-actions reveal" style="--d:120ms;">
-          <a class="btn btn-primary" href="https://github.com/sinhaankur/WatchTower/releases/latest" target="_blank" rel="noopener">Download v1.19.0</a>
+          <a class="btn btn-primary js-download" href="https://github.com/sinhaankur/WatchTower/releases/latest" target="_blank" rel="noopener">Download v1.19.0</a>
           <a class="btn btn-ghost" href="/WatchTower/how-it-works/">See how it works</a>
         </div>
       </section>
@@ -1121,6 +1124,84 @@
         }
       });
     }
+
+    // Device-specific download: show the visitor only the installer for the OS
+    // they're on. We detect the platform, then ask the GitHub Releases API for
+    // the matching asset and point the primary "Download" button straight at it,
+    // relabelled for that OS. If detection is uncertain or the API is
+    // unreachable, every button stays on /releases/latest — never a dead link.
+    (function () {
+      const buttons = document.querySelectorAll('.js-download');
+      if (!buttons.length) return;
+
+      // --- 1. Detect OS. Prefer the high-entropy UA-CH platform, fall back to UA. ---
+      function detectOS() {
+        const p = (navigator.userAgentData && navigator.userAgentData.platform) || '';
+        const ua = navigator.userAgent || '';
+        const hay = (p + ' ' + ua).toLowerCase();
+        if (/mac|darwin/.test(hay)) return 'mac';
+        if (/win/.test(hay)) return 'win';
+        // Exclude Android (a Linux, but not a desktop target here).
+        if (/linux|x11/.test(hay) && !/android/.test(hay)) return 'linux';
+        return null;
+      }
+
+      // Apple Silicon vs Intel: UA never says outright, so infer. Modern Safari
+      // reports "MacIntel" even on M-series, so we probe WebGL renderer as a hint.
+      function macIsArm() {
+        try {
+          const gl = document.createElement('canvas').getContext('webgl');
+          const dbg = gl && gl.getExtension('WEBGL_debug_renderer_info');
+          const r = dbg ? (gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) || '') : '';
+          if (/apple m\d|apple gpu/i.test(r)) return true;   // Apple GPU → arm64
+          if (/intel|amd|radeon|nvidia/i.test(r)) return false;
+        } catch { /* ignore */ }
+        return null; // unknown — let the asset picker prefer arm64 (current Macs)
+      }
+
+      const os = detectOS();
+      const LABEL = { mac: 'macOS', win: 'Windows', linux: 'Linux' };
+
+      // Pick the best asset for this OS from the release's asset list.
+      function pickAsset(assets, os) {
+        const byName = (re) => assets.find((a) => re.test(a.name));
+        if (os === 'mac') {
+          const arm = macIsArm();
+          // Prefer the arch-appropriate DMG; fall back to any DMG we can find.
+          if (arm === false) {
+            return byName(/(x64|x86_64|intel).*\.dmg$/i) || byName(/\.dmg$/i);
+          }
+          // arm === true or unknown → current Macs are Apple Silicon, prefer arm64.
+          return byName(/arm64.*\.dmg$/i) || byName(/\.dmg$/i);
+        }
+        if (os === 'win') return byName(/\.exe$/i) || byName(/win.*\.zip$/i);
+        if (os === 'linux') return byName(/\.appimage$/i) || byName(/\.deb$/i);
+        return null;
+      }
+
+      // If we know the OS, relabel immediately so the button reads right even
+      // before the API responds (it still points at /releases/latest for now).
+      if (os) buttons.forEach((b) => { b.textContent = 'Download for ' + LABEL[os]; });
+      if (!os) return; // unknown OS → leave generic "Download" → release page
+
+      // --- 2. Resolve the exact asset URL from the latest release. ---
+      fetch('https://api.github.com/repos/sinhaankur/WatchTower/releases/latest', {
+        headers: { Accept: 'application/vnd.github+json' },
+      })
+        .then((r) => (r.ok ? r.json() : Promise.reject(new Error('release fetch ' + r.status))))
+        .then((rel) => {
+          const assets = Array.isArray(rel.assets) ? rel.assets : [];
+          const asset = pickAsset(assets, os);
+          if (!asset || !asset.browser_download_url) return; // no matching binary → keep release-page link
+          const tag = rel.tag_name ? rel.tag_name.replace(/^v/, '') : '';
+          buttons.forEach((b) => {
+            b.href = asset.browser_download_url;
+            b.textContent = 'Download for ' + LABEL[os] + (tag ? ' · v' + tag : '');
+            b.setAttribute('download', '');
+          });
+        })
+        .catch(() => { /* offline / rate-limited → buttons stay on /releases/latest */ });
+    })();
   </script>
 </body>
 </html>
