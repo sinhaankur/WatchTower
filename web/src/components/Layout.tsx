@@ -7,6 +7,7 @@ import { CommandPalette, openCommandPalette } from './CommandPalette';
 import { UserMenu } from './UserMenu';
 
 const UPDATE_BANNER_DISMISSED_KEY = 'watchtower:updateBannerDismissed';
+const MORE_NAV_OPEN_KEY = 'watchtower:moreNavOpen';
 
 // Detect if running inside Electron
 const isElectron = typeof window !== 'undefined' && Boolean((window as any).electronAPI);
@@ -275,51 +276,41 @@ function IconContainers() {
 //                     the same content (Tailscale, Cloudflare, Podman
 //                     install commands, domain wiring); two nav entries
 //                     for one concept was confusing.
-// Navigation is grouped by user intent rather than a flat list, so a
-// newcomer can tell "what am I trying to do?" at a glance:
-//   DEPLOY         — ways to create + ship things
-//   INFRASTRUCTURE — the machines + data + containers underneath
-//   CONNECT        — wiring to the outside world
-//   SYSTEM         — account, governance, configuration
-// "Services" was a catalogue of one-click apps to launch (not running
-// services), so it's renamed "Catalog" and sits in DEPLOY next to
-// Templates. "Report Bug" moved out of the nav into the footer — it's a
-// support link, not a workspace.
+// Navigation leads with the handful of things a beginner needs, and tucks
+// power-user surfaces behind a "More" disclosure so the sidebar reads as a
+// short, obvious list on first run (the Conductor/Linear pattern: few items,
+// one clear next action). Primary groups are always visible; ADVANCED_ITEMS
+// collapse under "More ▸" until the user opts in (state persists).
+//
+//   MAIN  — the everyday loop: Dashboard, your Sites, servers, databases
+//   MORE  — Integrations, Remote Access, Team, Audit, Containers, Templates,
+//           Catalog — reachable, just not shouting on day one.
+// "Report Bug" lives in the footer — it's support, not a workspace.
 type NavGroup = { label: string; items: NavItem[] };
 
 const NAV_GROUPS: NavGroup[] = [
   {
-    label: 'Deploy',
+    label: 'Main',
     items: [
-      { path: '/',             label: 'Dashboard',    Icon: IconDashboard },
-      { path: '/applications', label: 'Applications', Icon: IconBox },
-      { path: '/templates',    label: 'Templates',    Icon: IconLayers },
-      { path: '/services',     label: 'Catalog',      Icon: IconPuzzle },
+      { path: '/',                  label: 'Dashboard', Icon: IconDashboard },
+      { path: '/applications',      label: 'Sites',     Icon: IconBox },
+      { path: '/servers',           label: 'Servers',   Icon: IconServer },
+      { path: '/managed-databases', label: 'Databases', Icon: IconBox },
+      { path: '/integrations',      label: 'Integrations', Icon: IconPuzzle },
+      { path: '/settings',          label: 'Settings',  Icon: IconSettings },
     ],
   },
-  {
-    label: 'Infrastructure',
-    items: [
-      { path: '/servers',           label: 'Servers',    Icon: IconServer },
-      { path: '/managed-databases', label: 'Databases',  Icon: IconBox },
-      { path: '/local-containers',  label: 'Containers', Icon: IconContainers },
-    ],
-  },
-  {
-    label: 'Connect',
-    items: [
-      { path: '/integrations',  label: 'Integrations',   Icon: IconPuzzle },
-      { path: '/remote-access', label: 'Remote Access',  Icon: IconRemoteAccess },
-    ],
-  },
-  {
-    label: 'System',
-    items: [
-      { path: '/team',     label: 'Team',      Icon: IconUsers },
-      { path: '/audit',    label: 'Audit Log', Icon: IconShield },
-      { path: '/settings', label: 'Settings',  Icon: IconSettings },
-    ],
-  },
+];
+
+// Collapsed under "More ▸". Advanced / occasional surfaces — everything still
+// reachable, just not in the first-run field of view.
+const ADVANCED_ITEMS: NavItem[] = [
+  { path: '/templates',        label: 'Templates',     Icon: IconLayers },
+  { path: '/services',         label: 'Catalog',       Icon: IconPuzzle },
+  { path: '/local-containers', label: 'Containers',    Icon: IconContainers },
+  { path: '/remote-access',    label: 'Remote Access', Icon: IconRemoteAccess },
+  { path: '/team',             label: 'Team',          Icon: IconUsers },
+  { path: '/audit',            label: 'Audit Log',     Icon: IconShield },
 ];
 
 // A small, opinionated section header. Slate-400 + uppercase +
@@ -433,6 +424,20 @@ export default function Layout({ children }: { children: ReactNode }) {
   const { data: updateData } = useUpdateCheck();
   const versionLabel = updateData?.current ? `v${updateData.current}` : '';
 
+  // "More" disclosure for the advanced nav items. Persist the user's choice,
+  // but always force it open when the current route lives under "More" so the
+  // active item is never hidden.
+  const onAdvancedRoute = ADVANCED_ITEMS.some((i) => pathname.startsWith(i.path));
+  const [moreOpen, setMoreOpen] = useState<boolean>(() => {
+    try { return localStorage.getItem(MORE_NAV_OPEN_KEY) === '1'; } catch { return false; }
+  });
+  const moreExpanded = moreOpen || onAdvancedRoute;
+  const toggleMore = () => setMoreOpen((v) => {
+    const next = !v;
+    try { localStorage.setItem(MORE_NAV_OPEN_KEY, next ? '1' : '0'); } catch { /* ignore */ }
+    return next;
+  });
+
   // Environment badge — pulled once at mount. Surfaces when this is
   // NOT a boring "desktop + production" combo so the user can tell at
   // a glance which backend / DB they're pointing at.
@@ -479,15 +484,15 @@ export default function Layout({ children }: { children: ReactNode }) {
 
       <div className={rail ? 'px-2 pt-3 pb-2' : 'px-3 pt-3 pb-2'}>
         <Link
-          to="/setup"
+          to="/start"
           onClick={onNavClick}
-          title={rail ? 'New Project' : undefined}
+          title={rail ? 'New site' : undefined}
           className={`flex items-center justify-center gap-2 w-full ${
             rail ? 'py-2' : 'py-1.5 px-3'
           } rounded-md bg-primary hover:bg-primary/90 transition-colors text-primary-foreground text-[13px] font-semibold shadow-retro`}
         >
           <IconPlus />
-          {!rail && <>New Project</>}
+          {!rail && <>New site</>}
         </Link>
       </div>
 
@@ -525,6 +530,47 @@ export default function Layout({ children }: { children: ReactNode }) {
             </div>
           </div>
         ))}
+
+        {/* Advanced surfaces. In rail (icon-only) mode a disclosure makes no
+            sense, so the icons show directly under a divider. In full mode
+            they hide behind a "More" toggle that keeps the first-run sidebar
+            short — and auto-expands when the active route lives here. */}
+        {rail ? (
+          <>
+            <div className="my-2 mx-3 border-t border-border-soft" />
+            <div className="space-y-px">
+              {ADVANCED_ITEMS.map((item) => (
+                <NavLink key={item.path} item={item} pathname={pathname} onClick={onNavClick} rail badge={navBadgeFor(item.path)} />
+              ))}
+            </div>
+          </>
+        ) : (
+          <div>
+            <button
+              type="button"
+              onClick={toggleMore}
+              aria-expanded={moreExpanded}
+              className="w-full flex items-center gap-2.5 rounded-md px-3 py-1.5 text-[13px] font-medium text-muted-foreground/70 hover:text-foreground transition-colors"
+            >
+              <svg
+                width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"
+                strokeLinecap="round" strokeLinejoin="round"
+                className={`transition-transform ${moreExpanded ? 'rotate-90' : ''}`}
+                aria-hidden="true"
+              >
+                <path d="m9 18 6-6-6-6" />
+              </svg>
+              <span>More</span>
+            </button>
+            {moreExpanded && (
+              <div className="space-y-px">
+                {ADVANCED_ITEMS.map((item) => (
+                  <NavLink key={item.path} item={item} pathname={pathname} onClick={onNavClick} rail={false} badge={navBadgeFor(item.path)} />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </nav>
 
       {/* Rail-mode footer: avatar dropdown trigger + update dot. The

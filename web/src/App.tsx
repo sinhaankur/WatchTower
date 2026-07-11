@@ -20,6 +20,7 @@ import './App.css';
 // bundle. The Suspense fallback is a faint full-height div so route
 // switches don't flash a giant spinner mid-layout.
 const SetupWizard          = lazy(() => import('./pages/SetupWizard'));
+const FirstRun             = lazy(() => import('./pages/FirstRun'));
 const ProjectDetail        = lazy(() => import('./pages/ProjectDetail'));
 const DeploymentDetail     = lazy(() => import('./pages/DeploymentDetail'));
 const Templates            = lazy(() => import('./pages/Templates'));
@@ -28,7 +29,6 @@ const InviteAccept         = lazy(() => import('./pages/InviteAccept'));
 const Servers              = lazy(() => import('./pages/Servers'));
 const Applications         = lazy(() => import('./pages/Applications'));
 const LocalNode            = lazy(() => import('./pages/LocalNode'));
-const Databases            = lazy(() => import('./pages/Databases'));
 const Services             = lazy(() => import('./pages/Services'));
 const Integrations         = lazy(() => import('./pages/Integrations'));
 const Settings             = lazy(() => import('./pages/Settings'));
@@ -171,10 +171,9 @@ function App() {
             <Route path="/deployments/:id"   element={withChrome('Deployment',       <DeploymentDetail />)} />
             <Route path="/servers"           element={withChrome('Servers',          <Servers />)} />
             <Route path="/servers/local"     element={withChrome('Local node',       <LocalNode />)} />
-            <Route path="/applications"      element={withChrome('Applications',     <Applications />)} />
+            <Route path="/applications"      element={withChrome('Sites',            <Applications />)} />
             <Route path="/templates"         element={withChrome('Templates',        <Templates />)} />
-            <Route path="/databases"         element={withChrome('Databases',        <Databases />)} />
-            <Route path="/services"          element={withChrome('Services',         <Services />)} />
+            <Route path="/services"          element={withChrome('Catalog',          <Services />)} />
             <Route path="/integrations"      element={withChrome('Integrations',     <Integrations />)} />
             <Route path="/host-connect"      element={withChrome('Host Connect',     <HostConnect />)} />
             <Route path="/remote-access"     element={withChrome('Remote Access',    <RemoteAccess />)} />
@@ -186,9 +185,11 @@ function App() {
             <Route path="/audit"             element={withChrome('Audit log',        <AuditLog />)} />
             <Route path="/account"           element={withChrome('Account',          <Account />)} />
             <Route path="/local-containers"  element={withChrome('Local containers', <LocalContainers />)} />
-            {/* Legacy redirect */}
+            {/* Legacy redirects — old paths that no longer have their own page. */}
             <Route path="/nodes" element={<Navigate to="/servers" replace />} />
+            <Route path="/databases" element={<Navigate to="/managed-databases" replace />} />
             {/* Full-screen pages (wizard & oauth flow — no sidebar) */}
+            <Route path="/start"                  element={withChrome('Get started',   <FirstRun />,           { bare: true })} />
             <Route path="/setup"                  element={withChrome('Setup wizard',  <SetupWizard />,        { bare: true })} />
             <Route path="/oauth/github/callback"  element={withChrome('OAuth callback', <GitHubOAuthCallback />, { bare: true })} />
             {/* Catch-all: redirect any unmatched path to home instead of showing a blank page */}

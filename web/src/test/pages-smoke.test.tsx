@@ -78,7 +78,6 @@ const PAGES: { path: string; name: string; importer: () => Promise<{ default: Re
   { path: '/servers',           name: 'Servers',          importer: () => import('@/pages/Servers') },
   { path: '/applications',      name: 'Applications',     importer: () => import('@/pages/Applications') },
   { path: '/servers/local',     name: 'LocalNode',        importer: () => import('@/pages/LocalNode') },
-  { path: '/databases',         name: 'Databases',        importer: () => import('@/pages/Databases') },
   { path: '/services',          name: 'Services',         importer: () => import('@/pages/Services') },
   { path: '/integrations',      name: 'Integrations',     importer: () => import('@/pages/Integrations') },
   { path: '/settings',          name: 'Settings',         importer: () => import('@/pages/Settings') },

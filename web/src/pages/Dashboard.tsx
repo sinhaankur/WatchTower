@@ -295,6 +295,22 @@ const Dashboard = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.state]);
 
+  // First-run auto-route: a brand-new user with no sites lands on the
+  // one-screen "get your first site live" flow instead of an empty dashboard.
+  // Guards: only once server data confirms zero projects, and only if they
+  // haven't chosen "Skip to dashboard" this session (so the escape hatch and
+  // the "New site" button don't bounce them back here).
+  useEffect(() => {
+    if (loading || dataSource !== 'server') return;
+    if (projects.length > 0) return;
+    let skipped = false;
+    try { skipped = sessionStorage.getItem('watchtower:skipFirstRun') === '1'; } catch { /* ignore */ }
+    if (skipped) return;
+    try { sessionStorage.setItem('watchtower:skipFirstRun', '1'); } catch { /* ignore */ }
+    navigate('/start', { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, dataSource, projects.length]);
+
   const stats = useMemo(() => ({
     total:  projects.length,
     static: projects.filter((p) => p.use_case === 'netlify_like').length,
@@ -316,7 +332,7 @@ const Dashboard = () => {
       >
         <div className="min-w-0">
           <h1 className="text-lg font-semibold text-foreground">Dashboard</h1>
-          <p className="text-xs text-muted-foreground mt-0.5 hidden sm:block">Overview of your self-hosted infrastructure</p>
+          <p className="text-xs text-muted-foreground mt-0.5 hidden sm:block">Your sites and the machines running them</p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <span
@@ -339,10 +355,10 @@ const Dashboard = () => {
             {loading ? '…' : 'Refresh'}
           </button>
           <Link
-            to="/setup"
+            to="/start"
             className="px-3 sm:px-4 py-1.5 rounded-md bg-primary hover:bg-primary/90 transition-colors text-primary-foreground text-xs sm:text-sm font-semibold shadow-retro"
           >
-            + New
+            + New site
           </Link>
         </div>
       </header>
@@ -354,60 +370,61 @@ const Dashboard = () => {
             marketing hero. The onboarding hero + explainer moved to the
             bottom and only show for new/empty installs. */}
 
-        {/* Stats row */}
+        {/* Stats row — plain language, "your sites" first. Infrastructure
+            detail (Podman version etc.) lives in the Container Runtime card
+            below, not in the headline numbers a beginner scans first. */}
         <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-          <StatCard label="Total Projects" value={stats.total} sub={dataSource === 'server' ? 'from API' : 'local cache'} accent="text-primary" />
-          <StatCard label="Containers" value={containers} sub={runtimeStatus?.podman?.installed ? `Podman ${runtimeStatus?.podman?.version ?? ''}` : 'Podman not detected'} />
-          <StatCard label="Static Sites"   value={stats.static} sub="Netlify-style" />
-          <StatCard label="Docker Apps"    value={stats.docker} sub="Container-based" />
+          <StatCard label="Your sites"   value={stats.total} sub={stats.total === 1 ? 'site' : 'sites'} accent="text-primary" />
+          <StatCard label="Running now"  value={containers} sub={containers === 1 ? 'container live' : 'containers live'} />
+          <StatCard label="Static sites" value={stats.static} sub="HTML / JS / CSS" />
+          <StatCard label="Apps"         value={stats.docker} sub="run in containers" />
         </div>
 
         {/* Self-healing activity — WatchTower's headline differentiator made
             visible. Renders nothing until there's healing history. */}
         <SelfHealingCard />
 
-        {/* Onboarding — only for new/empty installs. Once you have projects,
-            the dashboard leads with them, not the explainer. */}
+        {/* Empty state — one outcome, one action. New users are auto-routed to
+            /start; this is the fallback for anyone who skipped. Lead with the
+            result, describe (don't dispatch) the three things that happen, and
+            give a single obvious CTA rather than a three-page scavenger hunt. */}
         {projects.length === 0 && !loading && (
           <>
-            <SystemOverviewBanner />
-            <section className="relative overflow-hidden rounded-lg border border-border bg-card p-6 shadow-retro">
-              <div className="relative flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-                <div className="min-w-0">
-                  <p className="inline-flex items-center gap-1.5 text-[11px] uppercase tracking-[0.18em] text-muted-foreground font-semibold">
-                    <span className="h-1.5 w-1.5 rounded-full bg-primary" /> WatchTower
-                  </p>
-                  <h2 className="text-2xl font-bold text-foreground mt-1.5 tracking-tight">Simple Infrastructure Control</h2>
-                  <p className="text-sm text-muted-foreground mt-2 max-w-xl">
-                    Manage hosts, deploy apps, connect databases, and keep containers up to date — all from one place.
-                  </p>
+          <section className="relative overflow-hidden rounded-lg border border-border bg-card p-6 shadow-retro">
+            <div className="max-w-xl">
+              <p className="inline-flex items-center gap-1.5 text-[11px] uppercase tracking-[0.18em] text-muted-foreground font-semibold">
+                <span className="h-1.5 w-1.5 rounded-full bg-primary" /> Get started
+              </p>
+              <h2 className="text-2xl font-bold text-foreground mt-1.5 tracking-tight">Put a site live on this Mac</h2>
+              <p className="text-sm text-muted-foreground mt-2">
+                Paste a GitHub repo and WatchTower does the rest — no servers to rent, no config files to write.
+              </p>
+            </div>
+            <div className="mt-5 grid grid-cols-1 sm:grid-cols-3 gap-2">
+              {[
+                { n: '1', label: 'Paste your repo', desc: 'A GitHub URL, or pick from your account.' },
+                { n: '2', label: 'We build & run it', desc: 'On this Mac, in a container — set up automatically.' },
+                { n: '3', label: 'It stays up', desc: 'If a deploy breaks, WatchTower fixes it by itself.' },
+              ].map(({ n, label, desc }) => (
+                <div key={n} className="flex items-start gap-3 p-3 rounded-md border border-border-soft bg-surface-soft">
+                  <span className="w-5 h-5 rounded-full bg-primary text-primary-foreground text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">{n}</span>
+                  <div>
+                    <p className="text-xs font-semibold text-foreground">{label}</p>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">{desc}</p>
+                  </div>
                 </div>
-                <Link
-                  to="/host-connect?tab=tools"
-                  className="shrink-0 inline-flex items-center gap-2 rounded-md border border-border bg-card px-4 py-2 text-sm font-semibold text-foreground shadow-retro transition-all duration-fast ease-out-soft hover:bg-muted hover:shadow-retro-hover"
-                >
-                  Host Connect →
-                </Link>
-              </div>
-              <div className="mt-5 pt-5 border-t border-border-soft">
-                <p className="text-xs font-semibold text-foreground mb-3">Getting started</p>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                  {[
-                    { step: '1', label: 'Set up tools', desc: 'Install Podman, Docker or Nginx on your server', to: '/host-connect?tab=tools' },
-                    { step: '2', label: 'Add a server', desc: 'Connect your infrastructure node to WatchTower', to: '/servers' },
-                    { step: '3', label: 'Deploy a project', desc: 'Use the Setup Wizard to launch your first app', to: '/setup' },
-                  ].map(({ step, label, desc, to }) => (
-                    <Link key={step} to={to} className="flex items-start gap-3 p-3 rounded-md border border-border-soft bg-surface-soft hover:bg-muted hover:border-border transition-all">
-                      <span className="w-5 h-5 rounded-full bg-primary text-primary-foreground text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">{step}</span>
-                      <div>
-                        <p className="text-xs font-semibold text-foreground">{label}</p>
-                        <p className="text-[11px] text-muted-foreground mt-0.5">{desc}</p>
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-              </div>
-            </section>
+              ))}
+            </div>
+            <div className="mt-5">
+              <Link
+                to="/start"
+                className="inline-flex items-center gap-2 rounded-md bg-primary hover:bg-primary/90 px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow-retro transition-colors"
+              >
+                Get your first site live →
+              </Link>
+            </div>
+          </section>
+          <SystemOverviewBanner />
           </>
         )}
 
