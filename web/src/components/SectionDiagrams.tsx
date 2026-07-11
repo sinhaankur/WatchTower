@@ -179,13 +179,6 @@ const IconVolume = (
   </svg>
 );
 
-const IconLock = (
-  <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#6d28d9" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-    <rect x={5} y={11} width={14} height={10} rx={2} />
-    <path d="M8 11V7a4 4 0 0 1 8 0v4" />
-  </svg>
-);
-
 const IconFile = (
   <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#475569" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
     <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
@@ -302,15 +295,13 @@ export function ExternalDbDiagram() {
       viewBox="0 0 480 80"
       caption="WatchTower stores encrypted credentials. The database runs wherever you already host it."
     >
-      <Node x={10} y={18} w={110} icon={IconWatchTower}
+      <Node x={10} y={18} w={130} icon={IconWatchTower}
             label="WatchTower" variant="accent" />
-      <g transform="translate(140, 30)">
-        <rect x={0} y={0} width={50} height={22} rx={4} fill="#f5f3ff" stroke="#c4b5fd" strokeWidth={1} />
-        <g transform="translate(4, 3)">{IconLock}</g>
-        <text x={26} y={15} fontSize="8" fill="#5b21b6" textAnchor="middle" style={{ fontFamily: 'inherit' }}>creds</text>
-      </g>
-      <FlowLine x1={196} y1={40} x2={246} y2={40} />
-      <Node x={250} y={18} w={220} icon={IconCloud}
+      {/* The credential handoff is expressed as a labelled flow line — same
+          pattern as create/mount elsewhere — rather than a cramped extra box,
+          so it reads cleanly and matches the other diagrams. */}
+      <FlowLine x1={142} y1={40} x2={228} y2={40} label="encrypted creds" />
+      <Node x={230} y={18} w={240} icon={IconCloud}
             label="External database" sub="RDS, Supabase, NAS, another PC" variant="external" />
     </DiagramFrame>
   );
