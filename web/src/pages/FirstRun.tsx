@@ -165,11 +165,15 @@ export default function FirstRun() {
       <div className="w-full max-w-lg">
         {/* Brand + headline */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-primary/10 mb-4">
-            <span className="text-primary font-black text-lg">Wt</span>
-          </div>
+          <img
+            src="/wt-logo.svg"
+            alt="WatchTower"
+            width={52}
+            height={52}
+            className="mx-auto mb-4 rounded-xl shadow-retro"
+          />
           <h1 className="text-2xl font-bold text-foreground tracking-tight">Get your first site live</h1>
-          <p className="text-sm text-muted-foreground mt-2">
+          <p className="text-sm text-muted-foreground mt-2 max-w-sm mx-auto">
             Paste a GitHub repo. WatchTower runs it on this Mac — build, URL, and self-healing included.
           </p>
         </div>
@@ -189,7 +193,10 @@ export default function FirstRun() {
               onKeyDown={(e) => { if (e.key === 'Enter' && canDeploy) void deploy(); }}
               placeholder="github.com/you/my-site"
               disabled={phase !== 'idle'}
-              className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/40 disabled:opacity-60"
+              spellCheck={false}
+              autoCapitalize="off"
+              autoCorrect="off"
+              className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/15 disabled:opacity-60 transition-shadow"
             />
             {ghConnected && (
               <button
@@ -255,10 +262,20 @@ export default function FirstRun() {
             disabled={!canDeploy}
             className="w-full flex items-center justify-center gap-2 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground text-sm font-semibold py-2.5 shadow-retro transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
+            {phase !== 'idle' && (
+              <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-90" fill="currentColor" d="M4 12a8 8 0 0 1 8-8v4a4 4 0 0 0-4 4H4z" />
+              </svg>
+            )}
             {phase === 'idle' && <>Deploy →</>}
             {phase === 'preparing' && <>Preparing this Mac…</>}
             {phase === 'deploying' && <>Creating your site…</>}
           </button>
+
+          <p className="text-[11px] text-muted-foreground text-center">
+            Takes about a minute. You’ll watch it build and go live on the next screen.
+          </p>
         </div>
 
         {/* Escape hatches */}

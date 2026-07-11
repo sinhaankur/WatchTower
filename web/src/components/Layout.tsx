@@ -562,13 +562,20 @@ export default function Layout({ children }: { children: ReactNode }) {
               </svg>
               <span>More</span>
             </button>
-            {moreExpanded && (
-              <div className="space-y-px">
-                {ADVANCED_ITEMS.map((item) => (
-                  <NavLink key={item.path} item={item} pathname={pathname} onClick={onNavClick} rail={false} badge={navBadgeFor(item.path)} />
-                ))}
+            {/* Smooth height reveal via the grid-rows 0fr→1fr trick — no JS
+                measuring, respects the app's calm-motion feel. Items stay
+                mounted so the transition has something to animate. */}
+            <div
+              className={`grid transition-[grid-template-rows] duration-200 ease-out ${moreExpanded ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}
+            >
+              <div className="overflow-hidden">
+                <div className="space-y-px pt-px">
+                  {ADVANCED_ITEMS.map((item) => (
+                    <NavLink key={item.path} item={item} pathname={pathname} onClick={onNavClick} rail={false} badge={navBadgeFor(item.path)} />
+                  ))}
+                </div>
               </div>
-            )}
+            </div>
           </div>
         )}
       </nav>
