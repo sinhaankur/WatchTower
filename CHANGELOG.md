@@ -9,6 +9,17 @@ Curated, human-friendly history of WatchTower releases. Auto-generated GitHub Re
 
 ---
 
+## 1.20.0 — Seamless first run + a cleaner, lighter app
+
+A focused pass on the first-time experience and overall polish — getting from "installed" to "site live" in one screen, with a leaner, more consistent UI throughout.
+
+- **One-screen first run.** New users land on a single "Get your first site live" screen: paste a GitHub repo, click Deploy. WatchTower registers this machine as the target automatically (no server-hunting), creates the project, and queues the first deployment — then hands off to watch it build. The old three-page setup scavenger hunt is gone. Advanced options and "skip to dashboard" are one click away.
+- **Simpler navigation.** The sidebar leads with the six things you use daily (Dashboard, Sites, Servers, Databases, Integrations, Settings); everything advanced tucks under a "More" disclosure that expands smoothly and remembers your choice.
+- **Plain-language dashboard.** Stats and empty states now say "your sites" instead of infrastructure jargon. The empty state is one outcome and one button.
+- **Cleaner diagrams, one font.** Rebuilt the architecture diagrams (app + site) so labels never overlap, and standardized every diagram on the UI's sans-serif font.
+- **Lighter under the hood.** Removed 11 unused frontend dependencies (24 → 13) for a leaner tree, faster installs, and less supply-chain surface. No behavior change.
+- **Reliable installers + auto-update.** Fixes so desktop installers publish to the right place — every platform's DMG/AppImage/EXE now ships on the release, and in-app auto-update works end to end.
+
 ## 1.19.0 — Off-host backups + ntfy notifications
 
 Two features that make WatchTower safer to rely on across the devices you already own.
