@@ -458,7 +458,14 @@ jobs:
           APP_PID=$!
           trap 'kill $APP_PID 2>/dev/null || true' EXIT
 
-          DEADLINE=$((SECONDS + 90))
+          # 150s ceiling (was 90). The loop exits the instant /health responds,
+          # so a fast runner is unaffected — but AppImage FUSE-mount + first-run
+          # Alembic migrations can run long on a slow/contended Linux runner, and
+          # a too-tight 90s deadline flaked a legitimate release (v1.20.1) while
+          # migrations were still applying. Extending only the ceiling removes
+          # that false failure without hiding a real hang (the process-death
+          # check below still fails fast if the backend actually crashes).
+          DEADLINE=$((SECONDS + 150))
           while [ $SECONDS -lt $DEADLINE ]; do
             if curl -fsS -m 3 http://127.0.0.1:8000/health > /tmp/health.json 2>/dev/null; then
               echo "::notice::Backend responded within $SECONDS s:"
@@ -482,7 +489,7 @@ jobs:
             sleep 2
           done
 
-          echo "::error::Backend never reached /health within 90 s."
+          echo "::error::Backend never reached /health within 150 s."
           # Print every backend log we can find so the failure mode is
           # actually diagnosable from the workflow output. Without this
           # we'd cut another release tag just to add prints.

@@ -3,9 +3,11 @@ import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-route
 import { trackPageView } from '@/lib/analytics';
 import { QueryClientProvider, QueryClient, MutationCache, QueryCache } from '@tanstack/react-query';
 import { toast } from './lib/toast';
-// Eager — first-paint critical (login screen, then Dashboard for the
-// authed cold start), plus the chrome that wraps every authed page.
-import Dashboard from './pages/Dashboard';
+// Eager — first-paint critical (the login screen is the guaranteed first view
+// for logged-out users), plus the chrome that wraps every authed page. Dashboard
+// is NO LONGER eager: since the redesign, a fresh user lands on /start, not /,
+// so inlining Dashboard's ~30KB into the initial bundle taxed every load for a
+// page not always shown first. It's lazy below with the rest.
 import Login from './pages/Login';
 import Layout from './components/Layout';
 import ErrorBoundary from './components/ErrorBoundary';
@@ -19,6 +21,7 @@ import './App.css';
 // page on a desktop, invisible vs. the savings on the cold-start
 // bundle. The Suspense fallback is a faint full-height div so route
 // switches don't flash a giant spinner mid-layout.
+const Dashboard            = lazy(() => import('./pages/Dashboard'));
 const SetupWizard          = lazy(() => import('./pages/SetupWizard'));
 const FirstRun             = lazy(() => import('./pages/FirstRun'));
 const ProjectDetail        = lazy(() => import('./pages/ProjectDetail'));
