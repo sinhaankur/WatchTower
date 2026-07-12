@@ -768,6 +768,126 @@ function BackupCard() {
   );
 }
 
+// ── Storage: show + reclaim build-cache disk that accumulates over time. ──────
+type StorageInfo = {
+  build_dir: string;
+  reclaimable_bytes: number;
+  reclaimable_human: string;
+  breakdown: { label: string; path: string; bytes: number; human: string }[];
+};
+
+function StorageCard() {
+  const [info, setInfo] = useState<StorageInfo | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [clearing, setClearing] = useState(false);
+  const [includeCaches, setIncludeCaches] = useState(false);
+  const [note, setNote] = useState<string | null>(null);
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const res = await apiClient.get<StorageInfo>('/runtime/storage');
+      setInfo(res.data);
+    } catch {
+      setInfo(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { void load(); }, []);
+
+  const clear = async () => {
+    setClearing(true);
+    setNote(null);
+    try {
+      const res = await apiClient.post<{ freed_human: string }>(
+        `/runtime/storage/clear?include_caches=${includeCaches}`,
+      );
+      setNote(`Freed ${res.data.freed_human}.`);
+      await load();
+    } catch {
+      setNote('Could not clear the cache. Try again.');
+    } finally {
+      setClearing(false);
+    }
+  };
+
+  const nothingToClear = !info || info.reclaimable_bytes === 0;
+
+  return (
+    <div className="rounded-xl border border-border bg-card p-5 shadow-retro">
+      <div className="flex items-center gap-3 mb-4">
+        <div className="w-9 h-9 rounded-lg border border-border bg-slate-900 flex items-center justify-center shadow-retro">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <ellipse cx="12" cy="5" rx="9" ry="3" />
+            <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" />
+            <path d="M3 12c0 1.66 4 3 9 3s9-1.34 9-3" />
+          </svg>
+        </div>
+        <div className="flex-1 min-w-0">
+          <h2 className="text-sm font-semibold text-slate-900">Storage</h2>
+          <p className="text-xs text-slate-500">Reclaim disk from old build files</p>
+        </div>
+        <button
+          onClick={() => void load()}
+          disabled={loading}
+          className="text-xs text-slate-500 hover:text-slate-900 transition-colors disabled:opacity-50"
+        >
+          {loading ? '…' : '↻ Refresh'}
+        </button>
+      </div>
+
+      {loading && <p className="text-xs text-slate-500">Measuring…</p>}
+
+      {!loading && info && (
+        <>
+          <div className="flex items-baseline justify-between mb-3">
+            <span className="text-2xl font-bold text-slate-900 tabular-nums">{info.reclaimable_human}</span>
+            <span className="text-xs text-slate-500">reclaimable</span>
+          </div>
+          <div className="space-y-1.5 mb-4">
+            {info.breakdown.map((b) => (
+              <div key={b.path} className="flex items-center justify-between text-xs">
+                <span className="text-slate-600">{b.label}</span>
+                <span className="text-slate-500 tabular-nums">{b.human}</span>
+              </div>
+            ))}
+          </div>
+
+          <label className="flex items-center gap-2 text-xs text-slate-600 mb-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={includeCaches}
+              onChange={(e) => setIncludeCaches(e.target.checked)}
+              className="rounded border-slate-300"
+            />
+            Also clear package caches <span className="text-slate-400">(next build re-downloads)</span>
+          </label>
+
+          <button
+            onClick={() => void clear()}
+            disabled={clearing || nothingToClear}
+            className="w-full rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-sm font-semibold py-2 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            {clearing ? 'Clearing…' : nothingToClear ? 'Nothing to clear' : 'Clear build cache'}
+          </button>
+
+          {note && <p className="text-xs text-slate-500 mt-2 text-center">{note}</p>}
+          <p className="text-[11px] text-slate-400 mt-3">
+            Only removes repo clones under <span className="font-mono">{info.build_dir}</span>. Your projects,
+            databases, and backups are never touched.
+          </p>
+        </>
+      )}
+
+      {!loading && !info && (
+        <p className="text-xs text-slate-500">Storage info unavailable.</p>
+      )}
+    </div>
+  );
+}
+
 const Settings = () => {
   const navigate = useNavigate();
 
@@ -799,6 +919,7 @@ const Settings = () => {
         <CardBoundary name="Org notifications"><OrgWebhooksCard /></CardBoundary>
         <CardBoundary name="Diagnostics"><DiagnosticsCard /></CardBoundary>
         <CardBoundary name="System"><SystemCard /></CardBoundary>
+        <CardBoundary name="Storage"><StorageCard /></CardBoundary>
         <CardBoundary name="Backup & Restore"><BackupCard /></CardBoundary>
         <CardBoundary name="Off-host backups"><BackupDestinationsCard /></CardBoundary>
         <CardBoundary name="VS Code"><VSCodeCard /></CardBoundary>

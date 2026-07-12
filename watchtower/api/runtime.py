@@ -3018,3 +3018,128 @@ async def tool_install(
         logger.exception("tool-install: audit log write failed (continuing)")
 
     return {"started": True, "tool": tool, "last_run": state}
+
+
+# ── Storage / build-cache management ──────────────────────────────────────────
+# Build clones + package-manager caches accumulate under WATCHTOWER_BUILD_DIR
+# and can grow to gigabytes over time. These endpoints let the user see that
+# usage and reclaim it from Settings without touching the shell — the app data
+# (DB, keys, backups) is never affected.
+
+def _dir_size_bytes(path) -> int:
+    """Total size of a directory tree in bytes. Missing dir → 0."""
+    from pathlib import Path as _Path
+
+    root = _Path(path)
+    if not root.exists():
+        return 0
+    total = 0
+    for p in root.rglob("*"):
+        try:
+            if p.is_file() and not p.is_symlink():
+                total += p.stat().st_size
+        except OSError:
+            continue  # races / permission — skip, don't fail the whole scan
+    return total
+
+
+def _human_size(n: float) -> str:
+    for unit in ("B", "KB", "MB", "GB"):
+        if n < 1024:
+            return f"{n:.0f} {unit}" if unit == "B" else f"{n:.1f} {unit}"
+        n /= 1024
+    return f"{n:.1f} TB"
+
+
+@router.get("/storage")
+async def storage_usage(_current_user: dict = Depends(util.get_current_user)):
+    """Report reclaimable build-cache usage so the SPA can show + offer to clear it.
+
+    Reports the build workspace/cache tree under WATCHTOWER_BUILD_DIR. App data
+    (~/.watchtower: DB, keys, backups) is deliberately NOT included — it is not
+    reclaimable and must never be offered for deletion here.
+    """
+    from watchtower import builder
+
+    base = builder.BUILD_BASE
+    workspaces = builder.BUILD_BASE / "workspaces"
+    caches = builder.BUILD_BASE / "caches"
+
+    ws_bytes = _dir_size_bytes(workspaces)
+    cache_bytes = _dir_size_bytes(caches)
+    total = _dir_size_bytes(base)  # includes locks + anything else under base
+
+    return {
+        "build_dir": str(base),
+        "reclaimable_bytes": total,
+        "reclaimable_human": _human_size(total),
+        "breakdown": [
+            {"label": "Repo clones", "path": str(workspaces), "bytes": ws_bytes, "human": _human_size(ws_bytes)},
+            {"label": "Package caches", "path": str(caches), "bytes": cache_bytes, "human": _human_size(cache_bytes)},
+        ],
+    }
+
+
+@router.post("/storage/clear")
+async def storage_clear(
+    request: Request,
+    include_caches: bool = False,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(util.get_current_user),
+):
+    """Delete build clones (and optionally package caches) to reclaim disk.
+
+    Only ever touches paths under WATCHTOWER_BUILD_DIR. Repo clones are always
+    safe to remove — they are re-fetched on the next deploy. Package caches make
+    the next build slower to re-download, so they are opt-in (``include_caches``).
+    App data is never touched.
+    """
+    import shutil
+    from watchtower import builder
+
+    base = builder.BUILD_BASE.resolve()
+    targets = [builder.BUILD_BASE / "workspaces"]
+    if include_caches:
+        targets.append(builder.BUILD_BASE / "caches")
+
+    freed = 0
+    removed = []
+    for target in targets:
+        # Defence-in-depth: never delete anything that isn't strictly inside
+        # the resolved build base (guards against symlink / env-var surprises).
+        try:
+            resolved = target.resolve()
+        except OSError:
+            continue
+        if not str(resolved).startswith(str(base) + "/") and resolved != base:
+            logger.warning("storage_clear: refusing to delete out-of-base path %s", resolved)
+            continue
+        if not resolved.exists():
+            continue
+        size = _dir_size_bytes(resolved)
+        try:
+            shutil.rmtree(resolved)
+            resolved.mkdir(parents=True, exist_ok=True)  # recreate the empty dir
+            freed += size
+            removed.append(target.name)
+        except OSError as exc:
+            logger.warning("storage_clear: could not remove %s: %s", resolved, exc)
+
+    try:
+        from watchtower.api import audit as audit_log
+        from watchtower.api.enterprise import _ensure_user_org_member
+
+        _u, org, _m = _ensure_user_org_member(db, current_user)
+        audit_log.record_for_user(
+            db, current_user,
+            action="runtime.storage_clear",
+            entity_type="runtime",
+            org_id=org.id if org else None,
+            request=request,
+            extra={"removed": removed, "freed_bytes": freed, "include_caches": include_caches},
+        )
+        db.commit()
+    except Exception:  # noqa: BLE001 - never block the clear on audit
+        logger.exception("storage_clear: audit log write failed (continuing)")
+
+    return {"cleared": removed, "freed_bytes": freed, "freed_human": _human_size(freed)}
