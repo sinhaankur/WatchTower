@@ -9,6 +9,12 @@ Curated, human-friendly history of WatchTower releases. Auto-generated GitHub Re
 
 ---
 
+## 1.20.2 — Reclaim disk, faster load, steadier releases
+
+- **Storage cleaner.** Settings → Storage shows how much disk your build cache is using and lets you reclaim it in one click. Build clones (re-fetched on the next deploy) are always safe to clear; package caches are opt-in. Your projects, databases, and backups are never touched. Build caches can quietly grow to gigabytes — now you can see and clear them without a terminal.
+- **Faster first paint.** The Dashboard is now loaded on demand instead of being baked into the initial bundle, cutting the startup JavaScript ~27% (154 KB → 113 KB). Every page loads a little quicker.
+- **Steadier releases.** Raised the release smoke-test timeout so a slow CI runner doing first-run database migrations no longer fails a perfectly good build. The check still fails fast if the app actually crashes.
+
 ## 1.20.1 — Fix: desktop app crashed on launch (missing python-multipart)
 
 The 1.20.0 desktop builds crashed at startup because the packaged Python bundle was missing `python-multipart`, which FastAPI needs to register the photo-upload route. `python-multipart` was declared in `pyproject.toml` but not in `requirements.txt` — and the desktop bundle installs from `requirements.txt`, so it never made it in.
