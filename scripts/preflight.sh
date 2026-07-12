@@ -205,6 +205,18 @@ else
       FAIL "Bundled Python missing critical deps (would crash on first launch)"
       (cd /tmp && "$APP_PY" -c "import watchtower, pydantic_core, cryptography, alembic" 2>&1 | head -10)
     fi
+    # Actually LOAD the FastAPI ASGI app — importing `watchtower` alone does
+    # NOT register routes, so a missing form-data dep (python-multipart) or any
+    # other route-registration failure sails through the import check and only
+    # crashes at real startup. This is exactly the 1.20.0 python-multipart bug:
+    # photos.py's upload route calls ensure_multipart_is_installed() at import
+    # time. Loading `watchtower.api:app` triggers full router registration.
+    if (cd /tmp && WATCHTOWER_API_TOKEN=preflight-probe "$APP_PY" -c "from watchtower.api import app; assert app.routes; print('app-load-OK')" 2>&1 | grep -q app-load-OK); then
+      PASS "Bundled Python loads the FastAPI app (all routes register — catches missing form/runtime deps)"
+    else
+      FAIL "Bundled Python cannot load watchtower.api:app — the packaged backend WILL crash at startup"
+      (cd /tmp && WATCHTOWER_API_TOKEN=preflight-probe "$APP_PY" -c "from watchtower.api import app" 2>&1 | tail -12)
+    fi
     # Verify alembic migrations are bundled (caught the 1.11.0 fresh-DB bug).
     APP_ALEMBIC_ENV=$(find "$REPO_ROOT/desktop/dist/mac-arm64/WatchTower.app/Contents/Resources/python/lib" -path '*/site-packages/watchtower/alembic/env.py' 2>/dev/null | head -1)
     if [ -n "$APP_ALEMBIC_ENV" ]; then

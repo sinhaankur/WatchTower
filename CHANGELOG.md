@@ -9,6 +9,13 @@ Curated, human-friendly history of WatchTower releases. Auto-generated GitHub Re
 
 ---
 
+## 1.20.1 — Fix: desktop app crashed on launch (missing python-multipart)
+
+The 1.20.0 desktop builds crashed at startup because the packaged Python bundle was missing `python-multipart`, which FastAPI needs to register the photo-upload route. `python-multipart` was declared in `pyproject.toml` but not in `requirements.txt` — and the desktop bundle installs from `requirements.txt`, so it never made it in.
+
+- **Fix:** added `python-multipart` to `requirements.txt` so the bundle ships it.
+- **Guard so it can't recur:** `preflight.sh` now *loads the FastAPI app* (`watchtower.api:app`) instead of only importing the `watchtower` package — route registration is what surfaces a missing form/runtime dep, so this catches the whole class of "imports fine but crashes at startup" bugs before a tag.
+
 ## 1.20.0 — Seamless first run + a cleaner, lighter app
 
 A focused pass on the first-time experience and overall polish — getting from "installed" to "site live" in one screen, with a leaner, more consistent UI throughout.
