@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import apiClient from '@/lib/api';
 import AIAutonomyCard from '@/components/AIAutonomyCard';
+import EmailCard from '@/components/EmailCard';
 import BackupDestinationsCard from '@/components/BackupDestinationsCard';
 import DiagnosticsCard from '@/components/DiagnosticsCard';
 import OrgWebhooksCard from '@/components/OrgWebhooksCard';
@@ -916,6 +917,7 @@ const Settings = () => {
             notice, not a blank Settings page. */}
         <CardBoundary name="Updates"><UpdateCheckCard /></CardBoundary>
         <CardBoundary name="AI & Autonomy"><AIAutonomyCard /></CardBoundary>
+        <CardBoundary name="Email"><EmailCard /></CardBoundary>
         <CardBoundary name="Org notifications"><OrgWebhooksCard /></CardBoundary>
         <CardBoundary name="Diagnostics"><DiagnosticsCard /></CardBoundary>
         <CardBoundary name="System"><SystemCard /></CardBoundary>

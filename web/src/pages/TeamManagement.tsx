@@ -155,7 +155,7 @@ const TeamManagement = () => {
       setActionSuccess(
         body?.email_sent
           ? `Invitation email sent to ${invitedEmail}.`
-          : `Invitation created for ${invitedEmail}. Email wasn't sent (no SMTP) — copy the invite link below.`,
+          : `Invite ready for ${invitedEmail} — copy the secure link below to share it.`,
       );
       await refreshData(orgId);
     } catch (err: any) {
@@ -344,12 +344,21 @@ const TeamManagement = () => {
         )}
 
         {lastInvite && (
-          <div className="border border-amber-200 bg-amber-50 rounded-md px-4 py-3 space-y-2">
-            <p className="text-sm text-amber-900">
-              {lastInvite.emailSent
-                ? `Invitation email sent to ${lastInvite.email}. They can also use this link:`
-                : `Email wasn't sent (no SMTP configured). Send this link to ${lastInvite.email}:`}
-            </p>
+          <div className={`border rounded-md px-4 py-3 space-y-2 ${
+            lastInvite.emailSent ? 'border-green-200 bg-green-50' : 'border-amber-200 bg-amber-50'
+          }`}>
+            {lastInvite.emailSent ? (
+              <p className="text-sm text-green-900">
+                <span className="font-medium">Invitation emailed to {lastInvite.email}.</span>{' '}
+                They can also use this link:
+              </p>
+            ) : (
+              <p className="text-sm text-amber-900">
+                <span className="font-medium">Invite ready for {lastInvite.email}.</span>{' '}
+                Email auto-send isn't set up yet — copy this secure link and send it however you like
+                (Slack, iMessage, etc.). It's tied to their email, so only they can accept it.
+              </p>
+            )}
             <div className="flex items-center gap-2">
               <Input
                 readOnly
@@ -358,9 +367,18 @@ const TeamManagement = () => {
                 className="font-mono text-xs bg-white"
               />
               <Button type="button" variant="outline" onClick={copyInviteUrl}>
-                {inviteCopied ? 'Copied' : 'Copy'}
+                {inviteCopied ? '✓ Copied' : 'Copy link'}
               </Button>
             </div>
+            {!lastInvite.emailSent && (
+              <p className="text-[11px] text-amber-700">
+                Tired of copying links?{' '}
+                <a href="/settings" className="underline font-medium hover:text-amber-900">
+                  Set up email in Settings
+                </a>{' '}
+                and future invitations send themselves.
+              </p>
+            )}
           </div>
         )}
 

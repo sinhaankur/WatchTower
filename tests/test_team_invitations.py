@@ -280,3 +280,203 @@ def test_delete_team_member_requires_admin(client, db_session, monkeypatch):
         .first()
         is not None
     )
+
+
+# ── Email (SMTP) configuration — Settings → Email ────────────────────────────
+
+def test_email_config_get_reports_unconfigured_by_default(client, monkeypatch):
+    monkeypatch.delenv("WATCHTOWER_SMTP_HOST", raising=False)
+    _bootstrap_owner_org(client)
+    r = client.get("/api/email/config")
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["configured"] is False
+    assert body["source"] is None
+    assert body["has_password"] is False
+
+
+def test_email_config_get_reflects_env_fallback(client, monkeypatch):
+    monkeypatch.setenv("WATCHTOWER_SMTP_HOST", "smtp.env.example")
+    monkeypatch.setenv("WATCHTOWER_SMTP_PORT", "2525")
+    _bootstrap_owner_org(client)
+    r = client.get("/api/email/config")
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["configured"] is True
+    assert body["source"] == "env"
+    assert body["smtp_host"] == "smtp.env.example"
+    assert body["smtp_port"] == 2525
+
+
+def test_email_config_put_persists_and_never_echoes_password(client, monkeypatch):
+    monkeypatch.delenv("WATCHTOWER_SMTP_HOST", raising=False)
+    _bootstrap_owner_org(client)
+    r = client.put(
+        "/api/email/config",
+        json={
+            "smtp_host": "smtp.gmail.com",
+            "smtp_port": 587,
+            "smtp_user": "me@gmail.com",
+            "smtp_password": "super-secret-app-password",
+            "smtp_from": "me@gmail.com",
+            "use_tls": True,
+        },
+    )
+    assert r.status_code == 200, r.text
+    body = r.json()
+    # DB now wins → source flips to "database".
+    assert body["source"] == "database"
+    assert body["configured"] is True
+    assert body["smtp_host"] == "smtp.gmail.com"
+    assert body["has_password"] is True
+    # The password must NEVER be returned in any field.
+    assert "super-secret-app-password" not in r.text
+    assert "smtp_password" not in body
+
+
+def test_email_config_db_wins_over_env(client, monkeypatch):
+    monkeypatch.setenv("WATCHTOWER_SMTP_HOST", "smtp.env.example")
+    _bootstrap_owner_org(client)
+    client.put("/api/email/config", json={"smtp_host": "smtp.db.example", "smtp_port": 465})
+    r = client.get("/api/email/config")
+    body = r.json()
+    assert body["source"] == "database"
+    assert body["smtp_host"] == "smtp.db.example"
+
+
+def test_email_config_password_stored_encrypted_not_plaintext(client, db_session, monkeypatch):
+    from watchtower.database import SystemSetting
+    from watchtower.email_settings import KEY_SMTP_PASSWORD
+
+    monkeypatch.delenv("WATCHTOWER_SMTP_HOST", raising=False)
+    _bootstrap_owner_org(client)
+    client.put(
+        "/api/email/config",
+        json={"smtp_host": "smtp.x", "smtp_password": "plaintext-secret"},
+    )
+    row = (
+        db_session.query(SystemSetting)
+        .filter(SystemSetting.key == KEY_SMTP_PASSWORD)
+        .first()
+    )
+    assert row is not None
+    assert row.is_secret is True
+    # Fernet ciphertext, never the raw value at rest.
+    assert row.value != "plaintext-secret"
+    assert "plaintext-secret" not in (row.value or "")
+
+
+def test_require_team_admin_blocks_non_admin_member(monkeypatch):
+    """Unit-test the SMTP-settings gate directly.
+
+    Going through the HTTP layer can't exercise this under the test harness:
+    with owner mode OFF (the default) every caller gets their own org and is
+    admin of it, and with owner mode ON a static-token caller is a "guest"
+    that never claims the installation — so no request path produces a
+    genuine non-admin. Testing the gate function against a non-admin member
+    row is the honest, deterministic check.
+    """
+    import pytest
+    from fastapi import HTTPException
+    from watchtower.api import enterprise
+    from watchtower.database import TeamMember, TeamRole
+
+    non_admin = TeamMember(role=TeamRole.DEVELOPER, can_manage_team=False, is_active=True)
+    monkeypatch.setattr(
+        enterprise, "_ensure_user_org_member",
+        lambda db, cu: (object(), object(), non_admin),
+    )
+    with pytest.raises(HTTPException) as exc:
+        enterprise._require_team_admin(db=None, current_user={})
+    assert exc.value.status_code == 403
+
+    admin = TeamMember(role=TeamRole.ADMIN, can_manage_team=True, is_active=True)
+    sentinel_user, sentinel_org = object(), object()
+    monkeypatch.setattr(
+        enterprise, "_ensure_user_org_member",
+        lambda db, cu: (sentinel_user, sentinel_org, admin),
+    )
+    user, org = enterprise._require_team_admin(db=None, current_user={})
+    assert user is sentinel_user and org is sentinel_org
+
+
+def test_invite_auto_sends_when_db_smtp_configured(client, monkeypatch):
+    """With SMTP saved in the DB, an invite reports email_sent=True and the
+    low-level send is invoked — proving the DB config drives delivery."""
+    from watchtower.api import enterprise
+
+    monkeypatch.delenv("WATCHTOWER_SMTP_HOST", raising=False)
+    org_id = _bootstrap_owner_org(client)
+    client.put("/api/email/config", json={"smtp_host": "smtp.db", "smtp_from": "a@b.c"})
+
+    sent = {}
+
+    def _fake_send(cfg, to_email, subject, body_text, body_html):
+        sent["to"] = to_email
+        sent["host"] = cfg.host
+
+    monkeypatch.setattr(enterprise, "_send_email", _fake_send)
+
+    body = _invite(client, org_id, "newhire@example.com")
+    assert body["email_sent"] is True
+    assert sent == {"to": "newhire@example.com", "host": "smtp.db"}
+
+
+def test_invite_send_failure_falls_back_to_link(client, monkeypatch):
+    """If the SMTP send raises, the invite is still created and the URL is
+    returned so the admin can share it manually (non-fatal path)."""
+    from watchtower.api import enterprise
+
+    monkeypatch.delenv("WATCHTOWER_SMTP_HOST", raising=False)
+    org_id = _bootstrap_owner_org(client)
+    client.put("/api/email/config", json={"smtp_host": "smtp.db"})
+
+    def _boom(cfg, to_email, subject, body_text, body_html):
+        raise RuntimeError("connection refused")
+
+    monkeypatch.setattr(enterprise, "_send_email", _boom)
+
+    body = _invite(client, org_id, "fallback@example.com")
+    assert body["email_sent"] is False
+    assert body["invitation_url"].endswith(body["invitation_url"].split("/invite/")[-1])
+
+
+def test_email_test_send_ok(client, monkeypatch):
+    from watchtower.api import enterprise
+
+    monkeypatch.delenv("WATCHTOWER_SMTP_HOST", raising=False)
+    _bootstrap_owner_org(client)
+    client.put("/api/email/config", json={"smtp_host": "smtp.db", "smtp_from": "a@b.c"})
+    monkeypatch.setattr(enterprise, "_send_email", lambda *a, **k: None)
+
+    r = client.post("/api/email/test", json={"to": "check@example.com"})
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["ok"] is True
+    assert body["to"] == "check@example.com"
+    assert body["error"] is None
+
+
+def test_email_test_send_reports_error_verbatim(client, monkeypatch):
+    from watchtower.api import enterprise
+
+    monkeypatch.delenv("WATCHTOWER_SMTP_HOST", raising=False)
+    _bootstrap_owner_org(client)
+    client.put("/api/email/config", json={"smtp_host": "smtp.db", "smtp_from": "a@b.c"})
+
+    def _boom(*a, **k):
+        raise RuntimeError("auth failed")
+
+    monkeypatch.setattr(enterprise, "_send_email", _boom)
+    r = client.post("/api/email/test", json={"to": "check@example.com"})
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["ok"] is False
+    assert "auth failed" in body["error"]
+
+
+def test_email_test_send_400_when_unconfigured(client, monkeypatch):
+    monkeypatch.delenv("WATCHTOWER_SMTP_HOST", raising=False)
+    _bootstrap_owner_org(client)
+    r = client.post("/api/email/test", json={"to": "check@example.com"})
+    assert r.status_code == 400, r.text

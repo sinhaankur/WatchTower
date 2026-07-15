@@ -50,40 +50,61 @@ def _build_invitation_url(token: str) -> str:
     return f"{_app_base_url()}/invite/{token}"
 
 
+def _send_email(cfg, to_email: str, subject: str, body_text: str, body_html: str) -> None:
+    """Low-level SMTP send. Raises on failure — callers decide whether a
+    failure is fatal. ``cfg`` is a :class:`watchtower.email_settings.SMTPConfig`.
+
+    Used by both the invitation flow (failure is non-fatal, falls back to a
+    shareable link) and the Settings "send test email" probe (failure is
+    surfaced verbatim so the operator can fix their credentials)."""
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = subject
+    msg["From"] = cfg.from_addr
+    msg["To"] = to_email
+    msg.attach(MIMEText(body_text, "plain"))
+    msg.attach(MIMEText(body_html, "html"))
+
+    with smtplib.SMTP(cfg.host, cfg.port, timeout=10) as server:
+        server.ehlo()
+        if cfg.use_tls:
+            server.starttls()
+            server.ehlo()
+        if cfg.user and cfg.password:
+            server.login(cfg.user, cfg.password)
+        server.sendmail(cfg.from_addr, [to_email], msg.as_string())
+
+
 def _send_invitation_email(
+    db,
     to_email: str,
     org_name: str,
     role: str,
     inviter_name: str,
     invite_url: str,
 ) -> bool:
-    """Send a team-invitation email via SMTP. Returns True on success.
+    """Send a team-invitation email via the configured SMTP server. Returns
+    True on success, False when email couldn't be sent for any reason.
 
-    Reads configuration from environment variables:
-      WATCHTOWER_SMTP_HOST     — SMTP server hostname (required to send)
-      WATCHTOWER_SMTP_PORT     — port, default 587
-      WATCHTOWER_SMTP_USER     — login username (optional for local relays)
-      WATCHTOWER_SMTP_PASSWORD — login password (optional for local relays)
-      WATCHTOWER_SMTP_FROM     — From address, default noreply@watchtower.local
+    Configuration is resolved DB-first (Settings → Email in the SPA), then
+    from the ``WATCHTOWER_SMTP_*`` env vars — see
+    :func:`watchtower.email_settings.resolve_smtp_config`.
 
-    If ``WATCHTOWER_SMTP_HOST`` is not set, the function logs a warning and
-    returns False — the caller should expose the invite URL through the
-    response body so the admin can share it manually.
+    If no SMTP host is configured anywhere, the function logs a warning and
+    returns False — the caller exposes the invite URL through the response
+    body so the admin can share it manually (the no-SMTP fallback path).
     """
-    smtp_host = os.getenv("WATCHTOWER_SMTP_HOST")
-    if not smtp_host:
+    from watchtower.email_settings import resolve_smtp_config
+
+    cfg = resolve_smtp_config(db)
+    if not cfg.configured:
         logger.warning(
-            "Team invitation email NOT sent to %s — WATCHTOWER_SMTP_HOST is unset. "
+            "Team invitation email NOT sent to %s — no SMTP host configured. "
             "Returning the invite URL in the API response so the admin can share "
-            "it manually. Set WATCHTOWER_SMTP_HOST to enable automatic email.",
+            "it manually. Configure Settings → Email (or set WATCHTOWER_SMTP_HOST) "
+            "to enable automatic email.",
             to_email,
         )
         return False
-
-    smtp_port = int(os.getenv("WATCHTOWER_SMTP_PORT", "587"))
-    smtp_user = os.getenv("WATCHTOWER_SMTP_USER", "")
-    smtp_password = os.getenv("WATCHTOWER_SMTP_PASSWORD", "")
-    from_addr = os.getenv("WATCHTOWER_SMTP_FROM", "noreply@watchtower.local")
 
     subject = f"You've been invited to join {org_name} on WatchTower"
     body_text = (
@@ -103,22 +124,8 @@ def _send_invitation_email(
         f"<p>&mdash; The WatchTower Team</p>"
     )
 
-    msg = MIMEMultipart("alternative")
-    msg["Subject"] = subject
-    msg["From"] = from_addr
-    msg["To"] = to_email
-    msg.attach(MIMEText(body_text, "plain"))
-    msg.attach(MIMEText(body_html, "html"))
-
     try:
-        with smtplib.SMTP(smtp_host, smtp_port, timeout=10) as server:
-            server.ehlo()
-            if smtp_port != 25:
-                server.starttls()
-                server.ehlo()
-            if smtp_user and smtp_password:
-                server.login(smtp_user, smtp_password)
-            server.sendmail(from_addr, [to_email], msg.as_string())
+        _send_email(cfg, to_email, subject, body_text, body_html)
         logger.info("Invitation email sent to %s for org %s", to_email, org_name)
         return True
     except Exception:
@@ -127,8 +134,8 @@ def _send_invitation_email(
         logger.exception(
             "Failed to send invitation email to %s (SMTP %s:%s)",
             to_email,
-            smtp_host,
-            smtp_port,
+            cfg.host,
+            cfg.port,
         )
         return False
 
@@ -1860,6 +1867,7 @@ async def invite_team_member(
         org_name = org.name if org else str(org_id)
         inviter_name = current_user.get("name") or current_user.get("email") or "A WatchTower admin"
         email_sent = _send_invitation_email(
+            db,
             to_email=member_data.email,
             org_name=org_name,
             role=_role_value(member_data.role),
@@ -1878,6 +1886,150 @@ async def invite_team_member(
         db.rollback()
         logger.exception("Inviting team member failed")
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unable to invite team member")
+
+
+# ---------------------------------------------------------------------------
+# Outbound email (SMTP) configuration — Settings → Email
+#
+# Guided, DB-first setup so invitations auto-send once creds are entered.
+# Mirrors the AI & Autonomy config surface (GET/PUT/test) in agent.py:
+# admin-gated writes, password never echoed back, env vars stay a fallback.
+# ---------------------------------------------------------------------------
+
+
+class EmailConfigUpdate(_PydBaseModel):
+    """PUT /api/email/config body. A field left unset (None) is untouched;
+    an empty string clears it (falls back to the env var)."""
+    smtp_host: Optional[str] = None
+    smtp_port: Optional[int] = None
+    smtp_user: Optional[str] = None
+    smtp_password: Optional[str] = None
+    smtp_from: Optional[str] = None
+    use_tls: Optional[bool] = None
+
+
+class EmailTestRequest(_PydBaseModel):
+    """POST /api/email/test body. ``to`` defaults to the caller's own email so
+    the common case ("does my config work?") needs no input."""
+    to: Optional[str] = None
+
+
+def _require_team_admin(db: Session, current_user: dict):
+    """Gate a write on team-admin permission. Returns (user, org)."""
+    user, org, member = _ensure_user_org_member(db, current_user)
+    if not member or not member.can_manage_team:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Changing email (SMTP) settings requires team-admin permission.",
+        )
+    return user, org
+
+
+def _email_config_payload(cfg) -> dict:
+    """Serialise an SMTPConfig for the SPA. Never includes the password —
+    only ``has_password`` so the UI can show 'saved' without leaking it."""
+    return {
+        "configured": cfg.configured,
+        "smtp_host": cfg.host,
+        "smtp_port": cfg.port,
+        "smtp_user": cfg.user,
+        "smtp_from": cfg.from_addr,
+        "use_tls": cfg.use_tls,
+        "has_password": bool(cfg.password),
+        "source": cfg.source,
+    }
+
+
+@router.get("/email/config")
+async def get_email_config(
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(util.get_current_user),
+) -> dict:
+    """Surface SMTP config to the SPA so Settings → Email can show whether
+    invitations will auto-send. Never returns the password."""
+    from watchtower.email_settings import resolve_smtp_config
+
+    _ensure_user_org_member(db, current_user)
+    return _email_config_payload(resolve_smtp_config(db))
+
+
+@router.put("/email/config")
+async def update_email_config(
+    req: EmailConfigUpdate,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(util.get_current_user),
+) -> dict:
+    """Persist SMTP settings so operators configure email from the UI instead
+    of env vars. Empty string clears a field (env fallback). Admin-gated."""
+    from watchtower import email_settings
+
+    user, _org = _require_team_admin(db, current_user)
+    email_settings.update_smtp_config(
+        db,
+        host=req.smtp_host,
+        port=req.smtp_port,
+        user=req.smtp_user,
+        password=req.smtp_password,
+        from_addr=req.smtp_from,
+        use_tls=req.use_tls,
+        user_id=user.id,
+    )
+    db.commit()
+    return _email_config_payload(email_settings.resolve_smtp_config(db))
+
+
+@router.post("/email/test")
+@limiter.limit("6/minute", key_func=lambda request: request.client.host if request.client else "anon")
+async def test_email_config(
+    request: Request,
+    req: EmailTestRequest,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(util.get_current_user),
+) -> dict:
+    """Send a real test email to prove the SMTP config works before an admin
+    relies on it for invitations. Admin-gated + rate-limited. Returns the
+    error verbatim on failure so the operator can fix credentials."""
+    from watchtower.email_settings import resolve_smtp_config
+
+    user, _org = _require_team_admin(db, current_user)
+    cfg = resolve_smtp_config(db)
+    if not cfg.configured:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No SMTP host configured. Save the host/port first, then send a test.",
+        )
+
+    to_email = (req.to or "").strip() or (current_user.get("email") or getattr(user, "email", "") or "")
+    if not to_email or "@" not in to_email:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No valid recipient. Provide a 'to' address or sign in with an email account.",
+        )
+
+    subject = "WatchTower test email"
+    body_text = (
+        "This is a test email from WatchTower.\n\n"
+        "If you received this, your SMTP settings are working and team "
+        "invitations will be delivered automatically.\n\n"
+        "— WatchTower"
+    )
+    body_html = (
+        "<p>This is a <strong>test email</strong> from WatchTower.</p>"
+        "<p>If you received this, your SMTP settings are working and team "
+        "invitations will be delivered automatically.</p>"
+        "<p>&mdash; WatchTower</p>"
+    )
+
+    import anyio
+
+    try:
+        await anyio.to_thread.run_sync(
+            _send_email, cfg, to_email, subject, body_text, body_html
+        )
+    except Exception as exc:  # noqa: BLE001 — SMTP/connection errors are the expected failure here
+        logger.info("SMTP test send to %s failed: %s", to_email, exc)
+        return {"ok": False, "to": to_email, "error": f"{type(exc).__name__}: {exc}"}
+    return {"ok": True, "to": to_email, "error": None}
 
 
 @router.put("/team-members/{member_id}", response_model=schemas.TeamMemberResponse)
