@@ -50,6 +50,7 @@ export default {
         "out-soft": "var(--ease-out)",
       },
       transitionDuration: {
+        instant: "var(--dur-instant)",
         fast: "var(--dur-fast)",
         base: "var(--dur-base)",
         slow: "var(--dur-slow)",

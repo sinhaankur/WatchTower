@@ -156,14 +156,14 @@ export function CommandPalette() {
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[100] flex items-start justify-center pt-[15vh] bg-slate-900/40 backdrop-blur-sm"
+      className="fixed inset-0 z-[100] flex items-start justify-center pt-[15vh] bg-slate-900/40 backdrop-blur-sm anim-fade-in"
       onClick={() => setOpen(false)}
       role="dialog"
       aria-modal="true"
       aria-label="Command palette"
     >
       <div
-        className="w-full max-w-xl mx-4 rounded-xl bg-white border border-slate-200 shadow-2xl overflow-hidden"
+        className="w-full max-w-xl mx-4 rounded-xl bg-white border border-slate-200 shadow-2xl overflow-hidden anim-pop-in"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center px-4 py-3 border-b border-slate-100">

@@ -576,8 +576,8 @@ const Applications = () => {
 
       {/* Cache clear confirmation dialog */}
       {confirmCacheClear && (
-        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl border border-border shadow-xl p-6 max-w-sm w-full">
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4 anim-fade-in">
+          <div className="bg-white rounded-xl border border-border shadow-xl p-6 max-w-sm w-full anim-pop-in">
             <h2 className="text-base font-semibold text-slate-900">Clear build cache?</h2>
             <p className="text-sm text-slate-600 mt-1">
               Removes <span className="font-medium">{confirmCacheClear.name}</span>'s cloned workspace
@@ -608,8 +608,8 @@ const Applications = () => {
 
       {/* Delete confirmation dialog */}
       {confirmDelete && (
-        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl border border-border shadow-xl p-6 max-w-sm w-full">
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4 anim-fade-in">
+          <div className="bg-white rounded-xl border border-border shadow-xl p-6 max-w-sm w-full anim-pop-in">
             <h2 className="text-base font-semibold text-slate-900">Delete project?</h2>
             <p className="text-sm text-slate-600 mt-1">
               This removes the project and all deployment history. This cannot be undone.

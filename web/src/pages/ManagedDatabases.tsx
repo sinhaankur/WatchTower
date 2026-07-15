@@ -926,8 +926,8 @@ function AddReplicaModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-      <div className="bg-white rounded-xl shadow-xl border border-border w-full max-w-md mx-4 p-5 space-y-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm anim-fade-in">
+      <div className="bg-white rounded-xl shadow-xl border border-border w-full max-w-md mx-4 p-5 space-y-4 anim-pop-in">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-semibold text-slate-900">Add Standby Replica</h2>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-lg leading-none">×</button>
@@ -2133,11 +2133,11 @@ function CredentialsModal({
 function Modal({ children, onClose }: { children: React.ReactNode; onClose: () => void }) {
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm anim-fade-in"
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-2xl border border-border shadow-xl p-6 max-w-lg w-full mx-4"
+        className="bg-white rounded-2xl border border-border shadow-xl p-6 max-w-lg w-full mx-4 anim-pop-in"
         onClick={(e) => e.stopPropagation()}
       >
         {children}

@@ -368,7 +368,7 @@ function NavLink({ item, pathname, onClick, rail, badge }: NavLinkProps) {
       onClick={onClick}
       title={tooltip}
       aria-label={rail ? item.label : undefined}
-      className={`group flex items-center gap-2.5 rounded-md text-[13px] font-medium transition-colors ${
+      className={`group flex items-center gap-2.5 rounded-md text-[13px] font-medium transition-colors duration-instant ${
         rail ? 'justify-center px-2 py-2' : 'px-3 py-1.5'
       } ${
         active
