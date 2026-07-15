@@ -257,6 +257,26 @@ if [ "$USE_CROSS_INSTALL" = "false" ]; then
   "$PYTHON_BIN" -m pip uninstall -y pip setuptools wheel 2>/dev/null || true
 fi
 
+# Record the shell's runtime fingerprint for the two-stage updater
+# (docs/DESKTOP_TWO_STAGE_UPDATER.md). A payload may only run on a shell
+# whose bundled site-packages were built from the same requirements.txt —
+# main.js compares this file's requirementsSha256 against the payload
+# manifest's before ever booting a payload. Lands in the packaged app at
+# resources/python/runtime-fingerprint.json via the existing
+# extraResources mapping. Written with the HOST python3 (stdlib-only
+# subcommand) because the bundled interpreter can't run on cross-arch
+# builds.
+echo "==> Writing runtime-fingerprint.json"
+SHELL_VERSION=$(grep -E '^__version__' "$REPO_ROOT/watchtower/__init__.py" | sed -E 's/.*"([^"]+)".*/\1/')
+REQ_SHA=$(python3 "$REPO_ROOT/scripts/payload_tools.py" fingerprint "$REPO_ROOT/requirements.txt")
+cat > "$OUT_DIR/python/runtime-fingerprint.json" <<EOF
+{
+  "shellVersion": "$SHELL_VERSION",
+  "pythonVersion": "$PYTHON_VERSION",
+  "requirementsSha256": "$REQ_SHA"
+}
+EOF
+
 SIZE_MB=$(du -sm "$OUT_DIR/python" | awk '{print $1}')
 echo ""
 echo "✅ Bundle ready at $OUT_DIR/python/  (${SIZE_MB} MB)"

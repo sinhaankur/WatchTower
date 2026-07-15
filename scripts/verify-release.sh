@@ -78,14 +78,14 @@ if echo "$ASSET_NAMES" | grep -qx "latest-mac.yml"; then
   fi
 fi
 
-# Asset count sanity. A complete release ships ~27 files (DMGs + zips +
-# blockmaps + AppImages + debs + EXEs + latest-*.yml). Allow ±2 for
-# minor variations.
+# Asset count sanity. A complete release ships ~29 files (DMGs + zips +
+# blockmaps + AppImages + debs + EXEs + latest-*.yml + payload tarball +
+# payload manifest). Allow ±2 for minor variations.
 COUNT=$(echo "$ASSET_NAMES" | wc -l | tr -d ' ')
-if [ "$COUNT" -lt 25 ] || [ "$COUNT" -gt 30 ]; then
-  FAIL "Asset count $COUNT outside expected 25-30 range — partial build?"
+if [ "$COUNT" -lt 27 ] || [ "$COUNT" -gt 32 ]; then
+  FAIL "Asset count $COUNT outside expected 27-32 range — partial build?"
 else
-  PASS "Asset count $COUNT in expected range (25-30)"
+  PASS "Asset count $COUNT in expected range (27-32)"
 fi
 
 # Per-platform installer presence. Catches the v1.12.1 case where the
@@ -207,6 +207,18 @@ verify_bundle_contents() {
   else
     FAIL "$label: bundle has $bundle_mig migrations, repo has $repo_mig — INCOMPLETE. Users past the bundle's head will crash. Block release."
   fi
+  # Capture the shell's runtime fingerprint (two-stage updater). The payload
+  # section below cross-checks payload-manifest.json's requirementsSha256
+  # against it — a mismatch on the SAME release means payload-aware shells
+  # from this release could never apply this release's own payloads.
+  if [ -f "$python_root/runtime-fingerprint.json" ]; then
+    if [ ! -f "$WORK_DIR/shell-runtime-fingerprint.json" ]; then
+      cp "$python_root/runtime-fingerprint.json" "$WORK_DIR/shell-runtime-fingerprint.json"
+    fi
+    PASS "$label: runtime-fingerprint.json present in shell bundle"
+  else
+    WARN "$label: no runtime-fingerprint.json in shell bundle (pre-payload release, or build-python-bundle.sh regressed)"
+  fi
 }
 
 # Linux AppImage — extract the embedded squashfs and check the .so arch.
@@ -302,6 +314,117 @@ verify_windows_zip x64
 # Note: armv7l + Windows arm64 don't ship a python-build-standalone bundle
 # (no PBS target exists), so there's nothing to arch-verify there. They
 # fall back to system/pipx Python at runtime.
+
+# ──────────────────────────────────────────────────────────────────────────
+# Two-stage-updater payload (docs/DESKTOP_TWO_STAGE_UPDATER.md, phase 1).
+# The released tarball + manifest must be internally consistent (sha256,
+# Ed25519 signature against the pinned public key), carry the right
+# contents, and — critically — declare the same requirementsSha256 the
+# released shell bundles were built with, or payload-aware shells from
+# this release could never apply this release's own payloads.
+HEAD "Update payload (two-stage updater)"
+
+# Signature verification needs the cryptography lib — prefer the repo venv
+# (always has it, it's a core dep), fall back to system python3.
+if [ -x "$REPO_ROOT/.venv/bin/python" ]; then
+  PAYLOAD_PY="$REPO_ROOT/.venv/bin/python"
+else
+  PAYLOAD_PY=python3
+fi
+
+PAYLOAD_TAR_NAME="watchtower-payload-$VERSION.tar.gz"
+PAYLOAD_OK=1
+for asset in "$PAYLOAD_TAR_NAME" "payload-manifest.json"; do
+  if echo "$ASSET_NAMES" | grep -qx "$asset"; then
+    PASS "$asset present"
+  else
+    FAIL "$asset MISSING — the build-payload CI job didn't publish"
+    PAYLOAD_OK=0
+  fi
+done
+
+if [ "$PAYLOAD_OK" = "1" ]; then
+  PAYLOAD_TAR_PATH=$(DOWNLOAD "$PAYLOAD_TAR_NAME")
+  MANIFEST_PATH=$(DOWNLOAD "payload-manifest.json")
+  if [ -n "$PAYLOAD_TAR_PATH" ] && [ -n "$MANIFEST_PATH" ]; then
+    M_VERSION=$(jq -r .version "$MANIFEST_PATH")
+    M_SHA=$(jq -r .sha256 "$MANIFEST_PATH")
+    M_SIG=$(jq -r .signature "$MANIFEST_PATH")
+    M_REQ_SHA=$(jq -r .requirementsSha256 "$MANIFEST_PATH")
+
+    if [ "$M_VERSION" = "$VERSION" ]; then
+      PASS "payload-manifest.json version = $M_VERSION (matches tag)"
+    else
+      FAIL "payload-manifest.json version '$M_VERSION' != tag $VERSION"
+    fi
+
+    ACTUAL_SHA=$("$PAYLOAD_PY" "$REPO_ROOT/scripts/payload_tools.py" sha256 "$PAYLOAD_TAR_PATH")
+    if [ "$ACTUAL_SHA" = "$M_SHA" ]; then
+      PASS "Payload sha256 matches manifest"
+    else
+      FAIL "Payload sha256 MISMATCH — manifest says $M_SHA, asset is $ACTUAL_SHA. Tampered or corrupt upload. Block release."
+    fi
+
+    if [ -z "$M_SIG" ] || [ "$M_SIG" = "null" ]; then
+      FAIL "Payload manifest has an EMPTY signature — clients will reject it. Block release."
+    elif "$PAYLOAD_PY" "$REPO_ROOT/scripts/payload_tools.py" verify "$PAYLOAD_TAR_PATH" \
+           --pub "$REPO_ROOT/desktop/payload-signing.pub" --signature "$M_SIG" >/dev/null 2>&1; then
+      PASS "Payload Ed25519 signature verifies against desktop/payload-signing.pub"
+    else
+      FAIL "Payload signature INVALID against the pinned public key — CI secret and desktop/payload-signing.pub have diverged. Block release."
+    fi
+
+    # Contents + internal version — the payload-flavored stale-bundle guard.
+    PAYLOAD_EXTRACT="$WORK_DIR/payload-extract"
+    mkdir -p "$PAYLOAD_EXTRACT"
+    if tar -xzf "$PAYLOAD_TAR_PATH" -C "$PAYLOAD_EXTRACT" 2>/dev/null; then
+      for required in "payload/watchtower/alembic/env.py" "payload/web-dist/index.html" "payload/payload.json"; do
+        if [ -f "$PAYLOAD_EXTRACT/$required" ]; then
+          PASS "Payload contains $required"
+        else
+          FAIL "Payload missing $required — a shell booting it would crash"
+        fi
+      done
+      P_VERSION=$(jq -r .version "$PAYLOAD_EXTRACT/payload/payload.json" 2>/dev/null)
+      if [ "$P_VERSION" = "$VERSION" ]; then
+        PASS "Embedded payload.json version = $P_VERSION (matches tag)"
+      else
+        FAIL "Embedded payload.json version '$P_VERSION' != tag $VERSION — STALE PAYLOAD. Block release."
+      fi
+      REPO_MIG=$(ls "$REPO_ROOT"/alembic/versions/*.py 2>/dev/null | grep -v __pycache__ | wc -l | tr -d ' ')
+      PAYLOAD_MIG=$(ls "$PAYLOAD_EXTRACT"/payload/watchtower/alembic/versions/*.py 2>/dev/null | grep -v __pycache__ | wc -l | tr -d ' ')
+      if [ "$PAYLOAD_MIG" = "$REPO_MIG" ]; then
+        PASS "Payload ships $PAYLOAD_MIG alembic migrations (matches repo)"
+      else
+        FAIL "Payload has $PAYLOAD_MIG migrations, repo has $REPO_MIG — INCOMPLETE. Block release."
+      fi
+    else
+      FAIL "Could not extract $PAYLOAD_TAR_NAME — corrupt tarball?"
+    fi
+
+    # Fingerprint cross-check: the released shell's runtime-fingerprint.json
+    # (captured while a DMG was mounted above) must match the manifest.
+    # On non-macOS hosts no DMG gets mounted, so fall back to fingerprinting
+    # the local checkout's requirements.txt — valid as long as the checkout
+    # is at the released tag.
+    if [ -f "$WORK_DIR/shell-runtime-fingerprint.json" ]; then
+      SHELL_REQ_SHA=$(jq -r .requirementsSha256 "$WORK_DIR/shell-runtime-fingerprint.json")
+      if [ "$M_REQ_SHA" = "$SHELL_REQ_SHA" ]; then
+        PASS "requirementsSha256 matches the released shell bundle's runtime fingerprint"
+      else
+        FAIL "requirementsSha256 MISMATCH: manifest=$M_REQ_SHA shell=$SHELL_REQ_SHA — this release's shells can't apply this release's payloads. Block release."
+      fi
+    else
+      LOCAL_REQ_SHA=$("$PAYLOAD_PY" "$REPO_ROOT/scripts/payload_tools.py" fingerprint "$REPO_ROOT/requirements.txt")
+      if [ "$M_REQ_SHA" = "$LOCAL_REQ_SHA" ]; then
+        PASS "requirementsSha256 matches local requirements.txt fingerprint"
+        WARN "  (shell bundle fingerprint not inspected on this host — run on macOS to check the released DMG directly)"
+      else
+        FAIL "requirementsSha256 MISMATCH vs local requirements.txt — is the checkout at tag $TAG?"
+      fi
+    fi
+  fi
+fi
 
 # ──────────────────────────────────────────────────────────────────────────
 HEAD "Result"

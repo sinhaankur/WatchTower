@@ -368,8 +368,35 @@ async function applyMacUpdate(targetVersion, parentWindow, onProgress) {
  *  - Dev / unpackaged build: fall back to GitHub Releases API — compare versions
  *    and show a dialog with a link to the release page. No auto-install in dev.
  */
-function checkForAppUpdates(win) {
+async function checkForAppUpdates(win) {
   if (!win || win.isDestroyed()) return;
+
+  // ── Two-stage updater: try the ~1 MB payload path first ────────────────────
+  // 'installed'/'already-installed' → nudge to restart, done. 'up-to-date'
+  // → nothing to do. 'failed' → discard and retry on the next 4-hour poll;
+  // deliberately NOT falling through to the installer flows, so a failed
+  // signature can never steer users onto a less-verified update channel.
+  // Only 'unavailable'/'incompatible' (release genuinely needs a full
+  // installer) continue to the pre-payload flows below.
+  if (app.isPackaged) {
+    let payloadResult = { status: 'unavailable' };
+    try {
+      payloadResult = await tryPayloadUpdate();
+    } catch (err) {
+      console.warn('[WatchTower] payload update check failed:', err.message);
+      payloadResult = { status: 'failed', reason: err.message };
+    }
+    if (payloadResult.status === 'installed' || payloadResult.status === 'already-installed') {
+      notifyPayloadReady(payloadResult.version);
+      return;
+    }
+    if (payloadResult.status === 'up-to-date' || payloadResult.status === 'failed') {
+      if (payloadResult.reason) {
+        console.warn(`[WatchTower] payload update skipped: ${payloadResult.reason}`);
+      }
+      return;
+    }
+  }
 
   // ── Packaged path: electron-updater handles download + install ─────────────
   // Silent by design: download in the background, surface a single
@@ -636,6 +663,50 @@ function checkForUpdatesViaGitHubAPI(win, interactive) {
  */
 async function runUpdateNow(win, releaseUrl) {
   if (app.isPackaged) {
+    // Payload path first — the same ~1 MB update as the background check,
+    // but user-initiated, so respond with dialogs rather than passive
+    // notifications.
+    let payloadResult = { status: 'unavailable' };
+    try {
+      payloadResult = await tryPayloadUpdate();
+    } catch (err) {
+      payloadResult = { status: 'failed', reason: err.message };
+    }
+    if (payloadResult.status === 'installed' || payloadResult.status === 'already-installed') {
+      const { response } = await dialog.showMessageBox(win, {
+        type: 'info',
+        title: 'Update ready',
+        message: `WatchTower ${payloadResult.version} is ready to install.`,
+        detail: 'Restart WatchTower to finish updating — it takes a few seconds.',
+        buttons: ['Restart Now', 'Later'],
+        defaultId: 0,
+        cancelId: 1,
+      });
+      if (response === 0) {
+        relaunchAppCleanEnv();
+        app.quit();
+      }
+      return;
+    }
+    if (payloadResult.status === 'failed') {
+      // The user clicked a button — a silent no-op would read as broken.
+      // Manual fallback to the release page is fine here: it's the user's
+      // deliberate choice, not an automated downgrade of the update channel.
+      await dialog.showMessageBox(win, {
+        type: 'warning',
+        title: 'Update failed',
+        message: 'WatchTower could not download and verify the update.',
+        detail: `${payloadResult.reason || 'Unknown error.'}\n\nIt will retry automatically, or you can install the latest version from GitHub.`,
+        buttons: ['Open Release Page', 'Close'],
+        defaultId: 0,
+        cancelId: 1,
+      }).then(({ response }) => {
+        if (response === 0) shell.openExternal(releaseUrl);
+      });
+      return;
+    }
+    // 'unavailable' / 'incompatible' / 'up-to-date' → the existing full-
+    // installer flows below handle it.
     if (!canUseAutoUpdater()) {
       shell.openExternal(releaseUrl);
       return;
@@ -1502,6 +1573,403 @@ function resolvePython() {
   return null; // surfaced as a clear dialog in startBackend()
 }
 
+// ── Two-stage updater: payload boot selection (phase 2) ─────────────────────
+// docs/DESKTOP_TWO_STAGE_UPDATER.md. A payload is a per-release,
+// arch-independent copy of the backend + SPA (watchtower/ + web-dist/ +
+// payload.json) living in ~/.watchtower/payloads/<version>/ — installed by
+// the phase-3 downloader, or dropped there by hand for testing. Booting one
+// is the SAME backend spawn with --app-dir pointed at the payload dir
+// (uvicorn sys.path-inserts it ahead of the bundled site-packages copy) and
+// WATCHTOWER_WEB_DIST pointed at its web-dist/.
+//
+// Payloads are only ever considered in packaged builds; dev clones and
+// `WATCHTOWER_DISABLE_PAYLOADS=1` (the kill switch) ignore them entirely.
+
+let activePayloadVersion = null; // set once a payload passes the health gate
+
+function payloadsRoot() {
+  return path.join(writableDataDir(), 'payloads');
+}
+
+function shellRuntimeFingerprint() {
+  // Written into the bundle by scripts/build-python-bundle.sh. Absent on
+  // dev clones and pre-payload shells — in both cases payloads are
+  // ineligible because dependency compatibility can't be proven.
+  if (!app.isPackaged || !process.resourcesPath) return null;
+  try {
+    return JSON.parse(fs.readFileSync(
+      path.join(process.resourcesPath, 'python', 'runtime-fingerprint.json'), 'utf8'
+    ));
+  } catch {
+    return null;
+  }
+}
+
+function readPayloadState() {
+  try {
+    return JSON.parse(fs.readFileSync(path.join(payloadsRoot(), 'state.json'), 'utf8')) || {};
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * Forward-only floor: record the highest payload version that ever passed
+ * the health gate. Anything older is excluded from future selection, so a
+ * DB that newer code migrated forward can never be booted by older payload
+ * code — the "Can't locate revision" crash is prevented by construction,
+ * not just detected after the fact.
+ */
+function recordHealthyPayload(version) {
+  const state = readPayloadState();
+  if (state.lastHealthyVersion && compareVersions(version, state.lastHealthyVersion) <= 0) return;
+  state.lastHealthyVersion = version;
+  try {
+    fs.mkdirSync(payloadsRoot(), { recursive: true });
+    fs.writeFileSync(path.join(payloadsRoot(), 'state.json'), JSON.stringify(state, null, 2));
+  } catch (err) {
+    console.warn(`[WatchTower] could not persist payload state: ${err.message}`);
+  }
+}
+
+function quarantinePayload(dir, reason) {
+  // One strike: a payload that fails its health gate is never tried again.
+  // The marker keeps the evidence (reason + timestamp) for diagnostics.
+  try {
+    fs.writeFileSync(
+      path.join(dir, '.quarantined'),
+      JSON.stringify({ reason: String(reason), at: new Date().toISOString() }, null, 2)
+    );
+  } catch { /* unwritable payload dir — selection still skips it next time via fingerprint/floor */ }
+}
+
+/**
+ * Pick which payloads are eligible to boot, newest first, capped at two
+ * (newest + one fallback — everything older is quarantined, below the
+ * healthy floor, or superseded). Returns [] whenever payloads don't apply;
+ * the caller then boots the built-in backend exactly as before.
+ */
+function selectPayloadCandidates() {
+  if (!app.isPackaged) return [];
+  if (process.env.WATCHTOWER_DISABLE_PAYLOADS === '1') return [];
+  const fingerprint = shellRuntimeFingerprint();
+  if (!fingerprint || !fingerprint.requirementsSha256) return [];
+  const builtinVersion = app.getVersion();
+  const floor = readPayloadState().lastHealthyVersion || null;
+
+  let entries;
+  try {
+    entries = fs.readdirSync(payloadsRoot(), { withFileTypes: true });
+  } catch {
+    return []; // no payloads dir yet — the common case
+  }
+
+  const candidates = [];
+  for (const ent of entries) {
+    if (!ent.isDirectory() || !/^\d+\.\d+\.\d+/.test(ent.name)) continue;
+    const dir = path.join(payloadsRoot(), ent.name);
+    // Payloads only ever move code FORWARD from the built-in version…
+    if (compareVersions(ent.name, builtinVersion) <= 0) continue;
+    // …and never below the highest version that already passed the gate.
+    if (floor && compareVersions(ent.name, floor) < 0) continue;
+    if (fs.existsSync(path.join(dir, '.quarantined'))) continue;
+    let meta;
+    try {
+      meta = JSON.parse(fs.readFileSync(path.join(dir, 'payload.json'), 'utf8'));
+    } catch {
+      continue; // no self-description → not a payload we can trust
+    }
+    // Dependency-set fingerprint must match the shell's bundled
+    // site-packages. A mismatch means requirements.txt changed since this
+    // shell was built — that update must arrive as a full installer.
+    if (meta.requirementsSha256 !== fingerprint.requirementsSha256) continue;
+    // Shell too old for what the payload's SPA/backend expects of main.js.
+    if (meta.minShellVersion && compareVersions(builtinVersion, meta.minShellVersion) < 0) continue;
+    if (!fs.existsSync(path.join(dir, 'watchtower', '__init__.py'))) continue;
+    if (!fs.existsSync(path.join(dir, 'web-dist', 'index.html'))) continue;
+    candidates.push({ version: ent.name, dir });
+  }
+  candidates.sort((a, b) => compareVersions(b.version, a.version));
+  return candidates.slice(0, 2);
+}
+
+/** Cheap tail check on the most recent backend log (bounded read). */
+function backendLogTailHas(needle) {
+  if (!lastBackendLogPath) return false;
+  try {
+    const raw = fs.readFileSync(lastBackendLogPath, 'utf8');
+    return raw.slice(-16384).includes(needle);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Targeted dialog for the one rollback case that must not look like a
+ * generic failure: an update was rolled back, but it already migrated the
+ * database forward, so the remaining (older) code can't read it. The only
+ * real fix is installing the latest full version — name it, link it,
+ * never dead-end (product principle).
+ */
+async function showDbNewerThanAppDialog() {
+  const result = await dialog.showMessageBox({
+    type: 'error',
+    title: 'Update needed',
+    message: 'Your WatchTower data is newer than this version of the app',
+    detail:
+      'A newer update ran previously and upgraded your data, and the version ' +
+      'installed now can\'t read it. Download and install the latest version ' +
+      'from GitHub Releases — your data is safe and will work as-is with the ' +
+      'new version.',
+    buttons: ['Download latest version', 'Quit'],
+    defaultId: 0,
+    cancelId: 1,
+    noLink: true,
+  });
+  if (result.response === 0) {
+    try { shell.openExternal('https://github.com/sinhaankur/WatchTower/releases/latest'); } catch { /* no browser */ }
+  }
+}
+
+/**
+ * Garbage-collect old payloads after a successful boot: keep the active
+ * version, one previous (the rollback target), and anything newer (a
+ * pending update awaiting restart). Everything else — including old
+ * quarantined dirs — goes.
+ */
+function gcPayloads(activeVersion) {
+  let entries;
+  try {
+    entries = fs.readdirSync(payloadsRoot(), { withFileTypes: true });
+  } catch {
+    return;
+  }
+  const versions = entries
+    .filter((e) => e.isDirectory() && /^\d+\.\d+\.\d+/.test(e.name))
+    .map((e) => e.name)
+    .sort((a, b) => compareVersions(b, a));
+  const older = versions.filter((v) => compareVersions(v, activeVersion) < 0);
+  const keep = new Set([activeVersion]);
+  if (older.length) keep.add(older[0]);
+  for (const v of versions) {
+    if (compareVersions(v, activeVersion) > 0 || keep.has(v)) continue;
+    try {
+      fs.rmSync(path.join(payloadsRoot(), v), { recursive: true, force: true });
+    } catch { /* held open / permissions — retry next boot */ }
+  }
+}
+
+// ── Two-stage updater: payload download (phase 3) ───────────────────────────
+// The download half of docs/DESKTOP_TWO_STAGE_UPDATER.md §4: fetch the
+// latest release's payload-manifest.json, and when the payload is
+// compatible with this shell, download → verify sha256 + Ed25519 signature
+// → extract → atomic-rename into ~/.watchtower/payloads/<version>/. The
+// phase-2 boot path picks it up on next launch. A ~1 MB download replaces
+// the ~200 MB installer for every release that doesn't change
+// requirements.txt.
+
+// Pinned copy of desktop/payload-signing.pub. CI signs every payload with
+// the matching private key (WATCHTOWER_PAYLOAD_SIGNING_KEY repo secret);
+// preflight + verify-release assert the pair still matches before/after
+// every release. Rotation = new key here via a shell update; old shells
+// then reject newer payloads and fall back to installer prompts.
+const PAYLOAD_SIGNING_PUBKEY_PEM = `-----BEGIN PUBLIC KEY-----
+MCowBQYDK2VwAyEABPYcJ3EC8thsEVLrF4vgqJfyp9JThHH1MiMqtMvSZVk=
+-----END PUBLIC KEY-----`;
+
+function githubLatestReleaseJson() {
+  return new Promise((resolve, reject) => {
+    const req = https.get({
+      hostname: 'api.github.com',
+      path: '/repos/sinhaankur/WatchTower/releases/latest',
+      headers: {
+        'User-Agent': `WatchTower-Desktop/${app.getVersion()}`,
+        'Accept': 'application/vnd.github+json',
+      },
+      timeout: 10000,
+    }, (res) => {
+      let body = '';
+      res.on('data', (c) => { body += c; });
+      res.on('end', () => {
+        if (res.statusCode !== 200) {
+          reject(new Error(`GitHub API returned HTTP ${res.statusCode}`));
+          return;
+        }
+        try { resolve(JSON.parse(body)); } catch (e) { reject(e); }
+      });
+    });
+    req.on('error', reject);
+    req.on('timeout', () => req.destroy(new Error('GitHub API request timed out')));
+  });
+}
+
+/**
+ * Download, verify, and stage one payload. Throws on ANY validation
+ * failure — the caller discards and retries on a later poll; a payload
+ * that fails sha256/signature never touches payloads/<version>/.
+ */
+async function installPayload(tarballUrl, manifest) {
+  const version = manifest.version;
+  const root = payloadsRoot();
+  const tmpDir = path.join(root, `.tmp-${version}`);
+  fs.rmSync(tmpDir, { recursive: true, force: true });
+  fs.mkdirSync(tmpDir, { recursive: true });
+  const tarPath = path.join(tmpDir, 'payload.tar.gz');
+  try {
+    await downloadFile(tarballUrl, tarPath);
+
+    const data = fs.readFileSync(tarPath);
+    const sha = crypto.createHash('sha256').update(data).digest('hex');
+    if (sha !== manifest.sha256) {
+      throw new Error(`payload sha256 mismatch (manifest ${manifest.sha256}, got ${sha})`);
+    }
+    if (!manifest.signature) {
+      throw new Error('payload manifest has no signature');
+    }
+    const signatureOk = crypto.verify(
+      null, // Ed25519 has no separate digest step
+      data,
+      crypto.createPublicKey(PAYLOAD_SIGNING_PUBKEY_PEM),
+      Buffer.from(manifest.signature, 'base64')
+    );
+    if (!signatureOk) {
+      throw new Error('payload signature does not verify against the pinned key');
+    }
+
+    // System tar handles the extract on all three platforms (bsdtar ships
+    // with Windows 10 1803+). The tarball is ~1 MB — sync is fine.
+    execFileSync('tar', ['-xzf', tarPath, '-C', tmpDir], { timeout: 60000, stdio: 'ignore' });
+
+    // The extracted tree must describe itself as exactly what the signed
+    // manifest promised, and must be bootable.
+    const staged = path.join(tmpDir, 'payload');
+    const meta = JSON.parse(fs.readFileSync(path.join(staged, 'payload.json'), 'utf8'));
+    if (meta.version !== version) {
+      throw new Error(`extracted payload.json says ${meta.version}, manifest says ${version}`);
+    }
+    if (!fs.existsSync(path.join(staged, 'watchtower', '__init__.py')) ||
+        !fs.existsSync(path.join(staged, 'web-dist', 'index.html'))) {
+      throw new Error('extracted payload is missing watchtower/ or web-dist/');
+    }
+
+    const finalDir = path.join(root, version);
+    fs.rmSync(finalDir, { recursive: true, force: true });
+    fs.renameSync(staged, finalDir);
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+}
+
+// Guards against the 4-hour periodic check overlapping a manual
+// "Update Now" click mid-download.
+let payloadUpdateInFlight = false;
+
+/**
+ * The payload-first update check. Returns { status, version?, reason? }:
+ *   'installed'          downloaded + verified + staged; restart applies it
+ *   'already-installed'  a verified payload newer than what's running is
+ *                        already staged; just needs the restart
+ *   'up-to-date'         latest release isn't newer than what's running
+ *   'unavailable'        payloads don't apply (dev clone, kill switch,
+ *                        pre-payload shell or release) → installer flow
+ *   'incompatible'       release exists but needs a full installer
+ *                        (requirements changed / shell too old / payload
+ *                        quarantined on this machine) → installer flow
+ *   'failed'             download/verification failed → discard, retry on
+ *                        a later poll. NEVER falls through to the
+ *                        installer path: a tampered payload must not be
+ *                        able to steer users to a scarier update channel.
+ */
+async function tryPayloadUpdate() {
+  if (!app.isPackaged) return { status: 'unavailable' };
+  if (process.env.WATCHTOWER_DISABLE_PAYLOADS === '1') return { status: 'unavailable' };
+  const fingerprint = shellRuntimeFingerprint();
+  if (!fingerprint || !fingerprint.requirementsSha256) return { status: 'unavailable' };
+  if (payloadUpdateInFlight) return { status: 'failed', reason: 'update already in progress' };
+  payloadUpdateInFlight = true;
+  try {
+    let release;
+    try {
+      release = await githubLatestReleaseJson();
+    } catch (err) {
+      return { status: 'failed', reason: `release check failed: ${err.message}` };
+    }
+    const latest = (release.tag_name || '').replace(/^v/, '');
+    if (!latest) return { status: 'unavailable' };
+
+    const effectiveVersion = activePayloadVersion || app.getVersion();
+    if (compareVersions(latest, effectiveVersion) <= 0) return { status: 'up-to-date' };
+
+    const targetDir = path.join(payloadsRoot(), latest);
+    if (fs.existsSync(path.join(targetDir, '.quarantined'))) {
+      // This exact payload already failed its health gate here — the
+      // remaining upgrade path for this release is the full installer.
+      return { status: 'incompatible', version: latest };
+    }
+    if (fs.existsSync(path.join(targetDir, 'payload.json'))) {
+      return { status: 'already-installed', version: latest };
+    }
+
+    const assets = release.assets || [];
+    const manifestAsset = assets.find((a) => a.name === 'payload-manifest.json');
+    const tarballAsset = assets.find((a) => a.name === `watchtower-payload-${latest}.tar.gz`);
+    if (!manifestAsset || !tarballAsset) {
+      return { status: 'unavailable', version: latest }; // pre-payload release
+    }
+
+    let manifest;
+    try {
+      const manifestTmp = path.join(os.tmpdir(), `wt-payload-manifest-${Date.now()}.json`);
+      await downloadFile(manifestAsset.browser_download_url, manifestTmp);
+      manifest = JSON.parse(fs.readFileSync(manifestTmp, 'utf8'));
+      fs.rmSync(manifestTmp, { force: true });
+    } catch (err) {
+      return { status: 'failed', version: latest, reason: `manifest fetch failed: ${err.message}` };
+    }
+
+    if (manifest.version !== latest) {
+      return { status: 'failed', version: latest, reason: `manifest version ${manifest.version} != release ${latest}` };
+    }
+    if (manifest.requirementsSha256 !== fingerprint.requirementsSha256) {
+      // Dependency set changed since this shell was built — by design this
+      // update must arrive as a full installer.
+      return { status: 'incompatible', version: latest };
+    }
+    if (manifest.minShellVersion && compareVersions(app.getVersion(), manifest.minShellVersion) < 0) {
+      return { status: 'incompatible', version: latest };
+    }
+
+    try {
+      await installPayload(tarballAsset.browser_download_url, manifest);
+    } catch (err) {
+      appendDiagnostic('payload.download-failed', `payload ${latest}: ${err.message}`);
+      return { status: 'failed', version: latest, reason: err.message };
+    }
+    appendDiagnostic('payload.downloaded', `payload ${latest} verified + staged, applies on restart`);
+    return { status: 'installed', version: latest };
+  } finally {
+    payloadUpdateInFlight = false;
+  }
+}
+
+/** Non-blocking "restart to finish updating" nudge (OS notification). */
+function notifyPayloadReady(version) {
+  if (!Notification.isSupported()) return;
+  try {
+    const n = new Notification({
+      title: 'WatchTower update ready',
+      body: `Version ${version} will start next time you open WatchTower. Click to restart now.`,
+    });
+    n.on('click', () => {
+      relaunchAppCleanEnv();
+      app.quit();
+    });
+    n.show();
+  } catch (err) {
+    console.warn('[WatchTower] update notification failed:', err.message);
+  }
+}
+
 // Probe a container runtime CLI (podman/docker). Returns the resolved
 // version string on success, null on miss. Bounded so a hung CLI can't
 // stall the dependency-status IPC.
@@ -1679,7 +2147,12 @@ async function showPythonMissingDialog() {
   return false;
 }
 
-async function startBackend() {
+async function startBackend(payload = null) {
+  // `payload` (optional): a candidate from selectPayloadCandidates().
+  // Booting a payload is the identical spawn with --app-dir pointed at the
+  // payload dir (its watchtower/ shadows the bundled site-packages copy)
+  // and WATCHTOWER_WEB_DIST at its web-dist/ — nothing else differs.
+
   // Kill any process already holding the backend port (stale uvicorn, container, etc.)
   await killPortProcesses(BACKEND_PORT);
 
@@ -1735,7 +2208,11 @@ async function startBackend() {
   }
   lastBackendLogPath = backendLogPath;
   try {
-    fs.writeSync(backendLogFd, `\n--- desktop launch ${new Date().toISOString()} ---\n`);
+    fs.writeSync(
+      backendLogFd,
+      `\n--- desktop launch ${new Date().toISOString()}` +
+      `${payload ? ` (payload ${payload.version})` : ''} ---\n`
+    );
   } catch {}
 
   electronSpawnedBackend = true;
@@ -1743,7 +2220,7 @@ async function startBackend() {
     python,
     [
       '-m', 'uvicorn', 'watchtower.api:app',
-      '--app-dir', repoRoot,
+      '--app-dir', payload ? payload.dir : repoRoot,
       '--host', HOST,
       '--port', String(BACKEND_PORT),
       '--no-access-log',       // less I/O overhead
@@ -1779,7 +2256,11 @@ async function startBackend() {
         // (sqlite write to read-only mount) or serves the JSON health
         // shell instead of the React SPA (the wheel doesn't ship web/dist).
         WATCHTOWER_DATA_DIR: writableDataDir(),
-        WATCHTOWER_WEB_DIST: process.env.WATCHTOWER_WEB_DIST || resolveWebDist(),
+        // Payload boots serve the payload's OWN SPA — its frontend and
+        // backend shipped together and must not be mixed with the shell's.
+        WATCHTOWER_WEB_DIST: payload
+          ? path.join(payload.dir, 'web-dist')
+          : (process.env.WATCHTOWER_WEB_DIST || resolveWebDist()),
         // Lets the Python backend find bundled binaries (Nixpacks etc.)
         // shipped via electron-builder's extraResources. In packaged
         // builds, process.resourcesPath is the resources/ dir inside the
@@ -2076,6 +2557,10 @@ ipcMain.handle('wt:getDependencyStatus', async () => {
     platform: process.platform,
     arch: process.arch,
     appVersion: app.getVersion(),
+    // Two-stage updater: non-null when the backend is running from a
+    // downloaded payload rather than the built-in bundle. The effective
+    // app version is then payloadVersion, not appVersion.
+    payloadVersion: activePayloadVersion,
     python: { found: false, command: null, version: null, isStub: false },
     podman: { found: false, version: null, source: null },
     dataDir: writableDataDir(),
@@ -2703,11 +3188,65 @@ async function launch() {
       BACKEND_PORT = chosenPort;
       setSplashStatus(`Port ${BACKEND_PORT_DEFAULT} was busy — using port ${chosenPort} instead`, 20);
     }
-    setSplashStatus('Starting the engine', 25);
-    await startBackend();
-    setSplashStatus('Preparing your data — first launch can take a minute', 50);
-    // Re-derive the URL since BACKEND_PORT may have just changed.
-    await waitForUrl(`http://${HOST}:${BACKEND_PORT}/health`, 120000);
+    // Two-stage updater: try downloaded payloads (newest first, max two)
+    // before the built-in backend. Every attempt is health-gated; a payload
+    // that fails to serve /health is quarantined on the spot and never
+    // tried again. [] on dev clones / kill switch / no payloads — then this
+    // loop is exactly the old single-attempt boot.
+    const payloadCandidates = selectPayloadCandidates();
+    let bootedPayload = null;
+    for (const payload of [...payloadCandidates, null]) {
+      if (payload) {
+        appendDiagnostic('payload.boot-attempt', `trying payload ${payload.version} from ${payload.dir}`);
+        setSplashStatus(`Starting the engine (update ${payload.version})`, 25);
+      } else {
+        setSplashStatus('Starting the engine', 25);
+      }
+      await startBackend(payload);
+      setSplashStatus('Preparing your data — first launch can take a minute', 50);
+      try {
+        // 120s for every attempt — a payload's first boot can run brand-new
+        // Alembic migrations, the same slow path as a fresh install. A
+        // tighter payload gate would quarantine healthy updates on the slow
+        // disks (SD-card Pis) that need the ceiling in the first place.
+        // Real crashes still fail in seconds via the backendExited check.
+        await waitForUrl(`http://${HOST}:${BACKEND_PORT}/health`, 120000);
+        bootedPayload = payload;
+        break;
+      } catch (err) {
+        // Put the port back the way we found it before the next attempt.
+        if (backendProcess && !backendProcess.killed) {
+          try { backendProcess.kill(); } catch { /* already gone */ }
+        }
+        if (payload) {
+          quarantinePayload(payload.dir, err.message || String(err));
+          appendDiagnostic('payload.quarantined', `payload ${payload.version} failed health gate: ${err.message}`);
+          continue;
+        }
+        // Built-in backend failed. One case must not look like a generic
+        // failure: a rolled-back update already migrated the DB forward,
+        // so this (older) code can't read it. The forward-only floor
+        // prevents this by construction for payload-vs-payload, but a
+        // reinstalled older shell or a hand-edited payloads dir can still
+        // land here — detect it and name the exact fix.
+        if (payloadCandidates.length && backendLogTailHas("Can't locate revision")) {
+          await showDbNewerThanAppDialog();
+          stopProcesses();
+          app.exit(1);
+        }
+        throw err;
+      }
+    }
+    if (bootedPayload) {
+      activePayloadVersion = bootedPayload.version;
+      recordHealthyPayload(bootedPayload.version);
+      appendDiagnostic('payload.active', `running payload ${bootedPayload.version} on shell ${app.getVersion()}`);
+    }
+    // Prune payloads made obsolete by whatever just booted (keeps the
+    // active one, one rollback target, and any pending newer download).
+    if (app.isPackaged) {
+      gcPayloads(bootedPayload ? bootedPayload.version : app.getVersion());
+    }
     setSplashStatus('Almost there', 80);
   }
 

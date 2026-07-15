@@ -9,7 +9,8 @@
 # Usage:  ./scripts/preflight.sh
 #
 # Skip individual checks via env vars (escape hatch when iterating):
-#   SKIP_TESTS=1, SKIP_LINT=1, SKIP_BUILD=1, SKIP_PACK=1
+#   SKIP_TESTS=1, SKIP_LINT=1, SKIP_BUILD=1, SKIP_PACK=1, SKIP_WHEEL=1,
+#   SKIP_PAYLOAD=1
 # Setting any of these means the release does NOT meet the Stable bar.
 
 set -uo pipefail
@@ -257,7 +258,93 @@ else
 fi
 
 # ──────────────────────────────────────────────────────────────────────────
-HEAD "5. Forbidden user-facing strings"
+HEAD "5. Two-stage-updater payload"
+# Phase 1 of docs/DESKTOP_TWO_STAGE_UPDATER.md: every release publishes an
+# arch-independent watchtower-payload-<version>.tar.gz. This builds it the
+# same way the release.yml build-payload job does and asserts the contract
+# the (future) payload-aware shell relies on: migrations inside the package,
+# the SPA present, version coherent, and a signature that verifies against
+# the public key pinned in the desktop shell.
+
+if [ -n "${SKIP_PAYLOAD:-}" ]; then
+  WARN "SKIP_PAYLOAD set — payload verification skipped (NOT a stable release)"
+else
+  PAYLOAD_LOG=$(mktemp)
+  if "$REPO_ROOT/scripts/build-payload.sh" >"$PAYLOAD_LOG" 2>&1; then
+    PASS "Payload build succeeded (scripts/build-payload.sh)"
+  else
+    FAIL "Payload build failed — see $PAYLOAD_LOG"
+    tail -20 "$PAYLOAD_LOG"
+  fi
+  rm -f "$PAYLOAD_LOG"
+
+  PAYLOAD_TARBALL="$REPO_ROOT/payload-dist/watchtower-payload-$PKG_VERSION.tar.gz"
+  PAYLOAD_MANIFEST="$REPO_ROOT/payload-dist/payload-manifest.json"
+  if [ -f "$PAYLOAD_TARBALL" ] && [ -f "$PAYLOAD_MANIFEST" ]; then
+    # Contract: alembic inside the package + SPA + self-describing payload.json.
+    PAYLOAD_TAR_LIST=$(tar -tzf "$PAYLOAD_TARBALL" 2>/dev/null)
+    for required in "payload/watchtower/alembic/env.py" "payload/web-dist/index.html" "payload/payload.json"; do
+      if printf '%s\n' "$PAYLOAD_TAR_LIST" | grep -qx "$required"; then
+        PASS "Payload contains $required"
+      else
+        FAIL "Payload missing $required — a shell booting this payload would crash"
+      fi
+    done
+
+    # payload.json version must match the repo version (a mismatch means the
+    # staging step resolved stale code — the payload-flavored stale-bundle bug).
+    PAYLOAD_JSON_VERSION=$(tar -xzOf "$PAYLOAD_TARBALL" payload/payload.json 2>/dev/null \
+      | "$VENV_PY" -c "import json,sys; print(json.load(sys.stdin)['version'])" 2>/dev/null)
+    if [ "$PAYLOAD_JSON_VERSION" = "$PKG_VERSION" ]; then
+      PASS "payload.json version = $PAYLOAD_JSON_VERSION (matches watchtower/__init__.py)"
+    else
+      FAIL "payload.json version '$PAYLOAD_JSON_VERSION' != repo version $PKG_VERSION"
+    fi
+
+    # The updater client logic itself: run the phase-2/3 selection,
+    # verification, and decision-matrix tests against the REAL main.js code
+    # and the payload built above. This is the check that caught the
+    # minShellVersion=own-version bug that would have made payload updates
+    # dead on arrival.
+    if node "$REPO_ROOT/desktop/scripts/test-payload-logic.js" "$REPO_ROOT/desktop/main.js" >/dev/null 2>&1; then
+      PASS "Updater client logic tests (desktop/scripts/test-payload-logic.js) — all pass"
+    else
+      FAIL "Updater client logic tests failed — run: node desktop/scripts/test-payload-logic.js desktop/main.js"
+    fi
+
+    # Signature must verify against the SAME public key the shell pins
+    # (desktop/payload-signing.pub). When no local signing key exists, prove
+    # the sign/verify machinery with an ephemeral keypair instead and warn —
+    # CI signs with the real key either way.
+    PAYLOAD_SIG=$("$VENV_PY" -c "import json; print(json.load(open('$PAYLOAD_MANIFEST'))['signature'])" 2>/dev/null)
+    if [ -n "$PAYLOAD_SIG" ]; then
+      if "$VENV_PY" "$REPO_ROOT/scripts/payload_tools.py" verify "$PAYLOAD_TARBALL" \
+           --pub "$REPO_ROOT/desktop/payload-signing.pub" --signature "$PAYLOAD_SIG" >/dev/null 2>&1; then
+        PASS "Payload signature verifies against pinned desktop/payload-signing.pub"
+      else
+        FAIL "Payload signature does NOT verify against desktop/payload-signing.pub — local key and pinned pubkey have diverged"
+      fi
+    else
+      EPHEMERAL_DIR=$(mktemp -d)
+      if "$VENV_PY" "$REPO_ROOT/scripts/payload_tools.py" keygen \
+           --out-private "$EPHEMERAL_DIR/key.pem" --out-public "$EPHEMERAL_DIR/pub.pem" >/dev/null 2>&1 \
+         && EPHEMERAL_SIG=$("$VENV_PY" "$REPO_ROOT/scripts/payload_tools.py" sign "$PAYLOAD_TARBALL" --key "$EPHEMERAL_DIR/key.pem" 2>/dev/null) \
+         && "$VENV_PY" "$REPO_ROOT/scripts/payload_tools.py" verify "$PAYLOAD_TARBALL" \
+              --pub "$EPHEMERAL_DIR/pub.pem" --signature "$EPHEMERAL_SIG" >/dev/null 2>&1; then
+        PASS "Sign/verify machinery works (ephemeral key round-trip)"
+        WARN "Payload is UNSIGNED locally — no key at ~/.watchtower/payload-signing-key.pem; CI signs with the repo secret"
+      else
+        FAIL "Ephemeral sign/verify round-trip failed — payload signing machinery is broken"
+      fi
+      rm -rf "$EPHEMERAL_DIR"
+    fi
+  else
+    FAIL "payload-dist/ missing tarball or manifest after build"
+  fi
+fi
+
+# ──────────────────────────────────────────────────────────────────────────
+HEAD "6. Forbidden user-facing strings"
 # RELEASE_QUALITY.md specifies plain English in user-facing dialogs. These
 # strings would mean a developer-jargon error message slipped into the
 # Electron failure paths.

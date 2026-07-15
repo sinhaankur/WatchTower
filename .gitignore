@@ -174,3 +174,6 @@ desktop/build/binaries/
 # Wheel-build staging (created by scripts/build-wheel.sh, removed on exit)
 watchtower/_alembic/
 watchtower/_web_dist/
+
+# Two-stage updater payload artifacts (scripts/build-payload.sh)
+payload-dist/

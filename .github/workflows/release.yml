@@ -64,6 +64,93 @@ jobs:
           draft: false
           prerelease: ${{ contains(github.ref_name, '-') }}
 
+  # ── 2.4. Build + sign the two-stage-updater payload ─────────────────────────
+  # One arch-independent artifact per release (~5-10 MB): the pure-Python
+  # watchtower package + the built SPA. Phase 1 of
+  # docs/DESKTOP_TWO_STAGE_UPDATER.md — published every release so future
+  # payload-aware shells can update without re-downloading a 200 MB
+  # installer. Runs once, on Linux, not per matrix entry: pure Python +
+  # static assets have no arch, so the 1.12.0 cross-arch bug class cannot
+  # exist here.
+  build-payload:
+    name: Build + sign update payload
+    needs: create-release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install web dependencies
+        # Same 3-attempt retry as the desktop matrix — npm registry 502s
+        # during postinstall are the top transient failure in this workflow.
+        run: |
+          for attempt in 1 2 3; do
+            if npm --prefix web install; then exit 0; fi
+            echo "::warning::npm install (web) failed on attempt $attempt; retrying after backoff"
+            sleep $((attempt * 20))
+          done
+          exit 1
+        shell: bash
+
+      - name: Build frontend (web/dist)
+        run: npm --prefix web run build
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: 'pip'
+          cache-dependency-path: |
+            pyproject.toml
+            requirements.txt
+
+      - name: Install signing dependency
+        run: pip install cryptography
+
+      - name: Build + sign payload
+        env:
+          WATCHTOWER_PAYLOAD_SIGNING_KEY: ${{ secrets.WATCHTOWER_PAYLOAD_SIGNING_KEY }}
+        run: |
+          if [ -z "$WATCHTOWER_PAYLOAD_SIGNING_KEY" ]; then
+            echo "::error::WATCHTOWER_PAYLOAD_SIGNING_KEY secret is not set — refusing to publish an unsigned payload. Generate a key with scripts/payload_tools.py keygen and add the private PEM as a repo secret."
+            exit 1
+          fi
+          chmod +x scripts/build-payload.sh
+          ./scripts/build-payload.sh
+
+          TAG="${GITHUB_REF_NAME#v}"
+          MANIFEST=payload-dist/payload-manifest.json
+          VERSION=$(jq -r .version "$MANIFEST")
+          if [ "$VERSION" != "$TAG" ]; then
+            echo "::error::payload manifest version $VERSION != tag $TAG"
+            exit 1
+          fi
+          SIG=$(jq -r .signature "$MANIFEST")
+          if [ -z "$SIG" ] || [ "$SIG" = "null" ]; then
+            echo "::error::payload manifest has an empty signature"
+            exit 1
+          fi
+          # Round-trip against the COMMITTED public key — catches a rotated
+          # secret that no longer matches desktop/payload-signing.pub before
+          # clients ever see the mismatch.
+          python3 scripts/payload_tools.py verify \
+            "payload-dist/watchtower-payload-$TAG.tar.gz" \
+            --pub desktop/payload-signing.pub --signature "$SIG"
+        shell: bash
+
+      - name: Upload payload to release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload "$GITHUB_REF_NAME" \
+            payload-dist/watchtower-payload-*.tar.gz \
+            payload-dist/payload-manifest.json \
+            --clobber --repo "$GITHUB_REPOSITORY"
+
   # ── 2.5. Build the windows-x64 Python bundle on a Linux runner ──────────────
   # Why a separate job? Cross-installing win_amd64 wheels via
   # `pip install --target --platform win_amd64 --only-binary=:all:` is
