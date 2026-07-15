@@ -19,7 +19,7 @@ uvicorn==0.29.0
 # in api/photos.py). Declared in pyproject too — MUST stay here because the
 # packaged desktop bundle installs deps from THIS file, and without it the
 # backend crashes at startup when FastAPI registers the upload route.
-python-multipart==0.0.28
+python-multipart==0.0.30
 # Note: `[standard]` extras (uvloop, httptools, watchfiles) gave a small
 # perf win on Linux/Mac but uvloop has no Windows wheels. When the
 # Release workflow's Linux runner builds the win_amd64 Python bundle,

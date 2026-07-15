@@ -153,8 +153,12 @@ def on_primary_version(primary_addr: str, advertised_version: int) -> None:
         finally:
             db.close()
 
-        last = _last_triggered_at.get("t", 0.0)
-        if _time.monotonic() - last < DEBOUNCE_SECS:
+        # "Never triggered" must be a sentinel, not 0.0: time.monotonic() is
+        # roughly seconds-since-boot on Linux, so on a freshly booted machine
+        # monotonic() - 0.0 < DEBOUNCE_SECS would debounce away the FIRST
+        # gossip-triggered sync after boot.
+        last = _last_triggered_at.get("t")
+        if last is not None and _time.monotonic() - last < DEBOUNCE_SECS:
             return
         _last_triggered_at["t"] = _time.monotonic()
 
