@@ -67,6 +67,17 @@ else
   FAIL "CHANGELOG.md missing entry for $PKG_VERSION"
 fi
 
+# The macOS entitlements plist must parse. Local + unsigned-CI packs never
+# read it (no signing identity), so a syntax error would otherwise stay
+# invisible until the FIRST SIGNED release build — the worst moment.
+if [ "$(uname -s)" = "Darwin" ]; then
+  if plutil -lint "$REPO_ROOT/desktop/entitlements.mac.plist" >/dev/null 2>&1; then
+    PASS "desktop/entitlements.mac.plist parses (plutil -lint)"
+  else
+    FAIL "desktop/entitlements.mac.plist is malformed — the first SIGNED build would fail. Run: plutil -lint desktop/entitlements.mac.plist"
+  fi
+fi
+
 # ──────────────────────────────────────────────────────────────────────────
 HEAD "2. Test + lint + build"
 

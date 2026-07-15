@@ -159,6 +159,7 @@ The differentiator is the third row. Every tool in this table lets you self-host
 | Security hardening | [docs/SECURITY_HARDENING.md](docs/SECURITY_HARDENING.md) |
 | Examples | [docs/EXAMPLES.md](docs/EXAMPLES.md) |
 | Releasing (maintainers) | [docs/RELEASING.md](docs/RELEASING.md) · [RELEASE_QUALITY.md](RELEASE_QUALITY.md) |
+| Code signing (maintainers) | [docs/MAC_CODE_SIGNING.md](docs/MAC_CODE_SIGNING.md) · [docs/WINDOWS_CODE_SIGNING.md](docs/WINDOWS_CODE_SIGNING.md) |
 | The Shipping Playbook — release lessons for building any app | [docs/SHIPPING_PLAYBOOK.md](docs/SHIPPING_PLAYBOOK.md) |
 
 ## Development

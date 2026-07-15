@@ -171,7 +171,52 @@ verify_mac_dmg() {
     fi
   fi
   verify_bundle_contents "$dmg" "$mount_point/WatchTower.app/Contents/Resources/python"
+  verify_mac_signing "$dmg" "$mount_point/WatchTower.app"
   hdiutil detach "$mount_point" 2>/dev/null || true
+}
+
+# Code-signing state. The meaningful boundary is IDENTITY, not seal validity:
+#   1. No Developer ID identity (unsigned or ad-hoc, pre-membership) → WARN.
+#      Do NOT judge seal validity here — electron-builder's repack always
+#      leaves ad-hoc helper seals userland-"invalid" (verified empirically on
+#      v1.21.0: all four Helper.app seals fail codesign --verify, yet the app
+#      launches fine — the kernel's exec check only validates the binary's
+#      own code pages, and Gatekeeper routes users to right-click-open
+#      regardless). That's the expected shipped state until the Apple
+#      Developer membership lands (docs/MAC_CODE_SIGNING.md).
+#   2. Developer-ID signed + valid seal + notarized → PASS.
+#   3. Developer-ID identity but broken seal / not notarized → FAIL. A
+#      half-signed app is WORSE than unsigned: Gatekeeper hard-blocks it with
+#      no right-click-open escape hatch.
+verify_mac_signing() {
+  local label="$1" app="$2"
+  local sig_info
+  sig_info=$(codesign -dvv "$app" 2>&1)
+  if echo "$sig_info" | grep -q "code object is not signed"; then
+    WARN "$label: unsigned (code signing not enabled yet — docs/MAC_CODE_SIGNING.md)"
+    return 0
+  fi
+  if ! echo "$sig_info" | grep -q "Authority=Developer ID Application"; then
+    WARN "$label: ad-hoc/non-Developer-ID signed (expected pre-membership state — docs/MAC_CODE_SIGNING.md)"
+    return 0
+  fi
+  # Developer ID identity present — from here on, everything must be right.
+  PASS "$label: signed with a Developer ID Application cert"
+  if codesign --verify --deep --strict "$app" >/dev/null 2>&1; then
+    PASS "$label: codesign verifies (--deep --strict)"
+  else
+    FAIL "$label: Developer-ID signature does NOT verify (broken seal) — Gatekeeper hard-blocks this, worse than unsigned. Block release."
+  fi
+  if spctl -a -t exec "$app" >/dev/null 2>&1; then
+    PASS "$label: Gatekeeper accepts (signed + notarized)"
+  else
+    FAIL "$label: signed but Gatekeeper REJECTS — likely not notarized. Block release (worse than unsigned)."
+  fi
+  if xcrun stapler validate "$app" >/dev/null 2>&1; then
+    PASS "$label: notarization ticket stapled (first launch works offline)"
+  else
+    WARN "$label: no stapled notarization ticket — first launch needs network for Gatekeeper's online check"
+  fi
 }
 
 # Stale-bundle guard. A DMG can carry the right ARCH but a stale Python
@@ -306,11 +351,36 @@ verify_windows_zip() {
   fi
 }
 
+# Windows Authenticode state — same three-world logic as verify_mac_signing.
+# osslsigncode (brew install osslsigncode) lets a Mac/Linux host inspect a
+# PE signature; without it this check degrades to a WARN, never a silent skip.
+verify_windows_authenticode() {
+  local arch="$1"
+  local exe="WatchTower-$VERSION-win-${arch}.exe"
+  local exe_path
+  exe_path=$(DOWNLOAD "$exe") || return 1
+  if ! command -v osslsigncode >/dev/null 2>&1; then
+    WARN "$exe: osslsigncode not installed — can't inspect Authenticode from this host (brew install osslsigncode)"
+    return 0
+  fi
+  local out
+  out=$(osslsigncode verify "$exe_path" 2>&1)
+  if echo "$out" | grep -qi "no signature found"; then
+    WARN "$exe: unsigned (Windows signing not enabled yet — docs/WINDOWS_CODE_SIGNING.md)"
+  elif echo "$out" | grep -q "Signature verification: ok"; then
+    PASS "$exe: Authenticode signature verifies"
+  else
+    FAIL "$exe: signature present but does NOT verify — SmartScreen treats a broken signature worse than none. Block release."
+  fi
+}
+
 verify_mac_dmg arm64 "arm64"
 verify_mac_dmg x64 "x86_64"
 verify_linux_appimage x64 "x86-64"
 verify_linux_appimage arm64 "aarch64"
 verify_windows_zip x64
+verify_windows_authenticode x64
+verify_windows_authenticode arm64
 # Note: armv7l + Windows arm64 don't ship a python-build-standalone bundle
 # (no PBS target exists), so there's nothing to arch-verify there. They
 # fall back to system/pipx Python at runtime.

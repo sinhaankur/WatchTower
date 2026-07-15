@@ -451,6 +451,25 @@ jobs:
             fi
           fi
 
+          # ── Windows code signing via Azure Trusted Signing (opt-in) ─────────
+          # Same pattern as macOS: activates only when the Azure secrets exist
+          # (docs/WINDOWS_CODE_SIGNING.md lists all six). electron-builder's
+          # azureSignOptions path authenticates with AZURE_TENANT_ID /
+          # AZURE_CLIENT_ID / AZURE_CLIENT_SECRET (already in this step's env;
+          # empty values are harmless — nothing reads them unless the
+          # -c.win.azureSignOptions flags below are passed) and signs through
+          # the Invoke-TrustedSigning PowerShell module, which the runner
+          # doesn't preinstall.
+          if [ "${RUNNER_OS}" = "Windows" ]; then
+            if [ -n "${AZURE_SIGNING_ENDPOINT:-}" ] && [ -n "${AZURE_CLIENT_SECRET:-}" ]; then
+              echo "::notice::Azure Trusted Signing configured — building SIGNED Windows installers"
+              pwsh -NoProfile -Command 'Install-Module -Name TrustedSigning -Force -Scope CurrentUser -Repository PSGallery'
+              EXTRA_ARGS="-c.win.azureSignOptions.endpoint=${AZURE_SIGNING_ENDPOINT} -c.win.azureSignOptions.codeSigningAccountName=${AZURE_SIGNING_ACCOUNT} -c.win.azureSignOptions.certificateProfileName=${AZURE_SIGNING_PROFILE}"
+            else
+              echo "::warning::No Azure Trusted Signing secrets — building UNSIGNED Windows installers"
+            fi
+          fi
+
           # Disable errexit inside the retry loop — a non-zero electron-builder
           # exit is handled by the `if` below, not an abort. (GitHub runs bash
           # steps with -e by default, which would otherwise kill the retry.)
@@ -490,6 +509,17 @@ jobs:
           MAC_APPLE_ID: ${{ secrets.APPLE_ID }}
           MAC_APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           MAC_APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          # Windows signing via Azure Trusted Signing — opt-in, same pattern.
+          # Safe to carry as plain env (unlike CSC_LINK): electron-builder only
+          # consults these when the run step passes -c.win.azureSignOptions.*,
+          # which it does only when AZURE_SIGNING_ENDPOINT is non-empty.
+          # See docs/WINDOWS_CODE_SIGNING.md for the secret list.
+          AZURE_SIGNING_ENDPOINT: ${{ secrets.AZURE_SIGNING_ENDPOINT }}
+          AZURE_SIGNING_ACCOUNT: ${{ secrets.AZURE_SIGNING_ACCOUNT }}
+          AZURE_SIGNING_PROFILE: ${{ secrets.AZURE_SIGNING_PROFILE }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
 
       # ── Smoke test (Linux x64 only): launch the AppImage headless,
       # confirm the bundled launcher resolves a Python with the watchtower
