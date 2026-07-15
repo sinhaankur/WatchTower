@@ -55,6 +55,7 @@ export const queryKeys = {
   externalDatabases: ['external-databases'] as const,
   projectDatabases: (projectId: string) => ['projects', projectId, 'databases'] as const,
   agentConfig: ['agent', 'config'] as const,
+  emailConfig: ['email', 'config'] as const,
   healingConfig: ['healing', 'config'] as const,
   healingActions: (status?: string) => ['healing', 'actions', status ?? 'all'] as const,
   legalStatus: ['legal', 'status'] as const,
@@ -1010,6 +1011,24 @@ export type ControlPlaneStatus = {
   snapshot_present?: boolean;
   snapshot_bytes?: number | null;
   snapshot_mtime?: string | null;
+  auto_failover_enabled?: boolean;
+  last_failover_at?: string | null;
+  last_failover_note?: string | null;
+};
+
+export type MeshMember = {
+  addr: string;
+  name: string;
+  state: 'alive' | 'suspect' | 'dead';
+  incarnation: number;
+  self: boolean;
+};
+
+export type MeshStatus = {
+  running: boolean;
+  self_addr: string | null;
+  self_name?: string;
+  members: MeshMember[];
 };
 
 export function useControlPlane() {
@@ -1051,6 +1070,30 @@ export function useSyncControlPlane() {
         '/this-pc/control-plane/sync-now',
       )).data,
     onSuccess: () => { void qc.invalidateQueries({ queryKey: ['this-pc', 'control-plane'] }); },
+  });
+}
+
+export function useSetAutoFailover() {
+  const qc = useQueryClient();
+  return useMutation<
+    { auto_failover_enabled: boolean; last_failover_at: string | null; last_failover_note: string | null },
+    unknown,
+    boolean
+  >({
+    mutationFn: async (enabled) =>
+      (await apiClient.put('/this-pc/control-plane/failover', { enabled })).data,
+    onSuccess: () => { void qc.invalidateQueries({ queryKey: ['this-pc', 'control-plane'] }); },
+  });
+}
+
+export function useMeshStatus() {
+  return useQuery<MeshStatus>({
+    queryKey: ['this-pc', 'mesh'],
+    queryFn: async () => (await apiClient.get<MeshStatus>('/this-pc/mesh')).data,
+    // The mesh view is live-ish — poll while the page is open so up/suspect/dead
+    // transitions show without a manual refresh. Cheap: a single in-memory read.
+    refetchInterval: 5_000,
+    staleTime: 2_000,
   });
 }
 
@@ -1252,6 +1295,58 @@ export function useUpdateAgentConfig() {
 export function useTestAgentConnection() {
   return useMutation<AgentTestResult, unknown, { base_url?: string; api_key?: string }>({
     mutationFn: async (body) => (await apiClient.post<AgentTestResult>('/agent/test', body)).data,
+  });
+}
+
+// ── Outbound email (SMTP) — Settings → Email ─────────────────────────────────
+
+export type EmailConfig = {
+  configured: boolean;
+  smtp_host: string | null;
+  smtp_port: number;
+  smtp_user: string | null;
+  smtp_from: string;
+  use_tls: boolean;
+  has_password: boolean;
+  source: 'database' | 'env' | null;
+};
+
+export type EmailConfigPatch = {
+  smtp_host?: string;
+  smtp_port?: number;
+  smtp_user?: string;
+  smtp_password?: string;
+  smtp_from?: string;
+  use_tls?: boolean;
+};
+
+export type EmailTestResult = {
+  ok: boolean;
+  to: string;
+  error: string | null;
+};
+
+export function useEmailConfig() {
+  return useQuery<EmailConfig>({
+    queryKey: queryKeys.emailConfig,
+    queryFn: async () => (await apiClient.get<EmailConfig>('/email/config')).data,
+    staleTime: 30_000,
+  });
+}
+
+export function useUpdateEmailConfig() {
+  const qc = useQueryClient();
+  return useMutation<EmailConfig, unknown, EmailConfigPatch>({
+    mutationFn: async (patch) => (await apiClient.put<EmailConfig>('/email/config', patch)).data,
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.emailConfig });
+    },
+  });
+}
+
+export function useTestEmailConfig() {
+  return useMutation<EmailTestResult, unknown, { to?: string }>({
+    mutationFn: async (body) => (await apiClient.post<EmailTestResult>('/email/test', body)).data,
   });
 }
 

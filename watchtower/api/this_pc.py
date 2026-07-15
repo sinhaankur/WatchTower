@@ -402,6 +402,11 @@ async def control_plane_status(
         out.update(control_plane_sync.snapshot_status())
     except Exception:  # noqa: BLE001 - snapshot facts are a nicety
         pass
+    try:
+        from watchtower import failover
+        out.update(failover.status(db))
+    except Exception:  # noqa: BLE001 - failover facts are a nicety
+        pass
     return out
 
 
@@ -561,6 +566,58 @@ async def control_plane_unpair(
     except Exception:  # noqa: BLE001 - notify must not fail the unpair
         pass
     return _read_cp_pairing(db)
+
+
+# ── Live mesh membership (SWIM) ──────────────────────────────────────────────
+
+
+@router.get("/mesh")
+async def mesh_status(
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(util.get_current_user),
+) -> Dict[str, Any]:
+    """Live view of the node mesh — which peers are up / suspect / dead right
+    now, as maintained by the SWIM gossip loop. ``running`` is False on a
+    standalone node with no tailnet (nothing to mesh with)."""
+    try:
+        from watchtower import mesh
+        return mesh.status()
+    except Exception:  # noqa: BLE001 - mesh is best-effort
+        return {"running": False, "self_addr": None, "members": []}
+
+
+class FailoverConfigRequest(BaseModel):
+    enabled: bool
+
+
+@router.put("/control-plane/failover")
+async def set_auto_failover(
+    body: FailoverConfigRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(util.get_current_user),
+) -> Dict[str, Any]:
+    """Toggle automatic failover (a standby self-promoting when the mesh
+    confirms the primary is dead). Admin-gated; default OFF."""
+    from watchtower.api.runtime import _user_can_manage_org_secrets
+    from watchtower.llm_settings import set_setting
+    from watchtower import failover
+
+    if not _user_can_manage_org_secrets(db, current_user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Changing failover settings requires can_manage_team permission.",
+        )
+    set_setting(db, failover.AUTO_FAILOVER_KEY, "true" if body.enabled else "false")
+    audit_log.record_for_user(
+        db, current_user,
+        action="control_plane.failover_config",
+        entity_type="control_plane",
+        request=request,
+        extra={"enabled": body.enabled},
+    )
+    db.commit()
+    return failover.status(db)
 
 
 # ── Guided SSH setup ─────────────────────────────────────────────────────────

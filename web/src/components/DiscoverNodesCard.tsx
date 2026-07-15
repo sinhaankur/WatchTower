@@ -5,7 +5,20 @@ import {
   usePairControlPlane,
   useUnpairControlPlane,
   useSyncControlPlane,
+  useMeshStatus,
+  useSetAutoFailover,
 } from '@/hooks/queries';
+
+const MESH_DOT: Record<'alive' | 'suspect' | 'dead', string> = {
+  alive: 'bg-emerald-500',
+  suspect: 'bg-amber-500',
+  dead: 'bg-red-500',
+};
+const MESH_LABEL: Record<'alive' | 'suspect' | 'dead', string> = {
+  alive: 'up',
+  suspect: 'suspect',
+  dead: 'down',
+};
 
 function fmtAge(iso: string | null | undefined): string {
   if (!iso) return 'never';
@@ -32,9 +45,11 @@ export default function DiscoverNodesCard({
 }) {
   const { data, isLoading } = useDiscoverNodes();
   const { data: cp } = useControlPlane();
+  const { data: mesh } = useMeshStatus();
   const pair = usePairControlPlane();
   const unpair = useUnpairControlPlane();
   const syncNow = useSyncControlPlane();
+  const setFailover = useSetAutoFailover();
   const [pairError, setPairError] = useState<string | null>(null);
 
   const peers = data?.peers ?? [];
@@ -100,6 +115,59 @@ export default function DiscoverNodesCard({
               </button>
             </div>
           )}
+          {/* Auto-failover switch (standby): self-promote when the mesh confirms
+              the primary is dead. Off by default. */}
+          {cp.role === 'standby' && (
+            <div className="mt-2 flex items-start gap-2 pt-2 border-t border-border-soft">
+              <div className="flex-1">
+                <span className="text-foreground font-medium">Automatic failover</span>
+                <span className="block text-muted-foreground mt-0.5">
+                  {cp.auto_failover_enabled
+                    ? 'On — this standby self-promotes to primary when the mesh confirms the primary is down.'
+                    : 'Off — the primary going down is detected and shown, but promotion waits for you.'}
+                </span>
+                {cp.last_failover_note && (
+                  <span className="block text-amber-700 mt-0.5">Last: {cp.last_failover_note}</span>
+                )}
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={!!cp.auto_failover_enabled}
+                disabled={setFailover.isPending}
+                onClick={() => setFailover.mutate(!cp.auto_failover_enabled)}
+                className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full border border-border transition-colors disabled:opacity-50 ${
+                  cp.auto_failover_enabled ? 'bg-emerald-500' : 'bg-border'
+                }`}
+              >
+                <span
+                  className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white border border-border transition-transform ${
+                    cp.auto_failover_enabled ? 'translate-x-4' : 'translate-x-0.5'
+                  }`}
+                />
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Live mesh membership — which nodes the SWIM loop sees up right now */}
+      {mesh?.running && mesh.members.length > 1 && (
+        <div className="mb-3 rounded-md border border-border-soft bg-surface-soft px-3 py-2 text-xs">
+          <div className="flex items-center gap-2 mb-1.5">
+            <span className="font-medium text-foreground">Node mesh</span>
+            <span className="text-muted-foreground">live · {mesh.members.filter((m) => m.state === 'alive').length}/{mesh.members.length} up</span>
+          </div>
+          <div className="space-y-1">
+            {mesh.members.map((m) => (
+              <div key={m.addr} className="flex items-center gap-2">
+                <span className={`inline-block w-1.5 h-1.5 rounded-full shrink-0 ${MESH_DOT[m.state]}`} />
+                <span className="font-medium text-foreground truncate">{m.name || m.addr}</span>
+                {m.self && <span className="text-[10px] text-muted-foreground">(this node)</span>}
+                <span className="text-muted-foreground font-mono ml-auto shrink-0">{MESH_LABEL[m.state]}</span>
+              </div>
+            ))}
+          </div>
         </div>
       )}
       {pairError && <p className="mb-2 text-[11px] text-red-600">{pairError}</p>}

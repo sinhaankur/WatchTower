@@ -313,7 +313,25 @@ async def lifespan(_app: FastAPI):
         logger.exception("control-plane sync: failed to start — continuing without it")
         stop_cp_sync = None  # type: ignore[assignment]
 
+    # SWIM gossip mesh — gives a live "which nodes are up now" view and drives
+    # auto-failover. No-op on a node with no tailnet (nothing to mesh with) or
+    # when WATCHTOWER_MESH_DISABLE=true. Async start/stop (it owns a UDP socket).
+    mesh_started = False
+    try:
+        from watchtower import mesh
+        if await mesh.start() is not None:
+            mesh_started = True
+    except Exception:
+        logger.exception("mesh: failed to start — continuing without it")
+
     yield
+
+    if mesh_started:
+        try:
+            from watchtower import mesh
+            await mesh.stop()
+        except Exception:
+            logger.exception("mesh: failed to stop cleanly")
 
     if stop_scheduler is not None:
         try:

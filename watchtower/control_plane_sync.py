@@ -29,6 +29,13 @@ logger = logging.getLogger(__name__)
 
 _scheduler = None
 
+# Set transiently by the mesh trigger right before it calls sync_now(), so the
+# pull records exactly which primary version it caught up to. Not thread-shared
+# in anger — the mesh loop and the tick both run on the API's single event loop.
+_pending_target_version: dict = {}
+# Debounce: don't fire more than one gossip-triggered pull per this many secs.
+_last_triggered_at: dict = {}
+
 
 def _interval_secs() -> int:
     try:
@@ -101,12 +108,71 @@ def sync_now() -> Tuple[bool, str]:
         if ok:
             set_setting(db, this_pc._LAST_SYNC_KEY, now)
             set_setting(db, this_pc._LAST_SYNC_ERROR_KEY, None)
+            # Record the primary version we just caught up to (if the caller
+            # passed it via the mesh trigger), so we don't re-pull for the same
+            # advertised version. ``target_version`` rides on the module global
+            # set by the mesh trigger just before it calls us.
+            tv = _pending_target_version.get("v")
+            if tv:
+                set_setting(db, _LAST_SYNCED_VERSION_KEY, str(tv))
         else:
             set_setting(db, this_pc._LAST_SYNC_ERROR_KEY, message[:300])
         db.commit()
         return ok, message
     finally:
         db.close()
+
+
+def on_primary_version(primary_addr: str, advertised_version: int) -> None:
+    """Mesh callback: a peer advertised its state version on a datagram.
+
+    If that peer is our paired primary and its version is newer than what we've
+    synced, pull *now* instead of waiting for the timed tick — the whole point
+    of gossip-triggered sync. Debounced so a burst of primary changes collapses
+    into at most one pull per DEBOUNCE_SECS. Best-effort; never raises into the
+    mesh loop.
+    """
+    import time as _time
+
+    DEBOUNCE_SECS = _debounce_secs()
+    try:
+        from watchtower.database import SessionLocal
+        from watchtower.llm_settings import get_setting
+        from watchtower.api import this_pc
+
+        db = SessionLocal()
+        try:
+            if get_setting(db, this_pc._ROLE_KEY) != "standby":
+                return
+            peer_host = get_setting(db, this_pc._PEER_HOST_KEY) or ""
+            # Mesh addr is tailscale-ip:mesh-port; pairing stores host (the IP).
+            if peer_host and primary_addr.rsplit(":", 1)[0] != peer_host:
+                return  # not our primary
+            if advertised_version <= last_synced_version(db):
+                return  # already caught up
+        finally:
+            db.close()
+
+        last = _last_triggered_at.get("t", 0.0)
+        if _time.monotonic() - last < DEBOUNCE_SECS:
+            return
+        _last_triggered_at["t"] = _time.monotonic()
+
+        _pending_target_version["v"] = advertised_version
+        try:
+            ok, message = sync_now()
+            logger.info("gossip-triggered sync (v=%d): %s", advertised_version, message)
+        finally:
+            _pending_target_version.pop("v", None)
+    except Exception:  # noqa: BLE001 - must never break the mesh loop
+        logger.debug("on_primary_version errored", exc_info=True)
+
+
+def _debounce_secs() -> float:
+    try:
+        return max(0.0, float(os.getenv("WATCHTOWER_CP_SYNC_DEBOUNCE_SECS", "3")))
+    except ValueError:
+        return 3.0
 
 
 async def tick() -> bool:
@@ -151,6 +217,60 @@ def stop_scheduler() -> None:
         except Exception:  # noqa: BLE001
             pass
         _scheduler = None
+
+
+_LAST_SYNCED_VERSION_KEY = "control_plane.last_synced_version"
+
+
+def current_state_version(db=None) -> int:
+    """A cheap, monotonic-ish version number for the primary's exportable state.
+
+    Used by the mesh to advertise "my state changed" so standbys pull *now*
+    instead of waiting for the next timed tick. Derived from data we already
+    have — no new column, no per-writer bump:
+
+      * every mutating endpoint writes an ``AuditEvent`` (append-only), so the
+        row count strictly increases on each change; plus
+      * ``system_settings`` changes (LLM/email/pairing/toggles) that may not go
+        through the audit path, folded in as an epoch of the latest update.
+
+    The exact value doesn't matter — only that it *increases* when the primary's
+    state changes and stays put otherwise. Best-effort: returns 0 on any error
+    (which simply means "fall back to the timed pull").
+    """
+    from watchtower.database import SessionLocal, AuditEvent, SystemSetting
+    from sqlalchemy import func
+
+    own_db = db is None
+    if own_db:
+        db = SessionLocal()
+    try:
+        audit_count = db.query(func.count(AuditEvent.id)).scalar() or 0
+        latest_setting = db.query(func.max(SystemSetting.updated_at)).scalar()
+        settings_epoch = int(latest_setting.timestamp()) if latest_setting else 0
+        return int(audit_count) + settings_epoch
+    except Exception:  # noqa: BLE001 - a version read must never raise
+        logger.debug("state-version read failed", exc_info=True)
+        return 0
+    finally:
+        if own_db:
+            db.close()
+
+
+def last_synced_version(db=None) -> int:
+    from watchtower.llm_settings import get_setting
+    own_db = db is None
+    if own_db:
+        from watchtower.database import SessionLocal
+        db = SessionLocal()
+    try:
+        raw = get_setting(db, _LAST_SYNCED_VERSION_KEY)
+        return int(raw) if raw else 0
+    except (ValueError, TypeError):
+        return 0
+    finally:
+        if own_db:
+            db.close()
 
 
 def snapshot_status() -> dict:

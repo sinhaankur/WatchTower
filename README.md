@@ -154,10 +154,12 @@ The differentiator is the third row. Every tool in this table lets you self-host
 | Container auto-update service (config + troubleshooting) | [docs/CONTAINER_UPDATE_SERVICE.md](docs/CONTAINER_UPDATE_SERVICE.md) |
 | Tiny local LLMs for self-heal analysis | [docs/TINY_LLM_GUIDE.md](docs/TINY_LLM_GUIDE.md) |
 | High availability | [docs/HA_PODMAN_WATCHTOWER.md](docs/HA_PODMAN_WATCHTOWER.md) |
+| Research → feature ideas (P2P mesh, self-healing, edge caching) | [docs/RESEARCH_IDEAS.md](docs/RESEARCH_IDEAS.md) |
 | WatchTower vs Vercel | [docs/VERCEL_ALTERNATIVE.md](docs/VERCEL_ALTERNATIVE.md) |
 | Security hardening | [docs/SECURITY_HARDENING.md](docs/SECURITY_HARDENING.md) |
 | Examples | [docs/EXAMPLES.md](docs/EXAMPLES.md) |
 | Releasing (maintainers) | [docs/RELEASING.md](docs/RELEASING.md) · [RELEASE_QUALITY.md](RELEASE_QUALITY.md) |
+| The Shipping Playbook — release lessons for building any app | [docs/SHIPPING_PLAYBOOK.md](docs/SHIPPING_PLAYBOOK.md) |
 
 ## Development
 
@@ -172,6 +174,8 @@ Architecture notes live in [CLAUDE.md](CLAUDE.md); contributions are welcome —
 
 ## Roadmap
 
+- **Peer-to-peer node mesh** — *live membership, auto-failover, and gossip-triggered state sync shipped* (SWIM gossip over the tailnet: nodes track who's up in real time, standbys converge in seconds instead of minutes, and a standby self-promotes when the mesh confirms the primary is down). Next: decentralized deploy placement over the same fabric
+- **Edge caching / CDN** — cache a deployed site's static assets at the edge (cache-control + optional Cloudflare CDN in front of the tunnel) so assets serve fast without hitting origin every time
 - Broader Docker parity and runtime features
 - Windows and macOS container-service depth
 - Richer notification integrations
