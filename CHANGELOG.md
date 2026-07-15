@@ -9,6 +9,13 @@ Curated, human-friendly history of WatchTower releases. Auto-generated GitHub Re
 
 ---
 
+## 1.21.0 — Small fast updates, live node mesh, and email that just works
+
+- **Updates shrink from ~200 MB to under 1 MB.** The desktop app now updates in two stages: the heavy shell (Electron + bundled Python) changes rarely, while the part that changes every release ships as a tiny signed payload (0.7 MB, one artifact for every platform and chip). Downloads are verified twice (checksum + Ed25519 signature against a key pinned in the app) before they ever run, a payload that fails to boot is quarantined and rolled back automatically, and anything incompatible falls back to the normal installer flow. This release publishes the payloads and ships the first payload-aware app — so updates *after* this one get small.
+- **Your nodes now see each other live.** Machines running WatchTower on your tailnet gossip their health to each other (SWIM protocol, authenticated), so the Servers view shows who's up *right now* instead of minutes ago. On top of that sits optional **auto-failover**: when the mesh confirms your primary control plane is really down — not just unreachable from one node — a standby promotes itself. Off by default; one toggle in Settings when you want it.
+- **Team invites send themselves.** Configure your email provider once under Settings → Email (works with Gmail app passwords, Fastmail, or any SMTP server — with a send-a-test-email button), and invitation links go out automatically. No SMTP configured? The invite flow now hands you a polished copy-link card instead of an apologetic warning.
+- **Snappier feel.** Command palette, toasts, and dialogs get a subtle spring entrance, and reduced-motion preferences are now respected everywhere — including animations from libraries we don't control.
+
 ## 1.20.2 — Reclaim disk, faster load, steadier releases
 
 - **Storage cleaner.** Settings → Storage shows how much disk your build cache is using and lets you reclaim it in one click. Build clones (re-fetched on the next deploy) are always safe to clear; package caches are opt-in. Your projects, databases, and backups are never touched. Build caches can quietly grow to gigabytes — now you can see and clear them without a terminal.

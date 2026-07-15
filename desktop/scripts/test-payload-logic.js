@@ -19,9 +19,16 @@ const cvStart = mainSrc.indexOf('function compareVersions');
 const cvEnd = mainSrc.indexOf('\n}', cvStart) + 2;
 const compareVersionsSrc = mainSrc.slice(cvStart, cvEnd);
 
-// Real signed artifacts from phase 1
-const realTarball = path.join(repoRoot, 'payload-dist', 'watchtower-payload-1.20.2.tar.gz');
+// Real signed artifacts from phase 1. The tarball name is derived from the
+// manifest — never hardcoded: the artifact version tracks
+// watchtower/__init__.py and changes every release.
 const realManifest = JSON.parse(fs.readFileSync(path.join(repoRoot, 'payload-dist', 'payload-manifest.json'), 'utf8'));
+const realVersion = realManifest.version;
+const realTarball = path.join(repoRoot, 'payload-dist', `watchtower-payload-${realVersion}.tar.gz`);
+// A shell strictly older than every gate exercised below: any real
+// minShellVersion (>= 1.21.0, only ever bumped upward) and the payload
+// version itself both exceed it.
+const olderShell = '1.0.0';
 
 const fixture = fs.mkdtempSync(path.join(os.tmpdir(), 'wt-payload-test-'));
 const resources = path.join(fixture, 'resources');
@@ -123,10 +130,10 @@ function expect(label, actual, want) {
   writeFingerprint(realManifest.requirementsSha256);
 
   // Happy path: sha256 + Ed25519 verify against the pinned key in main.js.
-  ctx = buildContext({ builtinVersion: '1.20.1' });
+  ctx = buildContext({ builtinVersion: olderShell });
   await ctx.installPayload(realTarball, realManifest);
   expect('installPayload stages verified payload',
-    fs.existsSync(path.join(payloads, '1.20.2', 'payload.json')), true);
+    fs.existsSync(path.join(payloads, realVersion, 'payload.json')), true);
   expect('installPayload cleans tmp dir',
     fs.readdirSync(payloads).filter(n => n.startsWith('.tmp')), []);
 
@@ -134,7 +141,7 @@ function expect(label, actual, want) {
   const tampered = path.join(fixture, 'tampered.tar.gz');
   fs.copyFileSync(realTarball, tampered);
   fs.appendFileSync(tampered, 'X');
-  fs.rmSync(path.join(payloads, '1.20.2'), { recursive: true, force: true });
+  fs.rmSync(path.join(payloads, realVersion), { recursive: true, force: true });
   let threw = '';
   try { await ctx.installPayload(tampered, realManifest); } catch (e) { threw = e.message; }
   expect('tampered tarball rejected by sha256', /sha256 mismatch/.test(threw), true);
@@ -144,23 +151,23 @@ function expect(label, actual, want) {
   threw = '';
   try { await ctx.installPayload(tampered, { ...realManifest, sha256: tamperedSha }); } catch (e) { threw = e.message; }
   expect('bad signature rejected by pinned key', /signature does not verify/.test(threw), true);
-  expect('failed install leaves nothing staged', fs.existsSync(path.join(payloads, '1.20.2')), false);
+  expect('failed install leaves nothing staged', fs.existsSync(path.join(payloads, realVersion)), false);
 
   // ═══ Phase 3: tryPayloadUpdate decision matrix (stubbed GitHub API) ═══
-  // The real manifest demands minShellVersion 1.21.0 — the shell-too-old
-  // gate must route a 1.20.1 shell to the installer path.
+  // The real manifest demands minShellVersion >= 1.21.0 — the shell-too-old
+  // gate must route the olderShell to the installer path.
   const manifestFile = path.join(fixture, 'payload-manifest.json');
   fs.writeFileSync(manifestFile, JSON.stringify(realManifest));
   urlMap['https://x/manifest'] = manifestFile;
   urlMap['https://x/tarball'] = realTarball;
   const releaseStrict = {
-    tag_name: 'v1.20.2',
+    tag_name: `v${realVersion}`,
     assets: [
       { name: 'payload-manifest.json', browser_download_url: 'https://x/manifest' },
-      { name: 'watchtower-payload-1.20.2.tar.gz', browser_download_url: 'https://x/tarball' },
+      { name: `watchtower-payload-${realVersion}.tar.gz`, browser_download_url: 'https://x/tarball' },
     ],
   };
-  ctx = buildContext({ builtinVersion: '1.20.1' });
+  ctx = buildContext({ builtinVersion: olderShell });
   ctx.githubLatestReleaseJson = async () => releaseStrict;
   let rStrict = await ctx.tryPayloadUpdate();
   expect('shell older than minShellVersion → incompatible', rStrict.status, 'incompatible');
@@ -168,47 +175,47 @@ function expect(label, actual, want) {
   // Same release with a satisfiable minShellVersion exercises the full
   // download→verify→stage path (signature covers the tarball, not the
   // manifest's minShell field, so this edit is legitimate for testing).
-  fs.writeFileSync(manifestFile, JSON.stringify({ ...realManifest, minShellVersion: '1.20.0' }));
+  fs.writeFileSync(manifestFile, JSON.stringify({ ...realManifest, minShellVersion: olderShell }));
   urlMap['https://x/manifest'] = manifestFile;
   urlMap['https://x/tarball'] = realTarball;
   const release = {
-    tag_name: 'v1.20.2',
+    tag_name: `v${realVersion}`,
     assets: [
       { name: 'payload-manifest.json', browser_download_url: 'https://x/manifest' },
-      { name: 'watchtower-payload-1.20.2.tar.gz', browser_download_url: 'https://x/tarball' },
+      { name: `watchtower-payload-${realVersion}.tar.gz`, browser_download_url: 'https://x/tarball' },
     ],
   };
 
-  ctx = buildContext({ builtinVersion: '1.20.1' });
+  ctx = buildContext({ builtinVersion: olderShell });
   ctx.githubLatestReleaseJson = async () => release;
   let r = await ctx.tryPayloadUpdate();
   expect('tryPayloadUpdate downloads + installs', r.status, 'installed');
   r = await ctx.tryPayloadUpdate();
   expect('second check → already-installed', r.status, 'already-installed');
 
-  fs.writeFileSync(path.join(payloads, '1.20.2', '.quarantined'), '{"reason":"test"}');
+  fs.writeFileSync(path.join(payloads, realVersion, '.quarantined'), '{"reason":"test"}');
   r = await ctx.tryPayloadUpdate();
   expect('quarantined release → incompatible (installer path)', r.status, 'incompatible');
-  fs.rmSync(path.join(payloads, '1.20.2'), { recursive: true, force: true });
+  fs.rmSync(path.join(payloads, realVersion), { recursive: true, force: true });
 
   writeFingerprint('DIFFERENT');
-  ctx = buildContext({ builtinVersion: '1.20.1' });
+  ctx = buildContext({ builtinVersion: olderShell });
   ctx.githubLatestReleaseJson = async () => release;
   r = await ctx.tryPayloadUpdate();
   expect('dep-set change → incompatible (installer path)', r.status, 'incompatible');
 
   writeFingerprint(realManifest.requirementsSha256);
-  ctx = buildContext({ builtinVersion: '1.20.2' });
+  ctx = buildContext({ builtinVersion: realVersion });
   ctx.githubLatestReleaseJson = async () => release;
   r = await ctx.tryPayloadUpdate();
   expect('same version → up-to-date', r.status, 'up-to-date');
 
-  ctx = buildContext({ builtinVersion: '1.20.1' });
-  ctx.githubLatestReleaseJson = async () => ({ tag_name: 'v1.20.2', assets: [] });
+  ctx = buildContext({ builtinVersion: olderShell });
+  ctx.githubLatestReleaseJson = async () => ({ tag_name: `v${realVersion}`, assets: [] });
   r = await ctx.tryPayloadUpdate();
   expect('release without payload assets → unavailable', r.status, 'unavailable');
 
-  ctx = buildContext({ builtinVersion: '1.20.1' });
+  ctx = buildContext({ builtinVersion: olderShell });
   ctx.githubLatestReleaseJson = async () => { throw new Error('offline'); };
   r = await ctx.tryPayloadUpdate();
   expect('network failure → failed (no installer fallback)', r.status, 'failed');

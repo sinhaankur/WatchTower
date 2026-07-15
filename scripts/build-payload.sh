@@ -118,8 +118,12 @@ cat > "$PAYLOAD_DIR/payload.json" <<EOF
 EOF
 
 mkdir -p "$OUT_DIR"
+# Remove ALL versioned tarballs, not just the current one: release.yml
+# uploads via a watchtower-payload-*.tar.gz glob and the client-logic test
+# resolves the tarball from the manifest, so a stale tarball from a
+# previous version sitting next to a fresh manifest is a real hazard.
+rm -f "$OUT_DIR"/watchtower-payload-*.tar.gz
 TARBALL="$OUT_DIR/watchtower-payload-$VERSION.tar.gz"
-rm -f "$TARBALL"
 # COPYFILE_DISABLE: keep macOS AppleDouble (._*) files out so a tarball
 # built locally on a Mac matches what CI's GNU tar produces structurally.
 (cd "$STAGE" && COPYFILE_DISABLE=1 tar -czf "$TARBALL" payload)
