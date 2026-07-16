@@ -61,3 +61,8 @@ jobs:
         with:
           user: __token__
           password: ${{ secrets.PYPI_API_TOKEN }}
+          # A moved/re-pushed tag re-triggers this workflow, and PyPI rejects
+          # re-uploading an existing version ("400 File already exists") —
+          # that's a no-op, not a failure (bit v1.21.0 when the tag moved to
+          # pick up a fix after the first run had already published).
+          skip-existing: true
