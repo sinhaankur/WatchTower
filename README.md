@@ -49,6 +49,22 @@ Coolify, Dokploy, Umbrel, and CasaOS all let you self-host applications. **None 
 
 > Different from [`containrrr/watchtower`](https://github.com/containrrr/watchtower) (a Docker image auto-updater). This WatchTower is a full self-hosted deploy + database + self-heal control plane for Podman.
 
+## What it looks like
+
+Your sites, their live status, and one Deploy button — running on your own machine:
+
+<p align="center">
+  <img src="docs/screenshots/app-live.png" alt="WatchTower Applications view — projects with live status and one-click deploy" width="800">
+</p>
+
+And when a build breaks, you don't get a wall of CI output — you get the cause in plain English, down to the file and line, with the fix one click away:
+
+<p align="center">
+  <img src="docs/screenshots/self-heal-card.png" alt="A failed deploy explained in plain English: the exact file, line, and error, with a View log link" width="800">
+</p>
+
+Failures WatchTower can fix safely (port conflicts, registry flakes), it fixes and retries on its own — if you've turned autonomy on. Everything else waits for you with a root-cause analysis attached. Never a dead end.
+
 ## Quick start
 
 ### Desktop app (easiest)
