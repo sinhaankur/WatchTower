@@ -29,26 +29,26 @@
 # lazy dep, so think before dropping anything a feature imports on use.
 
 # Core
-fastapi==0.115.0
-uvicorn==0.29.0
-python-multipart==0.0.30
-pydantic==2.5.0
-pydantic-settings==2.1.0
-python-dotenv==1.0.0
+fastapi==0.142.2
+uvicorn==0.54.0
+python-multipart==0.0.32
+pydantic==2.13.5
+pydantic-settings==2.15.0
+python-dotenv==1.2.4
 
 # Database
-sqlalchemy==2.0.23
-psycopg2-binary==2.9.9
-alembic==1.13.1
+sqlalchemy==2.0.54
+psycopg2-binary==2.9.13
+alembic==1.20.0
 
 # Utilities
 pyyaml>=6.0
 apscheduler>=3.10.0
-requests==2.31.0
-podman==5.0.0; sys_platform == "linux"
+requests==2.34.2
+podman==5.8.0; sys_platform == "linux"
 
 # HTTP client (health checks + OIDC/Cloudflare/agent HTTP)
-httpx==0.25.2
+httpx==0.28.1
 
 # Rate limiting
 slowapi>=0.1.9

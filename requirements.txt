@@ -13,8 +13,8 @@
 # stay here so the dev clone and CI always exercise every code path.
 
 # Core
-fastapi==0.115.0
-uvicorn==0.29.0
+fastapi==0.142.2
+uvicorn==0.54.0
 # Required by FastAPI to parse multipart/form-data (photo-backup file uploads
 # in api/photos.py). Declared in pyproject too — MUST stay here because the
 # packaged desktop bundle installs deps from THIS file, and without it the
@@ -26,24 +26,24 @@ python-multipart>=0.0.32
 # pip evaluates the marker against the build host (Linux) instead of
 # the target, tries to install uvloop, and fails. The perf gain isn't
 # worth blocking Windows installer releases.
-pydantic==2.5.0
-pydantic-settings==2.1.0
-python-dotenv==1.0.0
+pydantic==2.13.5
+pydantic-settings==2.15.0
+python-dotenv==1.2.4
 
 # Database
-sqlalchemy==2.0.23
-psycopg2-binary==2.9.9
-alembic==1.13.1
+sqlalchemy==2.0.54
+psycopg2-binary==2.9.13
+alembic==1.20.0
 
 # Utilities
 pyyaml>=6.0
 apscheduler>=3.10.0
 requests>=2.34.2
 # podman Python SDK only has Linux binaries — skip on macOS/Windows
-podman==5.0.0; sys_platform == "linux"
+podman==5.8.0; sys_platform == "linux"
 
 # HTTP client (used in tests and health checks)
-httpx==0.25.2
+httpx==0.28.1
 
 # Rate limiting — protects auth and webhook endpoints from brute force /
 # DoS even on single-operator installs without a CDN/WAF in front.
@@ -55,7 +55,7 @@ slowapi>=0.1.9
 
 # [ssh] SSH/rsync deploys (legacy JSON-file path). The DB-path deploy
 # runner uses plain ssh/rsync, so fabric is only for watchtower-deploy.
-fabric==3.2.2
+fabric==3.2.3
 
 # [queue] Durable build queue. watchtower.queue falls back to in-process
 # execution when REDIS_URL is unset, so dev / desktop installs without
