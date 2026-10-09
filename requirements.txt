@@ -19,7 +19,7 @@ uvicorn==0.29.0
 # in api/photos.py). Declared in pyproject too — MUST stay here because the
 # packaged desktop bundle installs deps from THIS file, and without it the
 # backend crashes at startup when FastAPI registers the upload route.
-python-multipart==0.0.30
+python-multipart>=0.0.32
 # Note: `[standard]` extras (uvloop, httptools, watchfiles) gave a small
 # perf win on Linux/Mac but uvloop has no Windows wheels. When the
 # Release workflow's Linux runner builds the win_amd64 Python bundle,
@@ -38,7 +38,7 @@ alembic==1.13.1
 # Utilities
 pyyaml>=6.0
 apscheduler>=3.10.0
-requests==2.31.0
+requests>=2.34.2
 # podman Python SDK only has Linux binaries — skip on macOS/Windows
 podman==5.0.0; sys_platform == "linux"
 
@@ -67,3 +67,8 @@ rq==1.16.2
 # endpoint (Ollama, LM Studio, vLLM, llama.cpp, OpenAI, OpenRouter,
 # LiteLLM, etc.). WatchTower itself is provider-agnostic.
 openai>=1.50.0
+cryptography>=50.0.2  # security (pip-audit 2026-10-08)
+pillow>=12.3.0  # security (pip-audit 2026-10-08)
+PyJWT>=2.15.1  # security (pip-audit 2026-10-08)
+paramiko>=5.0.0  # security (pip-audit 2026-10-08)
+urllib3>=2.8.0  # security (pip-audit 2026-10-08)

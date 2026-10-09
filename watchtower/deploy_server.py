@@ -711,8 +711,13 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     serve_parser = subparsers.add_parser("serve", help="Run FastAPI listener")
+    # Private by default: bind to loopback only, so running the backend directly
+    # never exposes the API to the whole local network. To reach it from other
+    # devices, use the Remote Access (Tailscale) flow, or explicitly opt in with
+    # WATCHTOWER_HOST=0.0.0.0 (or --host). The app is token-authed either way,
+    # but "private by default" is the promise — this is defence in depth.
     serve_parser.add_argument(
-        "--host", default=os.getenv("WATCHTOWER_HOST", "0.0.0.0")
+        "--host", default=os.getenv("WATCHTOWER_HOST", "127.0.0.1")
     )
     serve_parser.add_argument(
         "--port",
