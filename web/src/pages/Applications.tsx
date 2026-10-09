@@ -86,15 +86,15 @@ type Deployment = {
 type ProjectWithDeployment = Project & { lastDeployment: Deployment | null; deploying: boolean };
 
 const USE_CASE_META: Record<Project['use_case'], { icon: string; label: string; color: string }> = {
-  netlify_like:    { icon: '🌐', label: 'Static Site',   color: 'bg-blue-50 text-blue-700 border-blue-200' },
-  vercel_like:     { icon: '⚡', label: 'SSR / Node.js', color: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
-  docker_platform: { icon: '🐳', label: 'Docker App',    color: 'bg-cyan-50 text-cyan-700 border-cyan-200' },
+  netlify_like:    { icon: '🌐', label: 'Static Site',   color: 'bg-blue-500/15 text-blue-500 dark:text-blue-400 border-blue-500/30' },
+  vercel_like:     { icon: '⚡', label: 'SSR / Node.js', color: 'bg-indigo-50 text-indigo-500 dark:text-indigo-400 border-indigo-500/30' },
+  docker_platform: { icon: '🐳', label: 'Docker App',    color: 'bg-cyan-50 text-cyan-500 dark:text-cyan-400 border-cyan-500/30' },
 };
 
 const STATUS_COLOR: Record<string, string> = {
-  live:        'bg-emerald-100 text-emerald-700 border-emerald-200',
-  building:    'bg-blue-100 text-blue-700 border-blue-200',
-  deploying:   'bg-indigo-100 text-indigo-700 border-indigo-200',
+  live:        'bg-emerald-100 text-emerald-500 dark:text-emerald-400 border-emerald-200',
+  building:    'bg-blue-100 text-blue-500 dark:text-blue-400 border-blue-200',
+  deploying:   'bg-indigo-500/15 text-indigo-500 dark:text-indigo-400 border-indigo-500/30',
   pending:     'bg-amber-100 text-accent border-accent/25',
   failed:      'bg-red-100 text-destructive border-destructive/30',
   rolled_back: 'bg-muted text-muted-foreground border-border',
@@ -358,7 +358,7 @@ const Applications = () => {
         {msg && (
           <div className={`rounded-lg border px-4 py-3 text-sm ${
             msg.kind === 'success'
-              ? 'border-emerald-300 bg-emerald-50 text-emerald-700'
+              ? 'border-emerald-300 bg-emerald-500/15 text-emerald-500 dark:text-emerald-400'
               : 'border-destructive/40 bg-destructive/10 text-destructive'
           }`}>
             {msg.text}
@@ -469,11 +469,11 @@ const Applications = () => {
                           target="_blank"
                           rel="noopener noreferrer"
                           title={`Live preview: ${localRunUrls[p.id]} — opens in your browser`}
-                          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 text-xs font-medium transition-colors max-w-[260px]"
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-emerald-300 bg-emerald-500/15 text-emerald-800 hover:bg-emerald-100 text-xs font-medium transition-colors max-w-[260px]"
                         >
                           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 anim-pulse-soft shrink-0" />
                           <span className="font-mono truncate">{localRunUrls[p.id].replace(/^https?:\/\//, '')}</span>
-                          <span className="text-emerald-700">↗</span>
+                          <span className="text-emerald-500 dark:text-emerald-400">↗</span>
                         </a>
                       )}
                       {p.launch_url && /^https?:\/\//i.test(p.launch_url) ? (

@@ -676,7 +676,7 @@ const SetupWizard = () => {
                 {/* Option 1: This machine — recommended default for trying things out */}
                 <label className={`block border rounded-lg p-4 cursor-pointer transition ${
                   data.deployment_target === 'this_machine'
-                    ? 'border-emerald-400 bg-emerald-50'
+                    ? 'border-emerald-400 bg-emerald-500/15'
                     : 'border-border bg-card hover:border-emerald-300'
                 }`}>
                   <div className="flex gap-3 items-start">
@@ -710,7 +710,7 @@ const SetupWizard = () => {
                 {/* Option 2: Remote SSH server */}
                 <label className={`block border rounded-lg p-4 cursor-pointer transition ${
                   data.deployment_target === 'remote_ssh'
-                    ? 'border-blue-400 bg-blue-50'
+                    ? 'border-blue-400 bg-blue-500/15'
                     : 'border-border bg-card hover:border-blue-300'
                 }`}>
                   <div className="flex gap-3 items-start">
@@ -927,26 +927,26 @@ const SetupWizard = () => {
                     </p>
 
                     {deviceConnect.open && (
-                      <div className="mt-3 border border-indigo-200 rounded-lg bg-indigo-50 p-4 space-y-2">
+                      <div className="mt-3 border border-indigo-500/30 rounded-lg bg-indigo-50 p-4 space-y-2">
                         <p className="text-sm font-semibold text-indigo-900">Authorize GitHub Connection</p>
                         <p className="text-xs text-indigo-800">
                           Open GitHub, enter this code, then return here. We will continue automatically once authorized.
                         </p>
                         <div className="flex items-center gap-2">
-                          <code className="px-2 py-1 rounded bg-card border border-indigo-200 text-indigo-900 font-semibold tracking-wider">
+                          <code className="px-2 py-1 rounded bg-card border border-indigo-500/30 text-indigo-900 font-semibold tracking-wider">
                             {deviceConnect.userCode || '---'}
                           </code>
                           <a
                             href={deviceConnect.verificationUriComplete || deviceConnect.verificationUri}
                             target="_blank"
                             rel="noreferrer"
-                            className="text-xs underline text-indigo-700 hover:text-indigo-900"
+                            className="text-xs underline text-indigo-500 dark:text-indigo-400 hover:text-indigo-900"
                           >
                             Open GitHub Verification
                           </a>
                         </div>
                         {deviceConnect.polling && (
-                          <p className="text-xs text-indigo-700 animate-pulse">Waiting for GitHub authorization…</p>
+                          <p className="text-xs text-indigo-500 dark:text-indigo-400 animate-pulse">Waiting for GitHub authorization…</p>
                         )}
                         {deviceConnect.error && (
                           <p className="text-xs text-destructive bg-destructive/10 border border-destructive/30 rounded px-2 py-1">{deviceConnect.error}</p>

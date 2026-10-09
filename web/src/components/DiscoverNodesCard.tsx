@@ -177,7 +177,7 @@ export default function DiscoverNodesCard({
           const isPairedPeer = cp?.peer_host === (p.dns_name || p.ip) || cp?.peer_host === p.ip;
           return (
             <div key={p.ip} className="flex items-center gap-2 text-xs">
-              <span className={`inline-block w-1.5 h-1.5 rounded-full shrink-0 ${p.online ? 'bg-emerald-500' : 'bg-slate-400'}`} />
+              <span className={`inline-block w-1.5 h-1.5 rounded-full shrink-0 ${p.online ? 'bg-emerald-500' : 'bg-muted-foreground/40'}`} />
               <span className="font-medium text-foreground truncate">{p.hostname}</span>
               <span className="text-muted-foreground font-mono">{p.ip}</span>
               {p.runs_watchtower && (
@@ -186,7 +186,7 @@ export default function DiscoverNodesCard({
                 </span>
               )}
               {isPairedPeer ? (
-                <span className="ml-auto text-xs font-medium text-emerald-700 shrink-0">Standby</span>
+                <span className="ml-auto text-xs font-medium text-emerald-500 dark:text-emerald-400 shrink-0">Standby</span>
               ) : p.runs_watchtower ? (
                 <button
                   type="button"
@@ -198,7 +198,7 @@ export default function DiscoverNodesCard({
                   {pair.isPending ? 'Pairing…' : 'Set up as standby'}
                 </button>
               ) : p.already_added ? (
-                <span className="ml-auto text-xs font-medium text-emerald-700 shrink-0">Added</span>
+                <span className="ml-auto text-xs font-medium text-emerald-500 dark:text-emerald-400 shrink-0">Added</span>
               ) : (
                 <button
                   type="button"

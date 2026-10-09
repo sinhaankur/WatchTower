@@ -309,7 +309,7 @@ export default function Templates() {
         {error && (
           <div className={`rounded-lg p-3 mb-4 text-xs flex items-center justify-between gap-3 ${
             error.status === 401
-              ? 'border border-blue-300 bg-blue-50 text-blue-800'
+              ? 'border border-blue-300 bg-blue-500/15 text-blue-800'
               : 'border border-destructive/40 bg-destructive/10 text-destructive'
           }`}>
             <span>{error.message}</span>

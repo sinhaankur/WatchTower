@@ -114,7 +114,7 @@ function VSCodeCard() {
         {!loading && (
           <span className={`ml-auto text-xs px-2 py-0.5 rounded-full border font-medium ${
             status?.installed
-              ? 'border-emerald-300 bg-emerald-50 text-emerald-700'
+              ? 'border-emerald-300 bg-emerald-500/15 text-emerald-500 dark:text-emerald-400'
               : 'border-amber-300 bg-accent/10 text-accent'
           }`}>
             {status?.installed ? `Installed · ${status.version ?? 'VS Code'}` : 'Not detected on host'}
@@ -146,7 +146,7 @@ function VSCodeCard() {
             {openLoading ? 'Opening…' : 'Open WatchTower in VS Code'}
           </button>
           {openResult && (
-            <p className={`text-xs ${openResult.ok ? 'text-emerald-700' : 'text-destructive'}`}>{openResult.msg}</p>
+            <p className={`text-xs ${openResult.ok ? 'text-emerald-500 dark:text-emerald-400' : 'text-destructive'}`}>{openResult.msg}</p>
           )}
         </div>
 
@@ -287,7 +287,7 @@ function UpdateCheckCard() {
             Update available
           </span>
         ) : data?.latest ? (
-          <span className="text-xs px-2 py-0.5 rounded-full border font-medium border-emerald-300 bg-emerald-50 text-emerald-700">
+          <span className="text-xs px-2 py-0.5 rounded-full border font-medium border-emerald-300 bg-emerald-500/15 text-emerald-500 dark:text-emerald-400">
             Up to date
           </span>
         ) : null}
@@ -404,7 +404,7 @@ type DepRowProps = {
 
 function DepRow({ label, found, detail, installCmd, hint, required }: DepRowProps) {
   const okBadge = (
-    <span className="text-xs px-2 py-0.5 rounded-full border font-medium border-emerald-300 bg-emerald-50 text-emerald-700">
+    <span className="text-xs px-2 py-0.5 rounded-full border font-medium border-emerald-300 bg-emerald-500/15 text-emerald-500 dark:text-emerald-400">
       Found
     </span>
   );
@@ -590,7 +590,7 @@ function SystemCard() {
                 Installed something just now? Recheck restarts the app so PATH refreshes.
               </p>
               {reportResult && (
-                <p className={`text-xs mt-1 ${reportResult.ok ? 'text-emerald-700' : 'text-destructive'}`}>
+                <p className={`text-xs mt-1 ${reportResult.ok ? 'text-emerald-500 dark:text-emerald-400' : 'text-destructive'}`}>
                   {reportResult.msg}
                 </p>
               )}

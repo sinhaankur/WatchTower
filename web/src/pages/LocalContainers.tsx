@@ -173,7 +173,7 @@ export default function LocalContainers() {
                       href={c.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-blue-700 hover:underline font-mono text-sm"
+                      className="text-blue-500 dark:text-blue-400 hover:underline font-mono text-sm"
                     >
                       {c.url} ↗
                     </a>

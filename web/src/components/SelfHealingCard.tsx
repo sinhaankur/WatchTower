@@ -25,17 +25,17 @@ const KIND_LABEL: Record<string, string> = {
 function statusMeta(a: { status: string; auto_applicable: boolean }): { dot: string; text: string; label: string } {
   switch (a.status) {
     case 'auto_applied':
-      return { dot: 'bg-emerald-500', text: 'text-emerald-700', label: 'Auto-fixed' };
+      return { dot: 'bg-emerald-500', text: 'text-emerald-500 dark:text-emerald-400', label: 'Auto-fixed' };
     case 'approved':
-      return { dot: 'bg-emerald-500', text: 'text-emerald-700', label: 'Fixed (approved)' };
+      return { dot: 'bg-emerald-500', text: 'text-emerald-500 dark:text-emerald-400', label: 'Fixed (approved)' };
     case 'pending':
       return { dot: 'bg-primary', text: 'text-accent', label: 'Needs you' };
     case 'failed':
       return { dot: 'bg-red-500', text: 'text-destructive', label: 'Fix failed' };
     case 'dismissed':
-      return { dot: 'bg-slate-400', text: 'text-muted-foreground', label: 'Dismissed' };
+      return { dot: 'bg-muted-foreground/40', text: 'text-muted-foreground', label: 'Dismissed' };
     default:
-      return { dot: 'bg-slate-400', text: 'text-muted-foreground', label: a.status };
+      return { dot: 'bg-muted-foreground/40', text: 'text-muted-foreground', label: a.status };
   }
 }
 
@@ -68,7 +68,7 @@ export default function SelfHealingCard() {
           <span aria-hidden>🩹</span> Self-healing activity
         </h2>
         {autoFixed > 0 && (
-          <span className="text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+          <span className="text-xs font-medium text-emerald-500 dark:text-emerald-400 bg-emerald-500/15 border border-emerald-200 px-2 py-0.5 rounded-full">
             {autoFixed} auto-fixed
           </span>
         )}

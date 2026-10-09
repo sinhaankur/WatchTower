@@ -32,7 +32,7 @@ function extractDetail(err: unknown, fallback: string): string {
 
 const stateBadge = (state: string) => {
   const s = (state || '').toLowerCase();
-  if (s.includes('running') || s === 'up') return 'text-emerald-700 bg-emerald-50 border-emerald-200';
+  if (s.includes('running') || s === 'up') return 'text-emerald-500 dark:text-emerald-400 bg-emerald-500/15 border-emerald-200';
   if (s.includes('paused')) return 'text-accent bg-accent/10 border-accent/25';
   if (s.includes('exited') || s.includes('stopped') || s.includes('created')) return 'text-muted-foreground bg-muted border-border';
   return 'text-muted-foreground bg-muted border-border';
@@ -188,7 +188,7 @@ function PortsEditor({ ports, onChange }: { ports: PodmanPort[]; onChange: (p: P
           <button onClick={() => onChange(ports.filter((_, j) => j !== i))} className="text-muted-foreground hover:text-destructive text-sm px-1">×</button>
         </div>
       ))}
-      <button onClick={() => onChange([...ports, { host: 0, container: 0 }])} className="text-xs text-blue-700 hover:underline">
+      <button onClick={() => onChange([...ports, { host: 0, container: 0 }])} className="text-xs text-blue-500 dark:text-blue-400 hover:underline">
         + Add port mapping
       </button>
     </div>
@@ -368,7 +368,7 @@ function ContainerRow({ c }: { c: PodmanContainer }) {
           <div className="flex items-center gap-1.5 mt-0.5">
             {c.pod && <span className="text-xs text-purple-700 bg-purple-50 border border-purple-200 rounded px-1">pod: {c.pod}</span>}
             {c.project_id && (
-              <Link to={`/projects/${c.project_id}`} className="text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded px-1 hover:underline">
+              <Link to={`/projects/${c.project_id}`} className="text-xs text-blue-500 dark:text-blue-400 bg-blue-500/15 border border-blue-200 rounded px-1 hover:underline">
                 {c.project_name || 'project'}
               </Link>
             )}
@@ -388,7 +388,7 @@ function ContainerRow({ c }: { c: PodmanContainer }) {
                   <button onClick={() => run('restart')} disabled={act.isPending} className="text-xs px-2 py-1 rounded border border-border hover:bg-muted disabled:opacity-50">Restart</button>
                   <button onClick={() => run('stop')} disabled={act.isPending} className="text-xs px-2 py-1 rounded border border-border hover:bg-muted disabled:opacity-50">Stop</button>
                 </>
-              : <button onClick={() => run('start')} disabled={act.isPending} className="text-xs px-2 py-1 rounded border border-emerald-300 text-emerald-700 hover:bg-emerald-50 disabled:opacity-50">Start</button>}
+              : <button onClick={() => run('start')} disabled={act.isPending} className="text-xs px-2 py-1 rounded border border-emerald-300 text-emerald-500 dark:text-emerald-400 hover:bg-emerald-500/15 disabled:opacity-50">Start</button>}
             <button onClick={() => setShowLogPanel((v) => !v)} className={`text-xs px-2 py-1 rounded border ${showLogPanel ? 'border-accent/50 bg-muted' : 'border-border hover:bg-muted'}`}>Logs</button>
             <button onClick={() => run('remove')} disabled={act.isPending} className="text-xs px-2 py-1 rounded border border-destructive/40 text-destructive hover:bg-destructive/10 disabled:opacity-50">Remove</button>
           </div>
@@ -466,14 +466,14 @@ function PodCard({ p }: { p: PodmanPod }) {
         <p className="font-mono text-xs font-semibold text-foreground">{p.name}</p>
         <span className={`text-xs border rounded px-1.5 py-0.5 ${stateBadge(p.status)}`}>{p.status}</span>
         {p.project_id && (
-          <Link to={`/projects/${p.project_id}`} className="text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded px-1 hover:underline">
+          <Link to={`/projects/${p.project_id}`} className="text-xs text-blue-500 dark:text-blue-400 bg-blue-500/15 border border-blue-200 rounded px-1 hover:underline">
             {p.project_name || 'project'}
           </Link>
         )}
         <div className="ml-auto inline-flex items-center gap-1">
           {running
             ? <button onClick={() => run('stop')} disabled={act.isPending} className="text-xs px-2 py-1 rounded border border-border hover:bg-muted disabled:opacity-50">Stop</button>
-            : <button onClick={() => run('start')} disabled={act.isPending} className="text-xs px-2 py-1 rounded border border-emerald-300 text-emerald-700 hover:bg-emerald-50 disabled:opacity-50">Start</button>}
+            : <button onClick={() => run('start')} disabled={act.isPending} className="text-xs px-2 py-1 rounded border border-emerald-300 text-emerald-500 dark:text-emerald-400 hover:bg-emerald-500/15 disabled:opacity-50">Start</button>}
           <button onClick={() => run('remove')} disabled={act.isPending} className="text-xs px-2 py-1 rounded border border-destructive/40 text-destructive hover:bg-destructive/10 disabled:opacity-50">Remove</button>
         </div>
       </div>

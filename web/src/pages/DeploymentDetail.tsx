@@ -45,11 +45,11 @@ type DetailResponse = {
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 const STATUS_COLOR: Record<string, string> = {
-  live:        'bg-emerald-100 text-emerald-700 border-emerald-200',
-  success:     'bg-emerald-100 text-emerald-700 border-emerald-200',
-  building:    'bg-blue-100 text-blue-700 border-blue-200',
-  deploying:   'bg-indigo-100 text-indigo-700 border-indigo-200',
-  running:     'bg-blue-100 text-blue-700 border-blue-200',
+  live:        'bg-emerald-100 text-emerald-500 dark:text-emerald-400 border-emerald-200',
+  success:     'bg-emerald-100 text-emerald-500 dark:text-emerald-400 border-emerald-200',
+  building:    'bg-blue-100 text-blue-500 dark:text-blue-400 border-blue-200',
+  deploying:   'bg-indigo-500/15 text-indigo-500 dark:text-indigo-400 border-indigo-500/30',
+  running:     'bg-blue-100 text-blue-500 dark:text-blue-400 border-blue-200',
   pending:     'bg-amber-100 text-accent border-accent/25',
   failed:      'bg-red-100 text-destructive border-destructive/30',
   cancelled:   'bg-muted text-muted-foreground border-border',
@@ -145,7 +145,7 @@ function Timeline({ d, now }: { d: Deployment; now: number }) {
           <div className="pb-4 -mt-0.5">
             <div className={`text-sm font-medium ${
               p.state === 'failed' ? 'text-destructive'
-              : p.state === 'active' ? 'text-blue-700'
+              : p.state === 'active' ? 'text-blue-500 dark:text-blue-400'
               : p.state === 'pending' ? 'text-muted-foreground'
               : 'text-foreground'}`}>
               {p.label}

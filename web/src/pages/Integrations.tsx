@@ -145,7 +145,7 @@ function Dot({ ok }: { ok: boolean }) {
   return (
     <span
       className={`inline-block w-2 h-2 rounded-full shrink-0 ${
-        ok ? 'bg-emerald-500 status-pulse' : 'bg-slate-400'
+        ok ? 'bg-emerald-500 status-pulse' : 'bg-muted-foreground/40'
       }`}
     />
   );
@@ -154,7 +154,7 @@ function Dot({ ok }: { ok: boolean }) {
 function Badge({ ok, label }: { ok: boolean; label?: string }) {
   const text = label ?? (ok ? 'Connected' : 'Not detected');
   const cls = ok
-    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+    ? 'bg-emerald-500/15 text-emerald-500 dark:text-emerald-400 border-emerald-500/30'
     : 'bg-muted text-muted-foreground border-border';
   return (
     <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${cls}`}>
@@ -302,7 +302,7 @@ function ServiceControls({ service, running, enabled, supportedActions, onDone }
           <button
             onClick={() => void doAction('enable')}
             disabled={busy !== null}
-            className="px-3 py-1 text-xs font-medium rounded-lg border border-blue-300 text-blue-700 hover:bg-blue-50 disabled:opacity-50 transition-colors"
+            className="px-3 py-1 text-xs font-medium rounded-lg border border-blue-300 text-blue-500 dark:text-blue-400 hover:bg-blue-500/15 disabled:opacity-50 transition-colors"
             title="Enable auto-start on boot"
           >
             {busy === 'enable' ? '…' : '🔒 Enable on boot'}
@@ -320,7 +320,7 @@ function ServiceControls({ service, running, enabled, supportedActions, onDone }
         )}
       </div>
       {msg && (
-        <p className={`text-xs font-medium ${msg.kind === 'ok' ? 'text-emerald-700' : 'text-destructive'}`}>
+        <p className={`text-xs font-medium ${msg.kind === 'ok' ? 'text-emerald-500 dark:text-emerald-400' : 'text-destructive'}`}>
           {msg.kind === 'ok' ? '✓' : '✗'} {msg.text}
         </p>
       )}
@@ -372,12 +372,12 @@ function IntegrationCard({
   return (
     <div className={`p-4 rounded-xl border transition-all ${
       connected
-        ? 'border-emerald-200 bg-emerald-50/30 hover:border-emerald-300'
+        ? 'border-emerald-200 bg-emerald-500/15/30 hover:border-emerald-300'
         : 'border-border bg-card hover:border-destructive/40 hover:bg-destructive/10/20'
     }`}>
       <div className="flex items-start gap-3">
         <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0 border ${
-          connected ? 'bg-emerald-50 border-emerald-200' : 'bg-muted border-border'
+          connected ? 'bg-emerald-500/15 border-emerald-200' : 'bg-muted border-border'
         }`}>
           {icon}
         </div>
@@ -471,13 +471,13 @@ function WatchdogCard({ podmanInstalled }: { podmanInstalled: boolean }) {
   return (
     <div className={`rounded-xl border p-5 transition-all ${
       enabled
-        ? 'border-emerald-300 bg-emerald-50/40'
+        ? 'border-emerald-300 bg-emerald-500/15/40'
         : 'border-accent/25 bg-accent/10/30'
     }`}>
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-start gap-3 min-w-0 flex-1">
           <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0 border ${
-            enabled ? 'bg-emerald-50 border-emerald-200' : 'bg-accent/10 border-accent/25'
+            enabled ? 'bg-emerald-500/15 border-emerald-200' : 'bg-accent/10 border-accent/25'
           }`}>
             🛡️
           </div>
@@ -508,7 +508,7 @@ function WatchdogCard({ podmanInstalled }: { podmanInstalled: boolean }) {
               <p className="text-xs text-accent mt-1">⚠ Podman not detected. Install Podman first.</p>
             )}
             {msg && (
-              <p className={`text-xs mt-2 font-medium ${msg.kind === 'ok' ? 'text-emerald-700' : 'text-destructive'}`}>
+              <p className={`text-xs mt-2 font-medium ${msg.kind === 'ok' ? 'text-emerald-500 dark:text-emerald-400' : 'text-destructive'}`}>
                 {msg.text}
               </p>
             )}
@@ -535,7 +535,7 @@ function WatchdogCard({ podmanInstalled }: { podmanInstalled: boolean }) {
 
       {enabled && (
         <div className="mt-3 pt-3 border-t border-emerald-200">
-          <p className="text-xs text-emerald-700 font-medium">
+          <p className="text-xs text-emerald-500 dark:text-emerald-400 font-medium">
             ✓ Watchdog is active — Podman will auto-restart your containers after any reboot or crash.
           </p>
           <p className="text-xs text-muted-foreground mt-1">
@@ -608,19 +608,19 @@ function WatchTowerServiceCard() {
 
   return (
     <div className={`rounded-xl border p-5 transition-all ${
-      enabled ? 'border-emerald-300 bg-emerald-50/40' : 'border-border bg-card'
+      enabled ? 'border-emerald-300 bg-emerald-500/15/40' : 'border-border bg-card'
     }`}>
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-start gap-3 min-w-0 flex-1">
           <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0 border ${
-            enabled ? 'bg-emerald-50 border-emerald-200' : 'bg-muted border-border'
+            enabled ? 'bg-emerald-500/15 border-emerald-200' : 'bg-muted border-border'
           }`}>🛡️</div>
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <h3 className="text-sm font-semibold text-foreground">Auto-Update Daemon</h3>
               <span className={`text-xs px-1.5 py-0.5 rounded-full border ${
                 enabled
-                  ? 'bg-emerald-50 border-emerald-300 text-emerald-700'
+                  ? 'bg-emerald-500/15 border-emerald-300 text-emerald-500 dark:text-emerald-400'
                   : installed
                     ? 'bg-muted border-border text-muted-foreground'
                     : 'bg-accent/10 border-amber-300 text-accent'
@@ -655,7 +655,7 @@ function WatchTowerServiceCard() {
       )}
 
       {msg && (
-        <p className={`mt-3 text-xs ${msg.kind === 'ok' ? 'text-emerald-700' : 'text-destructive'}`}>
+        <p className={`mt-3 text-xs ${msg.kind === 'ok' ? 'text-emerald-500 dark:text-emerald-400' : 'text-destructive'}`}>
           {msg.text}
         </p>
       )}
@@ -807,7 +807,7 @@ function WatchtowerConfigCard() {
 
       <div className="flex items-center justify-end gap-3 mt-4">
         {msg && (
-          <p className={`text-xs ${msg.kind === 'ok' ? 'text-emerald-700' : 'text-destructive'}`}>
+          <p className={`text-xs ${msg.kind === 'ok' ? 'text-emerald-500 dark:text-emerald-400' : 'text-destructive'}`}>
             {msg.text}
           </p>
         )}
@@ -944,7 +944,7 @@ function CloudflareSection() {
                   href="https://dash.cloudflare.com/profile/api-tokens"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-orange-700 hover:underline"
+                  className="text-orange-500 dark:text-orange-400 hover:underline"
                 >
                   dash.cloudflare.com → API Tokens
                 </a>
@@ -1509,11 +1509,11 @@ const Integrations = () => {
                 key={label}
                 className={`flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border font-medium ${
                   ok
-                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                    ? 'bg-emerald-500/15 text-emerald-500 dark:text-emerald-400 border-emerald-500/30'
                     : 'bg-muted text-muted-foreground border-border'
                 }`}
               >
-                <span className={`w-1.5 h-1.5 rounded-full ${ok ? 'bg-emerald-500' : 'bg-slate-400'}`} />
+                <span className={`w-1.5 h-1.5 rounded-full ${ok ? 'bg-emerald-500' : 'bg-muted-foreground/40'}`} />
                 {label}
               </span>
             ))}
@@ -1738,7 +1738,7 @@ const Integrations = () => {
         <McpSection />
 
         {/* How they work together */}
-        <section className="rounded-xl border border-blue-200 bg-blue-50 p-5">
+        <section className="rounded-xl border border-blue-200 bg-blue-500/15 p-5">
           <h2 className="text-sm font-semibold text-foreground mb-2">How these work together</h2>
           <div className="space-y-2">
             {[

@@ -260,7 +260,7 @@ export default function LocalNode() {
                 WatchTower will run as a background service. Pick the resource profile that fits your machine.
               </p>
               {autoDetectedProfile && (
-                <p className="text-xs text-emerald-700 mt-2 inline-flex items-center gap-1">
+                <p className="text-xs text-emerald-500 dark:text-emerald-400 mt-2 inline-flex items-center gap-1">
                   <span>✓</span>
                   Auto-detected: <strong>{autoDetectedProfile}</strong> based on your CPU + RAM. Override below if you prefer.
                 </p>
@@ -495,7 +495,7 @@ export default function LocalNode() {
         )}
 
         {/* Info box — always visible */}
-        <div className="rounded-xl border border-blue-100 bg-blue-50 px-5 py-4 text-xs text-blue-800 space-y-1">
+        <div className="rounded-xl border border-blue-100 bg-blue-500/15 px-5 py-4 text-xs text-blue-800 space-y-1">
           <p className="font-semibold">How does this work?</p>
           <p>
             WatchTower installs a lightweight agent process that runs in the background on your PC.

@@ -49,9 +49,9 @@ type Notice = { kind: 'success' | 'error' | 'info'; message: string };
 const STORAGE_KEY = 'wt_projects';
 
 const USE_CASE_META: Record<LocalProject['use_case'], { label: string; color: string; dot: string }> = {
-  netlify_like:    { label: 'Static + Functions', color: 'bg-blue-100 text-blue-700 border-blue-200', dot: 'bg-blue-500' },
-  vercel_like:     { label: 'SSR App',            color: 'bg-indigo-100 text-indigo-700 border-indigo-200', dot: 'bg-indigo-500' },
-  docker_platform: { label: 'Docker App',         color: 'bg-cyan-100 text-cyan-700 border-cyan-200', dot: 'bg-cyan-500' },
+  netlify_like:    { label: 'Static + Functions', color: 'bg-blue-100 text-blue-500 dark:text-blue-400 border-blue-200', dot: 'bg-blue-500' },
+  vercel_like:     { label: 'SSR App',            color: 'bg-indigo-500/15 text-indigo-500 dark:text-indigo-400 border-indigo-500/30', dot: 'bg-indigo-500' },
+  docker_platform: { label: 'Docker App',         color: 'bg-cyan-500/15 text-cyan-500 dark:text-cyan-400 border-cyan-500/30', dot: 'bg-cyan-500' },
 };
 
 /**
@@ -97,13 +97,13 @@ function StatCard({ label, value, sub, accent }: { label: string; value: string 
 
 function StatusDot({ running }: { running: boolean }) {
   return (
-    <span className={`inline-block w-2 h-2 rounded-full shrink-0 ${running ? 'bg-emerald-500 status-pulse' : 'bg-slate-400'}`} />
+    <span className={`inline-block w-2 h-2 rounded-full shrink-0 ${running ? 'bg-emerald-500 status-pulse' : 'bg-muted-foreground/40'}`} />
   );
 }
 
 function NoticeBanner({ notice }: { notice: Notice }) {
   const styles = {
-    success: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+    success: 'border-emerald-200 bg-emerald-500/15 text-emerald-500 dark:text-emerald-400',
     error:   'border-destructive/30 bg-destructive/10 text-destructive',
     info:    'border-border bg-muted text-foreground',
   };
@@ -339,7 +339,7 @@ const Dashboard = () => {
           <span
             className={`hidden sm:inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border font-medium ${
               serverStatus === 'online'
-                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                ? 'bg-emerald-500/15 text-emerald-500 dark:text-emerald-400 border-emerald-500/30'
                 : serverStatus === 'offline'
                   ? 'bg-destructive/10 text-destructive border-destructive/30'
                   : 'bg-muted text-muted-foreground border-border'
@@ -486,7 +486,7 @@ const Dashboard = () => {
               className={`w-full flex items-center gap-3 p-3 rounded-lg border transition-colors disabled:opacity-50 text-left ${
                 bgRunning
                   ? 'border-destructive/40 bg-destructive/10 hover:bg-red-100 text-destructive'
-                  : 'border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-700'
+                  : 'border-emerald-300 bg-emerald-500/15 hover:bg-emerald-100 text-emerald-500 dark:text-emerald-400'
               }`}
             >
               <span className="text-lg leading-none">{bgRunning ? '⏹' : '▶'}</span>

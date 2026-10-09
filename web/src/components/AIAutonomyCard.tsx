@@ -328,7 +328,7 @@ export default function AIAutonomyCard() {
         {testResult && (
           <p className={`text-xs rounded px-3 py-2 border ${
             testResult.ok
-              ? 'text-emerald-700 bg-emerald-50 border-emerald-200'
+              ? 'text-emerald-500 dark:text-emerald-400 bg-emerald-500/15 border-emerald-200'
               : 'text-destructive bg-destructive/10 border-destructive/30'
           }`}>
             {testResult.msg}

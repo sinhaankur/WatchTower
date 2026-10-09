@@ -251,7 +251,7 @@ export default function SystemResourceMonitor() {
 
       {/* WatchTower process memory */}
       {proc && (
-        <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 flex items-center gap-3">
+        <div className="rounded-lg border border-blue-200 bg-blue-500/15 p-3 flex items-center gap-3">
           <div className="w-8 h-8 rounded-lg bg-blue-100 border border-blue-200 flex items-center justify-center text-base shrink-0">
             🗼
           </div>
@@ -260,7 +260,7 @@ export default function SystemResourceMonitor() {
             <p className="text-xs text-blue-600">This app is using {fmtMb(proc.rss_mb)} of RAM</p>
           </div>
           {ram && (
-            <span className="text-xs font-medium text-blue-700 shrink-0">
+            <span className="text-xs font-medium text-blue-500 dark:text-blue-400 shrink-0">
               {((proc.rss_mb / ram.total_mb) * 100).toFixed(1)}% of total
             </span>
           )}

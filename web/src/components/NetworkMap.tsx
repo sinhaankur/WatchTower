@@ -119,7 +119,7 @@ export default function NetworkMap({ nodes }: { nodes: MapNode[] }) {
       <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
         <span className="inline-flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" /> healthy</span>
         <span className="inline-flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-red-500 inline-block" /> unhealthy</span>
-        <span className="inline-flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-slate-400 inline-block" /> offline</span>
+        <span className="inline-flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-muted-foreground/40 inline-block" /> offline</span>
         <span className="inline-flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-primary inline-block" /> maintenance</span>
         <span className="inline-flex items-center gap-1.5">★ primary</span>
       </div>

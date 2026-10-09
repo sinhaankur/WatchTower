@@ -32,7 +32,7 @@ const STATUS_LABEL: Record<CheckStatus, string> = {
 };
 
 const STATUS_BADGE: Record<CheckStatus, string> = {
-  ok:   'border-emerald-200 bg-emerald-50 text-emerald-700',
+  ok:   'border-emerald-200 bg-emerald-500/15 text-emerald-500 dark:text-emerald-400',
   warn: 'border-accent/25 bg-accent/10 text-accent',
   fail: 'border-destructive/30 bg-destructive/10 text-destructive',
 };

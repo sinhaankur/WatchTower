@@ -74,7 +74,7 @@ function StatusBadge({ ok, label }: { ok: boolean; label: string }) {
     <span
       className={`shrink-0 text-xs px-2 py-0.5 rounded-full border ${
         ok
-          ? 'border-emerald-300 bg-emerald-50 text-emerald-700'
+          ? 'border-emerald-300 bg-emerald-500/15 text-emerald-500 dark:text-emerald-400'
           : 'border-amber-300 bg-accent/10 text-accent'
       }`}
     >
@@ -419,7 +419,7 @@ const HostConnect = () => {
           {/* Readiness pill */}
           <span className={`hidden sm:inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border font-medium ${
             readiness >= 4
-              ? 'bg-emerald-500/10 text-emerald-700 border-emerald-300'
+              ? 'bg-emerald-500/10 text-emerald-500 dark:text-emerald-400 border-emerald-300'
               : readiness >= 2
                 ? 'bg-primary/10 text-accent border-amber-300'
                 : 'bg-red-500/10 text-destructive border-destructive/40'
@@ -1013,7 +1013,7 @@ const HostConnect = () => {
 
               {terminalResult && (
                 <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-3">
-                  <p className={`text-xs font-medium ${terminalResult.ok ? 'text-emerald-700' : 'text-destructive'}`}>
+                  <p className={`text-xs font-medium ${terminalResult.ok ? 'text-emerald-500 dark:text-emerald-400' : 'text-destructive'}`}>
                     {terminalResult.ok ? '✓ Success' : '✗ Failed'} · Exit code {terminalResult.exit_code}
                   </p>
                   {terminalResult.stdout && (

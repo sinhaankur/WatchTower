@@ -86,9 +86,9 @@ type Webhook = {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 const STATUS_COLOR: Record<string, string> = {
-  live:       'bg-emerald-100 text-emerald-700 border-emerald-200',
-  building:   'bg-blue-100 text-blue-700 border-blue-200',
-  deploying:  'bg-indigo-100 text-indigo-700 border-indigo-200',
+  live:       'bg-emerald-100 text-emerald-500 dark:text-emerald-400 border-emerald-200',
+  building:   'bg-blue-100 text-blue-500 dark:text-blue-400 border-blue-200',
+  deploying:  'bg-indigo-500/15 text-indigo-500 dark:text-indigo-400 border-indigo-500/30',
   pending:    'bg-amber-100 text-accent border-accent/25',
   failed:     'bg-red-100 text-destructive border-destructive/30',
   cancelled:  'bg-muted text-muted-foreground border-border',
@@ -316,7 +316,7 @@ function HealthCheckCard({ projectId }: { projectId: string }) {
 
   const statusColor =
     result?.status === 'healthy'
-      ? 'border-emerald-300 bg-emerald-50 text-emerald-700'
+      ? 'border-emerald-300 bg-emerald-500/15 text-emerald-500 dark:text-emerald-400'
       : result?.status === 'unhealthy'
         ? 'border-amber-300 bg-accent/10 text-accent'
         : result?.status === 'unreachable'
@@ -548,7 +548,7 @@ function GoLiveCard({ project }: { project: Project }) {
         </div>
         {project.live_url && (
           <a href={project.live_url} target="_blank" rel="noopener noreferrer"
-            className="text-xs text-emerald-700 hover:underline font-mono shrink-0">
+            className="text-xs text-emerald-500 dark:text-emerald-400 hover:underline font-mono shrink-0">
             {project.live_url.replace(/^https?:\/\//, '')} ↗
           </a>
         )}
@@ -615,7 +615,7 @@ function GoLiveCard({ project }: { project: Project }) {
           <div className="mt-1 rounded-lg border border-border p-3">
             <div className="text-xs font-medium mb-2">
               Result: <span className={
-                result.overall === 'live' ? 'text-emerald-700'
+                result.overall === 'live' ? 'text-emerald-500 dark:text-emerald-400'
                 : result.overall === 'manual' ? 'text-accent'
                 : result.overall === 'partial' ? 'text-accent' : 'text-destructive'}>
                 {result.overall}
@@ -890,8 +890,8 @@ function ProjectDbLinkRow({
         </span>
         <span className={`text-xs px-1.5 py-0.5 rounded-full border font-medium ${
           link.database_kind === 'managed'
-            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-            : 'bg-violet-50 text-violet-700 border-violet-200'
+            ? 'bg-emerald-500/15 text-emerald-500 dark:text-emerald-400 border-emerald-500/30'
+            : 'bg-violet-500/15 text-violet-500 dark:text-violet-400 border-violet-500/30'
         }`}>
           {link.database_kind}
         </span>
@@ -1311,9 +1311,9 @@ function AutonomousModeCard({ project }: { project: Project }) {
 
   const toneClass: Record<string, string> = {
     idle:       'text-foreground/90 bg-muted border-border',
-    healthy:    'text-emerald-700 bg-emerald-50 border-emerald-200',
+    healthy:    'text-emerald-500 dark:text-emerald-400 bg-emerald-500/15 border-emerald-200',
     flaky:      'text-accent bg-accent/10 border-accent/25',
-    restarting: 'text-orange-700 bg-orange-50 border-orange-200',
+    restarting: 'text-orange-500 dark:text-orange-400 bg-orange-50 border-orange-500/30',
     rollback:   'text-destructive bg-destructive/10 border-destructive/30',
   };
 
@@ -1533,7 +1533,7 @@ function DeploymentsTab({ projectId }: { projectId: string }) {
             const isRollingBack = Boolean(rolling[d.id]);
             return (
               <Fragment key={d.id}>
-                <tr className={`hover:bg-muted/30 transition-colors ${isActive ? 'bg-blue-50/40' : ''}`}>
+                <tr className={`hover:bg-muted/30 transition-colors ${isActive ? 'bg-blue-500/15/40' : ''}`}>
                   <td className="px-4 py-3">
                     <Link to={`/deployments/${d.id}`} className="font-mono text-destructive hover:underline">
                       {(d.commit_sha || '—').slice(0, 8)}
@@ -1688,7 +1688,7 @@ function DiagnosisPanel({ state, deploymentId, onApplied }: DiagnosisPanelProps)
           {KIND_LABEL[d.kind]}
         </span>
         {d.fix.auto_applicable && (
-          <span className="text-xs px-2 py-0.5 rounded-full border font-medium border-emerald-300 bg-emerald-50 text-emerald-700">
+          <span className="text-xs px-2 py-0.5 rounded-full border font-medium border-emerald-300 bg-emerald-500/15 text-emerald-500 dark:text-emerald-400">
             Auto-fixable
           </span>
         )}
@@ -1715,7 +1715,7 @@ function DiagnosisPanel({ state, deploymentId, onApplied }: DiagnosisPanelProps)
               {applying ? 'Applying…' : 'Apply fix'}
             </button>
             {applyResult && (
-              <span className={`text-xs ${applyResult.ok ? 'text-emerald-700' : 'text-destructive'}`}>
+              <span className={`text-xs ${applyResult.ok ? 'text-emerald-500 dark:text-emerald-400' : 'text-destructive'}`}>
                 {applyResult.msg}
               </span>
             )}
@@ -2137,7 +2137,7 @@ function WebhooksTab({ projectId }: { projectId: string }) {
           <button
             type="button"
             onClick={() => setShowGuide((v) => !v)}
-            className="text-xs text-blue-700 hover:underline whitespace-nowrap"
+            className="text-xs text-blue-500 dark:text-blue-400 hover:underline whitespace-nowrap"
           >
             {showGuide ? 'Hide setup guide' : 'How do I get a webhook URL?'}
           </button>
@@ -2159,7 +2159,7 @@ function WebhooksTab({ projectId }: { projectId: string }) {
           </div>
         )}
         {showGuide && provider === 'discord' && (
-          <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-3 mb-4 text-xs text-indigo-900 space-y-2">
+          <div className="rounded-lg border border-indigo-500/30 bg-indigo-50 p-3 mb-4 text-xs text-indigo-900 space-y-2">
             <p className="font-semibold">Discord Webhook setup (~30 s):</p>
             <ol className="list-decimal pl-5 space-y-1">
               <li>Right-click the channel in Discord → <strong>Edit Channel</strong> → <strong>Integrations</strong> → <strong>Webhooks</strong> → <strong>New Webhook</strong>.</li>
@@ -2169,7 +2169,7 @@ function WebhooksTab({ projectId }: { projectId: string }) {
           </div>
         )}
         {showGuide && provider === 'ntfy' && (
-          <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 mb-4 text-xs text-emerald-900 space-y-2">
+          <div className="rounded-lg border border-emerald-200 bg-emerald-500/15 p-3 mb-4 text-xs text-emerald-900 space-y-2">
             <p className="font-semibold">ntfy setup (~30 s, no account needed):</p>
             <ol className="list-decimal pl-5 space-y-1">
               <li>Install the <a href="https://ntfy.sh/" target="_blank" rel="noopener noreferrer" className="underline font-mono">ntfy</a> app (iOS/Android/desktop), or self-host your own server.</li>
@@ -2184,7 +2184,7 @@ function WebhooksTab({ projectId }: { projectId: string }) {
           <div
             className={`rounded-md border p-2.5 mb-3 text-xs ${
               testResult.ok
-                ? 'border-emerald-300 bg-emerald-50 text-emerald-800'
+                ? 'border-emerald-300 bg-emerald-500/15 text-emerald-800'
                 : 'border-destructive/40 bg-destructive/10 text-destructive'
             }`}
           >
@@ -2372,7 +2372,7 @@ function RelatedTab({ projectId }: { projectId: string }) {
                     <td className="px-3 py-2 font-medium">{r.project_name}</td>
                     <td className="px-3 py-2">
                       <span className={
-                        r.status === 'queued' ? 'text-emerald-700' :
+                        r.status === 'queued' ? 'text-emerald-500 dark:text-emerald-400' :
                         r.status === 'error'  ? 'text-destructive' :
                                                 'text-accent'
                       }>
@@ -2776,7 +2776,7 @@ function DomainRow({
               onClick={() => void purge()}
               disabled={busy}
               title="Clear Cloudflare's edge cache so visitors see the latest deploy immediately"
-              className="text-xs px-2 py-1 rounded border border-orange-300 text-orange-700 hover:bg-orange-50 disabled:opacity-50 font-medium"
+              className="text-xs px-2 py-1 rounded border border-orange-300 text-orange-500 dark:text-orange-400 hover:bg-orange-50 disabled:opacity-50 font-medium"
             >
               {busy ? 'Purging…' : 'Purge cache'}
             </button>
@@ -2795,7 +2795,7 @@ function DomainRow({
       </div>
 
       {showSync && (
-        <div className="mt-3 rounded-md border border-orange-200 bg-orange-50 p-3 space-y-2">
+        <div className="mt-3 rounded-md border border-orange-500/30 bg-orange-50 p-3 space-y-2">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <label className="block text-xs text-foreground/90">
               Cloudflare account
@@ -3084,7 +3084,7 @@ function RunLocallyCard({ projectId }: { projectId: string }) {
                 href={run.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-sm font-mono text-blue-700 hover:underline"
+                className="text-sm font-mono text-blue-500 dark:text-blue-400 hover:underline"
               >
                 {run.url} ↗
               </a>

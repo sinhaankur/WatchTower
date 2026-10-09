@@ -595,7 +595,7 @@ const Login = () => {
             {/* GitHub OAuth — PRIMARY auth method */}
             <div className="space-y-3 mb-4">
               {!oauthReady && !deviceFlowReady && (
-                  <div className="text-left text-xs rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-blue-700 mb-3">
+                  <div className="text-left text-xs rounded-lg border border-blue-200 bg-blue-500/15 px-3 py-2 text-blue-500 dark:text-blue-400 mb-3">
                   <p className="font-medium text-blue-800 mb-1">GitHub sign-in not set up yet</p>
                   <p>
                     Ask your administrator to configure GitHub login on the server.
@@ -859,7 +859,7 @@ const Login = () => {
                     <p className="text-accent">⚠ <strong>Insecure dev mode enabled</strong> — set <code className="font-mono bg-accent/10 px-1 rounded">WATCHTOWER_ALLOW_INSECURE_DEV_AUTH=false</code> in production.</p>
                   )}
                   {authStatus?.installation?.owner_mode_enabled && (
-                    <p className="text-blue-700"><strong>Installation ownership is active.</strong> If this is your machine and you're locked out, ask the owner to invite you — or, if you have shell access, run <code className="font-mono bg-blue-50 px-1 rounded">watchtower-deploy reset-installation-owner</code> and the next sign-in claims it.</p>
+                    <p className="text-blue-500 dark:text-blue-400"><strong>Installation ownership is active.</strong> If this is your machine and you're locked out, ask the owner to invite you — or, if you have shell access, run <code className="font-mono bg-blue-500/15 px-1 rounded">watchtower-deploy reset-installation-owner</code> and the next sign-in claims it.</p>
                   )}
                 </div>
               </details>

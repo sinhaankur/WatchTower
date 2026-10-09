@@ -218,7 +218,7 @@ export function ProvisionNodeWizard({ onClose, onRegistered }: Props) {
           <p>
             <span className="text-muted-foreground">Status:</span>{' '}
             <span className={
-              succeeded ? 'text-emerald-700 font-medium'
+              succeeded ? 'text-emerald-500 dark:text-emerald-400 font-medium'
               : job.status === 'failed' ? 'text-destructive font-medium'
               : 'text-foreground/90'
             }>{STATUS_LABEL[job.status]}</span>
@@ -237,7 +237,7 @@ export function ProvisionNodeWizard({ onClose, onRegistered }: Props) {
         )}
 
         {succeeded && (
-          <p className="text-xs text-emerald-700">
+          <p className="text-xs text-emerald-500 dark:text-emerald-400">
             The node is registered in this org and ready to deploy to. You can close this dialog.
           </p>
         )}

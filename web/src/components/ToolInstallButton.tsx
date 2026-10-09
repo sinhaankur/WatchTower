@@ -92,7 +92,7 @@ export default function ToolInstallButton({
   }
 
   if (state === 'succeeded') {
-    return <span className="text-xs font-medium text-emerald-700">✓ Installed</span>;
+    return <span className="text-xs font-medium text-emerald-500 dark:text-emerald-400">✓ Installed</span>;
   }
 
   return (

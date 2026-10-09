@@ -193,7 +193,7 @@ function Capability({ ok, label }: { ok?: boolean; label: string }) {
     <div
       className={`flex items-center gap-1.5 px-2 py-1.5 rounded-md border text-xs ${
         ok
-          ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+          ? 'bg-emerald-500/15 border-emerald-200 text-emerald-800'
           : 'bg-muted border-border text-muted-foreground'
       }`}
       title={ok ? `You can ${label.toLowerCase()}` : `You cannot ${label.toLowerCase()}`}

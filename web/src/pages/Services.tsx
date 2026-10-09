@@ -34,7 +34,7 @@ type ServiceDef = {
 
 const SERVICES: ServiceDef[] = [
   {
-    slug: 'meilisearch', name: 'Meilisearch', category: 'Search', tone: 'bg-pink-100 text-pink-700',
+    slug: 'meilisearch', name: 'Meilisearch', category: 'Search', tone: 'bg-pink-500/15 text-pink-500 dark:text-pink-400',
     desc: 'Lightning-fast full-text search engine for your apps.',
     image: 'docker.io/getmeili/meilisearch:latest',
     ports: [{ host: 7700, container: 7700 }], openPort: 7700,
@@ -46,7 +46,7 @@ const SERVICES: ServiceDef[] = [
     ports: [{ host: 8025, container: 8025 }, { host: 1025, container: 1025 }], openPort: 8025,
   },
   {
-    slug: 'grafana', name: 'Grafana', category: 'Monitoring', tone: 'bg-orange-100 text-orange-700',
+    slug: 'grafana', name: 'Grafana', category: 'Monitoring', tone: 'bg-orange-500/15 text-orange-500 dark:text-orange-400',
     desc: 'Beautiful, flexible metrics and log dashboards.',
     image: 'docker.io/grafana/grafana-oss:latest',
     ports: [{ host: 3300, container: 3000 }], openPort: 3300,
@@ -58,30 +58,30 @@ const SERVICES: ServiceDef[] = [
     ports: [{ host: 9090, container: 9090 }], openPort: 9090,
   },
   {
-    slug: 'minio', name: 'MinIO', category: 'Storage', tone: 'bg-rose-100 text-rose-700',
+    slug: 'minio', name: 'MinIO', category: 'Storage', tone: 'bg-rose-500/15 text-rose-500 dark:text-rose-400',
     desc: 'S3-compatible self-hosted object storage.',
     image: 'docker.io/minio/minio:latest',
     ports: [{ host: 9000, container: 9000 }, { host: 9001, container: 9001 }], openPort: 9001,
     env: { MINIO_ROOT_USER: 'admin', MINIO_ROOT_PASSWORD: 'watchtower' },
   },
   {
-    slug: 'vaultwarden', name: 'Vaultwarden', category: 'Security', tone: 'bg-violet-100 text-violet-700',
+    slug: 'vaultwarden', name: 'Vaultwarden', category: 'Security', tone: 'bg-violet-500/15 text-violet-500 dark:text-violet-400',
     desc: 'Bitwarden-compatible self-hosted password manager.',
     image: 'docker.io/vaultwarden/server:latest',
     ports: [{ host: 8222, container: 80 }], openPort: 8222,
   },
   {
-    slug: 'gitea', name: 'Gitea', category: 'Dev Tools', tone: 'bg-emerald-100 text-emerald-700',
+    slug: 'gitea', name: 'Gitea', category: 'Dev Tools', tone: 'bg-emerald-100 text-emerald-500 dark:text-emerald-400',
     desc: 'Lightweight self-hosted Git service and CI.',
     image: 'docker.io/gitea/gitea:latest',
     ports: [{ host: 3030, container: 3000 }], openPort: 3030,
   },
   {
-    slug: 'plausible', name: 'Plausible', category: 'Analytics', tone: 'bg-indigo-100 text-indigo-700',
+    slug: 'plausible', name: 'Plausible', category: 'Analytics', tone: 'bg-indigo-500/15 text-indigo-500 dark:text-indigo-400',
     desc: 'Privacy-friendly web analytics. Needs its own Postgres + ClickHouse — use the Setup Wizard.',
   },
   {
-    slug: 'rocketchat', name: 'Rocket.Chat', category: 'Comms', tone: 'bg-cyan-100 text-cyan-700',
+    slug: 'rocketchat', name: 'Rocket.Chat', category: 'Comms', tone: 'bg-cyan-500/15 text-cyan-500 dark:text-cyan-400',
     desc: 'Open-source team messaging. Needs MongoDB — use the Setup Wizard.',
   },
 ];
@@ -144,7 +144,7 @@ function ServiceCard({ svc, connected }: { svc: ServiceDef; connected: boolean }
           </Link>
         ) : running ? (
           <>
-            <span className="text-xs px-1.5 py-0.5 rounded border text-emerald-700 bg-emerald-50 border-emerald-200">Running</span>
+            <span className="text-xs px-1.5 py-0.5 rounded border text-emerald-500 dark:text-emerald-400 bg-emerald-500/15 border-emerald-200">Running</span>
             {svc.openPort && (
               <a
                 href={`http://localhost:${svc.openPort}`}

@@ -297,7 +297,7 @@ function ReportBug() {
           </div>
 
           {result && (
-            <p className={`text-xs ${result.ok ? 'text-emerald-700' : 'text-destructive'}`}>
+            <p className={`text-xs ${result.ok ? 'text-emerald-500 dark:text-emerald-400' : 'text-destructive'}`}>
               {result.msg}
             </p>
           )}

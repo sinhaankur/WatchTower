@@ -26,7 +26,7 @@ const TONE: Record<
 > = {
   healthy: {
     label: 'Healthy',
-    bg: 'bg-emerald-50', text: 'text-emerald-800', border: 'border-emerald-300',
+    bg: 'bg-emerald-500/15', text: 'text-emerald-800', border: 'border-emerald-300',
     icon: (
       <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
         <polyline points="20 6 9 17 4 12" />
@@ -35,7 +35,7 @@ const TONE: Record<
   },
   running: {
     label: 'Running',
-    bg: 'bg-blue-50', text: 'text-blue-800', border: 'border-blue-300',
+    bg: 'bg-blue-500/15', text: 'text-blue-800', border: 'border-blue-300',
     icon: (
       <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="animate-spin">
         <path d="M21 12a9 9 0 1 1-6.22-8.56" />

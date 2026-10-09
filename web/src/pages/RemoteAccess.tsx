@@ -49,7 +49,7 @@ export default function RemoteAccess() {
 
       <main className="px-4 sm:px-6 lg:px-8 py-6 max-w-2xl mx-auto space-y-5 fade-in-up">
         <RemoteAccessDiagram />
-        <div className="rounded-xl border border-blue-100 bg-blue-50 px-5 py-4 text-xs text-blue-800 space-y-1">
+        <div className="rounded-xl border border-blue-100 bg-blue-500/15 px-5 py-4 text-xs text-blue-800 space-y-1">
           <p className="font-semibold">How this works</p>
           <p>
             WatchTower runs on this machine and listens on <code className="font-mono">localhost:{defaultPort}</code>.
@@ -177,8 +177,8 @@ function ProviderCard({
       )}
 
       {provider.sharing && provider.url && (
-        <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 space-y-2">
-          <p className="text-xs uppercase tracking-wide text-emerald-700 font-semibold">
+        <div className="rounded-lg border border-emerald-200 bg-emerald-500/15 px-3 py-2 space-y-2">
+          <p className="text-xs uppercase tracking-wide text-emerald-500 dark:text-emerald-400 font-semibold">
             Sharing on
           </p>
           <div className="flex items-center gap-2">
@@ -255,10 +255,10 @@ function StatusBadge({ provider }: { provider: RemoteAccessProvider }) {
   let cls = 'bg-muted text-muted-foreground border-border';
   if (provider.sharing) {
     label = 'Sharing';
-    cls = 'bg-emerald-50 text-emerald-700 border-emerald-200';
+    cls = 'bg-emerald-500/15 text-emerald-500 dark:text-emerald-400 border-emerald-500/30';
   } else if (provider.ready) {
     label = 'Ready';
-    cls = 'bg-blue-50 text-blue-700 border-blue-200';
+    cls = 'bg-blue-500/15 text-blue-500 dark:text-blue-400 border-blue-500/30';
   } else if (provider.installed) {
     label = 'Needs setup';
     cls = 'bg-accent/10 text-accent border-accent/25';

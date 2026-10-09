@@ -62,7 +62,7 @@ type GitHubConnection = {
 const ROLE_META: Record<TeamMember['role'], { label: string; color: string }> = {
   owner:     { label: 'Owner',     color: 'bg-accent/10 text-accent border-accent/25' },
   admin:     { label: 'Admin',     color: 'bg-purple-50 text-purple-700 border-purple-200' },
-  developer: { label: 'Developer', color: 'bg-blue-50 text-blue-700 border-blue-200' },
+  developer: { label: 'Developer', color: 'bg-blue-500/15 text-blue-500 dark:text-blue-400 border-blue-500/30' },
   viewer:    { label: 'Viewer',    color: 'bg-muted text-muted-foreground border-border' },
 };
 
@@ -309,7 +309,7 @@ const TeamManagement = () => {
       <main className="px-8 py-6 space-y-6 max-w-4xl">
 
         {context?.installation?.owner_mode_enabled && (
-          <div className="rounded-md border border-blue-200 bg-blue-50 px-4 py-3">
+          <div className="rounded-md border border-blue-200 bg-blue-500/15 px-4 py-3">
             <p className="text-sm font-medium text-blue-900">Installation ownership is enabled</p>
             <p className="text-xs text-blue-800 mt-1">
               {context.installation.is_owner
@@ -428,11 +428,11 @@ const TeamManagement = () => {
             </CardHeader>
             <CardContent className="space-y-3">
               {context?.github_connection?.connected ? (
-                <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2">
+                <div className="rounded-md border border-emerald-200 bg-emerald-500/15 px-3 py-2">
                   <p className="text-xs font-medium text-emerald-800">
                     Connected as @{context.github_connection.github_username || 'github-user'}
                   </p>
-                  <p className="text-xs text-emerald-700 mt-0.5">
+                  <p className="text-xs text-emerald-500 dark:text-emerald-400 mt-0.5">
                     Provider: {context.github_connection.provider === 'github_enterprise' ? 'GitHub Enterprise' : 'GitHub.com'}
                   </p>
                 </div>
@@ -536,7 +536,7 @@ const TeamManagement = () => {
                       </p>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
-                      <span className={`text-xs px-2 py-0.5 border rounded-full ${conn.is_active ? 'bg-green-50 text-green-700 border-green-200' : 'bg-muted text-muted-foreground border-border'}`}>
+                      <span className={`text-xs px-2 py-0.5 border rounded-full ${conn.is_active ? 'bg-emerald-500/15 text-emerald-500 dark:text-emerald-400 border-emerald-500/30' : 'bg-muted text-muted-foreground border-border'}`}>
                         {conn.is_active ? 'Active' : 'Inactive'}
                       </span>
                       <button
@@ -579,7 +579,7 @@ const TeamManagement = () => {
                       <div className="flex items-center gap-2 flex-wrap">
                         <p className="text-sm font-semibold text-gray-900 truncate" title={member.email}>{member.email}</p>
                         {isCurrentUser && (
-                          <span className="text-xs px-1.5 py-0.5 rounded border border-blue-200 bg-blue-50 text-blue-700 shrink-0">You</span>
+                          <span className="text-xs px-1.5 py-0.5 rounded border border-blue-200 bg-blue-500/15 text-blue-500 dark:text-blue-400 shrink-0">You</span>
                         )}
                       </div>
                       <div className="flex items-center gap-2 mt-1.5 flex-wrap">
@@ -609,7 +609,7 @@ const TeamManagement = () => {
                       </div>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
-                      <span className={`text-xs px-2 py-0.5 border rounded-full ${member.is_active ? 'bg-green-50 text-green-700 border-green-200' : 'bg-muted text-muted-foreground border-border'}`}>
+                      <span className={`text-xs px-2 py-0.5 border rounded-full ${member.is_active ? 'bg-emerald-500/15 text-emerald-500 dark:text-emerald-400 border-emerald-500/30' : 'bg-muted text-muted-foreground border-border'}`}>
                         {member.is_active ? 'Active' : 'Inactive'}
                       </span>
                       {canEdit && member.is_active && (

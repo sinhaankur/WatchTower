@@ -236,7 +236,7 @@ function ScanBanner({
       </div>
 
       {runtime.tailscale_connected && (
-        <p className="text-xs text-emerald-700">
+        <p className="text-xs text-emerald-500 dark:text-emerald-400">
           Tailscale connected ({runtime.tailscale_ip}) — remote standby available.
         </p>
       )}
@@ -409,12 +409,12 @@ function ExternalDatabaseCard({ db }: { db: ExternalDatabase }) {
         <div className="min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <h3 className="text-sm font-semibold text-foreground truncate">{db.name}</h3>
-            <span className="text-xs px-2 py-0.5 rounded-full border font-medium bg-violet-50 text-violet-700 border-violet-200">
+            <span className="text-xs px-2 py-0.5 rounded-full border font-medium bg-violet-500/15 text-violet-500 dark:text-violet-400 border-violet-500/30">
               external
             </span>
             <span className="text-xs text-muted-foreground font-mono">{db.engine}</span>
             {db.use_tls && (
-              <span className="text-xs px-2 py-0.5 rounded-full border font-medium bg-emerald-50 text-emerald-700 border-emerald-200">
+              <span className="text-xs px-2 py-0.5 rounded-full border font-medium bg-emerald-500/15 text-emerald-500 dark:text-emerald-400 border-emerald-500/30">
                 TLS
               </span>
             )}
@@ -612,7 +612,7 @@ function CreateExternalModal({ onClose }: { onClose: () => void }) {
           <div className="space-y-1.5">
             {adoptable.map((d) => (
               <div key={d.container_id} className="flex items-center gap-2 text-xs">
-                <span className={`inline-block w-1.5 h-1.5 rounded-full shrink-0 ${d.state === 'running' ? 'bg-emerald-500' : 'bg-slate-400'}`} />
+                <span className={`inline-block w-1.5 h-1.5 rounded-full shrink-0 ${d.state === 'running' ? 'bg-emerald-500' : 'bg-muted-foreground/40'}`} />
                 <span className="font-mono text-foreground truncate">{d.container_name}</span>
                 <span className="text-muted-foreground">· {d.engine}{d.suggested_port ? ` :${d.suggested_port}` : ''}</span>
                 <button
@@ -992,7 +992,7 @@ function AddReplicaModal({
               ))}
             </div>
             {selectedPeer && (
-              <p className="text-xs text-muted-foreground bg-blue-50 border border-blue-200 rounded-md px-3 py-2">
+              <p className="text-xs text-muted-foreground bg-blue-500/15 border border-blue-200 rounded-md px-3 py-2">
                 After clicking "Add standby", download the compose file from the replica
                 card and run it on <span className="font-medium">{selectedPeer.hostname}</span>.
               </p>
@@ -1115,7 +1115,7 @@ function ReplicaRow({
           <ReplicaStatusBadge status={replica.status} />
           <ReplicaRoleBadge role={replica.role} />
           {replica.is_remote && (
-            <span className="text-xs px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 font-medium">
+            <span className="text-xs px-1.5 py-0.5 rounded bg-blue-100 text-blue-500 dark:text-blue-400 font-medium">
               Tailscale {replica.node_tailscale_ip}
             </span>
           )}
@@ -1128,7 +1128,7 @@ function ReplicaRow({
             <a
               href={`/api/managed-databases/${primaryDb.id}/replicas/${replica.id}/compose`}
               download
-              className="px-2 py-1 rounded-md border border-blue-300 bg-blue-50 text-xs text-blue-800 hover:bg-blue-100 transition-colors"
+              className="px-2 py-1 rounded-md border border-blue-300 bg-blue-500/15 text-xs text-blue-800 hover:bg-blue-100 transition-colors"
               title="Download compose file and run on the remote machine"
             >
               Download compose
@@ -1229,8 +1229,8 @@ function ReplicaRow({
 
 function ReplicaStatusBadge({ status }: { status: ManagedDbReplica['status'] }) {
   const map: Record<ManagedDbReplica['status'], string> = {
-    initializing: 'bg-blue-50 text-blue-700 border-blue-200',
-    streaming: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    initializing: 'bg-blue-500/15 text-blue-500 dark:text-blue-400 border-blue-500/30',
+    streaming: 'bg-emerald-500/15 text-emerald-500 dark:text-emerald-400 border-emerald-500/30',
     failed: 'bg-destructive/10 text-destructive border-destructive/30',
     promoted: 'bg-accent/10 text-accent border-accent/25',
   };
@@ -1420,7 +1420,7 @@ function BackupRow({
         <p className="text-xs text-destructive mt-1 break-all">{error}</p>
       )}
       {restoreSuccess && (
-        <p className="text-xs text-emerald-700 mt-1">{restoreSuccess}</p>
+        <p className="text-xs text-emerald-500 dark:text-emerald-400 mt-1">{restoreSuccess}</p>
       )}
       {confirm === 'delete' && (
         <div className="mt-2 rounded-md border border-destructive/30 bg-destructive/10 px-2 py-1.5 flex items-center gap-2 flex-wrap">
@@ -1581,13 +1581,13 @@ function ScheduleControls({
   };
 
   return (
-    <div className="rounded-lg border border-indigo-200 bg-indigo-50/60 px-3 py-2.5 space-y-2">
+    <div className="rounded-lg border border-indigo-500/30 bg-indigo-50/60 px-3 py-2.5 space-y-2">
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div className="text-xs font-semibold text-indigo-900">
           Schedule {schedule?.schedule_cron ? '· active' : '· off'}
         </div>
         {schedule?.next_run_at && (
-          <div className="text-xs text-indigo-700">
+          <div className="text-xs text-indigo-500 dark:text-indigo-400">
             Next: <span className="font-mono">{formatNextRun(schedule.next_run_at)}</span>
           </div>
         )}
@@ -1641,7 +1641,7 @@ function ScheduleControls({
           <button
             onClick={clear}
             disabled={update.isPending}
-            className="px-2 py-1 rounded-md border border-indigo-300 bg-card text-xs text-indigo-800 hover:bg-indigo-100 disabled:opacity-50"
+            className="px-2 py-1 rounded-md border border-indigo-300 bg-card text-xs text-indigo-800 hover:bg-indigo-500/15 disabled:opacity-50"
           >
             Clear
           </button>
@@ -1652,7 +1652,7 @@ function ScheduleControls({
         <p className="text-xs text-destructive break-all">{error}</p>
       )}
       {savedFlash && (
-        <p className="text-xs text-emerald-700">Saved.</p>
+        <p className="text-xs text-emerald-500 dark:text-emerald-400">Saved.</p>
       )}
       <p className="text-xs text-indigo-800">
         All times UTC. Manual backups are never auto-deleted. Older scheduled backups beyond the keep count are pruned after each successful run.
@@ -1793,8 +1793,8 @@ function RestoreConfirm({
 
 function BackupStatusBadge({ status }: { status: ManagedDbBackup['status'] }) {
   const map: Record<ManagedDbBackup['status'], string> = {
-    running: 'bg-blue-50 text-blue-700 border-blue-200',
-    ready: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    running: 'bg-blue-500/15 text-blue-500 dark:text-blue-400 border-blue-500/30',
+    ready: 'bg-emerald-500/15 text-emerald-500 dark:text-emerald-400 border-emerald-500/30',
     failed: 'bg-destructive/10 text-destructive border-destructive/30',
   };
   return (
@@ -2101,7 +2101,7 @@ function CredentialsModal({
         <div
           className={`mt-4 rounded-lg border px-3 py-2 text-xs ${
             testResult.ok
-              ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+              ? 'border-emerald-200 bg-emerald-500/15 text-emerald-500 dark:text-emerald-400'
               : 'border-destructive/30 bg-destructive/10 text-destructive'
           }`}
         >
@@ -2201,8 +2201,8 @@ function CredField({
 
 function StatusBadge({ status }: { status: ManagedDatabase['status'] }) {
   const map: Record<ManagedDatabase['status'], string> = {
-    creating: 'bg-blue-50 text-blue-700 border-blue-200',
-    running: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    creating: 'bg-blue-500/15 text-blue-500 dark:text-blue-400 border-blue-500/30',
+    running: 'bg-emerald-500/15 text-emerald-500 dark:text-emerald-400 border-emerald-500/30',
     stopped: 'bg-muted text-muted-foreground border-border',
     failed: 'bg-destructive/10 text-destructive border-destructive/30',
     deleting: 'bg-accent/10 text-accent border-accent/25',

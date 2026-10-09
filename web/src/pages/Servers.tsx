@@ -4,6 +4,8 @@ import axios from 'axios';
 import apiClient from '@/lib/api';
 import { Input } from '@/components/ui/input';
 import EmptyState from '@/components/EmptyState';
+import { PageHeader } from '@/components/ui/page-header';
+import { Plus, Github } from 'lucide-react';
 import UseThisPcCard from '@/components/UseThisPcCard';
 import DiscoverNodesCard from '@/components/DiscoverNodesCard';
 import NetworkMap from '@/components/NetworkMap';
@@ -30,7 +32,7 @@ type OrgNode = {
 };
 
 const STATUS_META = {
-  healthy:     { dot: 'bg-emerald-500', badge: 'bg-emerald-50 text-emerald-700 border-emerald-200', label: 'Healthy' },
+  healthy:     { dot: 'bg-emerald-500', badge: 'bg-emerald-500/15 text-emerald-500 dark:text-emerald-400 border-emerald-500/30', label: 'Healthy' },
   unhealthy:   { dot: 'bg-red-500',     badge: 'bg-destructive/10 text-destructive border-destructive/30',             label: 'Unhealthy' },
   offline:     { dot: 'bg-slate-500',   badge: 'bg-muted text-foreground/90 border-border',       label: 'Offline' },
   maintenance: { dot: 'bg-primary',   badge: 'bg-accent/10 text-accent border-accent/25',       label: 'Maintenance' },
@@ -187,56 +189,42 @@ const Servers = () => {
 
   return (
     <div className="flex-1 overflow-auto bg-muted">
-      <header
-        className="px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between border-b sticky top-0 z-10 backdrop-blur-sm"
-        style={{ borderColor: 'hsl(var(--border-soft))', background: 'hsl(var(--surface-soft) / 0.9)' }}
-      >
-        <div>
-          <h1 className="text-lg font-semibold text-foreground">Servers</h1>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            {loading ? 'Loading…' : orgName ? `Organization: ${orgName}` : offlineMode ? 'Offline — some features unavailable' : 'Manage deployment servers'}
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          {offlineMode && (
-            <button onClick={() => void loadContext()}
-              className="px-3 py-1.5 rounded-lg border border-border text-xs text-foreground/90 hover:bg-muted transition-colors">
-              ↺ Retry
+      <PageHeader
+        title="Servers"
+        description={loading ? 'Loading…' : orgName ? `Organization: ${orgName}` : offlineMode ? 'Offline — some features unavailable' : 'The machines WatchTower deploys to'}
+        secondary={
+          !isGuest && !offlineMode ? (
+            <button
+              onClick={() => { setShowProvision((v) => !v); setShowForm(false); }}
+              className="inline-flex items-center gap-1.5 px-4 h-9 rounded-md border border-border bg-card hover:bg-muted hover:border-accent/50 text-foreground text-sm font-medium transition-colors"
+              title="Auto-provision a fresh VM on DigitalOcean or Hetzner"
+            >
+              {showProvision ? 'Cancel' : 'Provision server'}
             </button>
-          )}
-          {isGuest ? (
+          ) : undefined
+        }
+        primary={
+          isGuest || offlineMode ? (
             <Link
               to="/login"
               title="Sign in with GitHub to add remote deployment servers"
-              className="px-4 py-1.5 rounded-lg border border-border bg-card text-muted-foreground text-sm font-medium transition-colors hover:bg-muted inline-flex items-center gap-1.5"
+              className="inline-flex items-center gap-1.5 px-4 h-9 rounded-md border border-border bg-card hover:bg-muted text-foreground text-sm font-medium transition-colors"
             >
-              <svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor" aria-hidden="true">
-                <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z" />
-              </svg>
-              Sign in to add servers
+              <Github size={14} /> Sign in to add servers
             </Link>
           ) : (
-            <>
-              <button
-                onClick={() => { setShowProvision((v) => !v); setShowForm(false); }}
-                className="px-4 py-1.5 rounded-lg bg-foreground hover:bg-slate-800 text-white text-sm font-medium transition-colors border border-border shadow-retro"
-                title="Auto-provision a fresh VM on DigitalOcean or Hetzner"
-              >
-                {showProvision ? 'Cancel' : '✨ Provision Server'}
-              </button>
-              <button
-                onClick={() => { setShowForm((v) => !v); setShowProvision(false); }}
-                className="px-4 py-1.5 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground text-sm font-medium transition-colors border border-border shadow-retro"
-                title="Manually register an existing server you've already set up"
-              >
-                {showForm ? 'Cancel' : '+ Add Server'}
-              </button>
-            </>
-          )}
-        </div>
-      </header>
+            <button
+              onClick={() => { setShowForm((v) => !v); setShowProvision(false); }}
+              className="inline-flex items-center gap-1.5 px-4 h-9 rounded-md bg-primary hover:bg-primary/90 text-primary-foreground text-sm font-semibold shadow-retro transition-colors"
+              title="Register an existing server you've already set up"
+            >
+              <Plus size={15} strokeWidth={2.5} /> {showForm ? 'Cancel' : 'Add server'}
+            </button>
+          )
+        }
+      />
 
-      <main className="px-4 sm:px-6 lg:px-8 py-6 space-y-6 max-w-5xl mx-auto w-full">
+      <main className="px-5 sm:px-8 lg:px-10 py-8 space-y-6 max-w-5xl mx-auto w-full">
         {/* Plug-and-play: register the local machine as a deploy target in
             one click. Hidden for guests (they can't manage nodes). */}
         {!isGuest && (
@@ -280,7 +268,7 @@ const Servers = () => {
         {actionMsg && (
           <div className={`rounded-xl border px-4 py-3 text-sm ${
             actionMsg.kind === 'success'
-              ? 'border-emerald-300 bg-emerald-50 text-emerald-700'
+              ? 'border-emerald-300 bg-emerald-500/15 text-emerald-500 dark:text-emerald-400'
               : 'border-destructive/40 bg-destructive/10 text-destructive'
           }`}>
             {actionMsg.text}
