@@ -38,6 +38,9 @@ class MeResponse(BaseModel):
     can_create_projects: bool = False
     is_guest: bool = False
     is_github_authenticated: bool = False
+    # True for the static-token desktop/CI identity (authenticated local
+    # operator, not GitHub). Lets the UI label it honestly as a local admin.
+    is_local_admin: bool = False
 
 
 @router.get("/me", response_model=MeResponse)
@@ -120,4 +123,6 @@ async def get_me(
         can_create_projects=can_create_projects,
         is_guest=is_guest,
         is_github_authenticated=is_github_authenticated,
+        # The static-token path sets this; GitHub/guest sessions don't.
+        is_local_admin=bool(current_user.get("is_local_admin")) and not is_github_authenticated,
     )

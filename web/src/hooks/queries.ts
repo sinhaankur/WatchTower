@@ -344,6 +344,7 @@ export type Me = {
   can_create_projects: boolean;
   is_guest: boolean;
   is_github_authenticated: boolean;
+  is_local_admin: boolean;
 };
 
 export function useMe() {

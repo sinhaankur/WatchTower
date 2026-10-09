@@ -315,21 +315,20 @@ def test_discover_nodes_flags_already_added(client: TestClient, monkeypatch):
     # discovery flags that peer as already added.
     import uuid as _uuid
     from watchtower.database import OrgNode, SessionLocal
-    from watchtower.api import enterprise
 
-    # First call establishes the caller's org membership.
+    # First call establishes the caller's org membership. Use the org the
+    # ENDPOINT actually resolves for this caller (via /api/me) rather than
+    # reconstructing an identity by hand — the static-token identity label is
+    # an implementation detail and shouldn't be duplicated here.
     client.get("/api/this-pc/discover-nodes")
+    me = client.get("/api/me").json()
+    target_org = _uuid.UUID(me["org_id"]) if me.get("org_id") else None
     db = SessionLocal()
     try:
-        _u, org, _m = enterprise._ensure_user_org_member(
-            db, {"user_id": str(_uuid.uuid5(_uuid.NAMESPACE_DNS, "watchtower-static-token-user")),
-                 "email": "developer@watchtower.local"}
-        )
-        # The static-token user's org is deterministic; register the node there.
-        db.add(OrgNode(org_id=org.id, name="bb", host="100.64.0.2", user="x",
-                       port=22, remote_path="/srv", reload_command="true"))
-        db.commit()
-        target_org = org.id
+        if target_org is not None:
+            db.add(OrgNode(org_id=target_org, name="bb", host="100.64.0.2", user="x",
+                           port=22, remote_path="/srv", reload_command="true"))
+            db.commit()
     finally:
         db.close()
 

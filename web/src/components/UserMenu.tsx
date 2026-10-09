@@ -171,9 +171,11 @@ export function UserMenu({ rail }: Props) {
               <p className="text-xs text-muted-foreground truncate" title={me?.org_name ?? ''}>
                 {me?.is_guest
                   ? 'Guest mode · sign in for full features'
-                  : me?.org_name
-                    ? `${me.org_name}${me.role ? ` · ${me.role}` : ''}`
-                    : 'WatchTower'}
+                  : me?.is_local_admin
+                    ? 'This device · sign in with GitHub to sync'
+                    : me?.org_name
+                      ? `${me.org_name}${me.role ? ` · ${me.role}` : ''}`
+                      : 'WatchTower'}
               </p>
             </div>
             <svg

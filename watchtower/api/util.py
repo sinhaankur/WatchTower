@@ -387,8 +387,14 @@ def get_current_user(
 
     user_id = str(uuid.uuid5(uuid.NAMESPACE_URL, f"watchtower:{provided_token}"))
     request.state.user_id = user_id
+    # Static-token identity: the desktop app / CI, authenticated by the local
+    # API token. This is NOT an anonymous bypass — the token was required
+    # above. Labelled honestly as a local admin on this device rather than a
+    # fake-looking "developer@watchtower.local". Signing in with GitHub issues
+    # a session token that takes the branch above and shows the real identity.
     return {
         "user_id": user_id,
-        "email": os.getenv("WATCHTOWER_DEFAULT_USER_EMAIL", "developer@watchtower.local"),
-        "name": os.getenv("WATCHTOWER_DEFAULT_USER_NAME", "WatchTower Developer"),
+        "email": os.getenv("WATCHTOWER_DEFAULT_USER_EMAIL", "local-admin@this-device"),
+        "name": os.getenv("WATCHTOWER_DEFAULT_USER_NAME", "Local admin"),
+        "is_local_admin": True,
     }
