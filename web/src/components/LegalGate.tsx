@@ -65,9 +65,9 @@ function DocTabs({ documents }: { documents: LegalDocument[] }) {
           <button
             key={d.id}
             onClick={() => setActive(d.id)}
-            className={`text-xs px-3 py-2 -mb-px border-b-2 transition-colors ${
+            className={`text-sm px-3 py-2 -mb-px border-b-2 transition-colors ${
               d.id === current?.id
-                ? 'border-amber-500 text-foreground font-semibold'
+                ? 'border-accent text-foreground font-semibold'
                 : 'border-transparent text-muted-foreground hover:text-foreground'
             }`}
           >
@@ -152,14 +152,14 @@ export default function LegalGate({ children }: { children: ReactElement }) {
                 localStorage.removeItem('authToken');
                 window.location.href = '/login';
               }}
-              className="text-xs px-3 py-1.5 rounded-lg border border-border text-muted-foreground hover:text-foreground hover:border-accent/50"
+              className="text-sm px-4 py-2 rounded-lg border border-border text-muted-foreground hover:text-foreground hover:border-accent/50 transition-colors"
             >
               Decline & sign out
             </button>
             <button
               onClick={() => void handleAccept()}
               disabled={!agreed || !docs || accept.isPending}
-              className="text-xs px-5 py-2 rounded-lg border border-border bg-amber-400 hover:bg-amber-500 text-foreground font-semibold shadow-retro disabled:opacity-50 disabled:cursor-not-allowed"
+              className="text-sm px-5 py-2 rounded-lg bg-primary text-primary-foreground font-semibold hover:brightness-110 shadow-retro transition disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {accept.isPending ? 'Recording…' : 'I agree — continue'}
             </button>
