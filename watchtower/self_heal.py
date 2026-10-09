@@ -31,6 +31,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+from dataclasses import dataclass
 from datetime import timedelta
 from typing import Optional
 from uuid import UUID
@@ -138,6 +139,100 @@ async def analyze_with_llm(db: Session, log_excerpt: str) -> Optional[str]:
         )
     except Exception as exc:  # noqa: BLE001 — LLM down must not break the loop
         logger.info("self-heal: LLM analysis failed (%s) — continuing without it", exc)
+        return None
+
+
+# ── Second-tier classification (tiny-model) ──────────────────────────────────
+#
+# When the regex library returns UNKNOWN, a tiny model gets a second attempt
+# at mapping the log onto a *known* FailureKind. It never invents a fix: its
+# only job is to pick one of the kinds the deterministic library already knows
+# how to handle. We then reuse that library's fix — so the action is always
+# deterministic even when the classification came from the model.
+#
+# Only two kinds are auto-applied this way (REGISTRY_TRANSIENT, PORT_IN_USE)
+# because they re-derive everything they need from the log and carry no risk
+# of a wrong edit — a retry or a port change. Any other kind the model names
+# is surfaced to the human as a *suggestion*, not applied. A confidence floor
+# keeps a hedging model from acting.
+
+# Kinds the model is allowed to act on (self-contained, log-derivable fixes).
+_LLM_AUTO_APPLY_KINDS: frozenset[str] = frozenset({
+    failure_analyzer.FailureKind.REGISTRY_TRANSIENT.value,
+    failure_analyzer.FailureKind.PORT_IN_USE.value,
+})
+
+# Below this the model's guess is advisory only, never auto-applied.
+_LLM_CONFIDENCE_FLOOR = 0.75
+
+
+@dataclass
+class LlmClassification:
+    kind: str
+    confidence: float
+    reason: str
+
+
+def _llm_classify_sync(
+    base_url: str, api_key: Optional[str], model: str, log_excerpt: str,
+) -> Optional["LlmClassification"]:
+    """Ask the tiny model to pick a known FailureKind. Returns None on any
+    parse/validation problem — a malformed answer must never become an action."""
+    import json
+
+    from openai import OpenAI
+
+    known = [k.value for k in failure_analyzer.FailureKind if k != failure_analyzer.FailureKind.UNKNOWN]
+    system = (
+        "You classify a failed build/deploy log into exactly one known failure "
+        "kind. Reply with ONLY a JSON object: "
+        '{"kind": "<one of the kinds>", "confidence": <0..1>, "reason": "<short>"}. '
+        "Use \"unknown\" if nothing fits. Kinds: " + ", ".join(known) + "."
+    )
+    client = OpenAI(base_url=base_url, api_key=api_key or "not-set", timeout=30.0, max_retries=0)
+    resp = client.chat.completions.create(
+        model=model,
+        max_tokens=120,
+        temperature=0,
+        messages=[
+            {"role": "system", "content": system},
+            {"role": "user", "content": f"Log tail:\n```\n{log_excerpt}\n```"},
+        ],
+    )
+    raw = (resp.choices[0].message.content or "").strip()
+    # Tolerate a model that wraps JSON in prose or ```json fences.
+    start, end = raw.find("{"), raw.rfind("}")
+    if start == -1 or end == -1 or end <= start:
+        return None
+    try:
+        data = json.loads(raw[start : end + 1])
+    except (ValueError, TypeError):
+        return None
+    kind = str(data.get("kind", "")).strip().lower()
+    valid = {k.value for k in failure_analyzer.FailureKind}
+    if kind not in valid:
+        return None
+    try:
+        conf = float(data.get("confidence", 0.0))
+    except (TypeError, ValueError):
+        conf = 0.0
+    conf = max(0.0, min(1.0, conf))
+    return LlmClassification(kind=kind, confidence=conf, reason=str(data.get("reason", ""))[:300])
+
+
+async def classify_with_llm(db: Session, log_excerpt: str) -> Optional["LlmClassification"]:
+    """Second-tier classifier. Returns None when no LLM is configured, the
+    call fails, or the answer can't be trusted — the caller then falls back
+    to the normal human-queue path."""
+    cfg = resolve_llm_config(db)
+    if not cfg.configured or not log_excerpt:
+        return None
+    try:
+        return await asyncio.to_thread(
+            _llm_classify_sync, cfg.base_url, cfg.api_key, cfg.analysis_model, log_excerpt
+        )
+    except Exception as exc:  # noqa: BLE001 — model problems must not break the loop
+        logger.info("self-heal: LLM classification failed (%s) — continuing without it", exc)
         return None
 
 
@@ -280,10 +375,86 @@ async def _heal_deployment(db: Session, deployment: Deployment) -> None:
             logger.exception("self-heal: auto-fix for deployment %s failed", deployment.id)
             return
 
-    # Human-intervention path. Attach an LLM diagnosis for failures the
-    # pattern library couldn't classify, so the queue entry is actionable.
+    # Second tier: the regex library couldn't classify this. Give a tiny model
+    # a chance to map it onto a KNOWN kind. If it names a confident, safe,
+    # auto-applicable kind and autonomous mode is on (and we're not thrashing),
+    # apply that library fix — the classification came from the model but the
+    # fix is still deterministic. Otherwise, store the suggestion + free-text
+    # analysis so the human queue entry is actionable.
     if diagnosis.kind == failure_analyzer.FailureKind.UNKNOWN:
-        action.llm_analysis = await analyze_with_llm(db, log_excerpt)
+        clf = await classify_with_llm(db, log_excerpt)
+        if clf is not None:
+            suggested = (
+                f"[LLM classified: {clf.kind} · confidence {clf.confidence:.0%}]"
+                f"{(' ' + clf.reason) if clf.reason else ''}"
+            )
+            can_act = (
+                autonomous
+                and clf.kind in _LLM_AUTO_APPLY_KINDS
+                and clf.confidence >= _LLM_CONFIDENCE_FLOOR
+                and clf.kind != failure_analyzer.FailureKind.UNKNOWN.value
+                and not _is_thrashing(db, project.id)
+            )
+            if can_act:
+                try:
+                    action.failure_kind = clf.kind
+                    action.auto_applicable = True
+                    action.llm_analysis = suggested
+                    retry = apply_fix(db, action, project, deployment)
+                    action.status = HealingActionStatus.AUTO_APPLIED
+                    action.result_deployment_id = retry.id
+                    action.resolved_at = utcnow()
+                    from watchtower.api import audit as audit_log
+                    audit_log.record(
+                        db,
+                        action="healing.llm_fix",   # distinct from healing.auto_fix
+                        entity_type="deployment",
+                        entity_id=retry.id,
+                        org_id=project.org_id,
+                        actor_email="self-heal",
+                        extra={
+                            "project_id": str(project.id),
+                            "fix_kind": clf.kind,
+                            "confidence": round(clf.confidence, 3),
+                            "failed_deployment_id": str(deployment.id),
+                            "classifier": "llm",
+                        },
+                    )
+                    db.commit()
+                    from watchtower.queue import enqueue_build
+                    enqueue_build(str(retry.id))
+                    logger.warning(
+                        "self-heal: LLM-classified %s (%.0f%%) on project %s — retry %s queued",
+                        clf.kind, clf.confidence * 100, project.id, retry.id,
+                    )
+                    try:
+                        from watchtower.notifier import notify_project
+                        notify_project(
+                            db, project.id,
+                            f"🔧 Self-heal (assisted) fixed **{project.name}**\n"
+                            f"An unrecognised failure was identified as `{clf.kind}` "
+                            f"({clf.confidence:.0%} confidence) and a fix was applied.",
+                        )
+                    except Exception:  # noqa: BLE001 - notify must not break the loop
+                        pass
+                    return
+                except Exception as exc:  # noqa: BLE001 — a failed fix becomes a human task
+                    db.rollback()
+                    db.add(action)
+                    action.failure_kind = failure_analyzer.FailureKind.UNKNOWN.value
+                    action.auto_applicable = False
+                    action.status = HealingActionStatus.PENDING
+                    action.llm_analysis = suggested
+                    action.error = f"LLM-assisted fix failed: {exc}"
+                    db.commit()
+                    logger.exception("self-heal: LLM-assisted fix for deployment %s failed", deployment.id)
+                    return
+            # Not acted on — keep the suggestion + a human-readable analysis.
+            analysis = await analyze_with_llm(db, log_excerpt)
+            action.llm_analysis = f"{suggested}\n\n{analysis}" if analysis else suggested
+        else:
+            # No usable classification — fall back to free-text analysis.
+            action.llm_analysis = await analyze_with_llm(db, log_excerpt)
     db.commit()
     logger.info(
         "self-heal: deployment %s (%s) queued for human intervention",

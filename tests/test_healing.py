@@ -254,6 +254,129 @@ def test_tick_attaches_llm_analysis_for_unknown_failures(client, db_session, can
     assert "flux capacitor" in action.llm_analysis
 
 
+# ── Second-tier classification: tiny model maps UNKNOWN → a known kind ─────────
+
+
+def test_llm_classify_parses_and_validates():
+    """The sync parser tolerates prose/fences and rejects anything invalid —
+    a bad answer must never become an action."""
+    from watchtower import self_heal as sh
+
+    def fake(prompt_json):
+        import types
+        msg = types.SimpleNamespace(content=prompt_json)
+        choice = types.SimpleNamespace(message=msg)
+        return types.SimpleNamespace(choices=[choice])
+
+    # Monkeypatch the OpenAI client at call time via a tiny shim.
+    class _Client:
+        def __init__(self, *a, **k): ...
+        class chat:  # noqa: N801
+            class completions:  # noqa: N801
+                _reply = ""
+                @classmethod
+                def create(cls, **k):
+                    return fake(cls._reply)
+
+    import openai
+    orig = openai.OpenAI
+    openai.OpenAI = _Client
+    try:
+        # Clean JSON.
+        _Client.chat.completions._reply = '{"kind":"registry_transient","confidence":0.9,"reason":"npm 503"}'
+        r = sh._llm_classify_sync("http://x/v1", None, "tiny", "log")
+        assert r is not None and r.kind == "registry_transient" and r.confidence == 0.9
+
+        # Wrapped in prose + fence → still parsed.
+        _Client.chat.completions._reply = 'Sure!\n```json\n{"kind":"port_in_use","confidence":0.8}\n```'
+        r = sh._llm_classify_sync("http://x/v1", None, "tiny", "log")
+        assert r is not None and r.kind == "port_in_use"
+
+        # Invalid kind → rejected.
+        _Client.chat.completions._reply = '{"kind":"meteor_strike","confidence":1.0}'
+        assert sh._llm_classify_sync("http://x/v1", None, "tiny", "log") is None
+
+        # Not JSON at all → rejected, no crash.
+        _Client.chat.completions._reply = 'I think it is probably a network thing'
+        assert sh._llm_classify_sync("http://x/v1", None, "tiny", "log") is None
+    finally:
+        openai.OpenAI = orig
+
+
+def test_tick_llm_classifies_unknown_and_auto_applies(
+    client, db_session, canonical_user_id, monkeypatch,
+):
+    """UNKNOWN log + autonomy on + tiny model confidently says registry_transient
+    → WatchTower applies the deterministic retry fix and records it as an
+    LLM-assisted heal."""
+    client.put("/api/agent/config", json={"base_url": "http://localhost:1234/v1"})
+    client.put("/api/healing/config", json={"autonomous_enabled": True})
+    monkeypatch.setattr(
+        self_heal, "_llm_classify_sync",
+        lambda base_url, api_key, model, log: self_heal.LlmClassification(
+            kind="registry_transient", confidence=0.95, reason="registry 503",
+        ),
+    )
+    _project, deployment = _seed_failed_deployment(db_session, canonical_user_id, log=UNKNOWN_LOG)
+
+    assert asyncio.run(self_heal.tick()) == 1
+    db_session.expire_all()
+    action = db_session.query(HealingAction).filter(
+        HealingAction.deployment_id == deployment.id
+    ).first()
+    assert action.status == HealingActionStatus.AUTO_APPLIED
+    assert action.failure_kind == "registry_transient"   # re-classified off UNKNOWN
+    assert action.result_deployment_id is not None
+    assert "LLM classified" in (action.llm_analysis or "")
+
+
+def test_tick_low_confidence_llm_guess_stays_pending(
+    client, db_session, canonical_user_id, monkeypatch,
+):
+    """A hedging model (below the floor) is advisory only — the suggestion is
+    recorded but no fix is applied."""
+    client.put("/api/agent/config", json={"base_url": "http://localhost:1234/v1"})
+    client.put("/api/healing/config", json={"autonomous_enabled": True})
+    monkeypatch.setattr(
+        self_heal, "_llm_classify_sync",
+        lambda *a: self_heal.LlmClassification(kind="registry_transient", confidence=0.4, reason="maybe"),
+    )
+    monkeypatch.setattr(self_heal, "_llm_analyze_sync", lambda *a: "could be the registry")
+    _project, deployment = _seed_failed_deployment(db_session, canonical_user_id, log=UNKNOWN_LOG)
+
+    assert asyncio.run(self_heal.tick()) == 1
+    db_session.expire_all()
+    action = db_session.query(HealingAction).filter(
+        HealingAction.deployment_id == deployment.id
+    ).first()
+    assert action.status == HealingActionStatus.PENDING
+    assert action.failure_kind == "unknown"              # not promoted
+    assert "LLM classified" in (action.llm_analysis or "")  # suggestion still shown
+
+
+def test_tick_never_acts_on_llm_guess_when_autonomy_off(
+    client, db_session, canonical_user_id, monkeypatch,
+):
+    """Even a confident, auto-applicable classification is queued (not applied)
+    when autonomous mode is off — the switch is absolute."""
+    client.put("/api/agent/config", json={"base_url": "http://localhost:1234/v1"})
+    # autonomy left OFF (default)
+    monkeypatch.setattr(
+        self_heal, "_llm_classify_sync",
+        lambda *a: self_heal.LlmClassification(kind="registry_transient", confidence=0.99, reason="503"),
+    )
+    monkeypatch.setattr(self_heal, "_llm_analyze_sync", lambda *a: "registry")
+    _project, deployment = _seed_failed_deployment(db_session, canonical_user_id, log=UNKNOWN_LOG)
+
+    assert asyncio.run(self_heal.tick()) == 1
+    db_session.expire_all()
+    action = db_session.query(HealingAction).filter(
+        HealingAction.deployment_id == deployment.id
+    ).first()
+    assert action.status == HealingActionStatus.PENDING
+    assert action.failure_kind == "unknown"
+
+
 def test_thrash_guardrail_stops_auto_fix_loop(client, db_session, canonical_user_id, monkeypatch):
     client.put("/api/healing/config", json={"autonomous_enabled": True})
     monkeypatch.setattr(
