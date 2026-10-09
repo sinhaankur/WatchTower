@@ -430,14 +430,36 @@ def _ensure_user_org_member(db: Session, current_user: dict):
                     db.flush()
 
             if not member or not member.is_active:
-                owner_label = claim.owner_login or "installation owner"
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail=(
-                        f"This WatchTower installation is owned by {owner_label}. "
-                        "Ask an owner/admin to invite your account before accessing resources."
-                    ),
-                )
+                # FORGIVING SINGLE-USER PATH: a local/dev session (no GitHub
+                # identity — the desktop app's own token) must never be locked out
+                # of its OWN installation by a stale claim left by an earlier
+                # GitHub sign-in. Rather than 403, enrol it as an active member so
+                # the app "just works" for the person at the machine. (A real
+                # multi-user install still gates GitHub-authed strangers: they have
+                # a github_id and fall through to the 403 below.)
+                if not user.github_id:
+                    member = member or TeamMember(
+                        org_id=org.id,
+                        user_id=user_id,
+                        email=user.email,
+                        role=TeamRole.OWNER,
+                        can_create_projects=True,
+                        can_manage_deployments=True,
+                        can_manage_nodes=True,
+                        can_manage_team=True,
+                    )
+                    member.is_active = True
+                    db.add(member)
+                    db.flush()
+                else:
+                    owner_label = claim.owner_login or "installation owner"
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail=(
+                            f"This WatchTower installation is owned by {owner_label}. "
+                            "Ask an owner/admin to invite your account before accessing resources."
+                        ),
+                    )
 
         db.commit()
         db.refresh(user)
@@ -587,6 +609,56 @@ def _upsert_user_from_github_profile(db: Session, profile: dict):
     user = User(
         email=email,
         github_id=github_id,
+        name=name,
+        avatar_url=avatar_url,
+        is_active=True,
+    )
+    db.add(user)
+    db.flush()
+    return user
+
+
+def _upsert_user_from_oidc_claims(db: Session, claims) -> User:
+    """Create/update a User from normalised OIDC claims (watchtower.oidc).
+
+    Matches an existing user first by ``oidc_subject`` (the stable
+    "<issuer>|<sub>"), then by verified email — so a user who previously
+    signed in with GitHub using the same verified email is linked to the
+    same account rather than getting a duplicate. Email is only trusted for
+    linking when the provider marks it verified; otherwise we key purely on
+    the subject and synthesise a placeholder email if none is present.
+    """
+    subject = claims.subject
+    email = claims.email
+    name = claims.name or (email.split("@")[0] if email else "user")
+    avatar_url = claims.picture
+
+    user = db.query(User).filter(User.oidc_subject == subject).first()
+    if not user and email and claims.email_verified:
+        user = db.query(User).filter(User.email == email).first()
+
+    if not email:
+        # No email from the provider — synthesise a stable, unique placeholder
+        # from the subject so the NOT-normally-null email column is satisfied
+        # without colliding across users.
+        digest = hashlib.sha256(subject.encode("utf-8")).hexdigest()[:12]
+        email = f"oidc-{digest}@users.noreply.watchtower.local"
+
+    if user:
+        user.oidc_subject = subject
+        # Don't clobber an existing email with a synthesised placeholder.
+        if claims.email:
+            user.email = claims.email
+        user.name = name
+        if avatar_url:
+            user.avatar_url = avatar_url
+        user.is_active = True
+        db.flush()
+        return user
+
+    user = User(
+        email=email,
+        oidc_subject=subject,
         name=name,
         avatar_url=avatar_url,
         is_active=True,
@@ -921,6 +993,119 @@ async def github_login_oauth_callback(
             "id": str(org.id),
             "name": org.name,
         },
+    }
+
+
+# ---------------------------------------------------------------------------
+# Generic OIDC login — provider-agnostic (Google, GitLab, Okta, Authentik…).
+# Mirrors the GitHub OAuth flow above but drives any spec-compliant OIDC
+# provider via watchtower/oidc.py. Same signed-session-token outcome.
+# ---------------------------------------------------------------------------
+
+@router.get("/auth/oidc/status")
+async def oidc_login_status():
+    """Lets the SPA decide whether to render a 'Sign in with <provider>'
+    button. No secrets returned — just whether it's configured + the label."""
+    from watchtower import oidc
+    configured = oidc.is_configured()
+    return {
+        "configured": configured,
+        "provider_name": oidc.provider_label() if configured else None,
+    }
+
+
+@router.get("/auth/oidc/start")
+async def start_oidc_login(redirect_uri: str, next_path: Optional[str] = None):
+    """Build the OIDC authorize URL + signed state (CSRF) and nonce (replay)."""
+    from watchtower import oidc
+    try:
+        cfg = oidc.discover()
+    except oidc.OidcError as exc:
+        raise HTTPException(status_code=exc.status, detail=exc.detail) from exc
+
+    effective_next = next_path or "/"
+    if not effective_next.startswith("/") or effective_next.startswith("//"):
+        effective_next = "/"
+
+    import secrets as _secrets
+    nonce = _secrets.token_urlsafe(16)
+    state = _sign_oauth_state(
+        {
+            "mode": "oidc-login",
+            "next": effective_next,
+            "nonce": nonce,
+            "iat": int(utcnow().timestamp()),
+        }
+    )
+    params = {
+        "response_type": "code",
+        "client_id": cfg.client_id,
+        "redirect_uri": redirect_uri,
+        "scope": cfg.scopes,
+        "state": state,
+        "nonce": nonce,
+    }
+    return {
+        "authorize_url": f"{cfg.authorize_url}?{urlencode(params)}",
+        "state": state,
+        "next": effective_next,
+    }
+
+
+@router.get("/auth/oidc/login")
+@limiter.limit("20/minute")
+async def redirect_oidc_login(
+    request: Request,  # for slowapi key extraction
+    redirect_uri: str,
+    next_path: Optional[str] = None,
+):
+    """Browser-first: 302 straight to the provider's authorize page."""
+    payload = await start_oidc_login(redirect_uri=redirect_uri, next_path=next_path)
+    return RedirectResponse(url=payload["authorize_url"], status_code=status.HTTP_307_TEMPORARY_REDIRECT)
+
+
+@router.post("/auth/oidc/callback")
+async def oidc_login_callback(
+    payload: schemas.GitHubOAuthCallback,  # same {code, state, redirect_uri} shape
+    db: Session = Depends(get_db),
+):
+    """Exchange the code, verify state+nonce, upsert the user, return a
+    WatchTower session token — identical outcome to the GitHub callback."""
+    from watchtower import oidc
+
+    state_data = _parse_oauth_state(payload.state)
+    if state_data.get("mode") != "oidc-login":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid OIDC login state")
+
+    try:
+        cfg = oidc.discover()
+        token_data = oidc.exchange_code(cfg, payload.code, payload.redirect_uri or "")
+        claims = oidc.claims_from_tokens(cfg, token_data, expected_nonce=state_data.get("nonce"))
+    except oidc.OidcError as exc:
+        raise HTTPException(status_code=exc.status, detail=exc.detail) from exc
+
+    user = _upsert_user_from_oidc_claims(db, claims)
+    user_payload = {"user_id": str(user.id), "email": user.email, "name": user.name}
+    user, org, _member = _ensure_user_org_member(db, user_payload)
+
+    session_token = util.create_user_session_token(
+        user_id=str(user.id),
+        email=user.email,
+        name=user.name,
+        avatar_url=user.avatar_url,
+    )
+    db.commit()
+
+    return {
+        "token": session_token,
+        "redirect_to": state_data.get("next") or "/",
+        "user": {
+            "id": str(user.id),
+            "email": user.email,
+            "name": user.name,
+            "avatar_url": user.avatar_url,
+        },
+        "organization": {"id": str(org.id), "name": org.name},
     }
 
 
