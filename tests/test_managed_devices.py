@@ -129,3 +129,81 @@ def test_proxy_forwards_allowlisted_view(client, monkeypatch):
     assert captured["ip"] == "100.64.0.6"
     assert captured["token"] == "the-token"
     assert captured["path"] == "/api/projects"
+
+
+# ── write actions ───────────────────────────────────────────────────────────
+
+
+def _pair_one(client, ip="100.64.0.8"):
+    _bootstrap_admin(client)
+    return client.post("/api/managed-devices", json={
+        "name": "bb", "ip": ip, "port": 8000, "token": "the-token",
+    }).json()
+
+
+def test_action_requires_auth(anon_client):
+    r = anon_client.post("/api/managed-devices/x/action", json={"action": "container.start", "target": "web"})
+    assert r.status_code == 401
+
+
+def test_action_rejects_unknown_action(client):
+    dev = _pair_one(client)
+    r = client.post(f"/api/managed-devices/{dev['id']}/action", json={"action": "rm -rf", "target": "web"})
+    assert r.status_code == 400
+    assert "allowed" in r.json()["detail"].lower()
+
+
+def test_action_rejects_bad_container_verb(client):
+    dev = _pair_one(client)
+    r = client.post(f"/api/managed-devices/{dev['id']}/action", json={"action": "container.nuke", "target": "web"})
+    assert r.status_code == 400
+
+
+def test_action_unknown_device_404(client):
+    _bootstrap_admin(client)
+    r = client.post("/api/managed-devices/nope/action", json={"action": "container.start", "target": "web"})
+    assert r.status_code == 404
+
+
+def test_container_start_proxies_correctly(client, monkeypatch):
+    dev = _pair_one(client, ip="100.64.0.10")
+    captured = {}
+
+    def fake_post(ip, port, path, token, payload, *, timeout=20.0):
+        captured.update(ip=ip, port=port, path=path, token=token, payload=payload)
+        return (200, {"ok": True, "name": "web", "action": "start"})
+
+    monkeypatch.setattr(md, "_proxy_post", fake_post)
+    r = client.post(f"/api/managed-devices/{dev['id']}/action", json={"action": "container.start", "target": "web"})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["status"] == 200
+    assert captured["path"] == "/api/podman/containers/web/action"
+    assert captured["payload"] == {"action": "start"}
+    assert captured["token"] == "the-token"
+
+
+def test_deploy_trigger_proxies_with_overrides(client, monkeypatch):
+    dev = _pair_one(client, ip="100.64.0.11")
+    captured = {}
+
+    def fake_post(ip, port, path, token, payload, *, timeout=20.0):
+        captured.update(path=path, payload=payload)
+        return (201, {"id": "deploy-1"})
+
+    monkeypatch.setattr(md, "_proxy_post", fake_post)
+    r = client.post(f"/api/managed-devices/{dev['id']}/action", json={
+        "action": "deploy.trigger", "target": "proj-123", "branch": "main", "commit_sha": "abc123",
+    })
+    assert r.status_code == 200
+    assert captured["path"] == "/api/projects/proj-123/deployments"
+    assert captured["payload"] == {"branch": "main", "commit_sha": "abc123"}
+
+
+def test_action_is_audited(client, db_session, monkeypatch):
+    dev = _pair_one(client, ip="100.64.0.12")
+    monkeypatch.setattr(md, "_proxy_post", lambda *a, **k: (200, {"ok": True}))
+    client.post(f"/api/managed-devices/{dev['id']}/action", json={"action": "container.stop", "target": "db"})
+    from watchtower.database import AuditEvent
+    ev = db_session.query(AuditEvent).filter(AuditEvent.action == "managed_device.action").first()
+    assert ev is not None

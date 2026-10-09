@@ -1193,6 +1193,35 @@ export function useDeviceView(deviceId: string | null, view: DeviceView, enabled
   });
 }
 
+export type DeviceAction =
+  | 'container.start' | 'container.stop' | 'container.restart' | 'deploy.trigger';
+
+export type DeviceActionResult = {
+  device_id: string;
+  action: DeviceAction;
+  target: string;
+  status: number;
+  data: unknown;
+};
+
+/** Run an allow-listed WRITE action on a paired device (start/stop a container,
+ *  trigger a deploy). Admin-gated + audited server-side. */
+export function useDeviceAction(deviceId: string) {
+  const qc = useQueryClient();
+  return useMutation<
+    DeviceActionResult,
+    unknown,
+    { action: DeviceAction; target: string; branch?: string; commit_sha?: string }
+  >({
+    mutationFn: async (body) =>
+      (await apiClient.post<DeviceActionResult>(`/managed-devices/${deviceId}/action`, body)).data,
+    onSuccess: () => {
+      // Refresh the inline views so the new container/deploy state shows.
+      void qc.invalidateQueries({ queryKey: ['managed-devices', deviceId, 'view'] });
+    },
+  });
+}
+
 export function useSetAutoFailover() {
   const qc = useQueryClient();
   return useMutation<

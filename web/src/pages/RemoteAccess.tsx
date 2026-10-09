@@ -20,6 +20,7 @@ import {
   type PeerHealth,
   type ManagedDevice,
   type DeviceView,
+  type DeviceAction,
   useDisableRemoteAccess,
   useEnableRemoteAccess,
   useRemoteAccessDefaultPort,
@@ -30,6 +31,7 @@ import {
   usePairDevice,
   useUnpairDevice,
   useDeviceView,
+  useDeviceAction,
 } from '@/hooks/queries';
 
 export default function RemoteAccess() {
@@ -587,11 +589,28 @@ const CONSOLE_VIEWS: { id: DeviceView; label: string }[] = [
  */
 function RemoteConsole({ device, onClose }: { device: ManagedDevice; onClose: () => void }) {
   const unpair = useUnpairDevice();
+  const action = useDeviceAction(device.id);
   const [view, setView] = useState<DeviceView>('projects');
+  const [actionMsg, setActionMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const { data, isLoading, error } = useDeviceView(device.id, view, true);
 
   const rows = Array.isArray(data?.data) ? (data!.data as Record<string, unknown>[]) : [];
   const upstreamError = data && data.status >= 400;
+
+  const runAction = (act: DeviceAction, target: string, label: string) => {
+    if (!confirm(`${label} on ${device.name}?`)) return;
+    setActionMsg(null);
+    action.mutate(
+      { action: act, target },
+      {
+        onSuccess: (res) => {
+          const ok = res.status >= 200 && res.status < 300;
+          setActionMsg({ ok, text: ok ? `${label} sent to ${device.name}.` : `${device.name} rejected it (${res.status}).` });
+        },
+        onError: () => setActionMsg({ ok: false, text: `Couldn’t reach ${device.name}.` }),
+      },
+    );
+  };
 
   return (
     <Overlay onClose={onClose}>
@@ -631,6 +650,15 @@ function RemoteConsole({ device, onClose }: { device: ManagedDevice; onClose: ()
       </div>
 
       <div className="p-5 min-h-[160px]">
+        {actionMsg && (
+          <div className={`mb-3 rounded-lg border px-3 py-2 text-xs ${
+            actionMsg.ok
+              ? 'border-emerald-500/30 bg-emerald-500/[0.08] text-emerald-700 dark:text-emerald-300'
+              : 'border-destructive/30 bg-destructive/10 text-destructive'
+          }`}>
+            {actionMsg.text}
+          </div>
+        )}
         {isLoading && <p className="text-xs text-muted-foreground">Loading {view} from {device.name}…</p>}
         {error && <p className="text-xs text-destructive">Couldn’t reach {device.name}. Is it online on the tailnet?</p>}
         {upstreamError && !error && (
@@ -643,19 +671,59 @@ function RemoteConsole({ device, onClose }: { device: ManagedDevice; onClose: ()
         )}
         {!isLoading && !error && !upstreamError && rows.length > 0 && (
           <div className="space-y-1.5">
-            {rows.map((row, i) => (
-              <div key={(row.id as string) ?? i} className="flex items-center gap-3 rounded-lg border border-border bg-background/60 px-3 py-2 text-xs">
-                <span className="font-medium text-foreground truncate">
-                  {(row.name as string) ?? (row.id as string) ?? `item ${i + 1}`}
-                </span>
-                {typeof row.status === 'string' && (
-                  <span className="ml-auto font-mono text-muted-foreground">{row.status}</span>
-                )}
-              </div>
-            ))}
+            {rows.map((row, i) => {
+              const name = (row.name as string) ?? (row.id as string) ?? `item ${i + 1}`;
+              return (
+                <div key={(row.id as string) ?? i} className="flex items-center gap-3 rounded-lg border border-border bg-background/60 px-3 py-2 text-xs">
+                  <span className="font-medium text-foreground truncate">{name}</span>
+                  {typeof row.status === 'string' && (
+                    <span className="font-mono text-muted-foreground">{row.status}</span>
+                  )}
+                  {/* Allow-listed write actions, remote-side admin-gated + audited. */}
+                  <div className="ml-auto flex items-center gap-1 shrink-0">
+                    {view === 'containers' && (
+                      <>
+                        <ActionBtn disabled={action.isPending} onClick={() => runAction('container.start', name, `Start ${name}`)}>Start</ActionBtn>
+                        <ActionBtn disabled={action.isPending} onClick={() => runAction('container.restart', name, `Restart ${name}`)}>Restart</ActionBtn>
+                        <ActionBtn disabled={action.isPending} danger onClick={() => runAction('container.stop', name, `Stop ${name}`)}>Stop</ActionBtn>
+                      </>
+                    )}
+                    {view === 'projects' && (
+                      <ActionBtn disabled={action.isPending} onClick={() => runAction('deploy.trigger', (row.id as string) ?? name, `Deploy ${name}`)}>Deploy</ActionBtn>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
     </Overlay>
+  );
+}
+
+function ActionBtn({
+  children,
+  onClick,
+  disabled,
+  danger,
+}: {
+  children: React.ReactNode;
+  onClick: () => void;
+  disabled?: boolean;
+  danger?: boolean;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className={`px-2 py-0.5 rounded border text-[11px] font-medium transition-colors disabled:opacity-40 ${
+        danger
+          ? 'border-destructive/30 text-destructive hover:bg-destructive/10'
+          : 'border-border text-foreground hover:border-accent/50 hover:bg-muted'
+      }`}
+    >
+      {children}
+    </button>
   );
 }

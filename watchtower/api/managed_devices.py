@@ -258,6 +258,36 @@ def _proxy_get(ip: str, port: int, upstream_path: str, token: str, *, timeout: f
         return (code, {"raw": body})
 
 
+def _proxy_post(ip: str, port: int, upstream_path: str, token: str, payload: dict, *, timeout: float = 20.0) -> tuple[int, Any]:
+    """POST JSON to http://<ip>:<port><upstream_path> with Bearer <token>.
+
+    Mirrors _proxy_get but for the small, allow-listed set of write actions.
+    Longer default timeout because a deploy-trigger can take a moment to
+    enqueue. Never raises."""
+    import urllib.error
+    import urllib.request
+
+    url = f"http://{ip}:{port}{upstream_path}"
+    data = json.dumps(payload).encode("utf-8")
+    req = urllib.request.Request(
+        url, data=data, method="POST",
+        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:  # noqa: S310 - tailnet IP
+            body = resp.read(1_000_000).decode("utf-8", "ignore")
+            code = resp.status
+    except urllib.error.HTTPError as exc:
+        body = exc.read(4096).decode("utf-8", "ignore") if exc.fp else ""
+        code = exc.code
+    except Exception as exc:  # noqa: BLE001 - unreachable / timeout
+        return (502, {"detail": f"Could not reach device: {exc}"})
+    try:
+        return (code, json.loads(body))
+    except (ValueError, TypeError):
+        return (code, {"raw": body})
+
+
 @router.get("/{device_id}/view/{view}")
 async def proxy_device_view(
     device_id: str,
@@ -290,6 +320,95 @@ async def proxy_device_view(
         )
     code, payload = _proxy_get(dev["ip"], dev["port"], upstream, token)
     return {"device_id": device_id, "view": view, "status": code, "data": payload}
+
+
+# ── Write actions (allow-listed, admin-gated, audited) ───────────────────────
+#
+# Reads are freely proxied; WRITES change the remote box, so they're tighter:
+#   • admin-gated (can_manage_team) — same bar as pairing.
+#   • each action is a NAMED entry in _WRITE_ACTIONS; nothing else is possible.
+#     The endpoint can only ever do what's spelled out here, so it can't be
+#     coaxed into an arbitrary POST against the remote device.
+#   • every action is audited locally (who did what, to which device).
+# The frontend adds a confirm step; the server does not rely on that.
+
+# Container lifecycle verbs we permit (maps 1:1 to the remote ActionRequest).
+_CONTAINER_VERBS = {"start", "stop", "restart"}
+
+
+class WriteActionRequest(BaseModel):
+    action: str = Field(..., description="container.start|container.stop|container.restart|deploy.trigger")
+    # container.* → the container name; deploy.trigger → the project id.
+    target: str = Field(..., min_length=1, max_length=256)
+    # deploy.trigger only: optional branch/commit override.
+    branch: Optional[str] = Field(None, max_length=256)
+    commit_sha: Optional[str] = Field(None, max_length=64)
+
+
+def _build_write(action: str, body: WriteActionRequest) -> tuple[str, dict]:
+    """Translate a named action into (upstream_path, json_payload). Raises
+    HTTPException(400) for anything not on the allow-list."""
+    if action.startswith("container."):
+        verb = action.split(".", 1)[1]
+        if verb not in _CONTAINER_VERBS:
+            raise HTTPException(status_code=400, detail=f"Unsupported container action '{verb}'.")
+        # Remote endpoint: POST /api/podman/containers/{name}/action {action}
+        return (f"/api/podman/containers/{body.target}/action", {"action": verb})
+    if action == "deploy.trigger":
+        # Remote endpoint: POST /api/projects/{project_id}/deployments
+        payload: dict = {}
+        if body.branch:
+            payload["branch"] = body.branch
+        if body.commit_sha:
+            payload["commit_sha"] = body.commit_sha
+        return (f"/api/projects/{body.target}/deployments", payload)
+    raise HTTPException(
+        status_code=400,
+        detail="Unknown action. Allowed: container.start, container.stop, container.restart, deploy.trigger.",
+    )
+
+
+@router.post("/{device_id}/action")
+async def device_action(
+    device_id: str,
+    body: WriteActionRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(util.get_current_user),
+) -> Dict[str, Any]:
+    """Run an allow-listed WRITE action on a paired device over the tailnet.
+
+    Only the named actions in _build_write are possible; the device's own token
+    authenticates the call. Admin-gated + audited."""
+    _require_admin(db, current_user)
+    dev = _read_device(db, device_id)
+    if dev is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Device not found")
+    if not _is_tailnet_ip(dev["ip"]):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Device IP is not on the tailnet.")
+    token = _device_token(db, device_id)
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No token stored for this device — re-pair it to run actions.",
+        )
+
+    upstream_path, payload = _build_write(body.action, body)
+    code, result = _proxy_post(dev["ip"], dev["port"], upstream_path, token, payload)
+
+    audit_log.record_for_user(
+        db, current_user,
+        action="managed_device.action",
+        entity_type="managed_device",
+        request=request,
+        extra={
+            "device": dev["name"], "ip": dev["ip"],
+            "remote_action": body.action, "target": body.target,
+            "upstream_status": code,
+        },
+    )
+    db.commit()
+    return {"device_id": device_id, "action": body.action, "target": body.target, "status": code, "data": result}
 
 
 @router.delete("/{device_id}")
