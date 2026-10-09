@@ -11,6 +11,7 @@ import TitleBar from './TitleBar';
 import { useUpdateCheck, useActiveDeploymentCount, useHealingConfig, useSelfUpdateStatus, useSelfUpdate } from '@/hooks/queries';
 import { CommandPalette, openCommandPalette } from './CommandPalette';
 import { UserMenu } from './UserMenu';
+import { ConnectionStatus } from './ConnectionStatus';
 
 const UPDATE_BANNER_DISMISSED_KEY = 'watchtower:updateBannerDismissed';
 const MORE_NAV_OPEN_KEY = 'watchtower:moreNavOpen';
@@ -502,6 +503,13 @@ export default function Layout({ children }: { children: ReactNode }) {
           )}
         </div>
       )}
+
+      {/* Connections at a glance — GitHub (identity) + Tailscale (network) in
+          ONE place, each with a one-tap connect action, so "is everything
+          connected?" is answerable without hunting across pages. */}
+      <div className={`px-2 pt-2 border-t ${rail ? 'hidden' : ''}`} style={{ borderColor: 'hsl(var(--border-soft))' }}>
+        <ConnectionStatus />
+      </div>
 
       <div className={`px-3 py-3 border-t ${rail ? 'hidden' : ''}`} style={{ borderColor: 'hsl(var(--border-soft))' }}>
         {/* Identity dropdown — single trigger that exposes account
