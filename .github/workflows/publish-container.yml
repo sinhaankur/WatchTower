@@ -93,7 +93,7 @@ jobs:
       # Signing the DIGEST (not a mutable tag) so the signature is bound to
       # the exact bytes, immune to a later tag-repoint.
       - name: Install cosign
-        uses: sigstore/cosign-installer@v4
+        uses: sigstore/cosign-installer@v3
 
       - name: Sign the published image (keyless)
         env:
