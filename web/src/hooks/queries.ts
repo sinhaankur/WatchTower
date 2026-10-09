@@ -1130,6 +1130,26 @@ export type PeerHealth = {
   url: string;
 };
 
+export type PairingToken = {
+  token: string;
+  has_token: boolean;
+  host: string | null;
+  tailscale_ip: string | null;
+  port: number;
+  address: string | null;
+};
+
+/** THIS device's own pairing details — what the OTHER device needs to connect
+ *  to it. Admin-gated server-side; shown so two-device setup is copy-paste. */
+export function usePairingToken() {
+  return useQuery<PairingToken>({
+    queryKey: ['this-pc', 'pairing-token'],
+    queryFn: async () => (await apiClient.get<PairingToken>('/this-pc/pairing-token')).data,
+    staleTime: 60_000,
+    retry: false,
+  });
+}
+
 /** Live reachability + WatchTower probe for one peer by IP (the Health button). */
 export function usePeerHealth() {
   return useMutation<PeerHealth, unknown, string>({

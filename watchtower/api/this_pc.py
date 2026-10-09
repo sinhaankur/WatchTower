@@ -384,6 +384,53 @@ async def discover_nodes(
     return {"source": "tailscale", "peers": peers}
 
 
+@router.get("/pairing-token")
+async def pairing_token(
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(util.get_current_user),
+) -> Dict[str, Any]:
+    """Return THIS device's pairing details so its twin can connect to it.
+
+    The missing piece for two-device setup: to pair box B from box A, box A
+    needs B's API token — and there was nowhere to get it. This hands back the
+    token plus the tailnet address + port, so you copy one thing here and paste
+    it there.
+
+    Admin-gated (can_manage_team): the token is a credential to this machine, so
+    only the owner/admin can reveal it — same bar as viewing other secrets."""
+    from watchtower.api.runtime import _user_can_manage_org_secrets
+    if not _user_can_manage_org_secrets(db, current_user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Revealing this device's pairing token requires can_manage_team permission.",
+        )
+    token = os.getenv("WATCHTOWER_API_TOKEN") or ""
+    ts_ip = _self_tailscale_ip()
+    host = ts_ip or _local_hostname()
+    return {
+        "token": token,
+        "has_token": bool(token),
+        "host": host,
+        "tailscale_ip": ts_ip,
+        "port": _WATCHTOWER_PORT,
+        "address": f"{host}:{_WATCHTOWER_PORT}" if host else None,
+    }
+
+
+def _self_tailscale_ip() -> Optional[str]:
+    """This machine's own Tailscale IP (100.64.0.0/10), if Tailscale is up."""
+    try:
+        from watchtower.tool_resolver import tailscale_binary
+        bin_ = tailscale_binary()
+        if not bin_:
+            return None
+        proc = subprocess.run([bin_, "ip", "-4"], capture_output=True, text=True, timeout=5.0)
+        ip = (proc.stdout or "").strip().splitlines()[0].strip() if proc.returncode == 0 else ""
+        return ip or None
+    except Exception:  # noqa: BLE001
+        return None
+
+
 @router.get("/peer-health")
 async def peer_health(
     ip: str,

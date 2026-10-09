@@ -12,7 +12,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import { ExternalLink, Activity, Monitor, RefreshCw, CheckCircle2, XCircle, Link2, Boxes } from 'lucide-react';
+import { ExternalLink, Activity, Monitor, RefreshCw, CheckCircle2, XCircle, Link2, Boxes, Copy, Check } from 'lucide-react';
 import { RemoteAccessDiagram } from '@/components/SectionDiagrams';
 import {
   type RemoteAccessProvider,
@@ -28,6 +28,7 @@ import {
   useTailnetDevices,
   usePeerHealth,
   useManagedDevices,
+  usePairingToken,
   usePairDevice,
   useUnpairDevice,
   useDeviceView,
@@ -376,6 +377,11 @@ function TailnetDevices() {
         </details>
       )}
 
+      {/* The other half of the two-device setup: to pair THIS box from another,
+          that box needs this one's token + address. Show it here so it's copy
+          there, paste here — no hunting through settings on the other machine. */}
+      <ConnectThisDevice />
+
       {pairing && (
         <PairDialog peer={pairing} onClose={() => setPairing(null)} onPaired={(d) => { setPairing(null); setConsoleDevice(d); }} />
       )}
@@ -383,6 +389,87 @@ function TailnetDevices() {
         <RemoteConsole device={consoleDevice} onClose={() => setConsoleDevice(null)} />
       )}
     </section>
+  );
+}
+
+function ConnectThisDevice() {
+  const { data, isLoading, error } = usePairingToken();
+  const [copied, setCopied] = useState<'token' | 'addr' | null>(null);
+
+  const copy = async (text: string, which: 'token' | 'addr') => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(which);
+      setTimeout(() => setCopied(null), 1500);
+    } catch { /* clipboard blocked — ignore */ }
+  };
+
+  if (isLoading) return null;
+  if (error || !data?.has_token) {
+    // Non-admin or no token — don't show a broken panel.
+    return null;
+  }
+
+  return (
+    <details className="group rounded-lg border border-border bg-background/40">
+      <summary className="flex items-center gap-2 px-3 py-2.5 cursor-pointer select-none text-sm font-medium text-foreground hover:bg-muted/40 rounded-lg">
+        <Link2 size={14} className="text-accent" />
+        Connect this device from another
+        <span className="ml-auto text-xs text-muted-foreground group-open:hidden">show</span>
+      </summary>
+      <div className="px-3 pb-3 pt-1 space-y-3">
+        <p className="text-xs text-muted-foreground">
+          On your <em>other</em> WatchTower, open Remote Access → Pair, then paste these:
+        </p>
+
+        <Field label="Address">
+          <div className="flex items-center gap-2">
+            <code className="flex-1 font-mono text-xs bg-card border border-border rounded-md px-2.5 py-1.5 text-foreground overflow-x-auto">
+              {data.address ?? `${data.host}:${data.port}`}
+            </code>
+            <button
+              onClick={() => copy(data.address ?? `${data.host}:${data.port}`, 'addr')}
+              className="shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border border-border text-xs text-foreground hover:border-accent/50 hover:bg-muted transition-colors"
+            >
+              {copied === 'addr' ? <Check size={13} className="text-emerald-500" /> : <Copy size={13} />}
+              {copied === 'addr' ? 'Copied' : 'Copy'}
+            </button>
+          </div>
+          {!data.tailscale_ip && (
+            <p className="mt-1 text-[11px] text-orange-500 dark:text-orange-400">
+              No Tailscale IP detected — the other device must be able to reach {data.host} on your network.
+            </p>
+          )}
+        </Field>
+
+        <Field label="Pairing token">
+          <div className="flex items-center gap-2">
+            <code className="flex-1 font-mono text-xs bg-card border border-border rounded-md px-2.5 py-1.5 text-foreground overflow-x-auto select-all">
+              {data.token}
+            </code>
+            <button
+              onClick={() => copy(data.token, 'token')}
+              className="shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-accent text-accent-foreground text-xs font-medium hover:bg-accent/90 transition-colors"
+            >
+              {copied === 'token' ? <Check size={13} /> : <Copy size={13} />}
+              {copied === 'token' ? 'Copied' : 'Copy'}
+            </button>
+          </div>
+          <p className="mt-1 text-[11px] text-muted-foreground">
+            This is a credential to this machine — only share it with your own devices.
+          </p>
+        </Field>
+      </div>
+    </details>
+  );
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-1">{label}</p>
+      {children}
+    </div>
   );
 }
 

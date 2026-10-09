@@ -202,6 +202,35 @@ def test_peer_health_probes_a_tailscale_ip(client: TestClient, monkeypatch):
     assert body["url"] == "http://100.64.0.5:8000"
 
 
+# ── Pairing token (the two-device setup) ─────────────────────────────────────
+
+
+def test_pairing_token_returns_this_devices_details(client: TestClient, monkeypatch):
+    """The owner can fetch this device's token + address to pair it from another
+    box — the piece that was missing, leaving the pairing instruction a dead end."""
+    _bootstrap_admin_cp(client)  # first user → owner (can_manage_team)
+    monkeypatch.setattr(_this_pc, "_self_tailscale_ip", lambda: "100.64.0.9")
+    r = client.get("/api/this-pc/pairing-token")
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["has_token"] is True
+    assert body["token"]                       # the real WATCHTOWER_API_TOKEN
+    assert body["tailscale_ip"] == "100.64.0.9"
+    assert body["address"] == "100.64.0.9:8000"
+
+
+def test_pairing_token_requires_admin(client: TestClient):
+    """The token is a credential to this machine — non-admins can't reveal it."""
+    from unittest.mock import patch
+    with patch("watchtower.api.runtime._user_can_manage_org_secrets", return_value=False):
+        r = client.get("/api/this-pc/pairing-token")
+    assert r.status_code == 403
+
+
+def test_pairing_token_requires_auth(anon_client):
+    assert anon_client.get("/api/this-pc/pairing-token").status_code == 401
+
+
 # ── Control-plane pairing ────────────────────────────────────────────────────
 
 
