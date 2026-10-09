@@ -239,22 +239,51 @@ def _serialize(node: OrgNode) -> Dict[str, Any]:
 _WATCHTOWER_PORT = int(os.getenv("WATCHTOWER_PEER_PORT", "8000"))
 
 
-def _peer_runs_watchtower(ip: str) -> bool:
+def _peer_watchtower_url(ip: str) -> str:
+    """The URL a browser would open to reach a peer's WatchTower UI over the
+    tailnet. http is correct here — the tailnet is the encrypted transport."""
+    return f"http://{ip}:{_WATCHTOWER_PORT}"
+
+
+def _probe_peer_watchtower(ip: str, *, timeout: float = 2.0) -> Dict[str, Any]:
     """Probe http://<ip>:<port>/health for the WatchTower service marker.
 
-    Short timeout, best-effort: a peer that doesn't answer or isn't WatchTower
-    just isn't a standby candidate. Never raises."""
+    Returns a small dict the UI can render directly:
+      {runs_watchtower, reachable, version, url}. Best-effort — a peer that
+      doesn't answer or isn't WatchTower comes back reachable=False. Never
+      raises."""
     import urllib.request
 
-    url = f"http://{ip}:{_WATCHTOWER_PORT}/health"
+    url = _peer_watchtower_url(ip)
+    result: Dict[str, Any] = {
+        "runs_watchtower": False,
+        "reachable": False,
+        "version": None,
+        "url": url,
+    }
     try:
-        with urllib.request.urlopen(url, timeout=2.0) as resp:  # noqa: S310 - tailnet IP, http on LAN
+        with urllib.request.urlopen(f"{url}/health", timeout=timeout) as resp:  # noqa: S310 - tailnet IP, http on LAN
+            result["reachable"] = True
             if resp.status != 200:
-                return False
-            body = resp.read(512).decode("utf-8", "ignore")
-        return "watchtower-api" in body
+                return result
+            body = resp.read(1024).decode("utf-8", "ignore")
     except Exception:  # noqa: BLE001 - unreachable / not-watchtower / timeout
-        return False
+        return result
+
+    if "watchtower-api" in body:
+        result["runs_watchtower"] = True
+        # The health body is JSON; pull the version if present, tolerantly.
+        try:
+            parsed = json.loads(body)
+            result["version"] = parsed.get("version") or parsed.get("watchtower_version")
+        except (json.JSONDecodeError, AttributeError):
+            pass
+    return result
+
+
+def _peer_runs_watchtower(ip: str) -> bool:
+    """Back-compat thin wrapper: just the boolean the discovery list needs."""
+    return _probe_peer_watchtower(ip)["runs_watchtower"]
 
 
 def _discover_tailnet_peers() -> List[Dict[str, Any]]:
@@ -297,15 +326,23 @@ def _discover_tailnet_peers() -> List[Dict[str, Any]]:
         dns = (p.get("DNSName") or "").rstrip(".")
         host_label = (p.get("HostName") or dns or ip)
         online = bool(p.get("Online"))
+        probe = _probe_peer_watchtower(ip) if online else {
+            "runs_watchtower": False, "reachable": False, "version": None,
+            "url": _peer_watchtower_url(ip),
+        }
         out.append({
             "hostname": host_label,
             "dns_name": dns or None,
             "ip": ip,
             "online": online,
             "os": p.get("OS") or None,
-            # Only probe online peers — flags those running WatchTower as
-            # control-plane standby candidates.
-            "runs_watchtower": _peer_runs_watchtower(ip) if online else False,
+            # Flags peers running WatchTower — both control-plane standby
+            # candidates AND devices you can open/manage over the tailnet.
+            "runs_watchtower": probe["runs_watchtower"],
+            "reachable": probe["reachable"],
+            "watchtower_version": probe["version"],
+            # The URL to open this device's own WatchTower UI over the tailnet.
+            "watchtower_url": probe["url"],
         })
     # Online peers first, then alphabetical — most-useful candidates on top.
     out.sort(key=lambda c: (not c["online"], c["hostname"].lower()))
@@ -345,6 +382,37 @@ async def discover_nodes(
         c["already_added"] = bool(candidates & known_hosts)
 
     return {"source": "tailscale", "peers": peers}
+
+
+@router.get("/peer-health")
+async def peer_health(
+    ip: str,
+    _current_user: dict = Depends(util.get_current_user),
+) -> Dict[str, Any]:
+    """Live reachability + WatchTower check for ONE tailnet peer by IP.
+
+    Backs the device list's 'Health' button so the status is fresh at click
+    time, not frozen at discovery time. Validates the IP is a Tailscale CGNAT
+    address (100.64.0.0/10) so this can't be turned into an SSRF probe of
+    arbitrary hosts."""
+    import ipaddress
+
+    try:
+        addr = ipaddress.ip_address(ip)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Not a valid IP address")
+    # Tailscale hands out addresses from the 100.64.0.0/10 CGNAT range (v4)
+    # and fd7a:115c:a1e0::/48 (v6). Refuse anything else — the whole point is
+    # this only ever probes machines on *your* tailnet.
+    in_ts_v4 = isinstance(addr, ipaddress.IPv4Address) and addr in ipaddress.ip_network("100.64.0.0/10")
+    in_ts_v6 = isinstance(addr, ipaddress.IPv6Address) and addr in ipaddress.ip_network("fd7a:115c:a1e0::/48")
+    if not (in_ts_v4 or in_ts_v6):
+        raise HTTPException(
+            status_code=400,
+            detail="Only Tailscale addresses (100.64.0.0/10) can be probed.",
+        )
+    probe = _probe_peer_watchtower(ip, timeout=3.0)
+    return {"ip": ip, **probe}
 
 
 # ── Control-plane HA pairing (primary / standby) ─────────────────────────────

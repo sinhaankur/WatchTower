@@ -150,20 +150,56 @@ def test_discover_nodes_lists_peers(client: TestClient, monkeypatch):
 
 
 def test_discover_nodes_flags_watchtower_peers(client: TestClient, monkeypatch):
-    """Online peers running WatchTower are flagged runs_watchtower=True so the
-    UI can offer control-plane standby pairing."""
+    """Online peers running WatchTower are flagged runs_watchtower=True and
+    carry a watchtower_url so the UI can offer 'Open' + standby pairing."""
     monkeypatch.setattr("watchtower.tool_resolver.tailscale_binary", lambda: "/usr/bin/tailscale")
     monkeypatch.setattr(
         _this_pc.subprocess, "run",
         lambda *a, **k: SimpleNamespace(returncode=0, stdout=_FAKE_TS_STATUS, stderr=""),
     )
     # build-box (100.64.0.2) runs WatchTower; old-laptop is offline (not probed).
-    monkeypatch.setattr(_this_pc, "_peer_runs_watchtower", lambda ip: ip == "100.64.0.2")
+    monkeypatch.setattr(
+        _this_pc, "_probe_peer_watchtower",
+        lambda ip, timeout=2.0: {
+            "runs_watchtower": ip == "100.64.0.2",
+            "reachable": ip == "100.64.0.2",
+            "version": "2.1.0" if ip == "100.64.0.2" else None,
+            "url": f"http://{ip}:8000",
+        },
+    )
     peers = client.get("/api/this-pc/discover-nodes").json()["peers"]
     bb = next(p for p in peers if p["hostname"] == "build-box")
     ol = next(p for p in peers if p["hostname"] == "old-laptop")
     assert bb["runs_watchtower"] is True
+    assert bb["watchtower_url"] == "http://100.64.0.2:8000"
+    assert bb["watchtower_version"] == "2.1.0"
     assert ol["runs_watchtower"] is False  # offline → not probed
+    assert ol["watchtower_url"]  # still has a URL even when offline
+
+
+def test_peer_health_rejects_non_tailscale_ip(client: TestClient):
+    """The peer-health probe must refuse arbitrary hosts — SSRF guard."""
+    r = client.get("/api/this-pc/peer-health", params={"ip": "8.8.8.8"})
+    assert r.status_code == 400
+    r = client.get("/api/this-pc/peer-health", params={"ip": "not-an-ip"})
+    assert r.status_code == 400
+
+
+def test_peer_health_probes_a_tailscale_ip(client: TestClient, monkeypatch):
+    """A valid tailnet IP is probed and the live result returned."""
+    monkeypatch.setattr(
+        _this_pc, "_probe_peer_watchtower",
+        lambda ip, timeout=3.0: {
+            "runs_watchtower": True, "reachable": True,
+            "version": "2.1.0", "url": f"http://{ip}:8000",
+        },
+    )
+    r = client.get("/api/this-pc/peer-health", params={"ip": "100.64.0.5"})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["ip"] == "100.64.0.5"
+    assert body["runs_watchtower"] is True
+    assert body["url"] == "http://100.64.0.5:8000"
 
 
 # ── Control-plane pairing ────────────────────────────────────────────────────

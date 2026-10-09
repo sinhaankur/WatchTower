@@ -12,13 +12,18 @@
  */
 
 import { useEffect, useState } from 'react';
+import { ExternalLink, Activity, Monitor, RefreshCw, CheckCircle2, XCircle } from 'lucide-react';
 import { RemoteAccessDiagram } from '@/components/SectionDiagrams';
 import {
   type RemoteAccessProvider,
+  type TailnetPeer,
+  type PeerHealth,
   useDisableRemoteAccess,
   useEnableRemoteAccess,
   useRemoteAccessDefaultPort,
   useRemoteAccessProviders,
+  useTailnetDevices,
+  usePeerHealth,
 } from '@/hooks/queries';
 
 export default function RemoteAccess() {
@@ -49,7 +54,7 @@ export default function RemoteAccess() {
 
       <main className="px-4 sm:px-6 lg:px-8 py-6 max-w-2xl mx-auto space-y-5 fade-in-up">
         <RemoteAccessDiagram />
-        <div className="rounded-xl border border-blue-100 bg-blue-500/15 px-5 py-4 text-xs text-blue-800 space-y-1">
+        <div className="rounded-xl border border-blue-500/20 bg-blue-500/10 px-5 py-4 text-xs text-blue-700 dark:text-blue-300 space-y-1">
           <p className="font-semibold">How this works</p>
           <p>
             WatchTower runs on this machine and listens on <code className="font-mono">localhost:{defaultPort}</code>.
@@ -73,6 +78,10 @@ export default function RemoteAccess() {
         {providers?.map((p) => (
           <ProviderCard key={p.id} provider={p} defaultPort={defaultPort} />
         ))}
+
+        {/* Devices on the tailnet you can open/manage — the other direction:
+            not exposing THIS box, but reaching your OTHER WatchTower boxes. */}
+        <TailnetDevices />
 
         {/* Placeholder for future providers — purely informational. */}
         <div className="rounded-xl border border-dashed border-border bg-transparent p-5 text-xs text-muted-foreground">
@@ -267,5 +276,155 @@ function StatusBadge({ provider }: { provider: RemoteAccessProvider }) {
     <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${cls}`}>
       {label}
     </span>
+  );
+}
+
+/* ------------------------------------------------ tailnet devices (open/manage) */
+
+/**
+ * TailnetDevices — the "other direction" of remote access: the machines on
+ * your Tailscale tailnet, with the ones running WatchTower openable in one
+ * click over the private network. You manage each box in its own real UI —
+ * nothing to keep in sync, and the tailnet is the encrypted transport.
+ */
+function TailnetDevices() {
+  const { data, isLoading, error, refetch, isFetching } = useTailnetDevices();
+  const peers = data?.peers ?? [];
+  const managed = peers.filter((p) => p.runs_watchtower);
+  const others = peers.filter((p) => !p.runs_watchtower);
+
+  return (
+    <section className="rounded-xl border border-border bg-card p-5 space-y-4">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2 min-w-0">
+          <Monitor size={16} className="text-accent shrink-0" />
+          <div className="min-w-0">
+            <h2 className="text-base font-semibold text-foreground">Devices on your tailnet</h2>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Open and manage your other WatchTower machines over Tailscale.
+            </p>
+          </div>
+        </div>
+        <button
+          onClick={() => refetch()}
+          disabled={isFetching}
+          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-border text-xs text-foreground hover:border-accent/50 hover:bg-muted transition-colors disabled:opacity-50 shrink-0"
+        >
+          <RefreshCw size={13} className={isFetching ? 'animate-spin' : ''} />
+          {isFetching ? 'Scanning…' : 'Rescan'}
+        </button>
+      </div>
+
+      {isLoading && (
+        <p className="text-xs text-muted-foreground">Scanning the tailnet…</p>
+      )}
+      {error && (
+        <p className="text-xs text-muted-foreground">
+          Couldn’t list tailnet devices. Make sure Tailscale is installed and connected.
+        </p>
+      )}
+      {!isLoading && !error && peers.length === 0 && (
+        <p className="text-xs text-muted-foreground">
+          No other devices found on your tailnet. When another machine running WatchTower joins,
+          it’ll appear here ready to open.
+        </p>
+      )}
+
+      {managed.length > 0 && (
+        <div className="space-y-2">
+          {managed.map((peer) => (
+            <DeviceRow key={peer.ip} peer={peer} />
+          ))}
+        </div>
+      )}
+
+      {others.length > 0 && (
+        <details className="group">
+          <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground select-none">
+            {others.length} other device{others.length === 1 ? '' : 's'} on this tailnet (no WatchTower)
+          </summary>
+          <div className="mt-2 space-y-1.5">
+            {others.map((peer) => (
+              <div key={peer.ip} className="flex items-center gap-2 px-3 py-2 text-xs text-muted-foreground">
+                <span className={`inline-block w-1.5 h-1.5 rounded-full shrink-0 ${peer.online ? 'bg-emerald-500' : 'bg-muted-foreground/40'}`} />
+                <span className="truncate text-foreground/90">{peer.hostname}</span>
+                <span className="font-mono">{peer.ip}</span>
+                {peer.os && <span className="ml-auto">{peer.os}</span>}
+              </div>
+            ))}
+          </div>
+        </details>
+      )}
+    </section>
+  );
+}
+
+function DeviceRow({ peer }: { peer: TailnetPeer }) {
+  const health = usePeerHealth();
+  const [live, setLive] = useState<PeerHealth | null>(null);
+
+  const checkHealth = () => {
+    setLive(null);
+    health.mutate(peer.ip, { onSuccess: setLive });
+  };
+
+  // Prefer the live probe (fresh at click) over the discovery-time snapshot.
+  const reachable = live ? live.reachable : peer.reachable;
+  const version = live?.version ?? peer.watchtower_version;
+
+  return (
+    <div className="rounded-lg border border-border bg-background/60 p-3">
+      <div className="flex items-center gap-3">
+        <span
+          className={`inline-block w-2 h-2 rounded-full shrink-0 ${peer.online ? 'bg-emerald-500' : 'bg-muted-foreground/40'}`}
+          title={peer.online ? 'Online' : 'Offline'}
+        />
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium text-foreground truncate flex items-center gap-2">
+            {peer.hostname}
+            <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-accent">
+              WatchTower{version ? ` ${version}` : ''}
+            </span>
+          </p>
+          <p className="text-xs text-muted-foreground font-mono">
+            {peer.ip}
+            {reachable != null && (
+              <span className={`ml-2 ${reachable ? 'text-emerald-500 dark:text-emerald-400' : 'text-muted-foreground'}`}>
+                · {reachable ? 'reachable' : 'unreachable'}
+              </span>
+            )}
+          </p>
+        </div>
+        <div className="flex items-center gap-1.5 shrink-0">
+          <button
+            onClick={checkHealth}
+            disabled={health.isPending}
+            title="Check if this device is reachable right now"
+            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-border text-xs text-foreground hover:border-accent/50 hover:bg-muted transition-colors disabled:opacity-50"
+          >
+            {health.isPending ? (
+              <Activity size={13} className="animate-pulse" />
+            ) : live ? (
+              live.reachable ? <CheckCircle2 size={13} className="text-emerald-500" /> : <XCircle size={13} className="text-destructive" />
+            ) : (
+              <Activity size={13} />
+            )}
+            Health
+          </button>
+          <a
+            href={peer.watchtower_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent text-accent-foreground text-xs font-medium hover:bg-accent/90 transition-colors"
+          >
+            Open
+            <ExternalLink size={13} />
+          </a>
+        </div>
+      </div>
+      {health.isError && (
+        <p className="mt-2 text-xs text-destructive">Couldn’t reach this device to check health.</p>
+      )}
+    </div>
   );
 }

@@ -1026,8 +1026,13 @@ export type TailnetPeer = {
   ip: string;
   online: boolean;
   os: string | null;
-  already_added: boolean;
+  already_added?: boolean;
   runs_watchtower: boolean;
+  // Added for open/manage-over-tailnet: whether a probe reached it, its
+  // WatchTower version, and the URL to open its own UI.
+  reachable: boolean;
+  watchtower_version: string | null;
+  watchtower_url: string;
 };
 
 export type ControlPlaneStatus = {
@@ -1100,6 +1105,36 @@ export function useSyncControlPlane() {
         '/this-pc/control-plane/sync-now',
       )).data,
     onSuccess: () => { void qc.invalidateQueries({ queryKey: ['this-pc', 'control-plane'] }); },
+  });
+}
+
+// ── Tailnet devices — discover + open/manage other WatchTower boxes ──────────
+// Uses the shared {@link TailnetPeer} type defined above.
+
+/** Machines on your Tailscale tailnet — the ones running WatchTower can be
+ *  opened/managed over the private network. */
+export function useTailnetDevices() {
+  return useQuery<{ source: string; peers: TailnetPeer[] }>({
+    queryKey: ['this-pc', 'discover-nodes'],
+    queryFn: async () =>
+      (await apiClient.get<{ source: string; peers: TailnetPeer[] }>('/this-pc/discover-nodes')).data,
+    staleTime: 15_000,
+  });
+}
+
+export type PeerHealth = {
+  ip: string;
+  runs_watchtower: boolean;
+  reachable: boolean;
+  version: string | null;
+  url: string;
+};
+
+/** Live reachability + WatchTower probe for one peer by IP (the Health button). */
+export function usePeerHealth() {
+  return useMutation<PeerHealth, unknown, string>({
+    mutationFn: async (ip) =>
+      (await apiClient.get<PeerHealth>('/this-pc/peer-health', { params: { ip } })).data,
   });
 }
 
