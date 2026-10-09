@@ -1,0 +1,35 @@
+# Umbrel App Store manifest for WatchTower.
+# Submit by PR to https://github.com/getumbrel/umbrel-apps (dir: watchtower/).
+# See https://github.com/getumbrel/umbrel-apps/blob/master/README.md for the
+# current required fields; update the version/releaseNotes at submission time.
+manifestVersion: 1
+id: watchtower
+category: Developer Tools
+name: WatchTower
+version: "2.1.0"
+tagline: Self-hosting that fixes itself
+description: >-
+  Deploy your websites and apps from GitHub to your own Umbrel, with managed
+  databases, scheduled backups, and private remote access over Tailscale — no
+  open ports. When a deploy breaks, WatchTower diagnoses the cause and applies a
+  fix automatically, retrying with guardrails. Rootless containers, fully on your
+  own hardware, free and open source.
+developer: Ankur Sinha
+website: https://sinhaankur.github.io/WatchTower/
+dependencies: []
+repo: https://github.com/sinhaankur/WatchTower
+support: https://github.com/sinhaankur/WatchTower/issues
+port: 8000
+gallery:
+  - 1.jpg
+  - 2.jpg
+  - 3.jpg
+path: ""
+defaultUsername: ""
+defaultPassword: ""
+submitter: Ankur Sinha
+submission: https://github.com/sinhaankur/WatchTower
+releaseNotes: >-
+  Remote device management over Tailscale (open, pair, and operate your other
+  WatchTower machines from one console), external database connect + test, audit
+  log export, and a self-heal pass that classifies and fixes more failure kinds.

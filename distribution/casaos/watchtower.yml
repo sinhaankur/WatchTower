@@ -1,0 +1,51 @@
+# CasaOS App Store manifest for WatchTower.
+# Submit by PR to https://github.com/IceWhaleTech/CasaOS-AppStore
+# (CasaOS extends docker-compose with an x-casaos block for store metadata).
+name: watchtower
+services:
+  watchtower:
+    image: ghcr.io/sinhaankur/watchtower:2.1.0
+    container_name: watchtower
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      WATCHTOWER_HOST: 0.0.0.0
+      WATCHTOWER_PORT: "8000"
+      WATCHTOWER_API_TOKEN: change-me
+      WATCHTOWER_ALLOW_INSECURE_DEV_AUTH: "false"
+    volumes:
+      - /DATA/AppData/watchtower:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/ready"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    x-casaos:
+      ports:
+        - container: "8000"
+          description: WatchTower web UI
+      volumes:
+        - container: /data
+          description: Projects, databases, and settings
+
+x-casaos:
+  architectures:
+    - amd64
+    - arm64
+  main: watchtower
+  description:
+    en_us: >-
+      Deploy websites and apps from GitHub to your own box, with managed
+      databases, backups, and private remote access over Tailscale. When a
+      deploy breaks, WatchTower diagnoses and fixes it automatically. Rootless,
+      on your own hardware, free and open source.
+  tagline:
+    en_us: Self-hosting that fixes itself
+  developer: Ankur Sinha
+  author: Ankur Sinha
+  category: Developer
+  port_map: "8000"
+  project_url: https://github.com/sinhaankur/WatchTower
+  title:
+    en_us: WatchTower

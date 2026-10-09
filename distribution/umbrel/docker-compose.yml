@@ -1,0 +1,31 @@
+# Umbrel app compose for WatchTower.
+# Mirrors docker-compose.app.yml, adapted to Umbrel conventions (app_proxy for
+# the web UI, ${APP_DATA_DIR} for persistence). Pin the image to a published
+# tag at submission time rather than :latest.
+version: "3.7"
+
+services:
+  app_proxy:
+    environment:
+      APP_HOST: watchtower_server_1
+      APP_PORT: 8000
+
+  server:
+    image: ghcr.io/sinhaankur/watchtower:2.1.0
+    restart: on-failure
+    stop_grace_period: 1m
+    environment:
+      WATCHTOWER_HOST: 0.0.0.0
+      WATCHTOWER_PORT: "8000"
+      # Umbrel serves the UI behind its own auth proxy on the local network, so
+      # the app stays private by default — the token is for API/CLI use.
+      WATCHTOWER_API_TOKEN: ${WATCHTOWER_API_TOKEN:-change-me-in-umbrel-settings}
+      WATCHTOWER_INSTALL_OWNER_MODE: "false"
+      WATCHTOWER_ALLOW_INSECURE_DEV_AUTH: "false"
+    volumes:
+      - ${APP_DATA_DIR}/data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/ready"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
