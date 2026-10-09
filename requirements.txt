@@ -61,7 +61,7 @@ fabric==3.2.2
 # execution when REDIS_URL is unset, so dev / desktop installs without
 # Redis still work.
 redis==5.0.1
-rq==1.16.2
+rq==2.12.0
 
 # [agent] LLM agent — talks to ANY OpenAI-compatible chat-completions
 # endpoint (Ollama, LM Studio, vLLM, llama.cpp, OpenAI, OpenRouter,
