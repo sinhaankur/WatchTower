@@ -38,7 +38,12 @@ python-dotenv==1.2.4
 
 # Database
 sqlalchemy==2.0.54
-psycopg2-binary==2.9.13
+# Pin a floor, not an exact version: psycopg2-binary 2.9.13 only ships aarch64
+# wheels for manylinux_2_27+, but the linux-arm64 cross-build targets an older
+# glibc baseline (manylinux2014) whose newest published wheel is 2.9.11 — so
+# ==2.9.13 broke the arm64 desktop build. A range lets each platform grab its
+# newest compatible wheel (x86_64 gets 2.9.13, arm64-cross gets 2.9.11).
+psycopg2-binary>=2.9.9,<2.10
 alembic==1.20.0
 
 # Utilities
