@@ -1,6 +1,6 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useEffect, useMemo, useState } from 'react';
-import { Plus } from 'lucide-react';
+import { Plus, Play, Square, RefreshCw, Server } from 'lucide-react';
 import axios from 'axios';
 import apiClient from '@/lib/api';
 import useCountUp from '@/hooks/useCountUp';
@@ -49,7 +49,7 @@ type Notice = { kind: 'success' | 'error' | 'info'; message: string };
 const STORAGE_KEY = 'wt_projects';
 
 const USE_CASE_META: Record<LocalProject['use_case'], { label: string; color: string; dot: string }> = {
-  netlify_like:    { label: 'Static + Functions', color: 'bg-blue-100 text-blue-500 dark:text-blue-400 border-blue-200', dot: 'bg-blue-500' },
+  netlify_like:    { label: 'Static + Functions', color: 'bg-blue-500/15 text-blue-500 dark:text-blue-400 border-blue-500/30', dot: 'bg-blue-500' },
   vercel_like:     { label: 'SSR App',            color: 'bg-indigo-500/15 text-indigo-500 dark:text-indigo-400 border-indigo-500/30', dot: 'bg-indigo-500' },
   docker_platform: { label: 'Docker App',         color: 'bg-cyan-500/15 text-cyan-500 dark:text-cyan-400 border-cyan-500/30', dot: 'bg-cyan-500' },
 };
@@ -103,7 +103,7 @@ function StatusDot({ running }: { running: boolean }) {
 
 function NoticeBanner({ notice }: { notice: Notice }) {
   const styles = {
-    success: 'border-emerald-200 bg-emerald-500/15 text-emerald-500 dark:text-emerald-400',
+    success: 'border-emerald-500/30 bg-emerald-500/15 text-emerald-500 dark:text-emerald-400',
     error:   'border-destructive/30 bg-destructive/10 text-destructive',
     info:    'border-border bg-muted text-foreground',
   };
@@ -485,14 +485,16 @@ const Dashboard = () => {
               disabled={runtimeAction !== null}
               className={`w-full flex items-center gap-3 p-3 rounded-lg border transition-colors disabled:opacity-50 text-left ${
                 bgRunning
-                  ? 'border-destructive/40 bg-destructive/10 hover:bg-red-100 text-destructive'
-                  : 'border-emerald-300 bg-emerald-500/15 hover:bg-emerald-100 text-emerald-500 dark:text-emerald-400'
+                  ? 'border-destructive/40 bg-destructive/10 hover:bg-destructive/15 text-destructive'
+                  : 'border-emerald-500/30 bg-emerald-500/15 hover:bg-emerald-500/20 text-emerald-500 dark:text-emerald-400'
               }`}
             >
-              <span className="text-lg leading-none">{bgRunning ? '⏹' : '▶'}</span>
+              <span className="w-8 h-8 rounded-md bg-background/60 flex items-center justify-center shrink-0">
+                {bgRunning ? <Square size={16} strokeWidth={2.5} /> : <Play size={16} strokeWidth={2.5} />}
+              </span>
               <div>
                 <p className="text-sm font-medium">
-                  {runtimeAction === 'start' ? 'Starting…' : runtimeAction === 'stop' ? 'Stopping…' : bgRunning ? 'Stop Background Updater' : 'Start Background Updater'}
+                  {runtimeAction === 'start' ? 'Starting…' : runtimeAction === 'stop' ? 'Stopping…' : bgRunning ? 'Stop background updater' : 'Start background updater'}
                 </p>
                 <p className="text-xs opacity-70 mt-0.5">Manage auto-update daemon</p>
               </div>
@@ -503,9 +505,11 @@ const Dashboard = () => {
               disabled={runtimeAction !== null}
               className="w-full flex items-center gap-3 p-3 rounded-lg border border-border bg-muted hover:bg-secondary text-foreground transition-colors disabled:opacity-50 text-left"
             >
-              <span className="text-lg leading-none">🔄</span>
+              <span className="w-8 h-8 rounded-md bg-background/60 flex items-center justify-center shrink-0 text-muted-foreground">
+                <RefreshCw size={16} strokeWidth={2} className={runtimeAction === 'update' ? 'animate-spin' : ''} />
+              </span>
               <div>
-                <p className="text-sm font-medium">{runtimeAction === 'update' ? 'Checking…' : 'Run Update Check Now'}</p>
+                <p className="text-sm font-medium">{runtimeAction === 'update' ? 'Checking…' : 'Run update check now'}</p>
                 <p className="text-xs opacity-70 mt-0.5">Force a container image refresh</p>
               </div>
             </button>
@@ -514,9 +518,11 @@ const Dashboard = () => {
               to="/servers"
               className="flex items-center gap-3 p-3 rounded-lg border border-border hover:bg-muted text-foreground transition-colors"
             >
-              <span className="text-lg leading-none">🖥</span>
+              <span className="w-8 h-8 rounded-md bg-background/60 flex items-center justify-center shrink-0 text-muted-foreground">
+                <Server size={16} strokeWidth={2} />
+              </span>
               <div>
-                <p className="text-sm font-medium">Manage Servers</p>
+                <p className="text-sm font-medium">Manage servers</p>
                 <p className="text-xs text-muted-foreground mt-0.5">Add or monitor infrastructure nodes</p>
               </div>
             </Link>

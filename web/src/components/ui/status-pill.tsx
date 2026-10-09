@@ -26,7 +26,7 @@ const TONE: Record<
 > = {
   healthy: {
     label: 'Healthy',
-    bg: 'bg-emerald-500/15', text: 'text-emerald-800', border: 'border-emerald-300',
+    bg: 'bg-emerald-500/15', text: 'text-emerald-700 dark:text-emerald-300', border: 'border-emerald-500/30',
     icon: (
       <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
         <polyline points="20 6 9 17 4 12" />
@@ -35,7 +35,7 @@ const TONE: Record<
   },
   running: {
     label: 'Running',
-    bg: 'bg-blue-500/15', text: 'text-blue-800', border: 'border-blue-300',
+    bg: 'bg-blue-500/15', text: 'text-blue-700 dark:text-blue-300', border: 'border-blue-500/30',
     icon: (
       <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="animate-spin">
         <path d="M21 12a9 9 0 1 1-6.22-8.56" />
@@ -44,7 +44,7 @@ const TONE: Record<
   },
   warning: {
     label: 'Warning',
-    bg: 'bg-accent/10', text: 'text-accent', border: 'border-amber-300',
+    bg: 'bg-accent/15', text: 'text-accent', border: 'border-accent/30',
     icon: (
       <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
         <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
