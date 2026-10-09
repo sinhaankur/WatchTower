@@ -828,6 +828,7 @@
       </a>
       <nav class="nav-links" aria-label="Site">
         <a href="#how">How it works</a>
+        <a href="#install">Install</a>
         <a class="nav-secondary" href="/WatchTower/how-it-works/">Under the hood</a>
         <a href="/WatchTower/compare/">Compare</a>
         <a href="/WatchTower/pricing/">Pricing</a>
@@ -871,10 +872,13 @@
         <p class="hero-otherplatforms reveal" style="--d:195ms; margin:.6rem 0 0; font-size:.85rem;">
           <a class="js-download-all" href="https://github.com/sinhaankur/WatchTower/releases/latest" target="_blank" rel="noopener" style="color:var(--muted); text-decoration: underline; text-underline-offset: 3px;">Need a different platform or version?</a>
         </p>
-        <div class="install-line reveal" style="--d:210ms;" role="group" aria-label="Install with pip">
-          <span><span class="prompt">$</span> <span class="cmd" id="pip-cmd">pip install watchtower-podman</span></span>
-          <button type="button" class="install-copy" id="pip-copy" aria-label="Copy pip install command">copy</button>
+        <div class="install-line reveal" style="--d:210ms;" role="group" aria-label="Install with one command">
+          <span><span class="prompt">$</span> <span class="cmd" id="pip-cmd">curl -fsSL https://sinhaankur.github.io/WatchTower/install.sh | sh</span></span>
+          <button type="button" class="install-copy" id="pip-copy" aria-label="Copy install command">copy</button>
         </div>
+        <p class="reveal" style="--d:225ms; margin:.5rem 0 0; font-size:.82rem; color:var(--muted);">
+          or <a href="#install" style="color:var(--ink-dim); text-decoration:underline; text-underline-offset:3px;">brew, pip, Docker &amp; direct download →</a>
+        </p>
         <p class="hero-meta reveal" style="--d:240ms;">
           <span class="version-badge">v2.1.0 · Open Source</span>
           <span>Apache-2.0 + ELv2</span>
@@ -1104,6 +1108,51 @@
             </tbody>
           </table>
           <p class="footnote">Reflects public feature sets as of mid-2026.</p>
+        </div>
+      </section>
+    </div>
+
+    <!-- ── Install (every way in) ─────────────────────────────────── -->
+    <div class="wrap">
+      <section id="install">
+        <p class="kicker reveal">Install</p>
+        <h2 class="headline reveal" style="--d:60ms;">Pick your way in.</h2>
+        <p class="lede reveal" style="--d:120ms;">
+          Desktop app or headless server, one command or a click — all free, all
+          on hardware you own. macOS, Linux &amp; Windows.
+        </p>
+
+        <div class="grid reveal" style="--d:160ms;">
+          <article class="card">
+            <h3>One command</h3>
+            <p>Detects your OS, grabs the right installer, opens it.</p>
+            <div class="step-visual" style="margin-top:14px;"><span class="dim">$</span> curl -fsSL https://sinhaankur.github.io/WatchTower/install.sh | sh</div>
+          </article>
+          <article class="card">
+            <h3>Homebrew (macOS)</h3>
+            <p>The Mac app, managed by brew.</p>
+            <div class="step-visual" style="margin-top:14px;"><span class="dim">$</span> brew install --cask sinhaankur/tap/watchtower</div>
+          </article>
+          <article class="card">
+            <h3>Python / headless</h3>
+            <p>Just the server — great for a mini-PC or VPS.</p>
+            <div class="step-visual" style="margin-top:14px;"><span class="dim">$</span> pip install watchtower-podman</div>
+          </article>
+          <article class="card">
+            <h3>Docker</h3>
+            <p>Running in one line; nothing installed on the host.</p>
+            <div class="step-visual" style="margin-top:14px;"><span class="dim">$</span> docker run -p 8000:8000 ghcr.io/sinhaankur/watchtower</div>
+          </article>
+          <article class="card">
+            <h3>Direct download</h3>
+            <p>Signed installers for every platform.</p>
+            <p style="margin-top:14px;"><a href="https://github.com/sinhaankur/WatchTower/releases/latest" target="_blank" rel="noopener" style="color:var(--accent); font-weight:700;">All downloads →</a></p>
+          </article>
+          <article class="card">
+            <h3>VS Code</h3>
+            <p>Deploy &amp; watch builds from your editor.</p>
+            <p style="margin-top:14px;"><a href="https://marketplace.visualstudio.com/items?itemName=sinhaankur.watchtower-podman" target="_blank" rel="noopener" style="color:var(--accent); font-weight:700;">Get the extension →</a></p>
+          </article>
         </div>
       </section>
     </div>

@@ -48,11 +48,36 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # Docker Hub is more discoverable than GHCR for many users ("docker run
+      # watchtower/watchtower"). Mirror the same multi-arch image there too —
+      # but ONLY if the credentials are configured, so the build never breaks
+      # for a fork or before Docker Hub is set up.
+      - name: Check Docker Hub secrets
+        id: dockerhub
+        run: |
+          if [ -n "${{ secrets.DOCKERHUB_USERNAME }}" ] && [ -n "${{ secrets.DOCKERHUB_TOKEN }}" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Docker Hub secrets not set — publishing to GHCR only. Add DOCKERHUB_USERNAME + DOCKERHUB_TOKEN to also push to Docker Hub."
+          fi
+
+      - name: Log in to Docker Hub
+        if: steps.dockerhub.outputs.enabled == 'true'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
       - name: Extract Docker metadata
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/${{ github.repository_owner }}/watchtower
+          # GHCR always; Docker Hub too when configured. metadata-action fans
+          # the same tag set across every image name listed here.
+          images: |
+            ghcr.io/${{ github.repository_owner }}/watchtower
+            ${{ steps.dockerhub.outputs.enabled == 'true' && format('{0}/watchtower', secrets.DOCKERHUB_USERNAME) || '' }}
           tags: |
             type=ref,event=branch
             type=ref,event=tag
