@@ -68,7 +68,7 @@ function Toast({ t }: { t: ToastMessage }) {
   const tone =
     t.kind === 'success' ? 'border-emerald-300 bg-emerald-50 text-emerald-800'
     : t.kind === 'error'   ? 'border-destructive/40 bg-destructive/10 text-destructive'
-    : t.kind === 'warning' ? 'border-amber-300 bg-accent/10 text-amber-900'
+    : t.kind === 'warning' ? 'border-amber-300 bg-accent/10 text-accent'
     :                        'border-border bg-card text-foreground';
 
   // Dual-cue: icon next to colored chrome so the message is parseable

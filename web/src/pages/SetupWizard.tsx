@@ -734,8 +734,8 @@ const SetupWizard = () => {
                       </ul>
                       {data.deployment_target === 'remote_ssh' && hasNodes === false && (
                         <div className="mt-3 rounded border border-amber-300 bg-accent/10 px-3 py-2 text-xs">
-                          <p className="text-amber-900">No servers added yet — you'll add one in the Servers tab after creating this project, or click below to do it now.</p>
-                          <Link to="/servers" className="inline-block mt-1 text-amber-900 underline">
+                          <p className="text-accent">No servers added yet — you'll add one in the Servers tab after creating this project, or click below to do it now.</p>
+                          <Link to="/servers" className="inline-block mt-1 text-accent underline">
                             → Add a server now
                           </Link>
                         </div>
@@ -1191,7 +1191,7 @@ const SetupWizard = () => {
                       <p className="text-sm text-muted-foreground">Picking a free port…</p>
                     ) : recommendedPort === 'error' ? (
                       <div className="flex items-center gap-3">
-                        <p className="text-sm text-amber-800">
+                        <p className="text-sm text-accent">
                           Couldn't auto-pick a port (no free port in 3000-3999, or the API is unreachable).
                         </p>
                         <Input
@@ -1270,13 +1270,13 @@ const SetupWizard = () => {
           {hasNodes === false && data.deployment_model === 'self_hosted' && (
             <Card className="rounded-xl shadow-none border-amber-300 bg-accent/10">
               <CardContent className="py-4">
-                <p className="text-xs font-semibold text-amber-900 mb-1">⚠ Server node required</p>
-                <p className="text-xs text-amber-800 mb-2">
+                <p className="text-xs font-semibold text-accent mb-1">⚠ Server node required</p>
+                <p className="text-xs text-accent mb-2">
                   No deployment nodes are registered. Add one in Servers before deploying.
                 </p>
                 <Link
                   to="/servers"
-                  className="text-xs font-medium text-amber-900 underline underline-offset-2 hover:text-accent"
+                  className="text-xs font-medium text-accent underline underline-offset-2 hover:text-accent"
                 >
                   → Go to Servers
                 </Link>

@@ -160,7 +160,7 @@ function ProviderCard({
       </div>
 
       {provider.hint && (
-        <div className="rounded-lg border border-accent/25 bg-accent/10 px-3 py-2 text-xs text-amber-900">
+        <div className="rounded-lg border border-accent/25 bg-accent/10 px-3 py-2 text-xs text-accent">
           {provider.hint}
         </div>
       )}
@@ -261,7 +261,7 @@ function StatusBadge({ provider }: { provider: RemoteAccessProvider }) {
     cls = 'bg-blue-50 text-blue-700 border-blue-200';
   } else if (provider.installed) {
     label = 'Needs setup';
-    cls = 'bg-accent/10 text-amber-800 border-accent/25';
+    cls = 'bg-accent/10 text-accent border-accent/25';
   }
   return (
     <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${cls}`}>

@@ -196,8 +196,8 @@ const Services = () => {
       <main className="px-4 sm:px-6 lg:px-8 py-6 max-w-5xl mx-auto w-full space-y-6">
         {!connected && (
           <div className="rounded-xl border border-amber-300 bg-accent/10 p-4">
-            <p className="text-sm font-semibold text-amber-900">Podman isn't running</p>
-            <p className="text-xs text-amber-800 mt-0.5">
+            <p className="text-sm font-semibold text-accent">Podman isn't running</p>
+            <p className="text-xs text-accent mt-0.5">
               One-click services run as local Podman containers. Head to the{' '}
               <Link to="/local-containers" className="underline font-medium">Containers page</Link>{' '}
               and click <strong>Start Podman</strong>, then come back here.

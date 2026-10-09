@@ -323,7 +323,7 @@ const TeamManagement = () => {
           <div className="flex items-start gap-3 border border-accent/25 bg-accent/10 rounded-md px-4 py-3">
             <span className="text-amber-500 mt-0.5">⚠</span>
             <div>
-              <p className="text-sm font-medium text-amber-800">Connection issue</p>
+              <p className="text-sm font-medium text-accent">Connection issue</p>
               <p className="text-sm text-accent mt-0.5">{pageError}</p>
             </div>
           </div>
@@ -353,7 +353,7 @@ const TeamManagement = () => {
                 They can also use this link:
               </p>
             ) : (
-              <p className="text-sm text-amber-900">
+              <p className="text-sm text-accent">
                 <span className="font-medium">Invite ready for {lastInvite.email}.</span>{' '}
                 Email auto-send isn't set up yet — copy this secure link and send it however you like
                 (Slack, iMessage, etc.). It's tied to their email, so only they can accept it.
@@ -373,7 +373,7 @@ const TeamManagement = () => {
             {!lastInvite.emailSent && (
               <p className="text-xs text-accent">
                 Tired of copying links?{' '}
-                <a href="/settings" className="underline font-medium hover:text-amber-900">
+                <a href="/settings" className="underline font-medium hover:text-accent">
                   Set up email in Settings
                 </a>{' '}
                 and future invitations send themselves.
@@ -438,7 +438,7 @@ const TeamManagement = () => {
                 </div>
               ) : (
                 <div className="rounded-md border border-accent/25 bg-accent/10 px-3 py-2">
-                  <p className="text-xs font-medium text-amber-800">No managed GitHub application is connected yet.</p>
+                  <p className="text-xs font-medium text-accent">No managed GitHub application is connected yet.</p>
                   <p className="text-xs text-accent mt-0.5">Connect one now to keep repository access managed and auditable.</p>
                 </div>
               )}

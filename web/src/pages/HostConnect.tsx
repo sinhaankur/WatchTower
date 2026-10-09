@@ -523,7 +523,7 @@ const HostConnect = () => {
               {missingTools.length > 0 && (
                 <div className="mt-3 flex flex-wrap gap-2">
                   {missingTools.map((name) => (
-                    <span key={name} className="rounded-full border border-amber-300 bg-accent/10 px-2 py-1 text-xs font-medium text-amber-800">
+                    <span key={name} className="rounded-full border border-amber-300 bg-accent/10 px-2 py-1 text-xs font-medium text-accent">
                       {TOOL_LABELS[name]}
                     </span>
                   ))}
@@ -557,7 +557,7 @@ const HostConnect = () => {
                 </p>
               )}
               {missingTools.length > 0 && !loading && (
-                <div className="mt-3 rounded-lg border border-accent/25 bg-accent/10 px-3 py-2 text-xs text-amber-900">
+                <div className="mt-3 rounded-lg border border-accent/25 bg-accent/10 px-3 py-2 text-xs text-accent">
                   Missing now: {missingTools.map((tool) => TOOL_LABELS[tool]).join(', ')}.
                 </div>
               )}

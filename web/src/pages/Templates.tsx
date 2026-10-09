@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { Workflow, BarChart3, FileText, Activity, Database, Globe, Package } from 'lucide-react';
 import apiClient from '@/lib/api';
 import Skeleton from '@/components/Skeleton';
 import EmptyState from '@/components/EmptyState';
@@ -25,14 +26,28 @@ type Template = {
   notes: string | null;
 };
 
+// Category badges use alpha tints of each hue so they read correctly in BOTH
+// light and dark (the old solid -50/-700 pairs looked washed-out on dark).
 const CATEGORY_BADGE: Record<string, string> = {
-  automation: 'border-violet-300 bg-violet-50 text-violet-700',
-  analytics: 'border-blue-300 bg-blue-50 text-blue-700',
-  content: 'border-emerald-300 bg-emerald-50 text-emerald-700',
-  monitoring: 'border-amber-300 bg-accent/10 text-accent',
-  database: 'border-border bg-muted text-foreground/90',
-  static: 'border-border bg-muted text-foreground/90',
-  other: 'border-border bg-muted text-foreground/90',
+  automation: 'border-violet-500/30 bg-violet-500/15 text-violet-400 dark:text-violet-300',
+  analytics:  'border-blue-500/30 bg-blue-500/15 text-blue-500 dark:text-blue-300',
+  content:    'border-emerald-500/30 bg-emerald-500/15 text-emerald-500 dark:text-emerald-300',
+  monitoring: 'border-accent/30 bg-accent/15 text-accent',
+  database:   'border-border bg-muted text-muted-foreground',
+  static:     'border-border bg-muted text-muted-foreground',
+  other:      'border-border bg-muted text-muted-foreground',
+};
+
+// A meaningful lucide icon per category — replaces the generic "first-two-letters"
+// placeholder so each template reads at a glance.
+const CATEGORY_ICON: Record<string, typeof Workflow> = {
+  automation: Workflow,
+  analytics:  BarChart3,
+  content:    FileText,
+  monitoring: Activity,
+  database:   Database,
+  static:     Globe,
+  other:      Package,
 };
 
 // Slug-safe project name: lowercase, hyphenated, no leading digit issues.
@@ -60,9 +75,14 @@ function TemplateCard({
       className="anim-fade-in-up rounded-xl border border-border bg-card p-4 shadow-retro flex flex-col gap-3 transition-shadow hover:shadow-retro"
     >
       <div className="flex items-start gap-3">
-        <div className="w-9 h-9 rounded-lg border border-border bg-amber-100 flex items-center justify-center text-xs font-mono font-bold text-foreground shadow-retro uppercase">
-          {template.slug.slice(0, 2)}
-        </div>
+        {(() => {
+          const Icon = CATEGORY_ICON[template.category ?? 'other'] ?? Package;
+          return (
+            <div className="w-10 h-10 rounded-lg border border-border bg-accent/10 flex items-center justify-center text-accent shrink-0">
+              <Icon size={18} strokeWidth={2} />
+            </div>
+          );
+        })()}
         <div className="flex-1 min-w-0">
           <h2 className="text-sm font-semibold text-foreground truncate">{template.name}</h2>
           <span
@@ -88,7 +108,7 @@ function TemplateCard({
       </div>
 
       {template.notes && (
-        <p className="text-xs text-amber-800 bg-accent/10 border border-accent/25 rounded px-2 py-1">
+        <p className="text-xs text-accent bg-accent/10 border border-accent/25 rounded px-2 py-1">
           {template.notes}
         </p>
       )}
@@ -118,7 +138,7 @@ function TemplateCard({
               <ul className="space-y-1">
                 {placeholders.map((v) => (
                   <li key={v.key} className="text-[10.5px] text-muted-foreground flex items-start gap-1.5">
-                    <code className="font-mono text-amber-800 bg-accent/10 border border-accent/25 rounded px-1 shrink-0">{v.key}</code>
+                    <code className="font-mono text-accent bg-accent/10 border border-accent/25 rounded px-1 shrink-0">{v.key}</code>
                     {v.description && <span className="text-muted-foreground">{v.description}</span>}
                   </li>
                 ))}
@@ -145,9 +165,12 @@ function TemplateCard({
         </div>
       ) : (
         <div className="flex items-center gap-2 pt-1 mt-auto">
+          {/* Demoted to outline: in the gallery, every card had a filled amber
+              button (6+ competing primaries). The amber primary now appears only
+              when you expand a card to configure it ("Create project"). */}
           <button
             onClick={() => setOpen(true)}
-            className="flex-1 text-xs px-3 py-1.5 rounded-lg border border-border bg-primary hover:bg-primary/90 text-primary-foreground font-semibold shadow-retro"
+            className="flex-1 inline-flex items-center justify-center gap-1.5 text-sm px-3 h-9 rounded-lg border border-border bg-card hover:bg-muted hover:border-accent/50 text-foreground font-medium transition-colors"
           >
             Use this template
           </button>
@@ -246,15 +269,12 @@ export default function Templates() {
   });
 
   return (
-    <div className="flex-1 overflow-auto bg-muted">
-      <header
-        className="px-4 sm:px-6 lg:px-8 py-4 border-b flex items-center justify-between"
-        style={{ borderColor: 'hsl(var(--border-soft))' }}
-      >
-        <div>
-          <h1 className="text-lg font-semibold text-foreground">Templates</h1>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            Pre-baked recipes for common self-hosted apps. One click → new project pre-filled with the right repo, env vars, and config hints.
+    <div className="flex-1 overflow-auto bg-background">
+      <header className="px-5 sm:px-8 lg:px-10 py-5 border-b border-border flex items-center justify-between gap-4 sticky top-0 z-10 bg-background/80 backdrop-blur-sm">
+        <div className="min-w-0">
+          <h1 className="text-xl font-semibold text-foreground tracking-tight">Templates</h1>
+          <p className="text-sm text-muted-foreground mt-1 hidden sm:block">
+            Known-good recipes for common self-hosted apps — one click to a pre-wired project.
           </p>
         </div>
         <input
@@ -296,7 +316,7 @@ export default function Templates() {
             {error.status === 401 && (
               <Link
                 to="/login"
-                className="shrink-0 px-2.5 py-1 rounded-md bg-foreground text-white text-xs font-medium hover:bg-slate-800"
+                className="shrink-0 px-2.5 py-1 rounded-md bg-foreground text-background text-xs font-medium hover:opacity-90"
               >
                 Sign in →
               </Link>
@@ -305,7 +325,7 @@ export default function Templates() {
               <button
                 type="button"
                 onClick={() => window.location.reload()}
-                className="shrink-0 px-2.5 py-1 rounded-md border border-destructive/40 text-destructive text-xs font-medium hover:bg-red-100"
+                className="shrink-0 px-2.5 py-1 rounded-md border border-destructive/40 text-destructive text-xs font-medium hover:bg-destructive/15"
               >
                 Retry
               </button>

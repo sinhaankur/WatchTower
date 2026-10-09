@@ -209,7 +209,7 @@ function VSCodeCard() {
         {/* Install instructions */}
         {!loading && !status?.installed && (
           <div className="rounded-lg border border-amber-300 bg-accent/10 p-4 space-y-2">
-            <p className="text-xs font-semibold text-amber-800 uppercase tracking-wide">Install VS Code on Host</p>
+            <p className="text-xs font-semibold text-accent uppercase tracking-wide">Install VS Code on Host</p>
             <p className="text-xs text-accent">{status?.install_instructions[os] ?? 'Visit https://code.visualstudio.com/download'}</p>
             <div className="flex items-center gap-2 p-2 rounded bg-card border border-accent/25 mt-1">
               <code className="text-xs font-mono text-foreground/90 flex-1">sudo snap install --classic code</code>
@@ -283,7 +283,7 @@ function UpdateCheckCard() {
           </p>
         </div>
         {data?.has_update ? (
-          <span className="text-xs px-2 py-0.5 rounded-full border font-medium border-amber-300 bg-accent/10 text-amber-800">
+          <span className="text-xs px-2 py-0.5 rounded-full border font-medium border-amber-300 bg-accent/10 text-accent">
             Update available
           </span>
         ) : data?.latest ? (
@@ -296,10 +296,10 @@ function UpdateCheckCard() {
       {data?.has_update && (
         <div className="rounded-lg border border-accent/25 bg-accent/10 p-3 mb-3 flex items-start gap-3">
           <div className="flex-1">
-            <p className="text-xs text-amber-900">
+            <p className="text-xs text-accent">
               <strong>{data.release_name ?? `v${data.latest}`}</strong> is available.
             </p>
-            <p className="text-xs text-amber-800 mt-0.5">
+            <p className="text-xs text-accent mt-0.5">
               {isElectron
                 ? 'Click Update Now to download and install in the background — the app will restart when ready.'
                 : 'Open the release page to download the new build.'}
@@ -310,7 +310,7 @@ function UpdateCheckCard() {
               href={data.release_url}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-xs px-3 py-1.5 rounded-lg border border-amber-700 bg-card text-amber-800 hover:bg-amber-100 font-medium shrink-0"
+              className="text-xs px-3 py-1.5 rounded-lg border border-amber-700 bg-card text-accent hover:bg-amber-100 font-medium shrink-0"
             >
               Release notes →
             </a>
@@ -694,7 +694,7 @@ function BackupCard() {
 
       {!loading && status && !status.supported && (
         <div className="rounded-lg border border-amber-300 bg-accent/10 p-3">
-          <p className="text-xs text-amber-800">
+          <p className="text-xs text-accent">
             This install uses a non-SQLite database. Use your database's native backup tool
             (e.g. <code className="font-mono bg-card px-1 rounded">pg_dump</code>) and back up
             <code className="font-mono bg-card px-1 rounded">~/.watchtower/secret.key</code> separately.
@@ -706,8 +706,8 @@ function BackupCard() {
       {!loading && status && status.supported && (
         <>
           <div className="rounded-lg border border-amber-300 bg-accent/10 p-3 mb-3">
-            <p className="text-xs text-amber-900 font-medium">⚠ Contains credentials</p>
-            <p className="text-xs text-amber-800 mt-0.5">
+            <p className="text-xs text-accent font-medium">⚠ Contains credentials</p>
+            <p className="text-xs text-accent mt-0.5">
               The backup file contains your Fernet encryption key plus the SQLite database
               with all encrypted secrets (GitHub PATs, SSH keys, env var values). Store it
               somewhere as secure as your password manager — anyone with this file can

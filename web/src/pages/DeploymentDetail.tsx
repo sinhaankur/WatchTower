@@ -292,7 +292,7 @@ export default function DeploymentDetail() {
             </button>
             {isLive && (
               <button onClick={() => void action('rollback')} disabled={!!busy}
-                className="text-xs px-3 py-1.5 rounded-lg border border-amber-300 bg-accent/10 hover:bg-amber-100 text-amber-800 disabled:opacity-50">
+                className="text-xs px-3 py-1.5 rounded-lg border border-amber-300 bg-accent/10 hover:bg-amber-100 text-accent disabled:opacity-50">
                 {busy === 'rollback' ? 'Rolling back…' : '↶ Rollback'}
               </button>
             )}

@@ -93,8 +93,8 @@ function UpdateBanner() {
   else if (lastState === 'failed') label = 'Update failed — retry';
 
   return (
-    <div className="flex items-center gap-3 px-4 py-2 bg-accent/10 border-b border-accent/25 text-amber-900 text-xs">
-      <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-primary text-amber-900 text-xs font-bold">!</span>
+    <div className="flex items-center gap-3 px-4 py-2 bg-accent/10 border-b border-accent/25 text-accent text-xs">
+      <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-primary text-accent text-xs font-bold">!</span>
       <span className="flex-1">
         <strong>WatchTower {data.latest}</strong> is available
         {data.current && <> — you're on <span className="font-mono">{data.current}</span></>}.
@@ -110,7 +110,7 @@ function UpdateBanner() {
           href={data.release_url}
           target="_blank"
           rel="noopener noreferrer"
-          className="px-2 py-0.5 rounded border border-amber-700 bg-card text-amber-800 hover:bg-amber-100 font-medium"
+          className="px-2 py-0.5 rounded border border-amber-700 bg-card text-accent hover:bg-amber-100 font-medium"
         >
           Release notes
         </a>
@@ -127,7 +127,7 @@ function UpdateBanner() {
       <button
         onClick={dismiss}
         title="Dismiss until next release"
-        className="ml-1 text-accent hover:text-amber-900"
+        className="ml-1 text-accent hover:text-accent"
         aria-label="Dismiss update banner"
       >
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -543,7 +543,7 @@ export default function Layout({ children }: { children: ReactNode }) {
                     ? 'bg-red-100 text-destructive border border-destructive/40'
                     : envInfo.env === 'production'
                       ? 'bg-muted text-muted-foreground border border-border'
-                      : 'bg-amber-100 text-amber-800 border border-amber-300'
+                      : 'bg-amber-100 text-accent border border-amber-300'
                 }`}
                 title={`mode: ${envInfo.mode} · env: ${envInfo.env}${envInfo.insecure_dev_auth ? ' · INSECURE DEV AUTH' : ''}`}
               >
@@ -555,7 +555,7 @@ export default function Layout({ children }: { children: ReactNode }) {
             <button
               type="button"
               onClick={() => void triggerUpdate(updateData.release_url)}
-              className="text-xs text-accent hover:text-amber-900 font-medium inline-flex items-center gap-1"
+              className="text-xs text-accent hover:text-accent font-medium inline-flex items-center gap-1"
               title={`Update to ${updateData.latest} — click to install`}
             >
               <span className="w-1.5 h-1.5 rounded-full bg-primary" />

@@ -318,7 +318,7 @@ function HealthCheckCard({ projectId }: { projectId: string }) {
     result?.status === 'healthy'
       ? 'border-emerald-300 bg-emerald-50 text-emerald-700'
       : result?.status === 'unhealthy'
-        ? 'border-amber-300 bg-accent/10 text-amber-800'
+        ? 'border-amber-300 bg-accent/10 text-accent'
         : result?.status === 'unreachable'
           ? 'border-destructive/40 bg-destructive/10 text-destructive'
           : 'border-border bg-muted text-muted-foreground';
@@ -896,7 +896,7 @@ function ProjectDbLinkRow({
           {link.database_kind}
         </span>
         {!link.is_active && (
-          <span className="text-xs px-1.5 py-0.5 rounded-full border font-medium bg-accent/10 text-amber-800 border-accent/25">
+          <span className="text-xs px-1.5 py-0.5 rounded-full border font-medium bg-accent/10 text-accent border-accent/25">
             paused
           </span>
         )}
@@ -1573,7 +1573,7 @@ function DeploymentsTab({ projectId }: { projectId: string }) {
                           onClick={() => void runRollback(d.id)}
                           disabled={isRollingBack}
                           title="Roll back to the previous successful deployment"
-                          className="text-xs px-2 py-1 rounded border border-amber-300 bg-accent/10 hover:bg-amber-100 text-amber-800 transition-colors disabled:opacity-50"
+                          className="text-xs px-2 py-1 rounded border border-amber-300 bg-accent/10 hover:bg-amber-100 text-accent transition-colors disabled:opacity-50"
                         >
                           {isRollingBack ? 'Rolling back…' : '↶ Rollback'}
                         </button>
@@ -1683,7 +1683,7 @@ function DiagnosisPanel({ state, deploymentId, onApplied }: DiagnosisPanelProps)
         <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${
           isUnknown
             ? 'border-border bg-muted text-foreground/90'
-            : 'border-amber-300 bg-accent/10 text-amber-800'
+            : 'border-amber-300 bg-accent/10 text-accent'
         }`}>
           {KIND_LABEL[d.kind]}
         </span>
@@ -2147,7 +2147,7 @@ function WebhooksTab({ projectId }: { projectId: string }) {
         </p>
 
         {showGuide && provider === 'slack' && (
-          <div className="rounded-lg border border-accent/25 bg-accent/10 p-3 mb-4 text-xs text-amber-900 space-y-2">
+          <div className="rounded-lg border border-accent/25 bg-accent/10 p-3 mb-4 text-xs text-accent space-y-2">
             <p className="font-semibold">Slack Incoming Webhook setup (~2 min):</p>
             <ol className="list-decimal pl-5 space-y-1">
               <li>Go to <a href="https://api.slack.com/apps" target="_blank" rel="noopener noreferrer" className="underline font-mono">api.slack.com/apps</a> → <strong>Create New App</strong> → <strong>From scratch</strong>.</li>
@@ -2577,7 +2577,7 @@ function DomainsTab({ projectId }: { projectId: string }) {
           Without it, you'll still need to point the DNS record at this server manually.
         </p>
         {creds && creds.length === 0 && (
-          <div className="flex items-start gap-2 rounded-md border border-accent/25 bg-accent/10 px-2.5 py-2 text-xs text-amber-800">
+          <div className="flex items-start gap-2 rounded-md border border-accent/25 bg-accent/10 px-2.5 py-2 text-xs text-accent">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="mt-0.5 shrink-0">
               <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
               <line x1="12" y1="9" x2="12" y2="13" />
@@ -2585,7 +2585,7 @@ function DomainsTab({ projectId }: { projectId: string }) {
             </svg>
             <div>
               <strong>Cloudflare not connected.</strong> You can still add a domain, but DNS won't auto-update.{' '}
-              <a href="/integrations" className="underline hover:text-amber-900">Connect Cloudflare →</a>
+              <a href="/integrations" className="underline hover:text-accent">Connect Cloudflare →</a>
             </div>
           </div>
         )}
@@ -3075,7 +3075,7 @@ function RunLocallyCard({ projectId }: { projectId: string }) {
               {run.kind === 'python-http-server' && (
                 <span
                   title="Served by Python's built-in http.server (no Podman). Fine for previewing static files; not a production server."
-                  className="inline-flex text-[10.5px] px-2 py-0.5 rounded-full border border-amber-300 bg-accent/10 text-amber-800"
+                  className="inline-flex text-[10.5px] px-2 py-0.5 rounded-full border border-amber-300 bg-accent/10 text-accent"
                 >
                   Static preview
                 </span>

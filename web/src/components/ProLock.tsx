@@ -86,7 +86,7 @@ export function ProBadge({ size = 'sm' }: { size?: 'sm' | 'xs' }) {
     : 'text-xs px-1.5 py-0.5';
   return (
     <span
-      className={`inline-flex items-center gap-0.5 rounded font-bold uppercase tracking-wide bg-amber-100 text-amber-800 border border-amber-300 ${cls}`}
+      className={`inline-flex items-center gap-0.5 rounded font-bold uppercase tracking-wide bg-amber-100 text-accent border border-amber-300 ${cls}`}
       title="Pro feature"
     >
       🔒 Pro

@@ -623,7 +623,7 @@ function WatchTowerServiceCard() {
                   ? 'bg-emerald-50 border-emerald-300 text-emerald-700'
                   : installed
                     ? 'bg-muted border-border text-muted-foreground'
-                    : 'bg-accent/10 border-amber-300 text-amber-800'
+                    : 'bg-accent/10 border-amber-300 text-accent'
               }`}>
                 {enabled ? 'Enabled on boot' : installed ? 'Disabled' : 'Not installed'}
               </span>
@@ -649,7 +649,7 @@ function WatchTowerServiceCard() {
       </div>
 
       {!installed && (
-        <div className="mt-3 rounded-lg bg-accent/10 border border-accent/25 px-3 py-2 text-xs text-amber-900">
+        <div className="mt-3 rounded-lg bg-accent/10 border border-accent/25 px-3 py-2 text-xs text-accent">
           The systemd unit isn't installed. Run <code className="font-mono bg-card border border-accent/25 px-1 rounded">scripts/install-watchtower-linux-full.sh</code> once from the source tree to install <code className="font-mono">watchtower.service</code>, then come back here to enable it.
         </div>
       )}

@@ -313,7 +313,7 @@ function ManagedTabContent({
     <>
       <ManagedDbDiagram />
       {runtime && !runtime.available && (
-        <div className="rounded-lg border border-accent/25 bg-accent/10 px-4 py-3 text-xs text-amber-900">
+        <div className="rounded-lg border border-accent/25 bg-accent/10 px-4 py-3 text-xs text-accent">
           No container runtime found on this host.{' '}
           <a
             href="https://podman.io/docs/installation"
@@ -1138,7 +1138,7 @@ function ReplicaRow({
             <button
               onClick={() => setConfirm('promote')}
               disabled={busy}
-              className="px-2 py-1 rounded-md border border-amber-300 bg-accent/10 text-xs text-amber-900 hover:bg-amber-100 transition-colors disabled:opacity-50"
+              className="px-2 py-1 rounded-md border border-amber-300 bg-accent/10 text-xs text-accent hover:bg-amber-100 transition-colors disabled:opacity-50"
               title="Promote this standby to primary (manual failover)"
             >
               Promote
@@ -1166,7 +1166,7 @@ function ReplicaRow({
 
       {confirm === 'promote' && (
         <div className="rounded-md border border-amber-300 bg-accent/10 px-3 py-2 space-y-2">
-          <p className="text-xs text-amber-900">
+          <p className="text-xs text-accent">
             Promote <span className="font-mono">{replica.name}</span> to primary? The current primary will be stopped and apps must switch connection strings to <span className="font-mono">{replica.host}:{replica.port}</span>.
           </p>
           <div className="flex items-center gap-2">
@@ -1186,7 +1186,7 @@ function ReplicaRow({
             <button
               onClick={() => setConfirm(null)}
               disabled={busy}
-              className="px-2 py-1 rounded-md border border-amber-400 bg-card text-xs text-amber-900 disabled:opacity-50"
+              className="px-2 py-1 rounded-md border border-amber-400 bg-card text-xs text-accent disabled:opacity-50"
             >
               Cancel
             </button>
@@ -1232,7 +1232,7 @@ function ReplicaStatusBadge({ status }: { status: ManagedDbReplica['status'] }) 
     initializing: 'bg-blue-50 text-blue-700 border-blue-200',
     streaming: 'bg-emerald-50 text-emerald-700 border-emerald-200',
     failed: 'bg-destructive/10 text-destructive border-destructive/30',
-    promoted: 'bg-accent/10 text-amber-800 border-accent/25',
+    promoted: 'bg-accent/10 text-accent border-accent/25',
   };
   return (
     <span className={`text-xs px-1.5 py-0.5 rounded-full border font-medium ${map[status]}`}>
@@ -1394,7 +1394,7 @@ function BackupRow({
                 setConfirm('restore');
               }}
               disabled={busy || primaryDb.status !== 'running'}
-              className="px-2 py-1 rounded-md border border-amber-300 bg-accent/10 text-xs text-amber-900 hover:bg-amber-100 transition-colors disabled:opacity-50"
+              className="px-2 py-1 rounded-md border border-amber-300 bg-accent/10 text-xs text-accent hover:bg-amber-100 transition-colors disabled:opacity-50"
               title={primaryDb.status !== 'running' ? 'Target DB must be running' : 'Restore this backup, replacing live data'}
             >
               Restore
@@ -1703,7 +1703,7 @@ function RestoreConfirm({
             checked={mode === 'in-place'}
             onChange={() => setMode('in-place')}
           />
-          <span className="text-amber-900">In place (replace live data)</span>
+          <span className="text-accent">In place (replace live data)</span>
         </label>
         <label className="flex items-center gap-1.5 cursor-pointer">
           <input
@@ -1713,19 +1713,19 @@ function RestoreConfirm({
             checked={mode === 'new'}
             onChange={() => setMode('new')}
           />
-          <span className="text-amber-900">To a new database (keeps original)</span>
+          <span className="text-accent">To a new database (keeps original)</span>
         </label>
       </div>
 
       {mode === 'in-place' && (
         <>
-          <p className="text-xs text-amber-900">
+          <p className="text-xs text-accent">
             <span className="font-semibold">Destructive:</span> drops every object in{' '}
             <span className="font-mono">{primaryDb.name}</span> and recreates it from the backup.
             Click <span className="font-semibold">Backup now</span> first if you want a rollback point.
           </p>
           <div className="flex items-center gap-2 flex-wrap">
-            <p className="text-xs text-amber-900 whitespace-nowrap">
+            <p className="text-xs text-accent whitespace-nowrap">
               Type <span className="font-mono font-semibold">{primaryDb.name}</span> to confirm:
             </p>
             <input
@@ -1741,12 +1741,12 @@ function RestoreConfirm({
 
       {mode === 'new' && (
         <>
-          <p className="text-xs text-amber-900">
+          <p className="text-xs text-accent">
             Creates a fresh pod alongside <span className="font-mono">{primaryDb.name}</span> and restores into it.
             Nothing existing is touched. <span className="font-semibold">Runs 2× resources</span> until you delete one.
           </p>
           <div className="flex items-center gap-2 flex-wrap">
-            <p className="text-xs text-amber-900 whitespace-nowrap">New database name:</p>
+            <p className="text-xs text-accent whitespace-nowrap">New database name:</p>
             <input
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
@@ -1782,7 +1782,7 @@ function RestoreConfirm({
         <button
           onClick={onCancel}
           disabled={isPending}
-          className="px-2 py-1 rounded-md border border-amber-400 bg-card text-xs text-amber-900 disabled:opacity-50"
+          className="px-2 py-1 rounded-md border border-amber-400 bg-card text-xs text-accent disabled:opacity-50"
         >
           Cancel
         </button>
@@ -1807,7 +1807,7 @@ function BackupStatusBadge({ status }: { status: ManagedDbBackup['status'] }) {
 function ReplicaRoleBadge({ role }: { role: ManagedDbReplica['role'] }) {
   if (role === 'promoted') {
     return (
-      <span className="text-xs px-1.5 py-0.5 rounded-full border font-medium bg-amber-100 text-amber-900 border-amber-300">
+      <span className="text-xs px-1.5 py-0.5 rounded-full border font-medium bg-amber-100 text-accent border-amber-300">
         new primary
       </span>
     );
@@ -2205,7 +2205,7 @@ function StatusBadge({ status }: { status: ManagedDatabase['status'] }) {
     running: 'bg-emerald-50 text-emerald-700 border-emerald-200',
     stopped: 'bg-muted text-muted-foreground border-border',
     failed: 'bg-destructive/10 text-destructive border-destructive/30',
-    deleting: 'bg-accent/10 text-amber-800 border-accent/25',
+    deleting: 'bg-accent/10 text-accent border-accent/25',
   };
   return (
     <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${map[status]}`}>

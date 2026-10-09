@@ -67,7 +67,7 @@ function InterventionRow({ action }: { action: HealingAction }) {
   return (
     <li className="rounded-lg border border-border bg-muted/20 p-3 space-y-2">
       <div className="flex items-center gap-2 flex-wrap">
-        <span className="text-xs uppercase tracking-wide font-semibold text-amber-800 bg-amber-100 border border-accent/25 rounded px-1.5 py-0.5">
+        <span className="text-xs uppercase tracking-wide font-semibold text-accent bg-amber-100 border border-accent/25 rounded px-1.5 py-0.5">
           {KIND_LABELS[action.failure_kind] ?? action.failure_kind}
         </span>
         {action.project_name && (
@@ -229,7 +229,7 @@ export default function AIAutonomyCard() {
           </p>
         </div>
         {pending.length > 0 && (
-          <span className="text-xs font-semibold text-amber-900 bg-amber-200 border border-amber-300 rounded-full px-2 py-0.5">
+          <span className="text-xs font-semibold text-accent bg-amber-200 border border-amber-300 rounded-full px-2 py-0.5">
             {pending.length} need{pending.length === 1 ? 's' : ''} attention
           </span>
         )}

@@ -571,7 +571,7 @@ const Login = () => {
             card so they don't compete with the primary sign-in CTA. */}
         {nothingConfigured && (
             <div className="text-left text-sm mb-5 rounded-lg border border-accent/25 bg-accent/10 px-4 py-3 space-y-1">
-            <p className="font-medium text-amber-800">⚠ Server setup required</p>
+            <p className="font-medium text-accent">⚠ Server setup required</p>
             <p className="text-accent text-xs">
               Set <code className="font-mono bg-amber-100 px-1 rounded">WATCHTOWER_API_TOKEN</code> on the server, or configure GitHub OAuth to enable secure team sign-in.
             </p>
@@ -787,7 +787,7 @@ const Login = () => {
                       type="button"
                       onClick={() => void devAutoLogin()}
                       disabled={loading}
-                      className="text-sm text-accent hover:text-amber-900 underline underline-offset-2 disabled:opacity-50"
+                      className="text-sm text-accent hover:text-accent underline underline-offset-2 disabled:opacity-50"
                     >
                       Quick dev login →
                     </button>

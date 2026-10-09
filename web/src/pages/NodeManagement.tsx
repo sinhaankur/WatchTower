@@ -206,7 +206,7 @@ const NodeManagement = () => {
           <div className="flex items-start gap-3 rounded-md border border-accent/25 bg-accent/10 px-4 py-3">
             <span className="text-amber-500 mt-0.5">⚠</span>
             <div>
-              <p className="text-sm font-medium text-amber-800">Connection issue</p>
+              <p className="text-sm font-medium text-accent">Connection issue</p>
               <p className="text-sm text-accent mt-0.5">{pageError}</p>
             </div>
           </div>
