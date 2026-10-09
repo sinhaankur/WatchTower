@@ -675,6 +675,26 @@ async def _run_static_container_on_node(
 _NGINX_HOSTNAME_RE = re.compile(r"^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$")
 
 
+# Reusable proxy directives (Host, real IP, WebSocket upgrade). Kept as one
+# string so every location block that proxies stays identical.
+_NGINX_PROXY_DIRECTIVES = (
+    f"        proxy_pass http://127.0.0.1:{{port}};\n"
+    "        proxy_http_version 1.1;\n"
+    "        proxy_set_header Host $host;\n"
+    "        proxy_set_header X-Real-IP $remote_addr;\n"
+    "        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n"
+    "        proxy_set_header X-Forwarded-Proto $scheme;\n"
+    "        proxy_set_header Upgrade $http_upgrade;\n"
+    '        proxy_set_header Connection "upgrade";\n'
+)
+
+# Filename suffix that marks a build-tool-fingerprinted asset: a dot, an
+# 8+ char hash, then the extension (e.g. app.5Zn00eSR.js, chunk-a1b2c3d4.css).
+# Vite/webpack/esbuild/Parcel all emit this shape. Such files are immutable —
+# the hash changes when the bytes change — so they're safe to cache forever.
+_NGINX_HASHED_ASSET_REGEX = r"\.[0-9a-fA-F]{8,}\.(?:js|css|woff2?|ttf|otf|eot|svg|png|jpg|jpeg|gif|webp|avif|ico|map)$"
+
+
 def _build_nginx_proxy_config(
     project: Project,
     custom_domains: list[str],
@@ -686,7 +706,21 @@ def _build_nginx_proxy_config(
     with several hostnames reloads in a single nginx pass. Listens on
     plain :80 — TLS termination is a Phase-3 concern (Cloudflare proxy)
     once Phase 2 has run against a real environment.
+
+    Origin cache rules (CDN correctness, docs/CDN_STRATEGY.md §3.2.3): a CDN
+    honours the origin's ``Cache-Control``, but many user frameworks emit
+    none — so the edge either can't cache (slow, hammers this uplink) or
+    caches HTML too long (stale after a deploy). We set the right headers at
+    the origin regardless of what the app does:
+      * content-hashed assets → ``immutable, max-age=1yr`` (safe: the URL
+        changes when the bytes do), so Cloudflare caches them at the edge
+        indefinitely and this machine serves each asset ~once.
+      * HTML documents → ``no-cache`` so a deploy is picked up immediately.
+    ``proxy_hide_header`` drops any upstream Cache-Control first so ours is
+    authoritative rather than duplicated. ``always`` applies the header on
+    non-2xx responses too.
     """
+    proxy_directives = _NGINX_PROXY_DIRECTIVES.format(port=int(upstream_port))
     server_names = " ".join(custom_domains)
     return (
         "# Managed by WatchTower — do not edit by hand.\n"
@@ -695,15 +729,26 @@ def _build_nginx_proxy_config(
         "    listen 80;\n"
         f"    server_name {server_names};\n"
         "\n"
+        "    # Content-hashed assets: immutable, cache at the edge for a year.\n"
+        # The regex is single-quoted: it contains `{8,}`, and nginx otherwise
+        # reads the first `{` as the start of the location block, erroring with
+        # 'unknown directive'. Quoting makes nginx treat the whole thing as the
+        # match pattern. (Caught by `nginx -t` — see the test.)
+        f"    location ~* '{_NGINX_HASHED_ASSET_REGEX}' {{\n"
+        "        proxy_hide_header Cache-Control;\n"
+        '        add_header Cache-Control "public, max-age=31536000, immutable" always;\n'
+        + proxy_directives +
+        "    }\n"
+        "\n"
+        "    # HTML documents: never cache — a deploy must be seen immediately.\n"
+        "    location ~* '\\.html?$' {\n"
+        "        proxy_hide_header Cache-Control;\n"
+        '        add_header Cache-Control "no-cache, no-store, must-revalidate" always;\n'
+        + proxy_directives +
+        "    }\n"
+        "\n"
         "    location / {\n"
-        f"        proxy_pass http://127.0.0.1:{int(upstream_port)};\n"
-        "        proxy_http_version 1.1;\n"
-        "        proxy_set_header Host $host;\n"
-        "        proxy_set_header X-Real-IP $remote_addr;\n"
-        "        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n"
-        "        proxy_set_header X-Forwarded-Proto $scheme;\n"
-        "        proxy_set_header Upgrade $http_upgrade;\n"
-        '        proxy_set_header Connection "upgrade";\n'
+        + proxy_directives +
         "    }\n"
         "}\n"
     )
@@ -1020,43 +1065,68 @@ async def _sync_dns_for_project(
         # Skip the Cloudflare round-trip when the record is already
         # pointing where we'd put it — saves a billed API call per
         # deploy when the node IP hasn't moved.
-        if (
+        dns_unchanged = bool(
             domain.cloudflare_record_id
             and domain.cloudflare_target_ip == target_ip
-        ):
-            append(f"[WatchTower]   {domain.domain} already → {target_ip} (skip)")
-            continue
+        )
+        if dns_unchanged:
+            append(f"[WatchTower]   {domain.domain} already → {target_ip} (DNS unchanged)")
+            # DON'T `continue` here. On a redeploy to the SAME machine the IP is
+            # identical, so the DNS record doesn't change — but NEW BYTES still
+            # shipped, and the edge is still serving the OLD cached copy. The
+            # cache purge below MUST still run or the user "deploys a fix" and
+            # visitors keep seeing the stale page. (This was the bug: the purge
+            # lived after a `continue`, so it only ever fired on the FIRST sync.)
+        else:
+            try:
+                result = cloudflare_dns.sync_a_record(
+                    token,
+                    domain.domain,
+                    target_ip,
+                    existing_zone_id=domain.cloudflare_zone_id,
+                    existing_record_id=domain.cloudflare_record_id,
+                    # Respect the domain's persisted proxy choice (set from the
+                    # Domains tab). Hardcoding False here would silently flip a
+                    # user's CDN-enabled ("orange cloud") domain back to DNS-only
+                    # on every deploy — undoing exactly what they turned on.
+                    proxied=bool(domain.cloudflare_proxied),
+                )
+            except cloudflare_dns.CloudflareDnsError as exc:
+                append(
+                    f"[WatchTower] ⚠ {domain.domain}: Cloudflare sync failed "
+                    f"({exc.status}): {exc.detail}. Retry from the Domains tab."
+                )
+                continue
+            except Exception as exc:  # pragma: no cover - defensive
+                append(
+                    f"[WatchTower] ⚠ {domain.domain}: unexpected DNS sync error: {exc}"
+                )
+                logger.exception("Cloudflare DNS sync failed for %s", domain.domain)
+                continue
 
-        try:
-            result = cloudflare_dns.sync_a_record(
-                token,
-                domain.domain,
-                target_ip,
-                existing_zone_id=domain.cloudflare_zone_id,
-                existing_record_id=domain.cloudflare_record_id,
-                # Phase 3 keeps Cloudflare proxy off (grey cloud) to
-                # match the existing manual-sync UX. A per-domain
-                # proxied toggle can come later.
-                proxied=False,
-            )
-        except cloudflare_dns.CloudflareDnsError as exc:
-            append(
-                f"[WatchTower] ⚠ {domain.domain}: Cloudflare sync failed "
-                f"({exc.status}): {exc.detail}. Retry from the Domains tab."
-            )
-            continue
-        except Exception as exc:  # pragma: no cover - defensive
-            append(
-                f"[WatchTower] ⚠ {domain.domain}: unexpected DNS sync error: {exc}"
-            )
-            logger.exception("Cloudflare DNS sync failed for %s", domain.domain)
-            continue
+            domain.cloudflare_zone_id = result.zone_id
+            domain.cloudflare_record_id = result.record_id
+            domain.cloudflare_target_ip = target_ip
+            domain.cloudflare_synced_at = utcnow()
+            append(f"[WatchTower]   ✓ {domain.domain} → {target_ip}")
 
-        domain.cloudflare_zone_id = result.zone_id
-        domain.cloudflare_record_id = result.record_id
-        domain.cloudflare_target_ip = target_ip
-        domain.cloudflare_synced_at = utcnow()
-        append(f"[WatchTower]   ✓ {domain.domain} → {target_ip}")
+        # ── Auto-purge the edge cache for proxied domains — EVERY deploy ──────
+        # Runs whether or not DNS changed (see above): the deploy shipped new
+        # bytes, but Cloudflare's edge still serves the old cached assets until
+        # their TTL expires. This is the correctness keystone of the CDN feature
+        # (docs/CDN_STRATEGY.md §4). Best-effort: a purge failure never fails an
+        # already-live deploy.
+        if domain.cloudflare_proxied and domain.cloudflare_zone_id:
+            try:
+                cloudflare_dns.purge_cache(token, domain.cloudflare_zone_id)
+                append(f"[WatchTower]   ✓ {domain.domain} edge cache purged")
+            except Exception as exc:  # pragma: no cover - defensive
+                append(
+                    f"[WatchTower] ⚠ {domain.domain}: edge-cache purge failed "
+                    f"({exc}); visitors may see stale assets until the CDN TTL "
+                    "expires. Purge manually from the Domains tab."
+                )
+                logger.warning("Cloudflare cache purge failed for %s: %s", domain.domain, exc)
 
 
 # ---------------------------------------------------------------------------
@@ -1704,8 +1774,12 @@ def _resolve_output_path(db: Session, project: Project, repo_dir: Path) -> Path:
 
 
 def _load_env_vars(db: Session, project: Project) -> dict:
+    # Values are Fernet-encrypted at rest (api/envvars.py). Decrypt before
+    # injecting into the deploy; dec_value tolerates legacy plaintext rows so
+    # a pre-encryption install still deploys.
+    from watchtower.api.envvars import dec_value
     rows = db.query(EnvironmentVariable).filter_by(project_id=project.id).all()
-    return {r.key: r.value for r in rows}
+    return {r.key: dec_value(r.value) for r in rows}
 
 
 def _get_deployment_nodes(db: Session, deployment: Deployment) -> list:
