@@ -1,5 +1,6 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useEffect, useMemo, useState } from 'react';
+import { Plus } from 'lucide-react';
 import axios from 'axios';
 import apiClient from '@/lib/api';
 import useCountUp from '@/hooks/useCountUp';
@@ -354,11 +355,14 @@ const Dashboard = () => {
           >
             {loading ? '…' : 'Refresh'}
           </button>
+          {/* Demoted to a quiet outline button — the ONE amber primary action on
+              this screen is the "Put a site live" hero below (framework: one
+              primary action per screen, signal over surface area). */}
           <Link
             to="/start"
-            className="px-3 sm:px-4 py-1.5 rounded-md bg-primary hover:bg-primary/90 transition-colors text-primary-foreground text-xs sm:text-sm font-semibold shadow-retro"
+            className="inline-flex items-center gap-1.5 px-3 sm:px-4 h-9 rounded-md border border-border bg-card hover:bg-muted hover:border-accent/50 transition-colors text-foreground text-sm font-medium"
           >
-            + New site
+            <Plus size={15} strokeWidth={2.5} /> New site
           </Link>
         </div>
       </header>
@@ -555,9 +559,9 @@ const Dashboard = () => {
             </div>
             <Link
               to="/setup"
-              className="px-3 py-1.5 rounded-md bg-primary hover:bg-primary/90 transition-colors text-primary-foreground text-xs font-semibold shadow-retro"
+              className="inline-flex items-center gap-1.5 px-3 h-9 rounded-md border border-border bg-card hover:bg-muted hover:border-accent/50 transition-colors text-foreground text-sm font-medium"
             >
-              + New Project
+              <Plus size={15} strokeWidth={2.5} /> New project
             </Link>
           </div>
 
