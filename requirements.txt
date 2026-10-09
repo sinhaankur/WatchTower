@@ -14,6 +14,12 @@
 
 # Core
 fastapi==0.142.2
+# Pin starlette explicitly: left transitive it resolved to 0.38.6, which has
+# known CVEs (PYSEC-2026-161/248/249/1941/1943/2280/2281). The CVE fix versions
+# are on the 1.x line; fastapi 0.142.x only needs >=0.46 (no upper bound) and
+# sse-starlette needs >=0.49.1, so the fully-patched 1.7.x satisfies everyone.
+# (security — pip-audit 2026-10-09)
+starlette>=1.7.0,<2
 uvicorn==0.54.0
 # Required by FastAPI to parse multipart/form-data (photo-backup file uploads
 # in api/photos.py). Declared in pyproject too — MUST stay here because the

@@ -10,10 +10,25 @@ echo "================================"
 echo ""
 
 # Check if running as root
-if [ "$EUID" -ne 0 ]; then 
+if [ "$EUID" -ne 0 ]; then
     echo "Please run as root (use sudo)"
     exit 1
 fi
+
+# ── Anchor to the repo root ─────────────────────────────────────────────────
+# install.sh lives in install/; the package, requirements.txt, config/, and
+# systemd/ live one level up. Resolve paths off the SCRIPT location so the
+# script works no matter where it's invoked from (fixes relative-path failures).
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+cd "${REPO_ROOT}"
+echo "Installing from local repo: ${REPO_ROOT}"
+
+# Under sudo, $HOME is /root — but the Electron cache lives in the INVOKING
+# user's home. Resolve that so the purge below actually hits the right dir.
+REAL_USER="${SUDO_USER:-${USER}}"
+REAL_HOME="$(getent passwd "${REAL_USER}" 2>/dev/null | cut -d: -f6)"
+[[ -z "${REAL_HOME}" ]] && REAL_HOME="${HOME}"
 
 # ── Detect existing installation ───────────────────────────────────────────────
 # Look in three places, in order:
@@ -41,28 +56,33 @@ if [[ -n "${EXISTING_VERSION}" ]]; then
         systemctl stop watchtower.service || true
     fi
     echo "Removing old installation before re-install…"
-    # Try both removal paths — whichever one actually has the install
-    # will succeed; the other is a no-op.
+    # Remove via EVERY path an old version could have landed, system-wide and
+    # in both the root and invoking-user pipx homes. Each is a no-op if empty.
+    PIPX_HOME=/opt/pipx PIPX_BIN_DIR=/usr/local/bin pipx uninstall watchtower-podman 2>/dev/null || true
     pipx uninstall watchtower-podman 2>/dev/null || true
+    sudo -u "${REAL_USER}" pipx uninstall watchtower-podman 2>/dev/null || true
+    pip3 uninstall -y watchtower-podman 2>/dev/null || true
     pip3 uninstall -y watchtower 2>/dev/null || true
+    # Nuke any leftover pipx venv dirs outright (a half-removed venv can shadow
+    # the new install and keep the OLD code around — the reported bug).
+    rm -rf /opt/pipx/venvs/watchtower-podman 2>/dev/null || true
+    rm -rf "${REAL_HOME}/.local/pipx/venvs/watchtower-podman" 2>/dev/null || true
 
     # Purge stale caches so the new version never serves OLD code/UI. This is
     # the fix for the "I updated but nothing changed" class of bug: the Electron
     # shell caches the SPA aggressively, and an orphaned _web_dist from a wheel
     # install can shadow a fresh build. Clearing them forces the new bundle.
-    echo "Clearing stale caches (Electron + bundled SPA)…"
+    # Use REAL_HOME, not $HOME — under sudo $HOME is /root (wrong dir).
+    echo "Clearing stale caches (Electron + bundled SPA) for ${REAL_USER}…"
     for cache in \
-        "$HOME/.config/watchtower-desktop/Cache" \
-        "$HOME/.config/watchtower-desktop/Code Cache" \
-        "$HOME/.config/watchtower-desktop/GPUCache" \
-        "$HOME/Library/Application Support/watchtower-desktop/Cache" \
-        "$HOME/Library/Application Support/watchtower-desktop/Code Cache" \
-        "$HOME/Library/Application Support/watchtower-desktop/GPUCache"; do
-        [[ -d "$cache" ]] && rm -rf "$cache" 2>/dev/null || true
+        "${REAL_HOME}/.config/watchtower-desktop/Cache" \
+        "${REAL_HOME}/.config/watchtower-desktop/Code Cache" \
+        "${REAL_HOME}/.config/watchtower-desktop/GPUCache" \
+        "${REAL_HOME}/.config/watchtower-desktop/last-version"; do
+        rm -rf "$cache" 2>/dev/null || true
     done
-    # Any orphaned _web_dist left by a previous wheel install (pipx/pip paths
-    # are already gone above, but a manual copy could linger).
-    find "$HOME/.local" -type d -path "*/watchtower/_web_dist" -prune -exec rm -rf {} + 2>/dev/null || true
+    # Any orphaned _web_dist left by a previous wheel install.
+    find "${REAL_HOME}/.local" /opt/pipx -type d -path "*/watchtower/_web_dist" -prune -exec rm -rf {} + 2>/dev/null || true
 
     echo "Old version removed. Installing new version now."
 else
@@ -109,6 +129,26 @@ podman --version
 PYTHON_STDLIB=$(python3 -c 'import sysconfig; print(sysconfig.get_paths()["stdlib"])')
 EXTERNALLY_MANAGED="${PYTHON_STDLIB}/EXTERNALLY-MANAGED"
 
+# ── Build the SPA into the package so the wheel ships the CURRENT UI ─────────
+# Without this, pip/pipx install the Python code but no web bundle, and the
+# server falls back to a 61-byte JSON stub — "installed but no UI". We stage
+# web/dist → watchtower/_web_dist (scripts/build-wheel.sh does the same).
+echo ""
+echo "Building the web UI into the package…"
+if command -v npm &>/dev/null; then
+    if [[ ! -d web/dist ]]; then
+        echo "  · web/dist missing — building it (npm --prefix web run build)…"
+        sudo -u "${REAL_USER}" npm --prefix web ci 2>/dev/null || npm --prefix web ci || true
+        sudo -u "${REAL_USER}" npm --prefix web run build || npm --prefix web run build
+    fi
+    rm -rf watchtower/_web_dist
+    cp -R web/dist watchtower/_web_dist
+    echo "  ✓ Staged web/dist → watchtower/_web_dist ($(find watchtower/_web_dist -type f 2>/dev/null | wc -l | tr -d ' ') files)"
+else
+    echo "  ⚠ npm not found — installing without a freshly-built UI."
+    echo "    If the dashboard shows a JSON stub, install Node.js and re-run."
+fi
+
 if [[ -f "${EXTERNALLY_MANAGED}" ]]; then
     echo ""
     echo "Detected externally-managed Python (PEP 668). Installing via pipx."
@@ -120,22 +160,42 @@ if [[ -f "${EXTERNALLY_MANAGED}" ]]; then
         pipx ensurepath --global 2>/dev/null || pipx ensurepath
     fi
     echo ""
-    echo "Installing WatchTower via pipx (isolated venv at /opt/pipx/venvs/watchtower-podman)..."
-    # --global so the install lands in /opt/pipx/ (system-wide), not
-    # /root/.local/. Falls back to user-scope if --global isn't supported
-    # on this pipx version (added in pipx 1.5).
-    PIPX_HOME=/opt/pipx PIPX_BIN_DIR=/usr/local/bin pipx install --force watchtower-podman 2>&1 \
-        || pipx install --force --pip-args="-r ${PWD}/requirements.txt" .
+    echo "Installing WatchTower via pipx from THIS repo (isolated venv at /opt/pipx/venvs/watchtower-podman)..."
+    # Install the LOCAL package (".") — NOT the PyPI name. Installing
+    # "watchtower-podman" from PyPI was the bug: it pulled a stale published
+    # version instead of the code in this repo. "." installs exactly what's
+    # checked out here, deps resolved from pyproject.toml.
+    PIPX_HOME=/opt/pipx PIPX_BIN_DIR=/usr/local/bin pipx install --force "${REPO_ROOT}"
     echo "WatchTower installed to /opt/pipx/venvs/watchtower-podman/"
 else
-    # Pre-PEP-668 system. The legacy path still works.
+    # Pre-PEP-668 system. The legacy path still works — install the LOCAL repo.
     echo ""
     echo "Installing Python dependencies (legacy pip path)..."
     pip3 install -r requirements.txt
 
     echo ""
-    echo "Installing WatchTower..."
-    pip3 install .
+    echo "Installing WatchTower from this repo..."
+    pip3 install --force-reinstall .
+fi
+
+# ── Verify the version we actually installed ────────────────────────────────
+echo ""
+INSTALLED_VERSION="$(watchtower --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || true)"
+EXPECTED_VERSION="$(python3 -c 'import tomllib,pathlib; 1' 2>/dev/null && python3 - <<PY 2>/dev/null || true
+import re, pathlib
+m = re.search(r'__version__\s*=\s*"([^"]+)"', pathlib.Path("watchtower/__init__.py").read_text())
+print(m.group(1) if m else "")
+PY
+)"
+if [[ -n "${INSTALLED_VERSION}" ]]; then
+    echo "Installed WatchTower ${INSTALLED_VERSION}."
+    if [[ -n "${EXPECTED_VERSION}" && "${INSTALLED_VERSION}" != "${EXPECTED_VERSION}" ]]; then
+        echo "⚠ Expected ${EXPECTED_VERSION} from this repo but CLI reports ${INSTALLED_VERSION}."
+        echo "  An old copy may still be on PATH — run: which -a watchtower"
+    fi
+else
+    echo "⚠ Could not confirm the installed version (watchtower CLI not on PATH yet)."
+    echo "  Open a new shell or run: pipx ensurepath"
 fi
 
 # Create directories

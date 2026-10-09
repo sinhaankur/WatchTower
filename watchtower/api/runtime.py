@@ -14,7 +14,7 @@ import threading
 import time
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, List, Optional
 
 import io
 import tarfile
@@ -1824,6 +1824,15 @@ class WatchtowerConfigUpdate(BaseModel):
     cleanup: bool = True
     include: List[str] = []
     exclude: List[str] = []
+
+
+# `from __future__ import annotations` (top of this module) turns every
+# annotation into a string/forward-ref. Pydantic 2.13+ validates FastAPI body
+# models more strictly and raises "not fully defined" at request time unless
+# the refs are resolved up front. Rebuilding here resolves List[str] etc.
+# against this module's namespace once, at import — cheap, explicit, and the
+# fix for the 3 config-roundtrip test failures after the fastapi/pydantic bump.
+WatchtowerConfigUpdate.model_rebuild()
 
 
 @router.get("/watchtower/config")

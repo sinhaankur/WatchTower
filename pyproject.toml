@@ -120,7 +120,10 @@ all = [
   "rq>=1.16.0",
 ]
 mcp = [
-  "mcp>=1.0,<3.0",
+  # Floor raised to 1.28.1 for the CVE fixes (PYSEC-2026-3481/3482/3483);
+  # kept on the 1.x line (<2) to avoid the mcp 2.x / httpx2 churn on an
+  # optional extra. (security — pip-audit 2026-10-09)
+  "mcp>=1.28.1,<2",
 ]
 
 [tool.setuptools]
