@@ -35,6 +35,8 @@ import {
   useImportDatabase,
   useUpdateBackupSchedule,
   useCreateExternalDatabase,
+  useTestExternalDatabase,
+  type TestConnectionResult,
   useCreateManagedDatabase,
   useDeleteBackup,
   useRestoreBackup,
@@ -176,7 +178,7 @@ function TabButton({
       onClick={onClick}
       className={`px-4 py-2 text-xs font-medium transition-colors border-b-2 -mb-px ${
         active
-          ? 'border-primary text-destructive'
+          ? 'border-accent text-foreground'
           : 'border-transparent text-muted-foreground hover:text-foreground'
       }`}
     >
@@ -533,6 +535,47 @@ function ExternalCredentialsModal({
   );
 }
 
+const EXTERNAL_DEFAULT_PORTS: Record<string, number> = {
+  postgres: 5432, mysql: 3306, mariadb: 3306, mongodb: 27017, redis: 6379,
+};
+
+// URL scheme → engine, mirroring what hosted providers hand you.
+const EXTERNAL_SCHEME_ENGINE: Record<string, string> = {
+  postgres: 'postgres', postgresql: 'postgres', mysql: 'mysql',
+  mariadb: 'mariadb', mongodb: 'mongodb', 'mongodb+srv': 'mongodb',
+  redis: 'redis', rediss: 'redis',
+};
+
+/** Parse a pasted connection URL in the browser so the form fills itself.
+ *  Mirrors the backend parser (incl. +driver suffix, rediss:// TLS). */
+function parseConnString(raw: string): Partial<{
+  engine: string; host: string; port: number; username: string;
+  password: string; databaseName: string; useTls: boolean;
+}> | null {
+  try {
+    const u = new URL(raw.trim());
+    const rawScheme = u.protocol.replace(/:$/, '').toLowerCase();
+    const scheme = rawScheme.split('+')[0];
+    const engine = EXTERNAL_SCHEME_ENGINE[scheme];
+    if (!engine) return null;
+    const host = u.hostname;
+    const isLocal = ['localhost', '127.0.0.1', '::1'].includes(host) ||
+      /^(10\.|192\.168\.|172\.1[6-9]\.)/.test(host);
+    return {
+      engine,
+      host,
+      port: u.port ? Number(u.port) : EXTERNAL_DEFAULT_PORTS[engine],
+      username: u.username ? decodeURIComponent(u.username) : '',
+      password: u.password ? decodeURIComponent(u.password) : '',
+      databaseName: u.pathname.replace(/^\//, ''),
+      useTls: rawScheme === 'rediss' || rawScheme.endsWith('+srv') ||
+        raw.toLowerCase().includes('sslmode=require') || (!isLocal && host !== ''),
+    };
+  } catch {
+    return null;
+  }
+}
+
 function CreateExternalModal({ onClose }: { onClose: () => void }) {
   const { data: engines } = useManagedDbEngines();
   const { data: discovered } = useDiscoverLocalDatabases();
@@ -546,16 +589,43 @@ function CreateExternalModal({ onClose }: { onClose: () => void }) {
   const [useTls, setUseTls] = useState(true);
   const [notes, setNotes] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [connString, setConnString] = useState('');
+  const [testResult, setTestResult] = useState<TestConnectionResult | null>(null);
 
   const create = useCreateExternalDatabase();
+  const test = useTestExternalDatabase();
 
   // Snap the default port when the engine changes.
   const onEngineChange = (id: string) => {
     setEngineId(id);
-    const defaultPorts: Record<string, number> = {
-      postgres: 5432, mysql: 3306, mariadb: 3306, mongodb: 27017, redis: 6379,
-    };
-    setPort(defaultPorts[id] ?? 5432);
+    setPort(EXTERNAL_DEFAULT_PORTS[id] ?? 5432);
+  };
+
+  // Paste a Supabase/Neon/Upstash URL → fields fill themselves.
+  const onPaste = (raw: string) => {
+    setConnString(raw);
+    setTestResult(null);
+    const p = parseConnString(raw);
+    if (!p) return;
+    if (p.engine) setEngineId(p.engine);
+    if (p.host) setHost(p.host);
+    if (p.port) setPort(p.port);
+    if (p.username !== undefined) setUsername(p.username);
+    if (p.password !== undefined) setPassword(p.password);
+    if (p.databaseName !== undefined) setDatabaseName(p.databaseName);
+    if (p.useTls !== undefined) setUseTls(p.useTls);
+    if (!name.trim() && p.host) setName(p.host.split('.')[0]);
+  };
+
+  // Live reachability probe — uses the pasted string if present, else fields.
+  const runTest = () => {
+    setTestResult(null);
+    test.mutate(
+      connString.trim()
+        ? { connection_string: connString.trim() }
+        : { engine: engineId, host: host.trim(), port, database_name: databaseName, username, password, use_tls: useTls },
+      { onSuccess: setTestResult },
+    );
   };
 
   const submit = () => {
@@ -601,8 +671,31 @@ function CreateExternalModal({ onClose }: { onClose: () => void }) {
     <Modal onClose={onClose}>
       <h2 className="text-base font-semibold text-foreground">Connect external database</h2>
       <p className="text-xs text-muted-foreground mt-1">
-        Point WatchTower at a database you already run. Credentials are encrypted at rest.
+        Point WatchTower at a database you already run — Supabase, Neon, RDS, or your own box.
+        Credentials are encrypted at rest.
       </p>
+
+      {/* Primary path: paste a hosted connection string and the form fills itself. */}
+      <div className="mt-4">
+        <Field
+          label="Connection string"
+          hint="Paste from Supabase, Neon, Upstash… — we fill in the fields below. Or leave blank and enter them by hand."
+        >
+          <input
+            value={connString}
+            onChange={(e) => onPaste(e.target.value)}
+            placeholder="postgresql://user:password@host:5432/dbname"
+            spellCheck={false}
+            autoComplete="off"
+            className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-accent/50"
+          />
+        </Field>
+        <div className="mt-2 flex items-center gap-2 text-[11px] text-muted-foreground">
+          <span className="h-px flex-1 bg-border" />
+          or enter details manually
+          <span className="h-px flex-1 bg-border" />
+        </div>
+      </div>
 
       {adoptable.length > 0 && (
         <div className="mt-3 rounded-lg border border-border-soft bg-surface-soft p-3">
@@ -637,7 +730,7 @@ function CreateExternalModal({ onClose }: { onClose: () => void }) {
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="prod-rds"
-            className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-300"
+            className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent/50"
           />
         </Field>
 
@@ -646,7 +739,7 @@ function CreateExternalModal({ onClose }: { onClose: () => void }) {
             <select
               value={engineId}
               onChange={(e) => onEngineChange(e.target.value)}
-              className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-300"
+              className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent/50"
             >
               {(engines ?? [{ id: 'postgres', name: 'PostgreSQL' }]).map((e) => (
                 <option key={e.id} value={e.id}>{e.name}</option>
@@ -660,7 +753,7 @@ function CreateExternalModal({ onClose }: { onClose: () => void }) {
               min={1}
               max={65535}
               onChange={(e) => setPort(Number(e.target.value) || 0)}
-              className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-300"
+              className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent/50"
             />
           </Field>
         </div>
@@ -670,7 +763,7 @@ function CreateExternalModal({ onClose }: { onClose: () => void }) {
             value={host}
             onChange={(e) => setHost(e.target.value)}
             placeholder="db.example.com"
-            className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-300"
+            className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent/50"
           />
         </Field>
 
@@ -680,14 +773,14 @@ function CreateExternalModal({ onClose }: { onClose: () => void }) {
               <input
                 value={databaseName}
                 onChange={(e) => setDatabaseName(e.target.value)}
-                className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-300"
+                className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent/50"
               />
             </Field>
             <Field label="Username (optional)">
               <input
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-300"
+                className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent/50"
               />
             </Field>
           </div>
@@ -699,7 +792,7 @@ function CreateExternalModal({ onClose }: { onClose: () => void }) {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="leave blank for no-auth"
-            className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-300"
+            className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent/50"
           />
         </Field>
 
@@ -717,7 +810,7 @@ function CreateExternalModal({ onClose }: { onClose: () => void }) {
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             placeholder="e.g. read replica for analytics"
-            className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-300"
+            className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent/50"
           />
         </Field>
       </div>
@@ -728,21 +821,52 @@ function CreateExternalModal({ onClose }: { onClose: () => void }) {
         </div>
       )}
 
-      <div className="mt-5 flex items-center justify-end gap-2">
-        <button
-          onClick={onClose}
-          disabled={create.isPending}
-          className="px-3 py-1.5 rounded-lg border border-border text-xs text-foreground/90 hover:bg-muted transition-colors disabled:opacity-50"
+      {/* Test-connection result — green on reach, red on failure, both show the
+          DB's own message so a typo'd host/password is obvious before saving. */}
+      {testResult && (
+        <div
+          className={`mt-3 rounded-lg border px-3 py-2 text-xs break-words ${
+            testResult.ok
+              ? 'border-emerald-500/30 bg-emerald-500/[0.08] text-emerald-700 dark:text-emerald-300'
+              : 'border-destructive/30 bg-destructive/10 text-destructive'
+          }`}
         >
-          Cancel
-        </button>
+          <p className="font-medium">{testResult.message}</p>
+          {testResult.ok && (testResult.server_version || testResult.latency_ms != null) && (
+            <p className="mt-0.5 opacity-80">
+              {testResult.server_version}
+              {testResult.latency_ms != null && ` · ${testResult.latency_ms} ms`}
+            </p>
+          )}
+        </div>
+      )}
+
+      <div className="mt-5 flex items-center justify-between gap-2">
+        {/* Secondary: verify before saving. Left-aligned so Save stays the one
+            primary action on the right (UX framework: one primary per screen). */}
         <button
-          onClick={submit}
-          disabled={create.isPending}
-          className="px-4 py-1.5 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-medium border border-border shadow-retro disabled:opacity-50"
+          onClick={runTest}
+          disabled={test.isPending || create.isPending || (!host.trim() && !connString.trim())}
+          className="px-3 py-1.5 rounded-lg border border-border text-xs font-medium text-foreground hover:border-accent/50 hover:bg-muted transition-colors disabled:opacity-40"
         >
-          {create.isPending ? 'Saving…' : 'Save connection'}
+          {test.isPending ? 'Testing…' : 'Test connection'}
         </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={onClose}
+            disabled={create.isPending}
+            className="px-3 py-1.5 rounded-lg border border-border text-xs text-foreground/90 hover:bg-muted transition-colors disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={submit}
+            disabled={create.isPending}
+            className="px-4 py-1.5 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-medium border border-border shadow-retro disabled:opacity-50"
+          >
+            {create.isPending ? 'Saving…' : 'Save connection'}
+          </button>
+        </div>
       </div>
     </Modal>
   );
@@ -1312,7 +1436,7 @@ function BackupsSection({ primaryDb }: { primaryDb: ManagedDatabase }) {
               value={label}
               onChange={(e) => setLabel(e.target.value)}
               placeholder="label (optional, e.g. 'pre-migration')"
-              className="flex-1 min-w-0 rounded-md border border-border bg-card px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-red-300"
+              className="flex-1 min-w-0 rounded-md border border-border bg-card px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-accent/50"
             />
             <button
               onClick={onCreate}
@@ -1900,7 +2024,7 @@ function CreateModal({
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="blog-prod"
-            className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-300"
+            className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent/50"
           />
         </Field>
 
@@ -1909,7 +2033,7 @@ function CreateModal({
             <select
               value={engineId}
               onChange={(e) => onEngineChange(e.target.value)}
-              className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-300"
+              className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent/50"
             >
               {(engines ?? [{ id: 'postgres', name: 'PostgreSQL', versions: ['16'], default_db_name: 'appdb', default_user: 'watchtower' }]).map((e) => (
                 <option key={e.id} value={e.id}>
@@ -1922,7 +2046,7 @@ function CreateModal({
             <select
               value={version}
               onChange={(e) => setVersion(e.target.value)}
-              className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-300"
+              className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent/50"
             >
               {(engine?.versions ?? [version]).map((v) => (
                 <option key={v} value={v}>
@@ -1939,14 +2063,14 @@ function CreateModal({
               <input
                 value={databaseName}
                 onChange={(e) => setDatabaseName(e.target.value)}
-                className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-300"
+                className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent/50"
               />
             </Field>
             <Field label="Username">
               <input
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-300"
+                className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent/50"
               />
             </Field>
           </div>

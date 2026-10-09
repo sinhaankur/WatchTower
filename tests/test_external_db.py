@@ -56,6 +56,51 @@ def test_create_rejects_duplicate_name(client):
     assert client.post("/api/external-databases", json=p).status_code == 409
 
 
+# ── /test — browser connect-and-verify (Supabase / Neon / any Postgres) ────────
+
+
+def test_test_connection_requires_auth(anon_client):
+    assert anon_client.post("/api/external-databases/test", json={}).status_code == 401
+
+
+def test_test_connection_needs_an_engine(client):
+    """Nothing to go on → clear guidance, not a crash."""
+    r = client.post("/api/external-databases/test", json={})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["ok"] is False
+    assert body["detail"] == "unknown_engine"
+
+
+def test_test_connection_parses_connection_string(client):
+    """A pasted hosted URL that can't actually be reached still parses: we
+    learn the engine + host from it and fail with a real connection error,
+    proving the string was understood (not rejected as unparseable)."""
+    r = client.post(
+        "/api/external-databases/test",
+        json={"connection_string": "postgresql://u:p@db.nonexistent.invalid:5432/app"},
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["engine"] == "postgres"      # engine inferred from the URL
+    assert body["ok"] is False               # host is unreachable
+    assert body["detail"] != "unknown_engine"
+    assert body["message"]                   # a human message, always
+
+
+def test_test_connection_unsupported_engine_is_honest(client):
+    """A recognised engine we can't probe from here says so — never a fake green."""
+    r = client.post(
+        "/api/external-databases/test",
+        json={"engine": "mongodb", "host": "db.example.com", "port": 27017},
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["ok"] is False
+    assert body["detail"] in ("unsupported_engine", "driver_missing")
+    assert "save" in body["message"].lower()  # tells them they can still save it
+
+
 def test_credentials_reveal_returns_plaintext_and_audits(client, db_session):
     from watchtower.database import AuditEvent
 

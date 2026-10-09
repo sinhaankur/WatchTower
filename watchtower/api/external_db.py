@@ -53,6 +53,35 @@ class UpdateExternalRequest(BaseModel):
     notes: Optional[str] = Field(None, max_length=500)
 
 
+class TestConnectionRequest(BaseModel):
+    """Test a database reachability BEFORE saving it. Two ways to describe the
+    target, so a hosted DB (Supabase, Neon, …) can be pasted whole:
+      • connection_string — a full URL (postgresql://…, redis://…). Wins if set.
+      • discrete fields    — engine + host/port/user/password/database.
+    We never persist anything here; this is a dry-run probe only."""
+    connection_string: Optional[str] = Field(None, max_length=2048)
+    engine: Optional[str] = Field(None)
+    host: Optional[str] = Field(None, max_length=255)
+    port: Optional[int] = Field(None, ge=1, le=65535)
+    database_name: str = Field("", max_length=128)
+    username: str = Field("", max_length=128)
+    password: str = Field("", max_length=512)
+    use_tls: bool = True
+
+
+class TestConnectionResult(BaseModel):
+    ok: bool
+    engine: Optional[str] = None
+    # Human message either way — the UI shows it verbatim.
+    message: str
+    # Populated on success so the user can see what they actually reached.
+    server_version: Optional[str] = None
+    latency_ms: Optional[int] = None
+    # "unsupported" when we recognise the engine but have no driver to probe it
+    # from here — honest, not a fake green.
+    detail: Optional[str] = None
+
+
 class DiscoveredDb(BaseModel):
     """A database container already running on this host that WatchTower didn't
     create — an adoption candidate. The UI pre-fills the 'connect external DB'
@@ -90,6 +119,117 @@ def _classify_engine(image: str) -> Optional[str]:
         if hint in img:
             return engine
     return None
+
+
+# ── Connection testing ─────────────────────────────────────────────────────────
+#
+# A dry-run reachability probe for a DB the user is about to save. The whole
+# point of the feature is that a hosted database (Supabase, Neon, Railway, RDS…)
+# can be verified from the browser before it's stored — so people stop saving
+# typo'd connection strings and finding out at deploy time.
+#
+# Honesty rule (ENGINE-STANDARDS): we only return ok=True when we actually
+# opened a socket and spoke the protocol. If we don't have a driver for the
+# engine, we say so plainly rather than guessing.
+
+# URL scheme → engine. Mirrors the schemes managed_db hands out, plus the
+# aliases hosted providers use (postgres://, postgresql+psycopg://, rediss://).
+_SCHEME_ENGINE: dict[str, str] = {
+    "postgres": "postgres",
+    "postgresql": "postgres",
+    "mysql": "mysql",
+    "mariadb": "mariadb",
+    "mongodb": "mongodb",
+    "mongodb+srv": "mongodb",
+    "redis": "redis",
+    "rediss": "redis",
+}
+
+
+def _parse_connection_string(raw: str) -> dict:
+    """Pull engine/host/port/user/password/db out of a connection URL.
+
+    Tolerates the '+driver' suffix (postgresql+psycopg2://) and the TLS-implied
+    schemes (rediss://, mongodb+srv://). Returns a dict with whatever it found;
+    missing pieces are filled by the engine default later."""
+    from urllib.parse import unquote, urlparse
+
+    url = urlparse(raw.strip())
+    raw_scheme = (url.scheme or "").lower()
+    scheme = raw_scheme.split("+", 1)[0]
+    engine = _SCHEME_ENGINE.get(scheme)
+    host = url.hostname or ""
+    # TLS is implied by the secure schemes, an explicit sslmode=require, OR a
+    # non-local host (hosted DBs — Supabase/Neon/etc. — mandate TLS even when
+    # their copy-paste URL omits sslmode). Only a loopback/private host defaults
+    # to no-TLS, which is the right call for a self-hosted box on the tailnet.
+    _lower = raw.lower()
+    _is_local = host in ("localhost", "127.0.0.1", "::1") or host.startswith(
+        ("10.", "192.168.", "172.16.", "172.17.", "172.18.", "172.19.")
+    )
+    use_tls = (
+        scheme in ("rediss",)
+        or raw_scheme.endswith("+srv")
+        or "sslmode=require" in _lower
+        or (not _is_local and host != "")
+    )
+    return {
+        "engine": engine,
+        "host": url.hostname or "",
+        "port": url.port,
+        "username": unquote(url.username) if url.username else "",
+        "password": unquote(url.password) if url.password else "",
+        "database_name": (url.path or "").lstrip("/"),
+        "use_tls": use_tls,
+    }
+
+
+def _probe_postgres(host, port, user, password, dbname, use_tls, timeout=6) -> tuple[bool, str, Optional[str]]:
+    """Open a real libpq connection and read server_version. Covers Supabase,
+    Neon, RDS, Cloud SQL, or any self-hosted Postgres."""
+    try:
+        import psycopg2  # type: ignore
+    except Exception:  # noqa: BLE001
+        return (False, "", "driver_missing")
+    conn = None
+    try:
+        conn = psycopg2.connect(
+            host=host, port=port or 5432, user=user or None,
+            password=password or None, dbname=dbname or "postgres",
+            connect_timeout=timeout,
+            sslmode="require" if use_tls else "prefer",
+        )
+        with conn.cursor() as cur:
+            cur.execute("SHOW server_version;")
+            ver = cur.fetchone()[0]
+        return (True, f"PostgreSQL {ver}", None)
+    except Exception as exc:  # noqa: BLE001 — surface the DB's own message
+        return (False, str(exc).strip().splitlines()[0][:300], None)
+    finally:
+        if conn is not None:
+            try:
+                conn.close()
+            except Exception:  # noqa: BLE001
+                pass
+
+
+def _probe_redis(host, port, password, use_tls, timeout=6) -> tuple[bool, str, Optional[str]]:
+    try:
+        import redis  # type: ignore
+    except Exception:  # noqa: BLE001
+        return (False, "", "driver_missing")
+    try:
+        client = redis.Redis(
+            host=host, port=port or 6379, password=password or None,
+            ssl=use_tls, socket_connect_timeout=timeout, socket_timeout=timeout,
+        )
+        client.ping()
+        info = client.info("server")
+        ver = info.get("redis_version", "")
+        client.close()
+        return (True, f"Redis {ver}".strip(), None)
+    except Exception as exc:  # noqa: BLE001
+        return (False, str(exc).strip().splitlines()[0][:300], None)
 
 
 class ExternalDbResponse(BaseModel):
@@ -217,6 +357,79 @@ async def discover_local_databases(
             and ("127.0.0.1", host_port) in connected_hostports,
         ))
     return out
+
+
+@router.post("/test", response_model=TestConnectionResult)
+async def test_connection(
+    body: TestConnectionRequest,
+    _current_user: dict = Depends(util.get_current_user),
+) -> TestConnectionResult:
+    """Dry-run reachability check. Paste a hosted connection string (Supabase,
+    Neon, …) OR fill the fields — we open a real socket and speak the protocol,
+    then throw the connection away. Nothing is saved."""
+    import time
+
+    # Connection string wins; discrete fields fill any gap it leaves.
+    parsed: dict = {}
+    if body.connection_string and body.connection_string.strip():
+        parsed = _parse_connection_string(body.connection_string)
+
+    engine = parsed.get("engine") or body.engine
+    host = parsed.get("host") or body.host or ""
+    port = parsed.get("port") or body.port
+    username = parsed.get("username") or body.username
+    password = parsed.get("password") or body.password
+    dbname = parsed.get("database_name") or body.database_name
+    use_tls = parsed.get("use_tls") if parsed.get("use_tls") is not None else body.use_tls
+
+    if not engine:
+        return TestConnectionResult(
+            ok=False,
+            message="Couldn't tell which database this is. Pick an engine, or paste a full connection URL (postgresql://…, redis://…).",
+            detail="unknown_engine",
+        )
+    if not host:
+        return TestConnectionResult(
+            ok=False, engine=engine,
+            message="No host to connect to. Add a host, or paste a connection URL that includes one.",
+            detail="no_host",
+        )
+
+    started = time.monotonic()
+    if engine == "postgres":
+        ok, msg, detail = _probe_postgres(host, port, username, password, dbname, use_tls)
+    elif engine == "redis":
+        ok, msg, detail = _probe_redis(host, port, password, use_tls)
+    else:
+        # Recognised engine, but no client library on this host to probe it.
+        # Say so honestly instead of a fake green — the DB can still be SAVED,
+        # it just can't be live-tested from here yet.
+        return TestConnectionResult(
+            ok=False, engine=engine,
+            message=f"Can't live-test {engine} from WatchTower yet (no {engine} client installed here). "
+                    f"You can still save it — connections are verified at deploy time.",
+            detail="unsupported_engine",
+        )
+
+    latency = int((time.monotonic() - started) * 1000)
+    if detail == "driver_missing":
+        return TestConnectionResult(
+            ok=False, engine=engine,
+            message=f"Can't live-test {engine} from WatchTower yet (the {engine} client isn't installed on this host). "
+                    f"You can still save it.",
+            detail="driver_missing",
+        )
+    if ok:
+        return TestConnectionResult(
+            ok=True, engine=engine,
+            message=f"Connected to {host}" + (f":{port}" if port else "") + " ✓",
+            server_version=msg, latency_ms=latency,
+        )
+    return TestConnectionResult(
+        ok=False, engine=engine,
+        message=msg or "Couldn't connect.",
+        latency_ms=latency,
+    )
 
 
 @router.post("", response_model=ExternalDbResponse)

@@ -609,7 +609,15 @@ export function useCreateManagedDatabase() {
   });
 }
 
-export type TestConnectionResult = { ok: boolean; message: string };
+export type TestConnectionResult = {
+  ok: boolean;
+  message: string;
+  // External-DB probe adds these; managed-DB test leaves them undefined.
+  engine?: string | null;
+  server_version?: string | null;
+  latency_ms?: number | null;
+  detail?: string | null;
+};
 
 export function useTestManagedDbConnection() {
   return useMutation<TestConnectionResult, unknown, string>({
@@ -971,6 +979,27 @@ export function useCreateExternalDatabase() {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: queryKeys.externalDatabases });
     },
+  });
+}
+
+export type TestConnectionInput = {
+  connection_string?: string;
+  engine?: string;
+  host?: string;
+  port?: number;
+  database_name?: string;
+  username?: string;
+  password?: string;
+  use_tls?: boolean;
+};
+
+/** Dry-run reachability probe — never saves. Used by the "Test connection"
+ *  button so a hosted DB (Supabase, Neon, …) can be verified before storing.
+ *  Returns the shared {@link TestConnectionResult} (superset) shape. */
+export function useTestExternalDatabase() {
+  return useMutation<TestConnectionResult, unknown, TestConnectionInput>({
+    mutationFn: async (input) =>
+      (await apiClient.post<TestConnectionResult>('/external-databases/test', input)).data,
   });
 }
 
