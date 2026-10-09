@@ -67,20 +67,38 @@ apiClient.interceptors.response.use(
     const rid = error?.response?.headers?.['x-request-id'];
     if (typeof rid === 'string' && rid) lastRequestId = rid;
     const status = error?.response?.status;
+    const detail: string | undefined = error?.response?.data?.detail;
+
     if (status === 401) {
+      // Login required — say so clearly, then send them to sign in (don't fail
+      // silently). A 401 without a session is a normal anonymous call; ignore.
       const hadSession = !!localStorage.getItem('authToken');
       if (hadSession && !redirecting) {
         redirecting = true;
-        try {
-          localStorage.removeItem('authToken');
-        } catch {
-          /* ignore */
-        }
+        try { localStorage.removeItem('authToken'); } catch { /* ignore */ }
         if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
+          void import('./toast').then((m) => m.toast.info('Please sign in to continue.'));
           const next = encodeURIComponent(window.location.pathname + window.location.search);
           window.location.replace(`/login?next=${next}`);
         }
       }
+    } else if (status === 403) {
+      // Permission denied (e.g. not invited to this installation) — surface the
+      // server's plain-language reason so the user knows WHY + what to do, rather
+      // than a silent failure. (402 = a Pro-feature lock, handled by the UI's
+      // <ProLock> — don't toast that as an error.)
+      void import('./toast').then((m) =>
+        m.toast.error(detail || "You don't have access to do that."),
+      );
+    } else if (status >= 500) {
+      void import('./toast').then((m) =>
+        m.toast.error(detail || 'Something went wrong on the server. Please try again.'),
+      );
+    } else if (!error?.response) {
+      // No response at all = network / backend down.
+      void import('./toast').then((m) =>
+        m.toast.error("Can't reach WatchTower. Is the backend running?"),
+      );
     }
     return Promise.reject(error);
   },
