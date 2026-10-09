@@ -282,7 +282,7 @@ const TeamManagement = () => {
       <header className="electron-card-solid electron-divider border-b sticky top-0 z-10 backdrop-blur-sm">
         <div className="px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
           <div>
-            <h1 className="text-base font-semibold text-gray-900">Team</h1>
+            <h1 className="text-base font-semibold text-foreground">Team</h1>
             <p className="text-xs text-muted-foreground mt-0.5">
               {loading ? 'Loading…' : orgName ? `Organization: ${orgName}` : offlineMode ? 'Server offline — showing cached data' : ''}
             </p>
@@ -402,7 +402,7 @@ const TeamManagement = () => {
                 <Label htmlFor="invite_role">Role</Label>
                 <select id="invite_role" value={role}
                   onChange={(e) => setRole(e.target.value as TeamMember['role'])}
-                  className="mt-1.5 w-full border border-border rounded-md h-10 px-3 text-sm bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-red-700 focus:ring-offset-2">
+                  className="mt-1.5 w-full border border-border rounded-md h-10 px-3 text-sm bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-accent/50">
                   <option value="developer">Developer — can create projects & deploy</option>
                   <option value="viewer">Viewer — read-only access</option>
                   <option value="admin">Admin — manage nodes, team & deployments</option>
@@ -458,7 +458,7 @@ const TeamManagement = () => {
               <p className="text-xs text-muted-foreground">You'll be redirected to GitHub to authorize access.</p>
 
               <details className="border-t border-dashed border-border pt-3 mt-3">
-                <summary className="text-xs font-semibold text-foreground/90 cursor-pointer hover:text-gray-900">
+                <summary className="text-xs font-semibold text-foreground/90 cursor-pointer hover:text-foreground">
                   Or paste a Personal Access Token instead
                 </summary>
                 <div className="space-y-2 mt-2">
@@ -481,7 +481,7 @@ const TeamManagement = () => {
                   <select
                     value={patProvider}
                     onChange={(e) => setPatProvider(e.target.value as 'github_com' | 'github_enterprise')}
-                    className="text-xs border border-border rounded-md h-9 px-2 bg-card text-foreground focus:outline-none focus:ring-1 focus:ring-red-600"
+                    className="text-xs border border-border rounded-md h-9 px-2 bg-card text-foreground focus:outline-none focus:ring-1 focus:ring-accent/50"
                   >
                     <option value="github_com">GitHub.com</option>
                     <option value="github_enterprise">GitHub Enterprise</option>
@@ -529,7 +529,7 @@ const TeamManagement = () => {
                 {connections.map((conn) => (
                   <div key={conn.id} className="electron-card-solid rounded-md px-3 py-2.5 flex items-center justify-between">
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm font-semibold text-gray-900 truncate" title={`@${conn.github_username}`}>@{conn.github_username}</p>
+                      <p className="text-sm font-semibold text-foreground truncate" title={`@${conn.github_username}`}>@{conn.github_username}</p>
                       <p className="text-xs text-muted-foreground mt-0.5">
                         {conn.provider === 'github_enterprise' ? (conn.enterprise_name ?? 'GitHub Enterprise') : 'GitHub.com'}
                         {conn.is_primary && <span className="ml-2 text-blue-600">· Primary</span>}
@@ -577,7 +577,7 @@ const TeamManagement = () => {
                   <div key={member.id} className={`electron-card-solid rounded-md px-4 py-3 flex items-center justify-between gap-3 ${isCurrentUser ? 'ring-1 ring-blue-200' : ''}`}>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <p className="text-sm font-semibold text-gray-900 truncate" title={member.email}>{member.email}</p>
+                        <p className="text-sm font-semibold text-foreground truncate" title={member.email}>{member.email}</p>
                         {isCurrentUser && (
                           <span className="text-xs px-1.5 py-0.5 rounded border border-blue-200 bg-blue-500/15 text-blue-500 dark:text-blue-400 shrink-0">You</span>
                         )}
@@ -588,7 +588,7 @@ const TeamManagement = () => {
                             value={member.role}
                             onChange={(e) => void updateMemberRole(member.id, e.target.value as TeamMember['role'])}
                             disabled={updatingMember === member.id}
-                            className={`text-xs border rounded-full px-2 py-0.5 cursor-pointer focus:outline-none focus:ring-1 focus:ring-red-600 disabled:opacity-50 ${roleMeta.color}`}
+                            className={`text-xs border rounded-full px-2 py-0.5 cursor-pointer focus:outline-none focus:ring-1 focus:ring-accent/50 disabled:opacity-50 ${roleMeta.color}`}
                           >
                             {(['owner', 'admin', 'developer', 'viewer'] as TeamMember['role'][]).map((r) => (
                               <option key={r} value={r}>{ROLE_META[r].label}</option>

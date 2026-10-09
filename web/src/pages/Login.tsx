@@ -810,7 +810,7 @@ const Login = () => {
                     value={tokenInput}
                     onChange={(e) => setTokenInput(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && void continueWithToken()}
-                    className="w-full rounded-lg border border-border focus:border-primary focus:ring-1 focus:ring-red-700 bg-card px-3 py-2 text-sm text-foreground outline-none transition"
+                    className="w-full rounded-lg border border-border focus:border-primary focus:ring-1 focus:ring-accent/50 bg-card px-3 py-2 text-sm text-foreground outline-none transition"
                     placeholder="WATCHTOWER_API_TOKEN"
                     autoComplete="current-password"
                   />

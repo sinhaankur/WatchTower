@@ -560,7 +560,7 @@ function GoLiveCard({ project }: { project: Project }) {
           <input
             type="text" value={hostname} onChange={e => setHostname(e.target.value)}
             placeholder="app.example.com"
-            className="text-sm border border-border rounded-lg px-3 py-2 bg-card focus:outline-none focus:ring-2 focus:ring-red-500 font-mono"
+            className="text-sm border border-border rounded-lg px-3 py-2 bg-card focus:outline-none focus:ring-2 focus:ring-accent/50 font-mono"
           />
         </div>
 
@@ -586,7 +586,7 @@ function GoLiveCard({ project }: { project: Project }) {
               </p>
             ) : (
               <select value={credId} onChange={e => setCredId(e.target.value)}
-                className="text-sm border border-border rounded-lg px-3 py-2 bg-card focus:outline-none focus:ring-2 focus:ring-red-500">
+                className="text-sm border border-border rounded-lg px-3 py-2 bg-card focus:outline-none focus:ring-2 focus:ring-accent/50">
                 {creds.map(c => <option key={c.id} value={c.id}>{c.name || c.account_name || c.id.slice(0, 8)}</option>)}
               </select>
             )}
@@ -1313,7 +1313,7 @@ function AutonomousModeCard({ project }: { project: Project }) {
     idle:       'text-foreground/90 bg-muted border-border',
     healthy:    'text-emerald-500 dark:text-emerald-400 bg-emerald-500/15 border-emerald-200',
     flaky:      'text-accent bg-accent/10 border-accent/25',
-    restarting: 'text-orange-500 dark:text-orange-400 bg-orange-50 border-orange-500/30',
+    restarting: 'text-orange-500 dark:text-orange-400 bg-orange-500/10 border-orange-500/30',
     rollback:   'text-destructive bg-destructive/10 border-destructive/30',
   };
 
@@ -1864,7 +1864,7 @@ function BuildLogsTab({ projectId }: { projectId: string }) {
           <select
             value={selectedDeploymentId}
             onChange={e => setSelectedDeploymentId(e.target.value)}
-            className="text-sm border border-border rounded-lg px-3 py-2 bg-card focus:outline-none focus:ring-2 focus:ring-red-500"
+            className="text-sm border border-border rounded-lg px-3 py-2 bg-card focus:outline-none focus:ring-2 focus:ring-accent/50"
           >
             {deployments.map(d => (
               <option key={d.id} value={d.id}>
@@ -1879,7 +1879,7 @@ function BuildLogsTab({ projectId }: { projectId: string }) {
             <select
               value={selectedBuild?.id ?? ''}
               onChange={e => setSelectedBuild(builds.find(b => b.id === e.target.value) ?? null)}
-              className="text-sm border border-border rounded-lg px-3 py-2 bg-card focus:outline-none focus:ring-2 focus:ring-red-500"
+              className="text-sm border border-border rounded-lg px-3 py-2 bg-card focus:outline-none focus:ring-2 focus:ring-accent/50"
             >
               {builds.map(b => (
                 <option key={b.id} value={b.id}>{fmtDate(b.started_at)} ({b.status})</option>
@@ -1984,19 +1984,19 @@ function EnvVarsTab({ projectId }: { projectId: string }) {
             value={newKey}
             onChange={e => setNewKey(e.target.value)}
             placeholder="KEY"
-            className="flex-1 min-w-[140px] border border-border rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-red-500 bg-background"
+            className="flex-1 min-w-[140px] border border-border rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-accent/50 bg-background"
           />
           <input
             type="password"
             value={newValue}
             onChange={e => setNewValue(e.target.value)}
             placeholder="VALUE"
-            className="flex-1 min-w-[200px] border border-border rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-red-500 bg-background"
+            className="flex-1 min-w-[200px] border border-border rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-accent/50 bg-background"
           />
           <select
             value={newEnv}
             onChange={e => setNewEnv(e.target.value)}
-            className="border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 bg-card"
+            className="border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent/50 bg-card"
           >
             <option value="production">Production</option>
             <option value="staging">Staging</option>
@@ -2198,7 +2198,7 @@ function WebhooksTab({ projectId }: { projectId: string }) {
           <select
             value={provider}
             onChange={e => { setProvider(e.target.value); setTestResult(null); }}
-            className="border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 bg-card"
+            className="border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent/50 bg-card"
           >
             <option value="slack">Slack</option>
             <option value="discord">Discord</option>
@@ -2208,13 +2208,13 @@ function WebhooksTab({ projectId }: { projectId: string }) {
             value={url}
             onChange={e => { setUrl(e.target.value); setTestResult(null); }}
             placeholder={provider === 'slack' ? 'https://hooks.slack.com/services/…' : provider === 'discord' ? 'https://discord.com/api/webhooks/…' : 'https://ntfy.sh/your-topic'}
-            className="flex-1 min-w-[280px] border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 bg-background font-mono text-sm"
+            className="flex-1 min-w-[280px] border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent/50 bg-background font-mono text-sm"
           />
           <input
             value={label}
             onChange={e => setLabel(e.target.value)}
             placeholder="Label (optional)"
-            className="w-36 border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 bg-background"
+            className="w-36 border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent/50 bg-background"
           />
           <button
             onClick={testHook}
@@ -2397,7 +2397,7 @@ function RelatedTab({ projectId }: { projectId: string }) {
             <select
               value={chosenId}
               onChange={e => setChosenId(e.target.value)}
-              className="flex-1 min-w-[220px] border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 bg-card"
+              className="flex-1 min-w-[220px] border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent/50 bg-card"
             >
               <option value="">Choose a project…</option>
               {candidates.map(p => (
@@ -2409,14 +2409,14 @@ function RelatedTab({ projectId }: { projectId: string }) {
               value={order}
               onChange={e => setOrder(parseInt(e.target.value || '0', 10))}
               placeholder="Order"
-              className="w-24 border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 bg-background"
+              className="w-24 border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent/50 bg-background"
               title="Lower = runs first"
             />
             <input
               value={note}
               onChange={e => setNote(e.target.value)}
               placeholder="Note (optional)"
-              className="flex-1 min-w-[180px] border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 bg-background"
+              className="flex-1 min-w-[180px] border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent/50 bg-background"
             />
             <button
               onClick={add}
@@ -2776,7 +2776,7 @@ function DomainRow({
               onClick={() => void purge()}
               disabled={busy}
               title="Clear Cloudflare's edge cache so visitors see the latest deploy immediately"
-              className="text-xs px-2 py-1 rounded border border-orange-300 text-orange-500 dark:text-orange-400 hover:bg-orange-50 disabled:opacity-50 font-medium"
+              className="text-xs px-2 py-1 rounded border border-orange-500/30 text-orange-500 dark:text-orange-400 hover:bg-orange-500/10 disabled:opacity-50 font-medium"
             >
               {busy ? 'Purging…' : 'Purge cache'}
             </button>
@@ -2795,7 +2795,7 @@ function DomainRow({
       </div>
 
       {showSync && (
-        <div className="mt-3 rounded-md border border-orange-500/30 bg-orange-50 p-3 space-y-2">
+        <div className="mt-3 rounded-md border border-orange-500/30 bg-orange-500/10 p-3 space-y-2">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <label className="block text-xs text-foreground/90">
               Cloudflare account

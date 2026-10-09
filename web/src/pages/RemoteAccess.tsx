@@ -212,7 +212,7 @@ function ProviderCard({
             max={65535}
             value={port}
             onChange={(e) => setPort(Number(e.target.value) || defaultPort)}
-            className="w-24 rounded-lg border border-border bg-card px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-300"
+            className="w-24 rounded-lg border border-border bg-card px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-accent/50"
           />
           <span className="text-xs text-muted-foreground">
             (WatchTower itself is on <code className="font-mono">{defaultPort}</code>)

@@ -464,7 +464,7 @@ const Servers = () => {
                   placeholder="Search servers…"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  className="w-full sm:w-52 pl-7 pr-3 py-1.5 text-xs rounded-lg border border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-red-400"
+                  className="w-full sm:w-52 pl-7 pr-3 py-1.5 text-xs rounded-lg border border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-accent/50"
                 />
                 <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground text-xs pointer-events-none">🔍</span>
               </div>

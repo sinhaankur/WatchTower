@@ -34,7 +34,7 @@ const STEP_LABELS = ['Basic Info', 'SSH Access', 'Deployment Config'];
 const STATUS_STYLES: Record<string, { dot: string; badge: string; label: string }> = {
   healthy: { dot: 'bg-green-500', badge: 'bg-emerald-500/15 text-emerald-500 dark:text-emerald-400 border-emerald-500/30', label: 'Healthy' },
   unhealthy: { dot: 'bg-red-400', badge: 'bg-destructive/10 text-destructive border-destructive/30', label: 'Unhealthy' },
-  offline: { dot: 'bg-gray-400', badge: 'bg-muted text-muted-foreground border-border', label: 'Offline' },
+  offline: { dot: 'bg-muted-foreground/40', badge: 'bg-muted text-muted-foreground border-border', label: 'Offline' },
   maintenance: { dot: 'bg-yellow-400', badge: 'bg-yellow-50 text-yellow-700 border-yellow-200', label: 'Maintenance' },
 };
 
