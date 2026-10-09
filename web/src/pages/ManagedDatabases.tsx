@@ -96,7 +96,7 @@ export default function ManagedDatabases() {
             <button
               onClick={() => setShowCreate(true)}
               disabled={!runtime?.available}
-              className="px-3 sm:px-4 py-1.5 rounded-lg bg-primary hover:bg-primary/90 text-white text-xs sm:text-sm font-medium transition-colors border border-border shadow-retro disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-3 sm:px-4 py-1.5 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground text-xs sm:text-sm font-medium transition-colors border border-border shadow-retro disabled:opacity-50 disabled:cursor-not-allowed"
               title={runtime?.available ? '' : 'Install Podman or Docker first'}
             >
               + New Database
@@ -104,7 +104,7 @@ export default function ManagedDatabases() {
           ) : (
             <button
               onClick={() => setShowCreateExternal(true)}
-              className="px-3 sm:px-4 py-1.5 rounded-lg bg-primary hover:bg-primary/90 text-white text-xs sm:text-sm font-medium transition-colors border border-border shadow-retro"
+              className="px-3 sm:px-4 py-1.5 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground text-xs sm:text-sm font-medium transition-colors border border-border shadow-retro"
             >
               + Connect External
             </button>
@@ -313,7 +313,7 @@ function ManagedTabContent({
     <>
       <ManagedDbDiagram />
       {runtime && !runtime.available && (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900">
+        <div className="rounded-lg border border-accent/25 bg-accent/10 px-4 py-3 text-xs text-amber-900">
           No container runtime found on this host.{' '}
           <a
             href="https://podman.io/docs/installation"
@@ -466,7 +466,7 @@ function ExternalDatabaseCard({ db }: { db: ExternalDatabase }) {
                 del.mutate(db.id, { onError: handleErr });
               }}
               disabled={del.isPending}
-              className="px-3 py-1 rounded-md bg-primary hover:bg-primary/90 text-white text-xs font-medium disabled:opacity-50"
+              className="px-3 py-1 rounded-md bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-medium disabled:opacity-50"
             >
               {del.isPending ? 'Removing…' : 'Confirm remove'}
             </button>
@@ -524,7 +524,7 @@ function ExternalCredentialsModal({
       <div className="mt-5 flex items-center justify-end">
         <button
           onClick={onClose}
-          className="px-4 py-1.5 rounded-lg bg-primary hover:bg-primary/90 text-white text-xs font-medium border border-border shadow-retro"
+          className="px-4 py-1.5 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-medium border border-border shadow-retro"
         >
           Done
         </button>
@@ -739,7 +739,7 @@ function CreateExternalModal({ onClose }: { onClose: () => void }) {
         <button
           onClick={submit}
           disabled={create.isPending}
-          className="px-4 py-1.5 rounded-lg bg-primary hover:bg-primary/90 text-white text-xs font-medium border border-border shadow-retro disabled:opacity-50"
+          className="px-4 py-1.5 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-medium border border-border shadow-retro disabled:opacity-50"
         >
           {create.isPending ? 'Saving…' : 'Save connection'}
         </button>
@@ -865,7 +865,7 @@ function DatabaseCard({ db }: { db: ManagedDatabase }) {
                 );
               }}
               disabled={del.isPending}
-              className="px-3 py-1 rounded-md bg-primary hover:bg-primary/90 text-white text-xs font-medium disabled:opacity-50"
+              className="px-3 py-1 rounded-md bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-medium disabled:opacity-50"
             >
               {del.isPending ? 'Deleting…' : 'Confirm delete'}
             </button>
@@ -941,7 +941,7 @@ function AddReplicaModal({
               onClick={() => { setMode(m); setSelectedPeer(null); }}
               className={`flex-1 py-2 transition-colors ${
                 mode === m
-                  ? 'bg-slate-900 text-white'
+                  ? 'bg-foreground text-white'
                   : 'bg-card text-muted-foreground hover:bg-muted'
               }`}
             >
@@ -1055,7 +1055,7 @@ function ReplicasSection({ primaryDb }: { primaryDb: ManagedDatabase }) {
             <button
               onClick={() => setShowAddModal(true)}
               disabled={primaryDb.status !== 'running'}
-              className="px-3 py-1 rounded-md bg-primary hover:bg-primary/90 text-white text-xs font-medium border border-border shadow-retro disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-3 py-1 rounded-md bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-medium border border-border shadow-retro disabled:opacity-50 disabled:cursor-not-allowed"
               title={primaryDb.status !== 'running' ? 'Primary must be running' : ''}
             >
               + Add standby
@@ -1138,7 +1138,7 @@ function ReplicaRow({
             <button
               onClick={() => setConfirm('promote')}
               disabled={busy}
-              className="px-2 py-1 rounded-md border border-amber-300 bg-amber-50 text-xs text-amber-900 hover:bg-amber-100 transition-colors disabled:opacity-50"
+              className="px-2 py-1 rounded-md border border-amber-300 bg-accent/10 text-xs text-amber-900 hover:bg-amber-100 transition-colors disabled:opacity-50"
               title="Promote this standby to primary (manual failover)"
             >
               Promote
@@ -1165,7 +1165,7 @@ function ReplicaRow({
       )}
 
       {confirm === 'promote' && (
-        <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 space-y-2">
+        <div className="rounded-md border border-amber-300 bg-accent/10 px-3 py-2 space-y-2">
           <p className="text-xs text-amber-900">
             Promote <span className="font-mono">{replica.name}</span> to primary? The current primary will be stopped and apps must switch connection strings to <span className="font-mono">{replica.host}:{replica.port}</span>.
           </p>
@@ -1209,7 +1209,7 @@ function ReplicaRow({
                 });
               }}
               disabled={busy}
-              className="px-2 py-1 rounded-md bg-primary hover:bg-primary/90 text-white text-xs font-medium disabled:opacity-50"
+              className="px-2 py-1 rounded-md bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-medium disabled:opacity-50"
             >
               {remove.isPending ? 'Removing…' : 'Confirm remove'}
             </button>
@@ -1232,7 +1232,7 @@ function ReplicaStatusBadge({ status }: { status: ManagedDbReplica['status'] }) 
     initializing: 'bg-blue-50 text-blue-700 border-blue-200',
     streaming: 'bg-emerald-50 text-emerald-700 border-emerald-200',
     failed: 'bg-destructive/10 text-destructive border-destructive/30',
-    promoted: 'bg-amber-50 text-amber-800 border-amber-200',
+    promoted: 'bg-accent/10 text-amber-800 border-accent/25',
   };
   return (
     <span className={`text-xs px-1.5 py-0.5 rounded-full border font-medium ${map[status]}`}>
@@ -1317,7 +1317,7 @@ function BackupsSection({ primaryDb }: { primaryDb: ManagedDatabase }) {
             <button
               onClick={onCreate}
               disabled={create.isPending || primaryDb.status !== 'running'}
-              className="px-3 py-1.5 rounded-md bg-primary hover:bg-primary/90 text-white text-xs font-medium border border-border shadow-retro disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+              className="px-3 py-1.5 rounded-md bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-medium border border-border shadow-retro disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
               title={primaryDb.status !== 'running' ? 'Database must be running' : ''}
             >
               {create.isPending ? 'Backing up…' : 'Backup now'}
@@ -1394,7 +1394,7 @@ function BackupRow({
                 setConfirm('restore');
               }}
               disabled={busy || primaryDb.status !== 'running'}
-              className="px-2 py-1 rounded-md border border-amber-300 bg-amber-50 text-xs text-amber-900 hover:bg-amber-100 transition-colors disabled:opacity-50"
+              className="px-2 py-1 rounded-md border border-amber-300 bg-accent/10 text-xs text-amber-900 hover:bg-amber-100 transition-colors disabled:opacity-50"
               title={primaryDb.status !== 'running' ? 'Target DB must be running' : 'Restore this backup, replacing live data'}
             >
               Restore
@@ -1434,7 +1434,7 @@ function BackupRow({
               });
             }}
             disabled={busy}
-            className="px-2 py-1 rounded-md bg-primary hover:bg-primary/90 text-white text-xs font-medium disabled:opacity-50"
+            className="px-2 py-1 rounded-md bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-medium disabled:opacity-50"
           >
             {del.isPending ? 'Deleting…' : 'Confirm'}
           </button>
@@ -1692,7 +1692,7 @@ function RestoreConfirm({
   const canSubmit = mode === 'in-place' ? matches : newNameValid;
 
   return (
-    <div className="mt-2 rounded-md border border-amber-300 bg-amber-50 px-2 py-2 space-y-2">
+    <div className="mt-2 rounded-md border border-amber-300 bg-accent/10 px-2 py-2 space-y-2">
       {/* Mode picker */}
       <div className="flex items-center gap-3 text-xs">
         <label className="flex items-center gap-1.5 cursor-pointer">
@@ -2023,7 +2023,7 @@ function CreateModal({
         <button
           onClick={submit}
           disabled={create.isPending}
-          className="px-4 py-1.5 rounded-lg bg-primary hover:bg-primary/90 text-white text-xs font-medium border border-border shadow-retro disabled:opacity-50"
+          className="px-4 py-1.5 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-medium border border-border shadow-retro disabled:opacity-50"
         >
           {create.isPending ? 'Creating…' : 'Create database'}
         </button>
@@ -2119,7 +2119,7 @@ function CredentialsModal({
         </button>
         <button
           onClick={onClose}
-          className="px-4 py-1.5 rounded-lg bg-primary hover:bg-primary/90 text-white text-xs font-medium border border-border shadow-retro"
+          className="px-4 py-1.5 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-medium border border-border shadow-retro"
         >
           Done
         </button>
@@ -2133,7 +2133,7 @@ function CredentialsModal({
 function Modal({ children, onClose }: { children: React.ReactNode; onClose: () => void }) {
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm anim-fade-in"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm anim-fade-in"
       onClick={onClose}
     >
       <div
@@ -2205,7 +2205,7 @@ function StatusBadge({ status }: { status: ManagedDatabase['status'] }) {
     running: 'bg-emerald-50 text-emerald-700 border-emerald-200',
     stopped: 'bg-muted text-muted-foreground border-border',
     failed: 'bg-destructive/10 text-destructive border-destructive/30',
-    deleting: 'bg-amber-50 text-amber-800 border-amber-200',
+    deleting: 'bg-accent/10 text-amber-800 border-accent/25',
   };
   return (
     <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${map[status]}`}>

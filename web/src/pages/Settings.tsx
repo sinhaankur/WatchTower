@@ -67,7 +67,7 @@ function CopyButton({ text }: { text: string }) {
   return (
     <button
       onClick={() => { void navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 1800); }}
-      className="text-xs px-2 py-0.5 rounded border border-border hover:border-slate-500 text-muted-foreground hover:text-foreground transition-colors"
+      className="text-xs px-2 py-0.5 rounded border border-border hover:border-accent/50 text-muted-foreground hover:text-foreground transition-colors"
     >
       {copied ? 'Copied!' : 'Copy'}
     </button>
@@ -115,7 +115,7 @@ function VSCodeCard() {
           <span className={`ml-auto text-xs px-2 py-0.5 rounded-full border font-medium ${
             status?.installed
               ? 'border-emerald-300 bg-emerald-50 text-emerald-700'
-              : 'border-amber-300 bg-amber-50 text-amber-700'
+              : 'border-amber-300 bg-accent/10 text-accent'
           }`}>
             {status?.installed ? `Installed · ${status.version ?? 'VS Code'}` : 'Not detected on host'}
           </span>
@@ -141,7 +141,7 @@ function VSCodeCard() {
           <button
             onClick={() => void openRoot()}
             disabled={openLoading || !status?.installed}
-            className="w-full py-2 rounded-lg border border-border bg-primary hover:bg-primary/90 text-white text-xs font-semibold shadow-retro transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full py-2 rounded-lg border border-border bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold shadow-retro transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {openLoading ? 'Opening…' : 'Open WatchTower in VS Code'}
           </button>
@@ -193,7 +193,7 @@ function VSCodeCard() {
               { step: '4', text: 'Open /path/to/your/project in the remote window' },
             ].map(({ step, text }) => (
               <div key={step} className="flex items-start gap-2">
-                <span className="w-4 h-4 rounded bg-amber-400 text-foreground text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">{step}</span>
+                <span className="w-4 h-4 rounded bg-primary text-foreground text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">{step}</span>
                 <p className="text-xs text-foreground/90">{text}</p>
               </div>
             ))}
@@ -208,10 +208,10 @@ function VSCodeCard() {
 
         {/* Install instructions */}
         {!loading && !status?.installed && (
-          <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 space-y-2">
+          <div className="rounded-lg border border-amber-300 bg-accent/10 p-4 space-y-2">
             <p className="text-xs font-semibold text-amber-800 uppercase tracking-wide">Install VS Code on Host</p>
-            <p className="text-xs text-amber-700">{status?.install_instructions[os] ?? 'Visit https://code.visualstudio.com/download'}</p>
-            <div className="flex items-center gap-2 p-2 rounded bg-card border border-amber-200 mt-1">
+            <p className="text-xs text-accent">{status?.install_instructions[os] ?? 'Visit https://code.visualstudio.com/download'}</p>
+            <div className="flex items-center gap-2 p-2 rounded bg-card border border-accent/25 mt-1">
               <code className="text-xs font-mono text-foreground/90 flex-1">sudo snap install --classic code</code>
               <CopyButton text="sudo snap install --classic code" />
             </div>
@@ -267,7 +267,7 @@ function UpdateCheckCard() {
   return (
     <div className="rounded-xl border border-border bg-card p-5 shadow-retro">
       <div className="flex items-center gap-3 mb-4">
-        <div className="w-9 h-9 rounded-lg border border-border bg-slate-900 flex items-center justify-center shadow-retro">
+        <div className="w-9 h-9 rounded-lg border border-border bg-foreground flex items-center justify-center shadow-retro">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
             <polyline points="23 4 23 10 17 10" />
             <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
@@ -283,7 +283,7 @@ function UpdateCheckCard() {
           </p>
         </div>
         {data?.has_update ? (
-          <span className="text-xs px-2 py-0.5 rounded-full border font-medium border-amber-300 bg-amber-50 text-amber-800">
+          <span className="text-xs px-2 py-0.5 rounded-full border font-medium border-amber-300 bg-accent/10 text-amber-800">
             Update available
           </span>
         ) : data?.latest ? (
@@ -294,7 +294,7 @@ function UpdateCheckCard() {
       </div>
 
       {data?.has_update && (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 mb-3 flex items-start gap-3">
+        <div className="rounded-lg border border-accent/25 bg-accent/10 p-3 mb-3 flex items-start gap-3">
           <div className="flex-1">
             <p className="text-xs text-amber-900">
               <strong>{data.release_name ?? `v${data.latest}`}</strong> is available.
@@ -332,7 +332,7 @@ function UpdateCheckCard() {
         </p>
       )}
       {data?.error && (
-        <p className="text-xs text-amber-700 mb-3">{data.error}</p>
+        <p className="text-xs text-accent mb-3">{data.error}</p>
       )}
 
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -412,7 +412,7 @@ function DepRow({ label, found, detail, installCmd, hint, required }: DepRowProp
     <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${
       required
         ? 'border-destructive/40 bg-destructive/10 text-destructive'
-        : 'border-amber-300 bg-amber-50 text-amber-700'
+        : 'border-amber-300 bg-accent/10 text-accent'
     }`}>
       {required ? 'Missing (required)' : 'Missing (optional)'}
     </span>
@@ -507,7 +507,7 @@ function SystemCard() {
   return (
     <div className="rounded-xl border border-border bg-card p-5 shadow-retro">
       <div className="flex items-center gap-3 mb-4">
-        <div className="w-9 h-9 rounded-lg border border-border bg-slate-900 flex items-center justify-center shadow-retro">
+        <div className="w-9 h-9 rounded-lg border border-border bg-foreground flex items-center justify-center shadow-retro">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
             <rect x="3" y="3" width="18" height="18" rx="2" />
             <path d="M9 9h6v6H9z" />
@@ -606,7 +606,7 @@ function SystemCard() {
               </button>
               <button
                 onClick={() => void handleRecheck()}
-                className="text-xs px-3 py-1.5 rounded-lg border border-border bg-amber-400 hover:bg-amber-500 text-foreground font-semibold shadow-retro"
+                className="text-xs px-3 py-1.5 rounded-lg border border-border bg-primary hover:bg-primary/90 text-primary-foreground font-semibold shadow-retro"
               >
                 Recheck (restarts app)
               </button>
@@ -675,7 +675,7 @@ function BackupCard() {
   return (
     <div className="rounded-xl border border-border bg-card p-5 shadow-retro">
       <div className="flex items-center gap-3 mb-4">
-        <div className="w-9 h-9 rounded-lg border border-border bg-slate-900 flex items-center justify-center shadow-retro">
+        <div className="w-9 h-9 rounded-lg border border-border bg-foreground flex items-center justify-center shadow-retro">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
             <polyline points="7 10 12 15 17 10" />
@@ -693,7 +693,7 @@ function BackupCard() {
       {loading && <p className="text-xs text-muted-foreground">Checking backup status…</p>}
 
       {!loading && status && !status.supported && (
-        <div className="rounded-lg border border-amber-300 bg-amber-50 p-3">
+        <div className="rounded-lg border border-amber-300 bg-accent/10 p-3">
           <p className="text-xs text-amber-800">
             This install uses a non-SQLite database. Use your database's native backup tool
             (e.g. <code className="font-mono bg-card px-1 rounded">pg_dump</code>) and back up
@@ -705,7 +705,7 @@ function BackupCard() {
 
       {!loading && status && status.supported && (
         <>
-          <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 mb-3">
+          <div className="rounded-lg border border-amber-300 bg-accent/10 p-3 mb-3">
             <p className="text-xs text-amber-900 font-medium">⚠ Contains credentials</p>
             <p className="text-xs text-amber-800 mt-0.5">
               The backup file contains your Fernet encryption key plus the SQLite database
@@ -751,7 +751,7 @@ function BackupCard() {
             <button
               onClick={() => void handleDownload()}
               disabled={downloading || !status.ready_for_backup || !status.can_export}
-              className="text-xs px-3 py-1.5 rounded-lg border border-border bg-amber-400 hover:bg-amber-500 text-foreground font-semibold shadow-retro disabled:opacity-50 disabled:cursor-not-allowed"
+              className="text-xs px-3 py-1.5 rounded-lg border border-border bg-primary hover:bg-primary/90 text-primary-foreground font-semibold shadow-retro disabled:opacity-50 disabled:cursor-not-allowed"
               title={
                 !status.can_export
                   ? "Requires can_manage_team permission on this org"
@@ -819,7 +819,7 @@ function StorageCard() {
   return (
     <div className="rounded-xl border border-border bg-card p-5 shadow-retro">
       <div className="flex items-center gap-3 mb-4">
-        <div className="w-9 h-9 rounded-lg border border-border bg-slate-900 flex items-center justify-center shadow-retro">
+        <div className="w-9 h-9 rounded-lg border border-border bg-foreground flex items-center justify-center shadow-retro">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
             <ellipse cx="12" cy="5" rx="9" ry="3" />
             <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" />
@@ -869,7 +869,7 @@ function StorageCard() {
           <button
             onClick={() => void clear()}
             disabled={clearing || nothingToClear}
-            className="w-full rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-sm font-semibold py-2 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            className="w-full rounded-lg bg-foreground hover:bg-slate-800 text-white text-sm font-semibold py-2 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {clearing ? 'Clearing…' : nothingToClear ? 'Nothing to clear' : 'Clear build cache'}
           </button>

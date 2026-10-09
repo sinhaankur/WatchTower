@@ -21,7 +21,7 @@ type DiagnosticReport = {
 
 const STATUS_DOT: Record<CheckStatus, string> = {
   ok:   'bg-emerald-500',
-  warn: 'bg-amber-500',
+  warn: 'bg-primary',
   fail: 'bg-red-500',
 };
 
@@ -33,7 +33,7 @@ const STATUS_LABEL: Record<CheckStatus, string> = {
 
 const STATUS_BADGE: Record<CheckStatus, string> = {
   ok:   'border-emerald-200 bg-emerald-50 text-emerald-700',
-  warn: 'border-amber-200 bg-amber-50 text-amber-700',
+  warn: 'border-accent/25 bg-accent/10 text-accent',
   fail: 'border-destructive/30 bg-destructive/10 text-destructive',
 };
 
@@ -192,7 +192,7 @@ export function DiagnosticsCard() {
         </ul>
       )}
 
-      <div className="flex items-center gap-2 mt-4 pt-3 border-t border-slate-100">
+      <div className="flex items-center gap-2 mt-4 pt-3 border-t border-border">
         <button
           type="button"
           onClick={() => void load()}

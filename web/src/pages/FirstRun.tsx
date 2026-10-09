@@ -241,7 +241,7 @@ export default function FirstRun() {
 
           {/* Runs-on chip */}
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <span className={`h-1.5 w-1.5 rounded-full ${runtimeReady === false ? 'bg-amber-500' : 'bg-emerald-500'}`} />
+            <span className={`h-1.5 w-1.5 rounded-full ${runtimeReady === false ? 'bg-primary' : 'bg-emerald-500'}`} />
             {runtimeReady === false ? (
               <span>Runs on <strong className="text-foreground">this Mac</strong> — we’ll set up the container runtime on first deploy.</span>
             ) : (

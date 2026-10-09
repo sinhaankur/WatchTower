@@ -136,7 +136,7 @@ export default function LegalGate({ children }: { children: ReactElement }) {
               type="checkbox"
               checked={agreed}
               onChange={(e) => setAgreed(e.target.checked)}
-              className="mt-0.5 accent-amber-500"
+              className="mt-0.5 accent-accent"
             />
             <span className="text-xs text-foreground/90">
               I have read and agree to the Terms of Use, Acceptable Use Policy, and Privacy

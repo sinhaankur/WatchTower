@@ -30,7 +30,7 @@ export function ProLock({ feature }: { feature: ProFeatureKey }) {
     meta?.description ?? 'Available on the Pro tier of WatchTower.';
 
   return (
-    <div className="rounded-2xl border-2 border-amber-200 bg-gradient-to-br from-amber-50 via-white to-amber-50/30 p-8">
+    <div className="rounded-2xl border-2 border-accent/25 bg-gradient-to-br from-amber-50 via-white to-amber-50/30 p-8">
       <div className="flex items-start gap-5">
         <div className="shrink-0 w-14 h-14 rounded-2xl bg-amber-100 border-2 border-amber-300 flex items-center justify-center text-2xl">
           🔒
@@ -50,7 +50,7 @@ export function ProLock({ feature }: { feature: ProFeatureKey }) {
               href={data?.upgrade_url ?? 'https://github.com/sinhaankur/WatchTower'}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-sm font-semibold transition-colors"
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-foreground hover:bg-slate-800 text-white text-sm font-semibold transition-colors"
             >
               Learn about Pro
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">

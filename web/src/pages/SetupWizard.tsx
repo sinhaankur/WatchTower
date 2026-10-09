@@ -733,7 +733,7 @@ const SetupWizard = () => {
                         <li>⚙ Needs SSH key + reload command (we'll guide you)</li>
                       </ul>
                       {data.deployment_target === 'remote_ssh' && hasNodes === false && (
-                        <div className="mt-3 rounded border border-amber-300 bg-amber-50 px-3 py-2 text-xs">
+                        <div className="mt-3 rounded border border-amber-300 bg-accent/10 px-3 py-2 text-xs">
                           <p className="text-amber-900">No servers added yet — you'll add one in the Servers tab after creating this project, or click below to do it now.</p>
                           <Link to="/servers" className="inline-block mt-1 text-amber-900 underline">
                             → Add a server now
@@ -772,7 +772,7 @@ const SetupWizard = () => {
                               href="https://www.oracle.com/cloud/free/"
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="block rounded border border-border bg-card hover:border-slate-500 p-2.5 text-xs"
+                              className="block rounded border border-border bg-card hover:border-accent/50 p-2.5 text-xs"
                             >
                               <p className="font-semibold text-foreground">Oracle Cloud Always Free</p>
                               <p className="text-muted-foreground mt-0.5">$0 forever · 4 ARM cores · 24 GB RAM · public IP</p>
@@ -781,7 +781,7 @@ const SetupWizard = () => {
                               href="https://www.hetzner.com/cloud/"
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="block rounded border border-border bg-card hover:border-slate-500 p-2.5 text-xs"
+                              className="block rounded border border-border bg-card hover:border-accent/50 p-2.5 text-xs"
                             >
                               <p className="font-semibold text-foreground">Hetzner CAX11</p>
                               <p className="text-muted-foreground mt-0.5">~$4.59/mo · 2 ARM · 4 GB RAM · billed hourly</p>
@@ -790,7 +790,7 @@ const SetupWizard = () => {
                               href="https://www.digitalocean.com/pricing/droplets"
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="block rounded border border-border bg-card hover:border-slate-500 p-2.5 text-xs"
+                              className="block rounded border border-border bg-card hover:border-accent/50 p-2.5 text-xs"
                             >
                               <p className="font-semibold text-foreground">DigitalOcean</p>
                               <p className="text-muted-foreground mt-0.5">$4–6/mo · 1 vCPU · 1 GB RAM · public IP</p>
@@ -799,7 +799,7 @@ const SetupWizard = () => {
                               href="https://tailscale.com/"
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="block rounded border border-border bg-card hover:border-slate-500 p-2.5 text-xs"
+                              className="block rounded border border-border bg-card hover:border-accent/50 p-2.5 text-xs"
                             >
                               <p className="font-semibold text-foreground">Tailscale + this machine</p>
                               <p className="text-muted-foreground mt-0.5">Free · this machine, accessible privately from anywhere</p>
@@ -1012,7 +1012,7 @@ const SetupWizard = () => {
                                 >
                                   <div className="flex items-center gap-2">
                                     <span className="text-xs font-medium text-foreground">{repo.name}</span>
-                                    {repo.private && <span className="text-xs bg-amber-100 text-amber-700 px-1 rounded">private</span>}
+                                    {repo.private && <span className="text-xs bg-amber-100 text-accent px-1 rounded">private</span>}
                                   </div>
                                   {repo.description && (
                                     <p className="text-xs text-muted-foreground truncate mt-0.5">{repo.description}</p>
@@ -1082,7 +1082,7 @@ const SetupWizard = () => {
                       </button>
                     </div>
                     {!hasElectronFolderPicker && browserPickedFolderName && (
-                      <p className="text-xs text-amber-700 mt-1">
+                      <p className="text-xs text-accent mt-1">
                         Browser security only shared the folder name ({browserPickedFolderName}). Please replace it with the full absolute path before continuing.
                       </p>
                     )}
@@ -1268,7 +1268,7 @@ const SetupWizard = () => {
 
         <aside className="space-y-4">
           {hasNodes === false && data.deployment_model === 'self_hosted' && (
-            <Card className="rounded-xl shadow-none border-amber-300 bg-amber-50">
+            <Card className="rounded-xl shadow-none border-amber-300 bg-accent/10">
               <CardContent className="py-4">
                 <p className="text-xs font-semibold text-amber-900 mb-1">⚠ Server node required</p>
                 <p className="text-xs text-amber-800 mb-2">
@@ -1276,7 +1276,7 @@ const SetupWizard = () => {
                 </p>
                 <Link
                   to="/servers"
-                  className="text-xs font-medium text-amber-900 underline underline-offset-2 hover:text-amber-700"
+                  className="text-xs font-medium text-amber-900 underline underline-offset-2 hover:text-accent"
                 >
                   → Go to Servers
                 </Link>

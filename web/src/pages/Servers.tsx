@@ -33,12 +33,12 @@ const STATUS_META = {
   healthy:     { dot: 'bg-emerald-500', badge: 'bg-emerald-50 text-emerald-700 border-emerald-200', label: 'Healthy' },
   unhealthy:   { dot: 'bg-red-500',     badge: 'bg-destructive/10 text-destructive border-destructive/30',             label: 'Unhealthy' },
   offline:     { dot: 'bg-slate-500',   badge: 'bg-muted text-foreground/90 border-border',       label: 'Offline' },
-  maintenance: { dot: 'bg-amber-500',   badge: 'bg-amber-50 text-amber-700 border-amber-200',       label: 'Maintenance' },
+  maintenance: { dot: 'bg-primary',   badge: 'bg-accent/10 text-accent border-accent/25',       label: 'Maintenance' },
 };
 
 function UsageBar({ label, value }: { label: string; value?: number }) {
   const pct = value ?? 0;
-  const color = pct > 80 ? 'bg-red-400' : pct > 60 ? 'bg-amber-400' : 'bg-emerald-400';
+  const color = pct > 80 ? 'bg-red-400' : pct > 60 ? 'bg-primary' : 'bg-emerald-400';
   return (
     <div>
       <div className="flex justify-between text-xs text-muted-foreground mb-1">
@@ -219,14 +219,14 @@ const Servers = () => {
             <>
               <button
                 onClick={() => { setShowProvision((v) => !v); setShowForm(false); }}
-                className="px-4 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-sm font-medium transition-colors border border-border shadow-retro"
+                className="px-4 py-1.5 rounded-lg bg-foreground hover:bg-slate-800 text-white text-sm font-medium transition-colors border border-border shadow-retro"
                 title="Auto-provision a fresh VM on DigitalOcean or Hetzner"
               >
                 {showProvision ? 'Cancel' : '✨ Provision Server'}
               </button>
               <button
                 onClick={() => { setShowForm((v) => !v); setShowProvision(false); }}
-                className="px-4 py-1.5 rounded-lg bg-primary hover:bg-primary/90 text-white text-sm font-medium transition-colors border border-border shadow-retro"
+                className="px-4 py-1.5 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground text-sm font-medium transition-colors border border-border shadow-retro"
                 title="Manually register an existing server you've already set up"
               >
                 {showForm ? 'Cancel' : '+ Add Server'}
@@ -272,9 +272,9 @@ const Servers = () => {
 
         {/* Notices */}
         {pageError && (
-          <div className="flex items-start gap-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3">
+          <div className="flex items-start gap-3 rounded-xl border border-amber-300 bg-accent/10 px-4 py-3">
             <span className="text-amber-600 mt-0.5">⚠</span>
-            <p className="text-sm text-amber-700">{pageError}</p>
+            <p className="text-sm text-accent">{pageError}</p>
           </div>
         )}
         {actionMsg && (
@@ -407,7 +407,7 @@ const Servers = () => {
               <button
                 onClick={() => step > 0 && setStep((s) => s - 1)}
                 disabled={step === 0}
-                className="px-4 py-2 text-sm font-semibold text-foreground border border-border bg-card rounded-lg shadow-retro hover:bg-amber-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                className="px-4 py-2 text-sm font-semibold text-foreground border border-border bg-card rounded-lg shadow-retro hover:bg-accent/10 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
               >
                 ← Back
               </button>
@@ -415,7 +415,7 @@ const Servers = () => {
                 <button
                   onClick={() => setStep((s) => s + 1)}
                   disabled={!isStepValid(step)}
-                  className="px-4 py-2 text-sm font-semibold bg-primary hover:bg-primary/90 text-white rounded-lg border border-border shadow-retro transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="px-4 py-2 text-sm font-semibold bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg border border-border shadow-retro transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   Continue →
                 </button>
@@ -423,7 +423,7 @@ const Servers = () => {
                 <button
                   onClick={() => void addNode()}
                   disabled={addingNode || !orgId}
-                  className="px-6 py-2 text-sm font-semibold bg-primary hover:bg-primary/90 text-white rounded-lg border border-border shadow-retro transition-colors disabled:opacity-40"
+                  className="px-6 py-2 text-sm font-semibold bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg border border-border shadow-retro transition-colors disabled:opacity-40"
                 >
                   {addingNode ? 'Adding…' : 'Add Server'}
                 </button>
@@ -505,7 +505,7 @@ const Servers = () => {
                     )}
                     <Link
                       to="/servers/local"
-                      className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary hover:bg-primary/90 text-white text-sm transition-colors border border-border shadow-retro"
+                      className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground text-sm transition-colors border border-border shadow-retro"
                     >
                       💻 Use This PC
                     </Link>

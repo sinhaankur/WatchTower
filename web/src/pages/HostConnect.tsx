@@ -75,7 +75,7 @@ function StatusBadge({ ok, label }: { ok: boolean; label: string }) {
       className={`shrink-0 text-xs px-2 py-0.5 rounded-full border ${
         ok
           ? 'border-emerald-300 bg-emerald-50 text-emerald-700'
-          : 'border-amber-300 bg-amber-50 text-amber-700'
+          : 'border-amber-300 bg-accent/10 text-accent'
       }`}
     >
       {label}
@@ -421,7 +421,7 @@ const HostConnect = () => {
             readiness >= 4
               ? 'bg-emerald-500/10 text-emerald-700 border-emerald-300'
               : readiness >= 2
-                ? 'bg-amber-500/10 text-amber-700 border-amber-300'
+                ? 'bg-primary/10 text-accent border-amber-300'
                 : 'bg-red-500/10 text-destructive border-destructive/40'
           }`}>
             {readiness}/6 ready
@@ -488,7 +488,7 @@ const HostConnect = () => {
               <div className="mt-4 flex flex-wrap gap-2">
                 <Link
                   to="/servers"
-                  className="rounded-lg border border-border bg-card px-3 py-2 text-xs font-semibold text-foreground shadow-retro hover:bg-amber-50"
+                  className="rounded-lg border border-border bg-card px-3 py-2 text-xs font-semibold text-foreground shadow-retro hover:bg-accent/10"
                 >
                   Open Servers
                 </Link>
@@ -501,7 +501,7 @@ const HostConnect = () => {
               </div>
             </div>
 
-            <div className="rounded-xl border border-amber-200 bg-card/80 p-4">
+            <div className="rounded-xl border border-accent/25 bg-card/80 p-4">
               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Recommended Next Step</p>
               <p className="mt-2 text-sm font-semibold text-foreground">
                 {missingTools.length > 0
@@ -523,7 +523,7 @@ const HostConnect = () => {
               {missingTools.length > 0 && (
                 <div className="mt-3 flex flex-wrap gap-2">
                   {missingTools.map((name) => (
-                    <span key={name} className="rounded-full border border-amber-300 bg-amber-50 px-2 py-1 text-xs font-medium text-amber-800">
+                    <span key={name} className="rounded-full border border-amber-300 bg-accent/10 px-2 py-1 text-xs font-medium text-amber-800">
                       {TOOL_LABELS[name]}
                     </span>
                   ))}
@@ -547,7 +547,7 @@ const HostConnect = () => {
               </div>
               <div className="h-2.5 rounded-full bg-muted border border-border overflow-hidden">
                 <div
-                  className={`h-full transition-all rounded-full ${readiness >= 5 ? 'bg-emerald-500' : readiness >= 3 ? 'bg-amber-500' : 'bg-primary'}`}
+                  className={`h-full transition-all rounded-full ${readiness >= 5 ? 'bg-emerald-500' : readiness >= 3 ? 'bg-primary' : 'bg-primary'}`}
                   style={{ width: `${Math.round((readiness / 6) * 100)}%` }}
                 />
               </div>
@@ -557,7 +557,7 @@ const HostConnect = () => {
                 </p>
               )}
               {missingTools.length > 0 && !loading && (
-                <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                <div className="mt-3 rounded-lg border border-accent/25 bg-accent/10 px-3 py-2 text-xs text-amber-900">
                   Missing now: {missingTools.map((tool) => TOOL_LABELS[tool]).join(', ')}.
                 </div>
               )}
@@ -674,7 +674,7 @@ const HostConnect = () => {
               <button
                 onClick={() => void generateDomainPlan()}
                 disabled={domainLoading}
-                className="px-4 py-2 rounded-lg bg-primary hover:bg-primary/90 text-white text-sm disabled:opacity-50 border border-border shadow-retro"
+                className="px-4 py-2 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground text-sm disabled:opacity-50 border border-border shadow-retro"
               >
                 {domainLoading ? 'Generating…' : 'Generate Cloudflare Plan'}
               </button>
@@ -788,7 +788,7 @@ const HostConnect = () => {
               <button
                 onClick={() => void generateDatabasePlan()}
                 disabled={dbPlanLoading}
-                className="px-4 py-2 rounded-lg bg-primary hover:bg-primary/90 text-white text-sm disabled:opacity-50 border border-border shadow-retro"
+                className="px-4 py-2 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground text-sm disabled:opacity-50 border border-border shadow-retro"
               >
                 {dbPlanLoading ? 'Generating…' : 'Generate Database Plan'}
               </button>
@@ -883,7 +883,7 @@ const HostConnect = () => {
               <button
                 onClick={() => void generateNginxPlan()}
                 disabled={nginxPlanLoading}
-                className="px-4 py-2 rounded-lg bg-primary hover:bg-primary/90 text-white text-sm disabled:opacity-50 border border-border shadow-retro"
+                className="px-4 py-2 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground text-sm disabled:opacity-50 border border-border shadow-retro"
               >
                 {nginxPlanLoading ? 'Generating…' : 'Generate Nginx Config'}
               </button>
@@ -1006,7 +1006,7 @@ const HostConnect = () => {
               <button
                 onClick={() => void runSecureTerminalCommand()}
                 disabled={terminalRunning || !terminalPolicy?.enabled}
-                className="px-4 py-2 rounded-lg bg-primary hover:bg-primary/90 text-white text-sm disabled:opacity-50 border border-border shadow-retro"
+                className="px-4 py-2 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground text-sm disabled:opacity-50 border border-border shadow-retro"
               >
                 {terminalRunning ? 'Running…' : terminalPolicy?.enabled ? 'Run Command' : 'Terminal Disabled'}
               </button>

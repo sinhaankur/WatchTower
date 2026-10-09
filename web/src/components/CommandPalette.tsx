@@ -156,7 +156,7 @@ export function CommandPalette() {
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[100] flex items-start justify-center pt-[15vh] bg-slate-900/40 backdrop-blur-sm anim-fade-in"
+      className="fixed inset-0 z-[100] flex items-start justify-center pt-[15vh] bg-black/50 backdrop-blur-sm anim-fade-in"
       onClick={() => setOpen(false)}
       role="dialog"
       aria-modal="true"
@@ -166,7 +166,7 @@ export function CommandPalette() {
         className="w-full max-w-xl mx-4 rounded-xl bg-card border border-border shadow-2xl overflow-hidden anim-pop-in"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center px-4 py-3 border-b border-slate-100">
+        <div className="flex items-center px-4 py-3 border-b border-border">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-muted-foreground mr-3">
             <circle cx="11" cy="11" r="8" />
             <line x1="21" y1="21" x2="16.65" y2="16.65" />
@@ -203,12 +203,12 @@ export function CommandPalette() {
                       onClick={() => select(it)}
                       onMouseEnter={() => setActiveIdx(idx)}
                       className={`w-full flex items-center justify-between px-4 py-2 text-sm text-left transition-colors ${
-                        active ? 'bg-slate-900 text-white' : 'text-foreground/90 hover:bg-muted'
+                        active ? 'bg-foreground text-white' : 'text-foreground/90 hover:bg-muted'
                       }`}
                     >
                       <span className="truncate">{it.label}</span>
                       {it.hint && (
-                        <span className={`text-xs ml-3 truncate ${active ? 'text-slate-300' : 'text-muted-foreground'}`}>
+                        <span className={`text-xs ml-3 truncate ${active ? 'text-muted-foreground' : 'text-muted-foreground'}`}>
                           {it.hint}
                         </span>
                       )}
@@ -219,7 +219,7 @@ export function CommandPalette() {
             );
           })}
         </div>
-        <div className="flex items-center justify-between px-4 py-2 border-t border-slate-100 text-xs text-muted-foreground">
+        <div className="flex items-center justify-between px-4 py-2 border-t border-border text-xs text-muted-foreground">
           <div className="flex items-center gap-3">
             <span><kbd className="font-mono border border-border px-1 rounded">↑↓</kbd> navigate</span>
             <span><kbd className="font-mono border border-border px-1 rounded">↵</kbd> jump</span>

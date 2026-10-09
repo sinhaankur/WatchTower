@@ -123,7 +123,7 @@ export default function UseThisPcCard({ onRegistered }: { onRegistered?: () => v
 
           {/* Runtime readiness line */}
           <div className="mt-3 flex items-center gap-2 text-xs">
-            <span className={`inline-block w-2 h-2 rounded-full shrink-0 ${runtimeReady ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+            <span className={`inline-block w-2 h-2 rounded-full shrink-0 ${runtimeReady ? 'bg-emerald-500' : 'bg-primary'}`} />
             <span className="text-muted-foreground">
               {runtimeReady ? (
                 <>Container runtime ready{runtime.version ? ` — ${runtime.version}` : ''}{runtime.connected ? '' : ' (not started)'}</>

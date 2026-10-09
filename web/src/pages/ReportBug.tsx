@@ -307,7 +307,7 @@ function ReportBug() {
               type="button"
               onClick={() => void handleSend()}
               disabled={sending || !canSubmit}
-              className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-border bg-primary hover:bg-primary/90 text-white font-semibold shadow-retro disabled:opacity-60"
+              className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-border bg-primary hover:bg-primary/90 text-primary-foreground font-semibold shadow-retro disabled:opacity-60"
             >
               <IconMail />
               {sending ? 'Opening…' : 'Open Mail Report'}

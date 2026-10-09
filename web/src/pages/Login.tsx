@@ -508,7 +508,7 @@ const Login = () => {
             </div>
             {loggedInUser.isTest ? (
               <div className="space-y-3">
-                <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
+                <p className="text-xs text-accent bg-accent/10 border border-accent/25 rounded-md px-3 py-2">
                   Test mode enabled. This confirms the post-login success UI without redirect.
                 </p>
                 <div className="flex gap-2 justify-center">
@@ -521,7 +521,7 @@ const Login = () => {
                   </Button>
                   <Button
                     onClick={() => navigate('/', { replace: true })}
-                    className="rounded-lg bg-slate-900 hover:bg-slate-800 text-white"
+                    className="rounded-lg bg-foreground hover:bg-slate-800 text-white"
                   >
                     Continue to Dashboard
                   </Button>
@@ -570,9 +570,9 @@ const Login = () => {
             now collapsed under "Server status" at the bottom of the
             card so they don't compete with the primary sign-in CTA. */}
         {nothingConfigured && (
-            <div className="text-left text-sm mb-5 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 space-y-1">
+            <div className="text-left text-sm mb-5 rounded-lg border border-accent/25 bg-accent/10 px-4 py-3 space-y-1">
             <p className="font-medium text-amber-800">⚠ Server setup required</p>
-            <p className="text-amber-700 text-xs">
+            <p className="text-accent text-xs">
               Set <code className="font-mono bg-amber-100 px-1 rounded">WATCHTOWER_API_TOKEN</code> on the server, or configure GitHub OAuth to enable secure team sign-in.
             </p>
             </div>
@@ -645,7 +645,7 @@ const Login = () => {
                       href={deviceFlow.verification_uri_complete || deviceFlow.verification_uri}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex-1 text-center text-xs bg-slate-900 hover:bg-slate-800 text-white rounded-md px-3 py-2"
+                      className="flex-1 text-center text-xs bg-foreground hover:bg-slate-800 text-white rounded-md px-3 py-2"
                     >
                       Reopen GitHub
                     </a>
@@ -684,8 +684,8 @@ const Login = () => {
                     disabled={loading}
                     className={`w-full rounded-lg gap-2 py-6 text-base font-semibold flex items-center justify-center ${
                       (oauthReady || deviceFlowReady)
-                        ? 'bg-slate-900 hover:bg-slate-800 text-white'
-                        : 'bg-slate-200 text-foreground/90 hover:bg-border border border-border'
+                        ? 'bg-foreground hover:bg-slate-800 text-white'
+                        : 'bg-muted text-foreground/90 hover:bg-border border border-border'
                     }`}
                     title={
                       (oauthReady || deviceFlowReady)
@@ -715,7 +715,7 @@ const Login = () => {
                     <Button
                       onClick={() => void loginWithOidc()}
                       disabled={loading}
-                      className="w-full rounded-lg gap-2 py-6 text-base font-semibold flex items-center justify-center bg-slate-900 hover:bg-slate-800 text-white"
+                      className="w-full rounded-lg gap-2 py-6 text-base font-semibold flex items-center justify-center bg-foreground hover:bg-slate-800 text-white"
                     >
                       <span className="inline-flex items-center gap-2">
                         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
@@ -787,12 +787,12 @@ const Login = () => {
                       type="button"
                       onClick={() => void devAutoLogin()}
                       disabled={loading}
-                      className="text-sm text-amber-700 hover:text-amber-900 underline underline-offset-2 disabled:opacity-50"
+                      className="text-sm text-accent hover:text-amber-900 underline underline-offset-2 disabled:opacity-50"
                     >
                       Quick dev login →
                     </button>
-                    <p className="text-xs text-amber-700 mt-0.5">
-                      ⚠ Server has <code className="font-mono bg-amber-50 px-1 rounded">WATCHTOWER_ALLOW_INSECURE_DEV_AUTH=true</code>. Skip in production.
+                    <p className="text-xs text-accent mt-0.5">
+                      ⚠ Server has <code className="font-mono bg-accent/10 px-1 rounded">WATCHTOWER_ALLOW_INSECURE_DEV_AUTH=true</code>. Skip in production.
                     </p>
                   </div>
                 )}
@@ -856,7 +856,7 @@ const Login = () => {
                 <summary className="cursor-pointer hover:text-foreground/90">Server status</summary>
                 <div className="mt-2 space-y-2">
                   {authStatus?.dev_auth?.allow_insecure && (
-                    <p className="text-amber-700">⚠ <strong>Insecure dev mode enabled</strong> — set <code className="font-mono bg-amber-50 px-1 rounded">WATCHTOWER_ALLOW_INSECURE_DEV_AUTH=false</code> in production.</p>
+                    <p className="text-accent">⚠ <strong>Insecure dev mode enabled</strong> — set <code className="font-mono bg-accent/10 px-1 rounded">WATCHTOWER_ALLOW_INSECURE_DEV_AUTH=false</code> in production.</p>
                   )}
                   {authStatus?.installation?.owner_mode_enabled && (
                     <p className="text-blue-700"><strong>Installation ownership is active.</strong> If this is your machine and you're locked out, ask the owner to invite you — or, if you have shell access, run <code className="font-mono bg-blue-50 px-1 rounded">watchtower-deploy reset-installation-owner</code> and the next sign-in claims it.</p>

@@ -203,11 +203,11 @@ const NodeManagement = () => {
 
         {/* Page-level notice */}
         {pageError && (
-          <div className="flex items-start gap-3 rounded-md border border-amber-200 bg-amber-50 px-4 py-3">
+          <div className="flex items-start gap-3 rounded-md border border-accent/25 bg-accent/10 px-4 py-3">
             <span className="text-amber-500 mt-0.5">⚠</span>
             <div>
               <p className="text-sm font-medium text-amber-800">Connection issue</p>
-              <p className="text-sm text-amber-700 mt-0.5">{pageError}</p>
+              <p className="text-sm text-accent mt-0.5">{pageError}</p>
             </div>
           </div>
         )}

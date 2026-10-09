@@ -327,11 +327,11 @@ const Dashboard = () => {
     <div className="flex-1 overflow-auto bg-transparent">
       {/* Page header */}
       <header
-        className="px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between gap-3 border-b sticky top-0 z-10 backdrop-blur-sm"
+        className="px-5 sm:px-8 lg:px-10 py-5 flex items-center justify-between gap-3 border-b sticky top-0 z-10 backdrop-blur-sm"
         style={{ borderColor: 'hsl(var(--border-soft))', background: 'hsl(var(--surface-soft) / 0.9)' }}
       >
         <div className="min-w-0">
-          <h1 className="text-lg font-semibold text-foreground">Dashboard</h1>
+          <h1 className="text-xl font-semibold text-foreground tracking-tight">Dashboard</h1>
           <p className="text-xs text-muted-foreground mt-0.5 hidden sm:block">Your sites and the machines running them</p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
@@ -363,7 +363,7 @@ const Dashboard = () => {
         </div>
       </header>
 
-      <main className="px-4 sm:px-6 lg:px-8 py-6 space-y-6 max-w-6xl mx-auto w-full fade-in-up">
+      <main className="px-5 sm:px-8 lg:px-10 py-8 space-y-8 max-w-6xl mx-auto w-full fade-in-up">
         {notice && <NoticeBanner notice={notice} />}
 
         {/* DATA-FIRST: returning users see their stats immediately, not a
@@ -373,7 +373,7 @@ const Dashboard = () => {
         {/* Stats row — plain language, "your sites" first. Infrastructure
             detail (Podman version etc.) lives in the Container Runtime card
             below, not in the headline numbers a beginner scans first. */}
-        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
           <StatCard label="Your sites"   value={stats.total} sub={stats.total === 1 ? 'site' : 'sites'} accent="text-primary" />
           <StatCard label="Running now"  value={containers} sub={containers === 1 ? 'container live' : 'containers live'} />
           <StatCard label="Static sites" value={stats.static} sub="HTML / JS / CSS" />
@@ -429,9 +429,9 @@ const Dashboard = () => {
         )}
 
         {/* Runtime health + quick actions */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Container status */}
-          <div className="rounded-lg border border-border bg-card p-5 space-y-3">
+          <div className="rounded-lg border border-border bg-card p-6 space-y-4">
             <div className="flex items-center justify-between">
               <h2 className="text-sm font-semibold text-foreground">Container Runtime</h2>
               <button
@@ -474,7 +474,7 @@ const Dashboard = () => {
           </div>
 
           {/* Quick actions */}
-          <div className="rounded-lg border border-border bg-card p-5 space-y-3">
+          <div className="rounded-lg border border-border bg-card p-6 space-y-4">
             <h2 className="text-sm font-semibold text-foreground">Quick Actions</h2>
             <button
               onClick={() => void (bgRunning ? stopBackground() : startBackground())}

@@ -245,7 +245,7 @@ export default function LocalNode() {
                   </span>
                   <span className={`text-xs hidden sm:block ${active ? 'text-foreground font-medium' : 'text-muted-foreground'}`}>{label}</span>
                 </div>
-                {i < 2 && <div className={`flex-1 h-px mx-2 transition-colors ${done ? 'bg-red-300' : 'bg-slate-200'}`} />}
+                {i < 2 && <div className={`flex-1 h-px mx-2 transition-colors ${done ? 'bg-red-300' : 'bg-muted'}`} />}
               </div>
             );
           })}
@@ -329,7 +329,7 @@ export default function LocalNode() {
               </div>
               <button
                 onClick={() => autoRegister ? void registerNode() : setStep(2)}
-                className="px-5 py-2 rounded-lg bg-primary hover:bg-primary/90 text-white text-sm font-medium border border-border shadow-retro transition-colors"
+                className="px-5 py-2 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground text-sm font-medium border border-border shadow-retro transition-colors"
               >
                 {autoRegister ? 'Register Now →' : 'Continue →'}
               </button>
@@ -402,7 +402,7 @@ export default function LocalNode() {
               <button
                 onClick={() => void registerNode()}
                 disabled={submitting || !nodeName.trim() || !deployPath.trim()}
-                className="px-5 py-2 rounded-lg bg-primary hover:bg-primary/90 text-white text-sm font-medium border border-border shadow-retro transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-5 py-2 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground text-sm font-medium border border-border shadow-retro transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {submitting ? (
                   <span className="inline-flex items-center gap-1.5">
@@ -486,7 +486,7 @@ export default function LocalNode() {
               </Link>
               <Link
                 to="/setup"
-                className="flex-1 text-center px-4 py-2 rounded-lg bg-primary hover:bg-primary/90 text-white text-sm font-medium border border-border shadow-retro transition-colors"
+                className="flex-1 text-center px-4 py-2 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground text-sm font-medium border border-border shadow-retro transition-colors"
               >
                 Deploy an App →
               </Link>

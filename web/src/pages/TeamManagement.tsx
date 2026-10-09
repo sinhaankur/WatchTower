@@ -60,7 +60,7 @@ type GitHubConnection = {
 };
 
 const ROLE_META: Record<TeamMember['role'], { label: string; color: string }> = {
-  owner:     { label: 'Owner',     color: 'bg-amber-50 text-amber-700 border-amber-200' },
+  owner:     { label: 'Owner',     color: 'bg-accent/10 text-accent border-accent/25' },
   admin:     { label: 'Admin',     color: 'bg-purple-50 text-purple-700 border-purple-200' },
   developer: { label: 'Developer', color: 'bg-blue-50 text-blue-700 border-blue-200' },
   viewer:    { label: 'Viewer',    color: 'bg-muted text-muted-foreground border-border' },
@@ -320,11 +320,11 @@ const TeamManagement = () => {
         )}
 
         {pageError && (
-          <div className="flex items-start gap-3 border border-amber-200 bg-amber-50 rounded-md px-4 py-3">
+          <div className="flex items-start gap-3 border border-accent/25 bg-accent/10 rounded-md px-4 py-3">
             <span className="text-amber-500 mt-0.5">⚠</span>
             <div>
               <p className="text-sm font-medium text-amber-800">Connection issue</p>
-              <p className="text-sm text-amber-700 mt-0.5">{pageError}</p>
+              <p className="text-sm text-accent mt-0.5">{pageError}</p>
             </div>
           </div>
         )}
@@ -345,7 +345,7 @@ const TeamManagement = () => {
 
         {lastInvite && (
           <div className={`border rounded-md px-4 py-3 space-y-2 ${
-            lastInvite.emailSent ? 'border-green-200 bg-green-50' : 'border-amber-200 bg-amber-50'
+            lastInvite.emailSent ? 'border-green-200 bg-green-50' : 'border-accent/25 bg-accent/10'
           }`}>
             {lastInvite.emailSent ? (
               <p className="text-sm text-green-900">
@@ -371,7 +371,7 @@ const TeamManagement = () => {
               </Button>
             </div>
             {!lastInvite.emailSent && (
-              <p className="text-xs text-amber-700">
+              <p className="text-xs text-accent">
                 Tired of copying links?{' '}
                 <a href="/settings" className="underline font-medium hover:text-amber-900">
                   Set up email in Settings
@@ -411,7 +411,7 @@ const TeamManagement = () => {
               </div>
               <Button onClick={() => void inviteMember()}
                 disabled={inviting || offlineMode || !orgId || !email.trim() || !canManageTeam}
-                className="w-full rounded-lg border border-border bg-amber-400 hover:bg-amber-500 text-foreground font-semibold shadow-retro disabled:opacity-40 disabled:shadow-none">
+                className="w-full rounded-lg border border-border bg-primary hover:bg-primary/90 text-primary-foreground font-semibold shadow-retro disabled:opacity-40 disabled:shadow-none">
                 {inviting ? 'Sending invite…' : offlineMode ? 'Server offline' : !canManageTeam ? 'No permission to invite' : 'Send Invite'}
               </Button>
               {!email.trim() && !inviting && (
@@ -437,16 +437,16 @@ const TeamManagement = () => {
                   </p>
                 </div>
               ) : (
-                <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2">
+                <div className="rounded-md border border-accent/25 bg-accent/10 px-3 py-2">
                   <p className="text-xs font-medium text-amber-800">No managed GitHub application is connected yet.</p>
-                  <p className="text-xs text-amber-700 mt-0.5">Connect one now to keep repository access managed and auditable.</p>
+                  <p className="text-xs text-accent mt-0.5">Connect one now to keep repository access managed and auditable.</p>
                 </div>
               )}
 
               <div className="flex flex-col gap-2">
                 <Button onClick={() => void startOAuth('github_com')}
                   disabled={loading || !orgId || offlineMode}
-                  className="w-full rounded-lg border border-border bg-amber-400 hover:bg-amber-500 text-foreground font-semibold shadow-retro disabled:opacity-40 disabled:shadow-none text-sm">
+                  className="w-full rounded-lg border border-border bg-primary hover:bg-primary/90 text-primary-foreground font-semibold shadow-retro disabled:opacity-40 disabled:shadow-none text-sm">
                   Connect GitHub.com App
                 </Button>
                 <Button onClick={() => void startOAuth('github_enterprise')}
@@ -513,7 +513,7 @@ const TeamManagement = () => {
                 <Button
                   onClick={() => void savePat()}
                   disabled={savingPat || offlineMode || !orgId || !patToken.trim() || !patUsername.trim()}
-                  className="w-full bg-slate-900 text-white hover:bg-slate-800 rounded-lg text-sm h-9 disabled:opacity-40"
+                  className="w-full bg-foreground text-white hover:bg-slate-800 rounded-lg text-sm h-9 disabled:opacity-40"
                 >
                   {savingPat ? 'Saving…' : 'Save Personal Access Token'}
                 </Button>

@@ -33,7 +33,7 @@ function extractDetail(err: unknown, fallback: string): string {
 const stateBadge = (state: string) => {
   const s = (state || '').toLowerCase();
   if (s.includes('running') || s === 'up') return 'text-emerald-700 bg-emerald-50 border-emerald-200';
-  if (s.includes('paused')) return 'text-amber-700 bg-amber-50 border-amber-200';
+  if (s.includes('paused')) return 'text-accent bg-accent/10 border-accent/25';
   if (s.includes('exited') || s.includes('stopped') || s.includes('created')) return 'text-muted-foreground bg-muted border-border';
   return 'text-muted-foreground bg-muted border-border';
 };
@@ -114,7 +114,7 @@ function ConnectionCard() {
   }
   if (!status) return null;
 
-  const dot = status.connected ? 'bg-emerald-500' : status.available ? 'bg-amber-500' : 'bg-red-500';
+  const dot = status.connected ? 'bg-emerald-500' : status.available ? 'bg-primary' : 'bg-red-500';
 
   return (
     <div className="rounded-xl border border-border bg-card p-4 flex items-center gap-4 flex-wrap">
@@ -135,7 +135,7 @@ function ConnectionCard() {
           </p>
         )}
         {!status.connected && status.hint && (
-          <p className="text-xs text-amber-700 mt-0.5">{status.hint}</p>
+          <p className="text-xs text-accent mt-0.5">{status.hint}</p>
         )}
       </div>
       {status.available && !status.connected && status.machine && !status.machine.running && (
@@ -149,7 +149,7 @@ function ConnectionCard() {
             });
           }}
           disabled={startMachine.isPending}
-          className="text-xs px-4 py-2 rounded-lg border border-border bg-amber-400 hover:bg-amber-500 text-foreground font-semibold shadow-retro disabled:opacity-50"
+          className="text-xs px-4 py-2 rounded-lg border border-border bg-primary hover:bg-primary/90 text-primary-foreground font-semibold shadow-retro disabled:opacity-50"
         >
           {startMachine.isPending ? 'Starting… (can take a minute)' : 'Start Podman'}
         </button>
@@ -158,7 +158,7 @@ function ConnectionCard() {
         <a
           href="https://podman.io/docs/installation"
           target="_blank" rel="noopener noreferrer"
-          className="text-xs px-3 py-2 rounded-lg border border-border text-foreground/90 hover:border-slate-500"
+          className="text-xs px-3 py-2 rounded-lg border border-border text-foreground/90 hover:border-accent/50"
         >
           Install Podman ↗
         </a>
@@ -290,7 +290,7 @@ function CreateContainerForm({ pods, onDone }: { pods: PodmanPod[]; onDone: () =
         <button
           onClick={submit}
           disabled={create.isPending || !name.trim() || !image.trim()}
-          className="text-xs px-4 py-1.5 rounded-lg border border-border bg-amber-400 hover:bg-amber-500 text-foreground font-semibold shadow-retro disabled:opacity-50"
+          className="text-xs px-4 py-1.5 rounded-lg border border-border bg-primary hover:bg-primary/90 text-primary-foreground font-semibold shadow-retro disabled:opacity-50"
         >
           {create.isPending ? 'Creating… (first pull can take a while)' : 'Create & start'}
         </button>
@@ -335,7 +335,7 @@ function CreatePodForm({ onDone }: { onDone: () => void }) {
             },
           )}
           disabled={create.isPending || !name.trim()}
-          className="text-xs px-4 py-1.5 rounded-lg border border-border bg-amber-400 hover:bg-amber-500 text-foreground font-semibold shadow-retro disabled:opacity-50"
+          className="text-xs px-4 py-1.5 rounded-lg border border-border bg-primary hover:bg-primary/90 text-primary-foreground font-semibold shadow-retro disabled:opacity-50"
         >
           {create.isPending ? 'Creating…' : 'Create pod'}
         </button>
@@ -389,7 +389,7 @@ function ContainerRow({ c }: { c: PodmanContainer }) {
                   <button onClick={() => run('stop')} disabled={act.isPending} className="text-xs px-2 py-1 rounded border border-border hover:bg-muted disabled:opacity-50">Stop</button>
                 </>
               : <button onClick={() => run('start')} disabled={act.isPending} className="text-xs px-2 py-1 rounded border border-emerald-300 text-emerald-700 hover:bg-emerald-50 disabled:opacity-50">Start</button>}
-            <button onClick={() => setShowLogPanel((v) => !v)} className={`text-xs px-2 py-1 rounded border ${showLogPanel ? 'border-slate-400 bg-muted' : 'border-border hover:bg-muted'}`}>Logs</button>
+            <button onClick={() => setShowLogPanel((v) => !v)} className={`text-xs px-2 py-1 rounded border ${showLogPanel ? 'border-accent/50 bg-muted' : 'border-border hover:bg-muted'}`}>Logs</button>
             <button onClick={() => run('remove')} disabled={act.isPending} className="text-xs px-2 py-1 rounded border border-destructive/40 text-destructive hover:bg-destructive/10 disabled:opacity-50">Remove</button>
           </div>
         </td>
@@ -427,7 +427,7 @@ function LiveLogPanel({ name }: { name: string }) {
   return (
     <div className="rounded-lg overflow-hidden border border-slate-800">
       <div className="flex items-center justify-between bg-slate-800 px-3 py-1.5">
-        <span className="text-xs font-mono text-slate-300 flex items-center gap-1.5">
+        <span className="text-xs font-mono text-muted-foreground flex items-center gap-1.5">
           <span className={`inline-block w-1.5 h-1.5 rounded-full ${connected ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'}`} />
           {connected ? 'live' : 'connecting…'} · {name}
         </span>
@@ -436,7 +436,7 @@ function LiveLogPanel({ name }: { name: string }) {
       <pre
         ref={preRef}
         onScroll={onScroll}
-        className="text-xs font-mono bg-slate-900 text-slate-100 p-3 max-h-72 overflow-auto whitespace-pre-wrap"
+        className="text-xs font-mono bg-foreground text-slate-100 p-3 max-h-72 overflow-auto whitespace-pre-wrap"
       >
         {error
           ? `⚠ ${error}`
@@ -505,13 +505,13 @@ export default function PodmanManager() {
             <h2 className="text-sm font-semibold text-foreground flex-1">All containers & pods on this machine</h2>
             <button
               onClick={() => setCreating(creating === 'pod' ? null : 'pod')}
-              className="text-xs px-3 py-1.5 rounded-lg border border-border text-foreground/90 hover:border-slate-500"
+              className="text-xs px-3 py-1.5 rounded-lg border border-border text-foreground/90 hover:border-accent/50"
             >
               New pod
             </button>
             <button
               onClick={() => setCreating(creating === 'container' ? null : 'container')}
-              className="text-xs px-3 py-1.5 rounded-lg border border-border bg-amber-400 hover:bg-amber-500 text-foreground font-semibold shadow-retro"
+              className="text-xs px-3 py-1.5 rounded-lg border border-border bg-primary hover:bg-primary/90 text-primary-foreground font-semibold shadow-retro"
             >
               New container
             </button>

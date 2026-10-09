@@ -40,7 +40,7 @@ function fmtMb(mb: number): string {
 
 function barColor(pct: number): string {
   if (pct < 60) return 'bg-emerald-500';
-  if (pct < 80) return 'bg-amber-400';
+  if (pct < 80) return 'bg-primary';
   return 'bg-red-500';
 }
 
@@ -104,7 +104,7 @@ function SegmentedBar({ ram }: { ram: RamStats }) {
         />
         <div
           title={`Free: ${fmtMb(ram.free_mb)}`}
-          className="bg-slate-200 transition-all duration-700 flex-1"
+          className="bg-muted transition-all duration-700 flex-1"
           style={{ width: `${Math.max(0, freePct)}%` }}
         />
       </div>
@@ -124,7 +124,7 @@ function SegmentedBar({ ram }: { ram: RamStats }) {
           Buffers · {fmtMb(ram.buffers_mb)}
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="w-2.5 h-2.5 rounded-sm bg-slate-200 inline-block border border-border" />
+          <span className="w-2.5 h-2.5 rounded-sm bg-muted inline-block border border-border" />
           Free · {fmtMb(ram.free_mb)}
         </span>
       </div>
@@ -235,7 +235,7 @@ export default function SystemResourceMonitor() {
               { dot: 'bg-blue-500',    title: 'Used',    desc: 'Apps and processes actively holding data in memory.' },
               { dot: 'bg-indigo-300',  title: 'Cache',   desc: 'Recently used files kept in RAM to speed up future reads. OS frees this instantly when an app needs more memory.' },
               { dot: 'bg-sky-300',     title: 'Buffers', desc: 'Temporary storage for I/O operations (disk writes, network). Freed automatically.' },
-              { dot: 'bg-slate-200',   title: 'Free',    desc: 'Completely idle RAM — not used by anything yet.' },
+              { dot: 'bg-muted',   title: 'Free',    desc: 'Completely idle RAM — not used by anything yet.' },
             ].map(({ dot, title, desc }) => (
               <div key={title} className="flex gap-2.5 items-start">
                 <span className={`w-2.5 h-2.5 rounded-sm ${dot} border border-black/10 shrink-0 mt-0.5`} />
@@ -280,7 +280,7 @@ export default function SystemResourceMonitor() {
           </div>
           <UsageBar pct={swap.percent_used} label="Swap usage" />
           {swap.percent_used > 30 && (
-            <p className="text-xs text-amber-700 bg-amber-50 rounded p-2 border border-amber-200">
+            <p className="text-xs text-accent bg-accent/10 rounded p-2 border border-accent/25">
               High swap usage slows down your system. Consider closing unused apps or adding more RAM.
             </p>
           )}

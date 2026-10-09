@@ -11,7 +11,7 @@ import {
 
 const MESH_DOT: Record<'alive' | 'suspect' | 'dead', string> = {
   alive: 'bg-emerald-500',
-  suspect: 'bg-amber-500',
+  suspect: 'bg-primary',
   dead: 'bg-red-500',
 };
 const MESH_LABEL: Record<'alive' | 'suspect' | 'dead', string> = {
@@ -127,7 +127,7 @@ export default function DiscoverNodesCard({
                     : 'Off — the primary going down is detected and shown, but promotion waits for you.'}
                 </span>
                 {cp.last_failover_note && (
-                  <span className="block text-amber-700 mt-0.5">Last: {cp.last_failover_note}</span>
+                  <span className="block text-accent mt-0.5">Last: {cp.last_failover_note}</span>
                 )}
               </div>
               <button

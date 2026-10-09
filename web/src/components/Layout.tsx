@@ -1,5 +1,11 @@
-import { ReactNode, useState, useEffect, type ReactElement } from 'react';
+import { ReactNode, useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+// One consistent, professional icon set (lucide) — replaces the hand-drawn
+// inline SVGs so every icon shares the same weight, grid, and style.
+import {
+  LayoutDashboard, Globe, Server, Database, Puzzle, Settings as SettingsIcon,
+  Layers, Boxes, Radio, Users, ScrollText, Plus,
+} from 'lucide-react';
 import BrandLogo from './BrandLogo';
 import TitleBar from './TitleBar';
 import { useUpdateCheck, useActiveDeploymentCount, useHealingConfig, useSelfUpdateStatus, useSelfUpdate } from '@/hooks/queries';
@@ -87,8 +93,8 @@ function UpdateBanner() {
   else if (lastState === 'failed') label = 'Update failed — retry';
 
   return (
-    <div className="flex items-center gap-3 px-4 py-2 bg-amber-50 border-b border-amber-200 text-amber-900 text-xs">
-      <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-amber-400 text-amber-900 text-xs font-bold">!</span>
+    <div className="flex items-center gap-3 px-4 py-2 bg-accent/10 border-b border-accent/25 text-amber-900 text-xs">
+      <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-primary text-amber-900 text-xs font-bold">!</span>
       <span className="flex-1">
         <strong>WatchTower {data.latest}</strong> is available
         {data.current && <> — you're on <span className="font-mono">{data.current}</span></>}.
@@ -121,7 +127,7 @@ function UpdateBanner() {
       <button
         onClick={dismiss}
         title="Dismiss until next release"
-        className="ml-1 text-amber-700 hover:text-amber-900"
+        className="ml-1 text-accent hover:text-amber-900"
         aria-label="Dismiss update banner"
       >
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -133,62 +139,6 @@ function UpdateBanner() {
 }
 
 // ── SVG icon helpers ──────────────────────────────────────────────────────────
-function IconDashboard() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="3" y="3" width="7" height="7" rx="1" />
-      <rect x="14" y="3" width="7" height="7" rx="1" />
-      <rect x="3" y="14" width="7" height="7" rx="1" />
-      <rect x="14" y="14" width="7" height="7" rx="1" />
-    </svg>
-  );
-}
-function IconServer() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="2" y="2" width="20" height="8" rx="2" />
-      <rect x="2" y="14" width="20" height="8" rx="2" />
-      <line x1="6" y1="6" x2="6.01" y2="6" />
-      <line x1="6" y1="18" x2="6.01" y2="18" />
-    </svg>
-  );
-}
-function IconBox() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
-      <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
-      <line x1="12" y1="22.08" x2="12" y2="12" />
-    </svg>
-  );
-}
-function IconLayers() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <polygon points="12 2 2 7 12 12 22 7 12 2" />
-      <polyline points="2 17 12 22 22 17" />
-      <polyline points="2 12 12 17 22 12" />
-    </svg>
-  );
-}
-function IconUsers() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-      <circle cx="9" cy="7" r="4" />
-      <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-    </svg>
-  );
-}
-function IconSettings() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="12" r="3" />
-      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-    </svg>
-  );
-}
 function IconBug() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -204,62 +154,17 @@ function IconBug() {
     </svg>
   );
 }
-function IconShield() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-      <path d="M9 12l2 2 4-4" />
-    </svg>
-  );
-}
-function IconPlus() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <line x1="12" y1="5" x2="12" y2="19" />
-      <line x1="5" y1="12" x2="19" y2="12" />
-    </svg>
-  );
-}
 
 // ── Navigation structure ──────────────────────────────────────────────────────
-type NavItem = { path: string; label: string; Icon: () => ReactElement };
+type NavItem = { path: string; label: string; Icon: typeof LayoutDashboard };
 
-function IconPuzzle() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M20.24 12.24a6 6 0 0 0-8.49-8.49L5 10.5V19h8.5z" />
-      <line x1="16" y1="8" x2="2" y2="22" />
-      <line x1="17.5" y1="15" x2="9" y2="15" />
-    </svg>
-  );
-}
 // Antenna / broadcast icon for Remote Access — communicates "expose this
 // machine to the outside" without leaning on a generic globe (which we
 // already use for Cloudflare in Integrations).
-function IconRemoteAccess() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M5 12.55a11 11 0 0 1 14.08 0" />
-      <path d="M1.42 9a16 16 0 0 1 21.16 0" />
-      <path d="M8.53 16.11a6 6 0 0 1 6.95 0" />
-      <line x1="12" y1="20" x2="12.01" y2="20" />
-    </svg>
-  );
-}
 
 // Stack-of-containers icon for the "Local Containers" admin view.
 // Simpler than a play-button-in-a-box — communicates "things running"
 // without overlapping with the existing IconBox (Applications).
-function IconContainers() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="3" y="3" width="18" height="6" rx="1" />
-      <rect x="3" y="11" width="18" height="6" rx="1" />
-      <line x1="7" y1="6" x2="7.01" y2="6" />
-      <line x1="7" y1="14" x2="7.01" y2="14" />
-    </svg>
-  );
-}
 
 // Sidebar information architecture:
 //   PRIMARY = "what am I working with?" — daily-flow surfaces in the
@@ -292,12 +197,12 @@ const NAV_GROUPS: NavGroup[] = [
   {
     label: 'Main',
     items: [
-      { path: '/',                  label: 'Dashboard', Icon: IconDashboard },
-      { path: '/applications',      label: 'Sites',     Icon: IconBox },
-      { path: '/servers',           label: 'Servers',   Icon: IconServer },
-      { path: '/managed-databases', label: 'Databases', Icon: IconBox },
-      { path: '/integrations',      label: 'Integrations', Icon: IconPuzzle },
-      { path: '/settings',          label: 'Settings',  Icon: IconSettings },
+      { path: '/',                  label: 'Dashboard', Icon: LayoutDashboard },
+      { path: '/applications',      label: 'Sites',     Icon: Globe },
+      { path: '/servers',           label: 'Servers',   Icon: Server },
+      { path: '/managed-databases', label: 'Databases', Icon: Database },
+      { path: '/integrations',      label: 'Integrations', Icon: Puzzle },
+      { path: '/settings',          label: 'Settings',  Icon: SettingsIcon },
     ],
   },
 ];
@@ -305,12 +210,12 @@ const NAV_GROUPS: NavGroup[] = [
 // Collapsed under "More ▸". Advanced / occasional surfaces — everything still
 // reachable, just not in the first-run field of view.
 const ADVANCED_ITEMS: NavItem[] = [
-  { path: '/templates',        label: 'Templates',     Icon: IconLayers },
-  { path: '/services',         label: 'Catalog',       Icon: IconPuzzle },
-  { path: '/local-containers', label: 'Containers',    Icon: IconContainers },
-  { path: '/remote-access',    label: 'Remote Access', Icon: IconRemoteAccess },
-  { path: '/team',             label: 'Team',          Icon: IconUsers },
-  { path: '/audit',            label: 'Audit Log',     Icon: IconShield },
+  { path: '/templates',        label: 'Templates',     Icon: Layers },
+  { path: '/services',         label: 'Catalog',       Icon: Puzzle },
+  { path: '/local-containers', label: 'Containers',    Icon: Boxes },
+  { path: '/remote-access',    label: 'Remote Access', Icon: Radio },
+  { path: '/team',             label: 'Team',          Icon: Users },
+  { path: '/audit',            label: 'Audit Log',     Icon: ScrollText },
 ];
 
 // A small, opinionated section header. Slate-400 + uppercase +
@@ -377,7 +282,7 @@ function NavLink({ item, pathname, onClick, rail, badge }: NavLinkProps) {
       }`}
     >
       <span className={active ? 'text-primary' : 'text-muted-foreground/70 group-hover:text-foreground'}>
-        <item.Icon />
+        <item.Icon size={16} strokeWidth={2} />
       </span>
       {!rail && (
         <>
@@ -391,7 +296,7 @@ function NavLink({ item, pathname, onClick, rail, badge }: NavLinkProps) {
       {rail && typeof badge === 'number' && badge > 0 && (
         <span
           aria-hidden="true"
-          className="absolute mt-[-12px] ml-[12px] w-2 h-2 rounded-full bg-amber-500 ring-2 ring-white"
+          className="absolute mt-[-12px] ml-[12px] w-2 h-2 rounded-full bg-primary ring-2 ring-white"
         />
       )}
     </Link>
@@ -491,7 +396,7 @@ export default function Layout({ children }: { children: ReactNode }) {
             rail ? 'py-2' : 'py-1.5 px-3'
           } rounded-md bg-primary hover:bg-primary/90 transition-colors text-primary-foreground text-sm font-semibold shadow-retro`}
         >
-          <IconPlus />
+          <Plus size={16} strokeWidth={2.5} />
           {!rail && <>New site</>}
         </Link>
       </div>
@@ -592,7 +497,7 @@ export default function Layout({ children }: { children: ReactNode }) {
               onClick={() => void triggerUpdate(updateData.release_url)}
               title={`Update v${updateData.latest} available — click to install`}
               aria-label={`Install update ${updateData.latest}`}
-              className="w-2 h-2 rounded-full bg-amber-500 ring-2 ring-white hover:ring-amber-200 transition"
+              className="w-2 h-2 rounded-full bg-primary ring-2 ring-white hover:ring-amber-200 transition"
             />
           )}
         </div>
@@ -650,10 +555,10 @@ export default function Layout({ children }: { children: ReactNode }) {
             <button
               type="button"
               onClick={() => void triggerUpdate(updateData.release_url)}
-              className="text-xs text-amber-700 hover:text-amber-900 font-medium inline-flex items-center gap-1"
+              className="text-xs text-accent hover:text-amber-900 font-medium inline-flex items-center gap-1"
               title={`Update to ${updateData.latest} — click to install`}
             >
-              <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+              <span className="w-1.5 h-1.5 rounded-full bg-primary" />
               Update
             </button>
           )}

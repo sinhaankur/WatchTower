@@ -139,7 +139,7 @@ function ServiceCard({ svc, connected }: { svc: ServiceDef; connected: boolean }
 
       <div className="mt-3 flex items-center gap-2">
         {!svc.image ? (
-          <Link to="/setup" className="text-xs px-3 py-1.5 rounded-lg border border-border text-foreground/90 hover:border-slate-500">
+          <Link to="/setup" className="text-xs px-3 py-1.5 rounded-lg border border-border text-foreground/90 hover:border-accent/50">
             Open Setup Wizard →
           </Link>
         ) : running ? (
@@ -149,7 +149,7 @@ function ServiceCard({ svc, connected }: { svc: ServiceDef; connected: boolean }
               <a
                 href={`http://localhost:${svc.openPort}`}
                 target="_blank" rel="noopener noreferrer"
-                className="text-xs px-3 py-1.5 rounded-lg border border-border bg-amber-400 hover:bg-amber-500 text-foreground font-semibold shadow-retro"
+                className="text-xs px-3 py-1.5 rounded-lg border border-border bg-primary hover:bg-primary/90 text-primary-foreground font-semibold shadow-retro"
               >
                 Open ↗
               </a>
@@ -163,7 +163,7 @@ function ServiceCard({ svc, connected }: { svc: ServiceDef; connected: boolean }
             onClick={() => void runNow()}
             disabled={busy || !connected}
             title={connected ? `podman run ${svc.image}` : 'Start Podman first (Containers page)'}
-            className="text-xs px-3 py-1.5 rounded-lg border border-border bg-amber-400 hover:bg-amber-500 text-foreground font-semibold shadow-retro disabled:opacity-50 disabled:cursor-not-allowed"
+            className="text-xs px-3 py-1.5 rounded-lg border border-border bg-primary hover:bg-primary/90 text-primary-foreground font-semibold shadow-retro disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {busy ? 'Starting…' : existing ? 'Start' : 'Run locally'}
           </button>
@@ -195,7 +195,7 @@ const Services = () => {
 
       <main className="px-4 sm:px-6 lg:px-8 py-6 max-w-5xl mx-auto w-full space-y-6">
         {!connected && (
-          <div className="rounded-xl border border-amber-300 bg-amber-50 p-4">
+          <div className="rounded-xl border border-amber-300 bg-accent/10 p-4">
             <p className="text-sm font-semibold text-amber-900">Podman isn't running</p>
             <p className="text-xs text-amber-800 mt-0.5">
               One-click services run as local Podman containers. Head to the{' '}

@@ -14,7 +14,7 @@ function WinControls({ isMaximized }: { isMaximized: boolean }) {
       <button
         title="Minimize"
         onClick={() => electronAPI?.minimize()}
-        className="flex items-center justify-center w-11 h-full text-muted-foreground hover:bg-slate-200 hover:text-foreground transition-colors"
+        className="flex items-center justify-center w-11 h-full text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
         style={{ fontSize: 14 }}
       >
         <svg width="10" height="1" viewBox="0 0 10 1" fill="currentColor">
@@ -25,7 +25,7 @@ function WinControls({ isMaximized }: { isMaximized: boolean }) {
       <button
         title={isMaximized ? 'Restore' : 'Maximize'}
         onClick={() => electronAPI?.maximize()}
-        className="flex items-center justify-center w-11 h-full text-muted-foreground hover:bg-slate-200 hover:text-foreground transition-colors"
+        className="flex items-center justify-center w-11 h-full text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
       >
         {isMaximized ? (
           <svg width="11" height="11" viewBox="0 0 11 11" fill="none" stroke="currentColor" strokeWidth="1.2">

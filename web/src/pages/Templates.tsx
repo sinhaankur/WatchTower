@@ -29,7 +29,7 @@ const CATEGORY_BADGE: Record<string, string> = {
   automation: 'border-violet-300 bg-violet-50 text-violet-700',
   analytics: 'border-blue-300 bg-blue-50 text-blue-700',
   content: 'border-emerald-300 bg-emerald-50 text-emerald-700',
-  monitoring: 'border-amber-300 bg-amber-50 text-amber-700',
+  monitoring: 'border-amber-300 bg-accent/10 text-accent',
   database: 'border-border bg-muted text-foreground/90',
   static: 'border-border bg-muted text-foreground/90',
   other: 'border-border bg-muted text-foreground/90',
@@ -88,7 +88,7 @@ function TemplateCard({
       </div>
 
       {template.notes && (
-        <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded px-2 py-1">
+        <p className="text-xs text-amber-800 bg-accent/10 border border-accent/25 rounded px-2 py-1">
           {template.notes}
         </p>
       )}
@@ -118,7 +118,7 @@ function TemplateCard({
               <ul className="space-y-1">
                 {placeholders.map((v) => (
                   <li key={v.key} className="text-[10.5px] text-muted-foreground flex items-start gap-1.5">
-                    <code className="font-mono text-amber-800 bg-amber-50 border border-amber-200 rounded px-1 shrink-0">{v.key}</code>
+                    <code className="font-mono text-amber-800 bg-accent/10 border border-accent/25 rounded px-1 shrink-0">{v.key}</code>
                     {v.description && <span className="text-muted-foreground">{v.description}</span>}
                   </li>
                 ))}
@@ -130,7 +130,7 @@ function TemplateCard({
             <button
               onClick={() => onCreate(slugifyName(name))}
               disabled={creating || !validName}
-              className="flex-1 text-xs px-3 py-1.5 rounded-lg border border-border bg-amber-400 hover:bg-amber-500 text-foreground font-semibold shadow-retro disabled:opacity-50 disabled:cursor-wait"
+              className="flex-1 text-xs px-3 py-1.5 rounded-lg border border-border bg-primary hover:bg-primary/90 text-primary-foreground font-semibold shadow-retro disabled:opacity-50 disabled:cursor-wait"
             >
               {creating ? 'Creating…' : 'Create project →'}
             </button>
@@ -147,7 +147,7 @@ function TemplateCard({
         <div className="flex items-center gap-2 pt-1 mt-auto">
           <button
             onClick={() => setOpen(true)}
-            className="flex-1 text-xs px-3 py-1.5 rounded-lg border border-border bg-amber-400 hover:bg-amber-500 text-foreground font-semibold shadow-retro"
+            className="flex-1 text-xs px-3 py-1.5 rounded-lg border border-border bg-primary hover:bg-primary/90 text-primary-foreground font-semibold shadow-retro"
           >
             Use this template
           </button>
@@ -275,12 +275,12 @@ export default function Templates() {
             <span className="w-5 h-5 rounded-full bg-secondary text-secondary-foreground font-bold flex items-center justify-center shrink-0">1</span>
             <span><strong className="text-foreground">Pick a template.</strong> Each is a known-good recipe: repo, env vars, config.</span>
           </div>
-          <span className="hidden sm:block text-slate-300 px-3" aria-hidden>→</span>
+          <span className="hidden sm:block text-muted-foreground px-3" aria-hidden>→</span>
           <div className="flex items-center gap-2 sm:flex-1">
             <span className="w-5 h-5 rounded-full bg-secondary text-secondary-foreground font-bold flex items-center justify-center shrink-0">2</span>
             <span><strong className="text-foreground">We create your project</strong> with everything pre-wired — you land on its page to review.</span>
           </div>
-          <span className="hidden sm:block text-slate-300 px-3" aria-hidden>→</span>
+          <span className="hidden sm:block text-muted-foreground px-3" aria-hidden>→</span>
           <div className="flex items-center gap-2 sm:flex-1">
             <span className="w-5 h-5 rounded-full bg-secondary text-secondary-foreground font-bold flex items-center justify-center shrink-0">3</span>
             <span><strong className="text-foreground">Hit Deploy.</strong> It runs on your machine and shows up under <Link to="/applications" className="underline font-medium text-primary">Applications</Link>.</span>
@@ -296,7 +296,7 @@ export default function Templates() {
             {error.status === 401 && (
               <Link
                 to="/login"
-                className="shrink-0 px-2.5 py-1 rounded-md bg-slate-900 text-white text-xs font-medium hover:bg-slate-800"
+                className="shrink-0 px-2.5 py-1 rounded-md bg-foreground text-white text-xs font-medium hover:bg-slate-800"
               >
                 Sign in →
               </Link>

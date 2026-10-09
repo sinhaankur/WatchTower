@@ -74,7 +74,7 @@ export function UserMenu({ rail }: Props) {
         to="/login"
         className={
           rail
-            ? 'mx-1 my-2 flex items-center justify-center w-9 h-9 rounded-full border border-border hover:border-slate-500 text-muted-foreground hover:text-foreground transition-colors'
+            ? 'mx-1 my-2 flex items-center justify-center w-9 h-9 rounded-full border border-border hover:border-accent/50 text-muted-foreground hover:text-foreground transition-colors'
             : 'block text-xs text-muted-foreground hover:text-destructive transition-colors px-1'
         }
         title="Sign in with GitHub"
@@ -98,7 +98,7 @@ export function UserMenu({ rail }: Props) {
     />
   ) : (
     <div
-      className={`rounded-full bg-slate-200 text-muted-foreground text-xs font-semibold flex items-center justify-center shrink-0 uppercase ${
+      className={`rounded-full bg-muted text-muted-foreground text-xs font-semibold flex items-center justify-center shrink-0 uppercase ${
         rail ? 'w-7 h-7' : 'w-7 h-7'
       }`}
     >
@@ -142,14 +142,14 @@ export function UserMenu({ rail }: Props) {
         aria-haspopup="menu"
         aria-expanded={open}
         className={`w-full flex items-center gap-2 px-2 py-2 rounded-lg bg-card border border-border text-left transition-colors hover:border-accent/50 focus:outline-none focus:ring-2 focus:ring-accent/40 ${
-          open ? 'border-slate-400 ring-2 ring-accent/30' : ''
+          open ? 'border-accent/50 ring-2 ring-accent/30' : ''
         }`}
       >
         {isLoading && !me ? (
           <>
-            <div className="w-7 h-7 rounded-full bg-slate-200 shrink-0 animate-pulse" />
+            <div className="w-7 h-7 rounded-full bg-muted shrink-0 animate-pulse" />
             <div className="min-w-0 flex-1 space-y-1">
-              <div className="h-2.5 w-24 bg-slate-200 rounded animate-pulse" />
+              <div className="h-2.5 w-24 bg-muted rounded animate-pulse" />
               <div className="h-2 w-32 bg-muted rounded animate-pulse" />
             </div>
           </>
@@ -232,12 +232,12 @@ function DropdownPanel({ me, onSignOut, onClose, anchor }: DropdownPanelProps) {
       }`}
     >
       {/* Profile header — bigger, friendlier than the trigger card. */}
-      <div className="px-3 py-3 border-b border-slate-100 bg-muted/60">
+      <div className="px-3 py-3 border-b border-border bg-muted/60">
         <div className="flex items-center gap-2.5">
           {me?.avatar_url ? (
             <img src={me.avatar_url} alt="" className="w-9 h-9 rounded-full border border-border" />
           ) : (
-            <div className="w-9 h-9 rounded-full bg-slate-200 text-muted-foreground text-sm font-semibold flex items-center justify-center uppercase">
+            <div className="w-9 h-9 rounded-full bg-muted text-muted-foreground text-sm font-semibold flex items-center justify-center uppercase">
               {(me?.name ?? me?.email ?? '?').slice(0, 1)}
             </div>
           )}
@@ -258,7 +258,7 @@ function DropdownPanel({ me, onSignOut, onClose, anchor }: DropdownPanelProps) {
           </p>
         )}
         {me?.is_guest && (
-          <p className="mt-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 px-2 py-1 rounded">
+          <p className="mt-2 text-xs text-accent bg-accent/10 border border-accent/25 px-2 py-1 rounded">
             Guest mode — sign in with GitHub for full access
           </p>
         )}

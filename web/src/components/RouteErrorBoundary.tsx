@@ -131,7 +131,7 @@ export class RouteErrorBoundary extends Component<Props, State> {
             <summary className="text-xs text-foreground/90 cursor-pointer select-none hover:text-foreground">
               Stack trace
             </summary>
-            <pre className="mt-2 text-xs bg-slate-900 text-slate-100 rounded-md p-3 overflow-auto max-h-64 font-mono whitespace-pre-wrap">
+            <pre className="mt-2 text-xs bg-foreground text-slate-100 rounded-md p-3 overflow-auto max-h-64 font-mono whitespace-pre-wrap">
               {error.stack || '(no stack)'}
             </pre>
           </details>
@@ -141,7 +141,7 @@ export class RouteErrorBoundary extends Component<Props, State> {
               <summary className="text-xs text-foreground/90 cursor-pointer select-none hover:text-foreground">
                 Component stack
               </summary>
-              <pre className="mt-2 text-xs bg-slate-900 text-slate-100 rounded-md p-3 overflow-auto max-h-48 font-mono whitespace-pre-wrap">
+              <pre className="mt-2 text-xs bg-foreground text-slate-100 rounded-md p-3 overflow-auto max-h-48 font-mono whitespace-pre-wrap">
                 {componentStack}
               </pre>
             </details>
@@ -151,7 +151,7 @@ export class RouteErrorBoundary extends Component<Props, State> {
             <button
               type="button"
               onClick={this.copyDiagnostics}
-              className="px-3 py-1.5 rounded-md bg-slate-900 hover:bg-slate-800 text-white text-xs font-medium"
+              className="px-3 py-1.5 rounded-md bg-foreground hover:bg-slate-800 text-white text-xs font-medium"
             >
               {copied ? 'Copied to clipboard' : 'Copy diagnostics'}
             </button>

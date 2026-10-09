@@ -89,7 +89,7 @@ const STATUS_COLOR: Record<string, string> = {
   live:       'bg-emerald-100 text-emerald-700 border-emerald-200',
   building:   'bg-blue-100 text-blue-700 border-blue-200',
   deploying:  'bg-indigo-100 text-indigo-700 border-indigo-200',
-  pending:    'bg-amber-100 text-amber-700 border-amber-200',
+  pending:    'bg-amber-100 text-accent border-accent/25',
   failed:     'bg-red-100 text-destructive border-destructive/30',
   cancelled:  'bg-muted text-muted-foreground border-border',
   rolled_back:'bg-muted text-muted-foreground border-border',
@@ -264,7 +264,7 @@ function TriggerDeployButton({ projectId, branch }: { projectId: string; branch:
       <button
         onClick={trigger}
         disabled={busy}
-        className="px-4 py-2 rounded-lg bg-primary hover:bg-primary/90 text-white text-sm font-medium disabled:opacity-50 transition-colors"
+        className="px-4 py-2 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground text-sm font-medium disabled:opacity-50 transition-colors"
       >
         {busy ? 'Queueing…' : 'Deploy Now'}
       </button>
@@ -318,7 +318,7 @@ function HealthCheckCard({ projectId }: { projectId: string }) {
     result?.status === 'healthy'
       ? 'border-emerald-300 bg-emerald-50 text-emerald-700'
       : result?.status === 'unhealthy'
-        ? 'border-amber-300 bg-amber-50 text-amber-800'
+        ? 'border-amber-300 bg-accent/10 text-amber-800'
         : result?.status === 'unreachable'
           ? 'border-destructive/40 bg-destructive/10 text-destructive'
           : 'border-border bg-muted text-muted-foreground';
@@ -346,7 +346,7 @@ function HealthCheckCard({ projectId }: { projectId: string }) {
           <button
             onClick={() => void runProbe()}
             disabled={checking}
-            className="text-xs px-3 py-1.5 rounded-lg border border-border bg-amber-400 hover:bg-amber-500 text-foreground font-semibold shadow-retro disabled:opacity-50 disabled:cursor-wait"
+            className="text-xs px-3 py-1.5 rounded-lg border border-border bg-primary hover:bg-primary/90 text-primary-foreground font-semibold shadow-retro disabled:opacity-50 disabled:cursor-wait"
           >
             {checking ? 'Probing…' : 'Check health'}
           </button>
@@ -581,7 +581,7 @@ function GoLiveCard({ project }: { project: Project }) {
           <div className="flex flex-col gap-1">
             <label className="text-xs text-muted-foreground">Cloudflare credential</label>
             {creds.length === 0 ? (
-              <p className="text-xs text-amber-700">
+              <p className="text-xs text-accent">
                 No Cloudflare credential configured. Add one under Integrations → Cloudflare first.
               </p>
             ) : (
@@ -607,7 +607,7 @@ function GoLiveCard({ project }: { project: Project }) {
 
         <button
           type="button" onClick={() => void submit()} disabled={running}
-          className="self-start text-sm px-4 py-2 rounded-lg border border-border bg-amber-400 hover:bg-amber-500 text-foreground font-semibold shadow-retro disabled:opacity-50 disabled:cursor-wait">
+          className="self-start text-sm px-4 py-2 rounded-lg border border-border bg-primary hover:bg-primary/90 text-primary-foreground font-semibold shadow-retro disabled:opacity-50 disabled:cursor-wait">
           {running ? 'Going live…' : '🚀 Go Live'}
         </button>
 
@@ -616,8 +616,8 @@ function GoLiveCard({ project }: { project: Project }) {
             <div className="text-xs font-medium mb-2">
               Result: <span className={
                 result.overall === 'live' ? 'text-emerald-700'
-                : result.overall === 'manual' ? 'text-amber-700'
-                : result.overall === 'partial' ? 'text-amber-700' : 'text-destructive'}>
+                : result.overall === 'manual' ? 'text-accent'
+                : result.overall === 'partial' ? 'text-accent' : 'text-destructive'}>
                 {result.overall}
               </span>
             </div>
@@ -838,7 +838,7 @@ function DatabaseLinksCard({ project }: { project: { id: string } }) {
               <button
                 onClick={onAdd}
                 disabled={create.isPending || !picker}
-                className="px-4 py-2 rounded bg-primary hover:bg-primary/90 text-white text-xs font-medium border border-border shadow-retro disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                className="px-4 py-2 rounded bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-medium border border-border shadow-retro disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
               >
                 {create.isPending ? 'Linking…' : 'Link'}
               </button>
@@ -878,7 +878,7 @@ function ProjectDbLinkRow({
   return (
     <div className="rounded-lg border border-border bg-card px-3 py-2 flex items-center justify-between gap-2 flex-wrap">
       <div className="min-w-0 flex items-center gap-2 flex-wrap">
-        <code className="text-xs font-mono font-semibold text-foreground bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded">
+        <code className="text-xs font-mono font-semibold text-foreground bg-accent/10 border border-accent/25 px-1.5 py-0.5 rounded">
           ${link.env_var_name}
         </code>
         <span className="text-xs text-muted-foreground">→</span>
@@ -896,7 +896,7 @@ function ProjectDbLinkRow({
           {link.database_kind}
         </span>
         {!link.is_active && (
-          <span className="text-xs px-1.5 py-0.5 rounded-full border font-medium bg-amber-50 text-amber-800 border-amber-200">
+          <span className="text-xs px-1.5 py-0.5 rounded-full border font-medium bg-accent/10 text-amber-800 border-accent/25">
             paused
           </span>
         )}
@@ -1021,7 +1021,7 @@ function LiveUrlCard({ project }: { project: Project }) {
               <button
                 onClick={save}
                 disabled={busy}
-                className="text-xs px-3 py-1.5 rounded bg-primary hover:bg-primary/90 text-white border border-border shadow-retro disabled:opacity-50"
+                className="text-xs px-3 py-1.5 rounded bg-primary hover:bg-primary/90 text-primary-foreground border border-border shadow-retro disabled:opacity-50"
               >
                 {busy ? 'Saving…' : 'Save'}
               </button>
@@ -1181,7 +1181,7 @@ function RunAsContainerCard({ project }: { project: Project }) {
     <div className="rounded-xl border border-border bg-card overflow-hidden">
       <div className="px-5 py-4 border-b border-border bg-muted/30 flex items-center justify-between">
         <h2 className="text-sm font-semibold">Run as Container</h2>
-        <span className="text-xs uppercase tracking-wide font-semibold text-amber-700 bg-amber-100 rounded px-2 py-0.5">
+        <span className="text-xs uppercase tracking-wide font-semibold text-accent bg-amber-100 rounded px-2 py-0.5">
           Phase 1
         </span>
       </div>
@@ -1197,7 +1197,7 @@ function RunAsContainerCard({ project }: { project: Project }) {
           </p>
         )}
         {portMissing && !enabled && (
-          <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-2">
+          <p className="text-xs text-accent bg-accent/10 border border-accent/25 rounded px-3 py-2">
             Set a host port on this project before enabling container mode — the container needs a port to bind.
           </p>
         )}
@@ -1312,7 +1312,7 @@ function AutonomousModeCard({ project }: { project: Project }) {
   const toneClass: Record<string, string> = {
     idle:       'text-foreground/90 bg-muted border-border',
     healthy:    'text-emerald-700 bg-emerald-50 border-emerald-200',
-    flaky:      'text-amber-700 bg-amber-50 border-amber-200',
+    flaky:      'text-accent bg-accent/10 border-accent/25',
     restarting: 'text-orange-700 bg-orange-50 border-orange-200',
     rollback:   'text-destructive bg-destructive/10 border-destructive/30',
   };
@@ -1333,7 +1333,7 @@ function AutonomousModeCard({ project }: { project: Project }) {
         </p>
 
         {containerOff && !enabled && (
-          <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-2">
+          <p className="text-xs text-accent bg-accent/10 border border-accent/25 rounded px-3 py-2">
             Enable “Run as Container” first — autonomous mode probes the Phase 1 container, and there isn't one yet.
           </p>
         )}
@@ -1563,7 +1563,7 @@ function DeploymentsTab({ projectId }: { projectId: string }) {
                       {isFailed && (
                         <button
                           onClick={() => void runDiagnose(d.id)}
-                          className="text-xs px-2 py-1 rounded border border-border hover:border-slate-500 text-muted-foreground hover:text-foreground transition-colors"
+                          className="text-xs px-2 py-1 rounded border border-border hover:border-accent/50 text-muted-foreground hover:text-foreground transition-colors"
                         >
                           {diag ? 'Hide' : 'Diagnose'}
                         </button>
@@ -1573,7 +1573,7 @@ function DeploymentsTab({ projectId }: { projectId: string }) {
                           onClick={() => void runRollback(d.id)}
                           disabled={isRollingBack}
                           title="Roll back to the previous successful deployment"
-                          className="text-xs px-2 py-1 rounded border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-800 transition-colors disabled:opacity-50"
+                          className="text-xs px-2 py-1 rounded border border-amber-300 bg-accent/10 hover:bg-amber-100 text-amber-800 transition-colors disabled:opacity-50"
                         >
                           {isRollingBack ? 'Rolling back…' : '↶ Rollback'}
                         </button>
@@ -1683,7 +1683,7 @@ function DiagnosisPanel({ state, deploymentId, onApplied }: DiagnosisPanelProps)
         <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${
           isUnknown
             ? 'border-border bg-muted text-foreground/90'
-            : 'border-amber-300 bg-amber-50 text-amber-800'
+            : 'border-amber-300 bg-accent/10 text-amber-800'
         }`}>
           {KIND_LABEL[d.kind]}
         </span>
@@ -2005,7 +2005,7 @@ function EnvVarsTab({ projectId }: { projectId: string }) {
           <button
             onClick={addVar}
             disabled={saving || !newKey.trim()}
-            className="px-4 py-2 rounded-lg bg-primary hover:bg-primary/90 text-white text-sm font-medium disabled:opacity-50 transition-colors"
+            className="px-4 py-2 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground text-sm font-medium disabled:opacity-50 transition-colors"
           >
             {saving ? 'Saving…' : 'Add'}
           </button>
@@ -2147,7 +2147,7 @@ function WebhooksTab({ projectId }: { projectId: string }) {
         </p>
 
         {showGuide && provider === 'slack' && (
-          <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 mb-4 text-xs text-amber-900 space-y-2">
+          <div className="rounded-lg border border-accent/25 bg-accent/10 p-3 mb-4 text-xs text-amber-900 space-y-2">
             <p className="font-semibold">Slack Incoming Webhook setup (~2 min):</p>
             <ol className="list-decimal pl-5 space-y-1">
               <li>Go to <a href="https://api.slack.com/apps" target="_blank" rel="noopener noreferrer" className="underline font-mono">api.slack.com/apps</a> → <strong>Create New App</strong> → <strong>From scratch</strong>.</li>
@@ -2227,7 +2227,7 @@ function WebhooksTab({ projectId }: { projectId: string }) {
           <button
             onClick={addHook}
             disabled={saving || testing || !url.trim()}
-            className="px-4 py-2 rounded-lg bg-primary hover:bg-primary/90 text-white text-sm font-medium disabled:opacity-50 transition-colors"
+            className="px-4 py-2 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground text-sm font-medium disabled:opacity-50 transition-colors"
           >
             {saving ? 'Saving…' : 'Add'}
           </button>
@@ -2349,7 +2349,7 @@ function RelatedTab({ projectId }: { projectId: string }) {
           <button
             onClick={runBundle}
             disabled={running}
-            className="px-4 py-2 rounded-lg bg-primary hover:bg-primary/90 text-white text-sm font-medium disabled:opacity-50 transition-colors whitespace-nowrap"
+            className="px-4 py-2 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground text-sm font-medium disabled:opacity-50 transition-colors whitespace-nowrap"
           >
             {running ? 'Queueing…' : 'Run with Related'}
           </button>
@@ -2374,7 +2374,7 @@ function RelatedTab({ projectId }: { projectId: string }) {
                       <span className={
                         r.status === 'queued' ? 'text-emerald-700' :
                         r.status === 'error'  ? 'text-destructive' :
-                                                'text-amber-700'
+                                                'text-accent'
                       }>
                         {r.status}
                       </span>
@@ -2421,7 +2421,7 @@ function RelatedTab({ projectId }: { projectId: string }) {
             <button
               onClick={add}
               disabled={saving || !chosenId}
-              className="px-4 py-2 rounded-lg bg-primary hover:bg-primary/90 text-white text-sm font-medium disabled:opacity-50 transition-colors"
+              className="px-4 py-2 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground text-sm font-medium disabled:opacity-50 transition-colors"
             >
               {saving ? 'Saving…' : 'Add'}
             </button>
@@ -2577,7 +2577,7 @@ function DomainsTab({ projectId }: { projectId: string }) {
           Without it, you'll still need to point the DNS record at this server manually.
         </p>
         {creds && creds.length === 0 && (
-          <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-2 text-xs text-amber-800">
+          <div className="flex items-start gap-2 rounded-md border border-accent/25 bg-accent/10 px-2.5 py-2 text-xs text-amber-800">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="mt-0.5 shrink-0">
               <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
               <line x1="12" y1="9" x2="12" y2="13" />
@@ -2602,7 +2602,7 @@ function DomainsTab({ projectId }: { projectId: string }) {
             type="button"
             onClick={() => void addDomain()}
             disabled={adding || !newDomain.trim()}
-            className="px-3 py-1.5 rounded-md bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white text-sm font-medium"
+            className="px-3 py-1.5 rounded-md bg-foreground hover:bg-slate-800 disabled:opacity-50 text-white text-sm font-medium"
           >
             {adding ? 'Adding…' : 'Add'}
           </button>
@@ -2610,7 +2610,7 @@ function DomainsTab({ projectId }: { projectId: string }) {
       </section>
 
       <section className="rounded-xl border border-border bg-card">
-        <header className="px-4 py-3 border-b border-slate-100">
+        <header className="px-4 py-3 border-b border-border">
           <h2 className="text-sm font-semibold text-foreground">Domains</h2>
         </header>
         {!domains ? (
@@ -3075,7 +3075,7 @@ function RunLocallyCard({ projectId }: { projectId: string }) {
               {run.kind === 'python-http-server' && (
                 <span
                   title="Served by Python's built-in http.server (no Podman). Fine for previewing static files; not a production server."
-                  className="inline-flex text-[10.5px] px-2 py-0.5 rounded-full border border-amber-300 bg-amber-50 text-amber-800"
+                  className="inline-flex text-[10.5px] px-2 py-0.5 rounded-full border border-amber-300 bg-accent/10 text-amber-800"
                 >
                   Static preview
                 </span>
@@ -3147,14 +3147,14 @@ function RunLocallyCard({ projectId }: { projectId: string }) {
             {/* Logs panel — collapsible, polls every 3s while open + follow */}
             {logsOpen && (
               <div className="rounded-lg border border-border bg-slate-950 overflow-hidden">
-                <div className="px-3 py-2 border-b border-border bg-slate-900 flex items-center justify-between">
-                  <div className="flex items-center gap-3 text-xs text-slate-300">
+                <div className="px-3 py-2 border-b border-border bg-foreground flex items-center justify-between">
+                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
                     <span className="font-medium">Container logs</span>
                     <span className="text-muted-foreground">last 200 lines</span>
                     {logsLoading && <span className="text-muted-foreground">refreshing…</span>}
                   </div>
                   <div className="flex items-center gap-3">
-                    <label className="flex items-center gap-1.5 text-xs text-slate-300 cursor-pointer">
+                    <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer">
                       <input
                         type="checkbox"
                         checked={autoFollow}
@@ -3166,7 +3166,7 @@ function RunLocallyCard({ projectId }: { projectId: string }) {
                     <button
                       type="button"
                       onClick={() => void fetchLogs()}
-                      className="text-xs text-slate-300 hover:text-white"
+                      className="text-xs text-muted-foreground hover:text-white"
                     >
                       Refresh
                     </button>

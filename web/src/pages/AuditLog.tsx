@@ -38,7 +38,7 @@ const ENTITY_PRESETS: { label: string; value: string }[] = [
 function actionTone(action: string): { bg: string; text: string } {
   if (action.endsWith('.delete')) return { bg: 'bg-destructive/10', text: 'text-destructive' };
   if (action.endsWith('.create')) return { bg: 'bg-emerald-50', text: 'text-emerald-700' };
-  if (action.endsWith('.update')) return { bg: 'bg-amber-50', text: 'text-amber-800' };
+  if (action.endsWith('.update')) return { bg: 'bg-accent/10', text: 'text-amber-800' };
   if (action.endsWith('.trigger')) return { bg: 'bg-blue-50', text: 'text-blue-700' };
   if (action.endsWith('.rollback')) return { bg: 'bg-orange-50', text: 'text-orange-700' };
   return { bg: 'bg-muted', text: 'text-foreground/90' };

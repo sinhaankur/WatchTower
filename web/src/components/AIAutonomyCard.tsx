@@ -67,7 +67,7 @@ function InterventionRow({ action }: { action: HealingAction }) {
   return (
     <li className="rounded-lg border border-border bg-muted/20 p-3 space-y-2">
       <div className="flex items-center gap-2 flex-wrap">
-        <span className="text-xs uppercase tracking-wide font-semibold text-amber-800 bg-amber-100 border border-amber-200 rounded px-1.5 py-0.5">
+        <span className="text-xs uppercase tracking-wide font-semibold text-amber-800 bg-amber-100 border border-accent/25 rounded px-1.5 py-0.5">
           {KIND_LABELS[action.failure_kind] ?? action.failure_kind}
         </span>
         {action.project_name && (
@@ -103,7 +103,7 @@ function InterventionRow({ action }: { action: HealingAction }) {
         <button
           onClick={() => void act('approve')}
           disabled={busyVerb !== null}
-          className="text-xs px-3 py-1 rounded-lg border border-border bg-amber-400 hover:bg-amber-500 text-foreground font-semibold shadow-retro disabled:opacity-50"
+          className="text-xs px-3 py-1 rounded-lg border border-border bg-primary hover:bg-primary/90 text-primary-foreground font-semibold shadow-retro disabled:opacity-50"
         >
           {busyVerb === 'approve'
             ? 'Working…'
@@ -252,8 +252,8 @@ export default function AIAutonomyCard() {
               }}
               className={`text-xs px-3 py-1 rounded-full border transition-colors ${
                 activePreset === p.id
-                  ? 'border-border bg-slate-900 text-white'
-                  : 'border-border text-muted-foreground hover:border-slate-500 hover:text-foreground'
+                  ? 'border-border bg-foreground text-white'
+                  : 'border-border text-muted-foreground hover:border-accent/50 hover:text-foreground'
               }`}
             >
               {p.label}
@@ -311,14 +311,14 @@ export default function AIAutonomyCard() {
             <button
               onClick={() => void handleTest()}
               disabled={testConnection.isPending || (!baseUrl && !config?.configured)}
-              className="text-xs px-3 py-2 rounded-lg border border-border text-foreground/90 hover:border-slate-500 hover:text-foreground disabled:opacity-50"
+              className="text-xs px-3 py-2 rounded-lg border border-border text-foreground/90 hover:border-accent/50 hover:text-foreground disabled:opacity-50"
             >
               {testConnection.isPending ? 'Testing…' : 'Test connection'}
             </button>
             <button
               onClick={() => void handleSave()}
               disabled={updateConfig.isPending || !dirty}
-              className="text-xs px-4 py-2 rounded-lg border border-border bg-amber-400 hover:bg-amber-500 text-foreground font-semibold shadow-retro disabled:opacity-50"
+              className="text-xs px-4 py-2 rounded-lg border border-border bg-primary hover:bg-primary/90 text-primary-foreground font-semibold shadow-retro disabled:opacity-50"
             >
               {updateConfig.isPending ? 'Saving…' : 'Save'}
             </button>
@@ -360,7 +360,7 @@ export default function AIAutonomyCard() {
               type="checkbox"
               checked={tinyEnabled}
               onChange={(e) => { setTinyEnabled(e.target.checked); setDirty(true); }}
-              className="mt-0.5 accent-amber-500"
+              className="mt-0.5 accent-accent"
             />
             <span className="text-xs text-foreground/90">
               <span className="font-semibold">Use a tiny model for autonomous self-heal</span>

@@ -34,7 +34,7 @@ export default function Account() {
   if (isLoading && !me) {
     return (
       <div className="max-w-3xl mx-auto px-6 py-8">
-        <div className="h-7 w-40 bg-slate-200 rounded animate-pulse" />
+        <div className="h-7 w-40 bg-muted rounded animate-pulse" />
         <div className="mt-2 h-4 w-72 bg-muted rounded animate-pulse" />
         <div className="mt-8 h-48 bg-card border border-border rounded-xl animate-pulse" />
       </div>
@@ -68,7 +68,7 @@ export default function Account() {
               className="w-16 h-16 rounded-full border border-border shrink-0"
             />
           ) : (
-            <div className="w-16 h-16 rounded-full bg-slate-200 text-muted-foreground text-xl font-semibold flex items-center justify-center shrink-0 uppercase">
+            <div className="w-16 h-16 rounded-full bg-muted text-muted-foreground text-xl font-semibold flex items-center justify-center shrink-0 uppercase">
               {initial}
             </div>
           )}
@@ -86,7 +86,7 @@ export default function Account() {
                 </span>
               )}
               {me?.is_guest && (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-50 border border-amber-200 text-xs font-medium text-amber-700">
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-accent/10 border border-accent/25 text-xs font-medium text-accent">
                   Guest mode
                 </span>
               )}

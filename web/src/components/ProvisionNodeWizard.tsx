@@ -281,7 +281,7 @@ export function ProvisionNodeWizard({ onClose, onRegistered }: Props) {
         {loadingCreds ? (
           <Skeleton.Line className="h-9 w-full" />
         ) : creds && creds.length === 0 ? (
-          <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-2">
+          <p className="text-xs text-accent bg-accent/10 border border-accent/25 rounded px-3 py-2">
             No credentials saved yet. Go to Integrations → Cloud providers to add one.
           </p>
         ) : (
@@ -369,7 +369,7 @@ export function ProvisionNodeWizard({ onClose, onRegistered }: Props) {
         <button
           onClick={submit}
           disabled={!canSubmit}
-          className="px-4 py-1.5 rounded-md bg-slate-900 hover:bg-slate-800 text-white text-sm font-medium disabled:opacity-50"
+          className="px-4 py-1.5 rounded-md bg-foreground hover:bg-slate-800 text-white text-sm font-medium disabled:opacity-50"
         >
           {submitting ? 'Launching…' : 'Launch'}
         </button>

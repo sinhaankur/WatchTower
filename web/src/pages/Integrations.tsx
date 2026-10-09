@@ -172,13 +172,13 @@ function InstallBlock({ cmds }: { cmds: string[] }) {
     setTimeout(() => setCopied(false), 1800);
   };
   return (
-    <div className="mt-3 rounded-lg bg-slate-900 p-3 text-xs font-mono text-slate-200 relative">
+    <div className="mt-3 rounded-lg bg-foreground p-3 text-xs font-mono text-slate-200 relative">
       {cmds.map((c, i) => (
         <div key={i} className="leading-relaxed">{c}</div>
       ))}
       <button
         onClick={() => void copy()}
-        className="absolute top-2 right-2 text-xs px-2 py-0.5 rounded bg-slate-700 hover:bg-slate-600 text-slate-300 transition-colors"
+        className="absolute top-2 right-2 text-xs px-2 py-0.5 rounded bg-slate-700 hover:bg-slate-600 text-muted-foreground transition-colors"
       >
         {copied ? 'Copied!' : 'Copy'}
       </button>
@@ -312,7 +312,7 @@ function ServiceControls({ service, running, enabled, supportedActions, onDone }
           <button
             onClick={() => void doAction('disable')}
             disabled={busy !== null}
-            className="px-3 py-1 text-xs font-medium rounded-lg border border-amber-300 text-amber-700 hover:bg-amber-50 disabled:opacity-50 transition-colors"
+            className="px-3 py-1 text-xs font-medium rounded-lg border border-amber-300 text-accent hover:bg-accent/10 disabled:opacity-50 transition-colors"
             title="Disable auto-start on boot"
           >
             {busy === 'disable' ? '…' : '🔓 Disable on boot'}
@@ -325,7 +325,7 @@ function ServiceControls({ service, running, enabled, supportedActions, onDone }
         </p>
       )}
       {errorDetail?.command && errorDetail.needs_terminal && (
-        <div className="mt-1 rounded-lg bg-slate-900 px-3 py-2 text-xs font-mono text-slate-200 flex items-center gap-2 overflow-hidden">
+        <div className="mt-1 rounded-lg bg-foreground px-3 py-2 text-xs font-mono text-slate-200 flex items-center gap-2 overflow-hidden">
           <span className="text-muted-foreground shrink-0">$</span>
           <span className="truncate flex-1" title={errorDetail.command}>{errorDetail.command}</span>
           <button
@@ -472,12 +472,12 @@ function WatchdogCard({ podmanInstalled }: { podmanInstalled: boolean }) {
     <div className={`rounded-xl border p-5 transition-all ${
       enabled
         ? 'border-emerald-300 bg-emerald-50/40'
-        : 'border-amber-200 bg-amber-50/30'
+        : 'border-accent/25 bg-accent/10/30'
     }`}>
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-start gap-3 min-w-0 flex-1">
           <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0 border ${
-            enabled ? 'bg-emerald-50 border-emerald-200' : 'bg-amber-50 border-amber-200'
+            enabled ? 'bg-emerald-50 border-emerald-200' : 'bg-accent/10 border-accent/25'
           }`}>
             🛡️
           </div>
@@ -505,7 +505,7 @@ function WatchdogCard({ podmanInstalled }: { podmanInstalled: boolean }) {
               )}
             </p>
             {!podmanInstalled && (
-              <p className="text-xs text-amber-700 mt-1">⚠ Podman not detected. Install Podman first.</p>
+              <p className="text-xs text-accent mt-1">⚠ Podman not detected. Install Podman first.</p>
             )}
             {msg && (
               <p className={`text-xs mt-2 font-medium ${msg.kind === 'ok' ? 'text-emerald-700' : 'text-destructive'}`}>
@@ -519,7 +519,7 @@ function WatchdogCard({ podmanInstalled }: { podmanInstalled: boolean }) {
             onClick={() => void toggle()}
             disabled={toggling || loading || !podmanInstalled}
             className={`relative inline-flex items-center h-6 w-11 rounded-full border-2 transition-colors duration-200 focus:outline-none disabled:opacity-40 ${
-              enabled ? 'bg-emerald-500 border-emerald-600' : 'bg-slate-200 border-border'
+              enabled ? 'bg-emerald-500 border-emerald-600' : 'bg-muted border-border'
             }`}
             title={enabled ? 'Disable watchdog' : 'Enable watchdog'}
             aria-label={enabled ? 'Disable Podman watchdog' : 'Enable Podman watchdog'}
@@ -545,8 +545,8 @@ function WatchdogCard({ podmanInstalled }: { podmanInstalled: boolean }) {
       )}
 
       {!enabled && (
-        <div className="mt-3 pt-3 border-t border-amber-200">
-          <p className="text-xs text-amber-700">
+        <div className="mt-3 pt-3 border-t border-accent/25">
+          <p className="text-xs text-accent">
             Without the watchdog, your containers will stay offline after a reboot until you manually start them.
           </p>
         </div>
@@ -623,7 +623,7 @@ function WatchTowerServiceCard() {
                   ? 'bg-emerald-50 border-emerald-300 text-emerald-700'
                   : installed
                     ? 'bg-muted border-border text-muted-foreground'
-                    : 'bg-amber-50 border-amber-300 text-amber-800'
+                    : 'bg-accent/10 border-amber-300 text-amber-800'
               }`}>
                 {enabled ? 'Enabled on boot' : installed ? 'Disabled' : 'Not installed'}
               </span>
@@ -649,8 +649,8 @@ function WatchTowerServiceCard() {
       </div>
 
       {!installed && (
-        <div className="mt-3 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-900">
-          The systemd unit isn't installed. Run <code className="font-mono bg-card border border-amber-200 px-1 rounded">scripts/install-watchtower-linux-full.sh</code> once from the source tree to install <code className="font-mono">watchtower.service</code>, then come back here to enable it.
+        <div className="mt-3 rounded-lg bg-accent/10 border border-accent/25 px-3 py-2 text-xs text-amber-900">
+          The systemd unit isn't installed. Run <code className="font-mono bg-card border border-accent/25 px-1 rounded">scripts/install-watchtower-linux-full.sh</code> once from the source tree to install <code className="font-mono">watchtower.service</code>, then come back here to enable it.
         </div>
       )}
 
@@ -814,7 +814,7 @@ function WatchtowerConfigCard() {
         <button
           onClick={() => void save()}
           disabled={!dirty || saving}
-          className="px-3 py-1.5 rounded-lg text-xs font-medium border bg-slate-900 text-white border-border hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="px-3 py-1.5 rounded-lg text-xs font-medium border bg-foreground text-white border-border hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {saving ? 'Saving…' : 'Save settings'}
         </button>
@@ -901,7 +901,7 @@ function CloudflareSection() {
 
   return (
     <section className="rounded-xl border border-border bg-card">
-      <header className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+      <header className="px-5 py-4 border-b border-border flex items-center justify-between">
         <div>
           <h2 className="text-sm font-semibold text-foreground">Cloudflare</h2>
           <p className="text-xs text-muted-foreground mt-0.5">
@@ -1128,7 +1128,7 @@ function CloudProviderSection() {
 
   return (
     <section className="rounded-xl border border-border bg-card">
-      <header className="px-5 py-4 border-b border-slate-100 flex items-center justify-between gap-3">
+      <header className="px-5 py-4 border-b border-border flex items-center justify-between gap-3">
         <div>
           <h2 className="text-sm font-semibold text-foreground">Cloud providers</h2>
           <p className="text-xs text-muted-foreground mt-0.5">
@@ -1151,7 +1151,7 @@ function CloudProviderSection() {
           <button
             type="button"
             onClick={() => { setShowForm(true); setError(''); }}
-            className="px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-medium"
+            className="px-3 py-1.5 rounded-lg bg-foreground hover:bg-slate-800 text-white text-xs font-medium"
           >
             + Connect a cloud provider
           </button>
@@ -1169,7 +1169,7 @@ function CloudProviderSection() {
                     onClick={() => setProvider(p)}
                     className={`px-3 py-1.5 rounded-md text-xs font-medium border ${
                       provider === p
-                        ? 'bg-slate-900 text-white border-slate-900'
+                        ? 'bg-foreground text-white border-slate-900'
                         : 'bg-card text-foreground/90 border-border hover:bg-muted'
                     }`}
                   >
@@ -1408,7 +1408,7 @@ function McpSection() {
         </div>
 
         {revealToken && storedToken && (
-          <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-2">
+          <p className="text-xs text-accent bg-accent/10 border border-accent/25 rounded px-3 py-2">
             ⚠ Your real API token is now visible in the JSON above. Anyone with this token can deploy as you — treat it like a password and don't share screenshots.
           </p>
         )}
@@ -1489,7 +1489,7 @@ const Integrations = () => {
 
       <main className="px-4 sm:px-6 lg:px-8 py-6 space-y-6 max-w-5xl mx-auto w-full">
         {error && (
-          <div className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+          <div className="rounded-xl border border-amber-300 bg-accent/10 px-4 py-3 text-sm text-accent">
             ⚠ {error}
           </div>
         )}

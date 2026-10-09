@@ -50,7 +50,7 @@ const STATUS_COLOR: Record<string, string> = {
   building:    'bg-blue-100 text-blue-700 border-blue-200',
   deploying:   'bg-indigo-100 text-indigo-700 border-indigo-200',
   running:     'bg-blue-100 text-blue-700 border-blue-200',
-  pending:     'bg-amber-100 text-amber-700 border-amber-200',
+  pending:     'bg-amber-100 text-accent border-accent/25',
   failed:      'bg-red-100 text-destructive border-destructive/30',
   cancelled:   'bg-muted text-muted-foreground border-border',
   rolled_back: 'bg-muted text-muted-foreground border-border',
@@ -139,7 +139,7 @@ function Timeline({ d, now }: { d: Deployment; now: number }) {
           <div className="flex flex-col items-center">
             <span className={`mt-1 w-3 h-3 rounded-full border-2 ${DOT_CLASS[p.state]}`} />
             {i < phases.length - 1 && (
-              <span className={`w-0.5 grow min-h-[1.75rem] ${p.state === 'done' ? 'bg-emerald-300' : 'bg-slate-200'}`} />
+              <span className={`w-0.5 grow min-h-[1.75rem] ${p.state === 'done' ? 'bg-emerald-300' : 'bg-muted'}`} />
             )}
           </div>
           <div className="pb-4 -mt-0.5">
@@ -292,7 +292,7 @@ export default function DeploymentDetail() {
             </button>
             {isLive && (
               <button onClick={() => void action('rollback')} disabled={!!busy}
-                className="text-xs px-3 py-1.5 rounded-lg border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-800 disabled:opacity-50">
+                className="text-xs px-3 py-1.5 rounded-lg border border-amber-300 bg-accent/10 hover:bg-amber-100 text-amber-800 disabled:opacity-50">
                 {busy === 'rollback' ? 'Rolling back…' : '↶ Rollback'}
               </button>
             )}

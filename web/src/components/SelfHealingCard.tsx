@@ -29,7 +29,7 @@ function statusMeta(a: { status: string; auto_applicable: boolean }): { dot: str
     case 'approved':
       return { dot: 'bg-emerald-500', text: 'text-emerald-700', label: 'Fixed (approved)' };
     case 'pending':
-      return { dot: 'bg-amber-500', text: 'text-amber-700', label: 'Needs you' };
+      return { dot: 'bg-primary', text: 'text-accent', label: 'Needs you' };
     case 'failed':
       return { dot: 'bg-red-500', text: 'text-destructive', label: 'Fix failed' };
     case 'dismissed':

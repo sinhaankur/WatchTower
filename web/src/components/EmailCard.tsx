@@ -166,8 +166,8 @@ export default function EmailCard() {
               onClick={() => applyPreset(p)}
               className={`text-xs px-3 py-1 rounded-full border transition-colors ${
                 activePreset.id === p.id
-                  ? 'border-border bg-slate-900 text-white'
-                  : 'border-border text-muted-foreground hover:border-slate-500 hover:text-foreground'
+                  ? 'border-border bg-foreground text-white'
+                  : 'border-border text-muted-foreground hover:border-accent/50 hover:text-foreground'
               }`}
             >
               {p.label}
@@ -266,14 +266,14 @@ export default function EmailCard() {
             onClick={() => void handleTest()}
             disabled={testEmail.isPending || !config?.configured || dirty}
             title={dirty ? 'Save your changes first' : 'Send yourself a test email'}
-            className="text-xs px-3 py-2 rounded-lg border border-border text-foreground/90 hover:border-slate-500 hover:text-foreground disabled:opacity-50"
+            className="text-xs px-3 py-2 rounded-lg border border-border text-foreground/90 hover:border-accent/50 hover:text-foreground disabled:opacity-50"
           >
             {testEmail.isPending ? 'Sending…' : 'Send test email'}
           </button>
           <button
             onClick={() => void handleSave()}
             disabled={updateConfig.isPending || !dirty}
-            className="text-xs px-4 py-2 rounded-lg border border-border bg-amber-400 hover:bg-amber-500 text-foreground font-semibold shadow-retro disabled:opacity-50"
+            className="text-xs px-4 py-2 rounded-lg border border-border bg-primary hover:bg-primary/90 text-primary-foreground font-semibold shadow-retro disabled:opacity-50"
           >
             {updateConfig.isPending ? 'Saving…' : 'Save'}
           </button>
