@@ -301,7 +301,8 @@ def deploy_registered_app(
     return deploy_result
 
 
-app = FastAPI(title="Watchtower Deployment API", version="1.0.0")
+from watchtower import __version__ as _wt_version  # single source of truth
+app = FastAPI(title="Watchtower Deployment API", version=_wt_version)
 
 
 DASHBOARD_HTML = """

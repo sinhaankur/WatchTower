@@ -41,7 +41,7 @@
     "description": "Turn a computer you already own into your personal cloud. Deploy websites from GitHub with managed databases, backups, and a private URL — free and open source. When a deploy breaks, WatchTower diagnoses and fixes it automatically.",
     "url": "https://sinhaankur.github.io/WatchTower/",
     "downloadUrl": "https://github.com/sinhaankur/WatchTower/releases",
-    "softwareVersion": "1.21.0",
+    "softwareVersion": "2.1.0",
     "license": "https://www.apache.org/licenses/LICENSE-2.0",
     "author": { "@type": "Person", "name": "Ankur Sinha" },
     "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
@@ -50,7 +50,8 @@
       "Self-healing: automatically diagnoses and fixes failed deploys",
       "Managed databases (Postgres, MySQL, MariaDB, Mongo, Redis)",
       "Private remote access over Tailscale — no open ports",
-      "Rootless Podman containers"
+      "Rootless Podman containers",
+      "Manage all your machines from one console over Tailscale"
     ]
   }
   </script>
@@ -794,11 +795,22 @@
       .pricing-band { grid-template-columns: 1fr; }
     }
     @media (max-width: 640px) {
-      .nav-links a:not(.btn) { display: none; }
+      /* Don't hide the nav on phones (dead end). Let it wrap under the brand
+         and shrink so every link stays reachable, with the Download button
+         always last. */
+      .nav-inner { flex-wrap: wrap; gap: 8px 14px; padding: 12px 16px; }
+      .nav-links { flex-wrap: wrap; gap: 2px 4px; width: 100%; justify-content: flex-start; }
+      .nav-links a { padding: 6px 9px; font-size: 0.84rem; }
+      .nav-links a.btn { margin-left: auto; }
       .hero { padding: 72px 0 60px; }
       section { padding: 64px 0; }
       .step { padding: 26px; gap: 18px; }
       .heal { margin: 0; border-radius: 0; }
+    }
+    /* Very narrow phones: drop the two lowest-priority links (Blog, Under the
+       hood) rather than let the bar get too tall — the key ones stay. */
+    @media (max-width: 420px) {
+      .nav-links a.nav-secondary { display: none; }
     }
   </style>
 </head>
@@ -816,10 +828,10 @@
       </a>
       <nav class="nav-links" aria-label="Site">
         <a href="#how">How it works</a>
-        <a href="/WatchTower/how-it-works/">Under the hood</a>
+        <a class="nav-secondary" href="/WatchTower/how-it-works/">Under the hood</a>
         <a href="/WatchTower/compare/">Compare</a>
         <a href="/WatchTower/pricing/">Pricing</a>
-        <a href="/WatchTower/blog/">Blog</a>
+        <a class="nav-secondary" href="/WatchTower/blog/">Blog</a>
         <a href="https://github.com/sinhaankur/WatchTower" target="_blank" rel="noopener">GitHub</a>
         <a class="btn btn-primary btn-small" href="https://github.com/sinhaankur/WatchTower/releases/latest" target="_blank" rel="noopener">Download</a>
       </nav>
@@ -864,7 +876,7 @@
           <button type="button" class="install-copy" id="pip-copy" aria-label="Copy pip install command">copy</button>
         </div>
         <p class="hero-meta reveal" style="--d:240ms;">
-          <span class="version-badge">v1.21.0 · Open Source</span>
+          <span class="version-badge">v2.1.0 · Open Source</span>
           <span>Apache-2.0 + ELv2</span>
           <span>macOS · Linux · Windows</span>
           <span>On PyPI · Rootless Podman</span>
@@ -1049,6 +1061,13 @@
             <h3>AI operator — bring your own model</h3>
             <p>Point it at Ollama, LM Studio, or any OpenAI-compatible endpoint.
             It can only do what you can do — no privilege escalation.</p>
+          </article>
+          <article class="card reveal" style="--d:360ms;">
+            <span class="icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/><circle cx="7" cy="10" r="1.2"/><circle cx="12" cy="10" r="1.2"/><circle cx="17" cy="10" r="1.2"/></svg></span>
+            <h3>One console for every machine</h3>
+            <p>Pair your other WatchTower boxes over Tailscale and manage them from a
+            single pane — see each one's projects and containers, start/stop, and
+            trigger deploys remotely. Like a private vSphere for your own hardware.</p>
           </article>
         </div>
       </section>
