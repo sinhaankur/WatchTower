@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from typing import Optional
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -74,7 +74,12 @@ async def get_me(
         user, org, member = _ensure_user_org_member(db, current_user)
         if user is not None:
             email = email or user.email
-            name = name or getattr(user, "name", None)
+            # The DB user's name WINS over the token's default: once you've
+            # personalized it (PATCH /api/me), that's your name — the token's
+            # generic "Local admin" default must not shadow it. Fall back to the
+            # token name only when the DB has none yet.
+            db_name = getattr(user, "name", None)
+            name = db_name or name
             avatar_url = avatar_url or getattr(user, "avatar_url", None)
         if org is not None:
             org_id = str(org.id)
@@ -126,3 +131,37 @@ async def get_me(
         # The static-token path sets this; GitHub/guest sessions don't.
         is_local_admin=bool(current_user.get("is_local_admin")) and not is_github_authenticated,
     )
+
+
+class UpdateMeRequest(BaseModel):
+    # Just your display name, for now — easy personalization without needing to
+    # set up GitHub login. Trimmed, capped, and cannot be blanked to nothing.
+    name: str
+
+
+@router.patch("/me", response_model=MeResponse)
+async def update_me(
+    body: UpdateMeRequest,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(util.get_current_user),
+) -> MeResponse:
+    """Personalize your display name — persisted to your user record, so the app
+    stops showing a generic 'Local admin' and shows YOU. No GitHub required.
+
+    Only the name is editable here; email is the stable identity key and isn't
+    changed. GitHub-authenticated users can rename too (it won't be overwritten
+    on next login unless GitHub sends a name)."""
+    name = (body.name or "").strip()
+    if not name:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Name can't be empty.")
+    if len(name) > 80:
+        name = name[:80]
+
+    from watchtower.api.enterprise import _ensure_user_org_member
+    user, _org, _member = _ensure_user_org_member(db, current_user)
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No user record to update.")
+    user.name = name
+    db.commit()
+    # Re-read the full identity so the response reflects the new name everywhere.
+    return await get_me(db=db, current_user={**current_user, "name": name})

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useMe } from '@/hooks/queries';
+import { Pencil, Check, X } from 'lucide-react';
+import { useMe, useUpdateMe } from '@/hooks/queries';
 import { toast } from '@/lib/toast';
 
 const IS_ELECTRON =
@@ -74,9 +75,7 @@ export default function Account() {
           )}
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 flex-wrap">
-              <h2 className="text-base font-semibold text-foreground truncate">
-                {me?.name ?? me?.email ?? 'Signed in'}
-              </h2>
+              <EditableName current={me?.name ?? me?.email ?? 'Signed in'} />
               {me?.is_github_authenticated && (
                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-muted border border-border text-xs font-medium text-foreground/90">
                   <svg viewBox="0 0 16 16" width="11" height="11" fill="currentColor" aria-hidden="true">
@@ -208,6 +207,60 @@ function Capability({ ok, label }: { ok?: boolean; label: string }) {
         </svg>
       )}
       <span className="truncate">{label}</span>
+    </div>
+  );
+}
+
+/** Inline-editable display name — click the pencil, type, save. The easy
+ *  personalization: make the app show YOU without setting up GitHub login. */
+function EditableName({ current }: { current: string }) {
+  const update = useUpdateMe();
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(current);
+
+  const save = () => {
+    const name = draft.trim();
+    if (!name || name === current) { setEditing(false); return; }
+    update.mutate(
+      { name },
+      {
+        onSuccess: () => { setEditing(false); toast.success('Name updated'); },
+        onError: () => toast.error('Couldn’t update your name'),
+      },
+    );
+  };
+
+  if (!editing) {
+    return (
+      <div className="flex items-center gap-1.5 group">
+        <h2 className="text-base font-semibold text-foreground truncate">{current}</h2>
+        <button
+          onClick={() => { setDraft(current); setEditing(true); }}
+          title="Edit your name"
+          className="opacity-0 group-hover:opacity-100 focus:opacity-100 text-muted-foreground hover:text-foreground transition-opacity"
+        >
+          <Pencil size={13} />
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-1.5">
+      <input
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onKeyDown={(e) => { if (e.key === 'Enter') save(); if (e.key === 'Escape') setEditing(false); }}
+        autoFocus
+        maxLength={80}
+        className="text-base font-semibold text-foreground bg-background border border-border rounded-md px-2 py-0.5 focus:outline-none focus:ring-2 focus:ring-accent/50 w-48"
+      />
+      <button onClick={save} disabled={update.isPending} title="Save" className="text-emerald-500 hover:text-emerald-400 disabled:opacity-50">
+        <Check size={16} />
+      </button>
+      <button onClick={() => setEditing(false)} title="Cancel" className="text-muted-foreground hover:text-foreground">
+        <X size={16} />
+      </button>
     </div>
   );
 }
