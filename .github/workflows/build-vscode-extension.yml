@@ -18,10 +18,10 @@ jobs:
         working-directory: vscode-extension
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: "20"
           cache: "npm"
@@ -40,7 +40,7 @@ jobs:
         run: npx vsce package --no-dependencies -o watchtower-extension.vsix
 
       - name: Upload VSIX artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: watchtower-vscode-extension
           path: vscode-extension/watchtower-extension.vsix
@@ -55,9 +55,9 @@ jobs:
       run:
         working-directory: vscode-extension
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: "20"
           cache: "npm"

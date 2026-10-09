@@ -42,7 +42,7 @@ jobs:
             artifact: watchtower-desktop-windows
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         # fetch-depth: 0 so we have the PR base commit available for
         # `git diff` in the path-change gate below. Default depth=1
         # only has HEAD and would make the diff fail.
@@ -74,7 +74,7 @@ jobs:
           fi
 
       # ── Build web frontend first ──────────────────────────────────────────
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         if: steps.changes.outputs.needed == 'true'
         with:
           node-version: 20
@@ -90,14 +90,14 @@ jobs:
         run: npm --prefix web run build
 
       # ── Build desktop ─────────────────────────────────────────────────────
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         if: steps.changes.outputs.needed == 'true'
         with:
           node-version: 20
           cache: npm
           cache-dependency-path: desktop/package-lock.json
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         if: steps.changes.outputs.needed == 'true'
         with:
           python-version: "3.12"
@@ -118,7 +118,7 @@ jobs:
 
       - name: Upload installer artifacts
         if: steps.changes.outputs.needed == 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: ${{ matrix.artifact }}
           path: desktop/dist/*
