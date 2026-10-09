@@ -562,7 +562,7 @@ const Applications = () => {
                 { icon: '🐳', title: 'Docker App',    desc: 'Any containerised service. Bring your own Dockerfile.' },
               ].map(({ icon, title, desc }) => (
                 <Link key={title} to="/setup"
-                  className="p-4 rounded-lg border border-border bg-muted/20 hover:border-destructive/40 hover:bg-destructive/10/40 transition-all group">
+                  className="p-4 rounded-lg border border-border bg-muted/20 hover:border-destructive/40 hover:bg-destructive/10 transition-all group">
                   <span className="text-2xl">{icon}</span>
                   <p className="text-sm font-semibold text-foreground mt-2">{title}</p>
                   <p className="text-xs text-muted-foreground mt-1">{desc}</p>

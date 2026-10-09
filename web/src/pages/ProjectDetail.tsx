@@ -1533,7 +1533,7 @@ function DeploymentsTab({ projectId }: { projectId: string }) {
             const isRollingBack = Boolean(rolling[d.id]);
             return (
               <Fragment key={d.id}>
-                <tr className={`hover:bg-muted/30 transition-colors ${isActive ? 'bg-blue-500/15/40' : ''}`}>
+                <tr className={`hover:bg-muted/30 transition-colors ${isActive ? 'bg-blue-500/15' : ''}`}>
                   <td className="px-4 py-3">
                     <Link to={`/deployments/${d.id}`} className="font-mono text-destructive hover:underline">
                       {(d.commit_sha || '—').slice(0, 8)}

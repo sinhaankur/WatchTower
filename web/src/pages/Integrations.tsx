@@ -370,14 +370,14 @@ function IntegrationCard({
   const [showInstall, setShowInstall] = useState(false);
 
   return (
-    <div className={`p-4 rounded-xl border transition-all ${
+    <div className={`p-4 rounded-xl border transition-colors ${
       connected
-        ? 'border-emerald-200 bg-emerald-500/15/30 hover:border-emerald-300'
-        : 'border-border bg-card hover:border-destructive/40 hover:bg-destructive/10/20'
+        ? 'border-emerald-500/30 bg-emerald-500/[0.06] hover:border-emerald-500/50'
+        : 'border-border bg-card hover:border-accent/40'
     }`}>
       <div className="flex items-start gap-3">
-        <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0 border ${
-          connected ? 'bg-emerald-500/15 border-emerald-200' : 'bg-muted border-border'
+        <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg shrink-0 border ${
+          connected ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-500 dark:text-emerald-400' : 'bg-muted border-border text-muted-foreground'
         }`}>
           {icon}
         </div>
@@ -471,8 +471,8 @@ function WatchdogCard({ podmanInstalled }: { podmanInstalled: boolean }) {
   return (
     <div className={`rounded-xl border p-5 transition-all ${
       enabled
-        ? 'border-emerald-300 bg-emerald-500/15/40'
-        : 'border-accent/25 bg-accent/10/30'
+        ? 'border-emerald-300 bg-emerald-500/15'
+        : 'border-accent/25 bg-accent/10'
     }`}>
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-start gap-3 min-w-0 flex-1">
@@ -608,7 +608,7 @@ function WatchTowerServiceCard() {
 
   return (
     <div className={`rounded-xl border p-5 transition-all ${
-      enabled ? 'border-emerald-300 bg-emerald-500/15/40' : 'border-border bg-card'
+      enabled ? 'border-emerald-300 bg-emerald-500/15' : 'border-border bg-card'
     }`}>
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-start gap-3 min-w-0 flex-1">

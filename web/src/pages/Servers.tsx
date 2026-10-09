@@ -515,7 +515,7 @@ const Servers = () => {
               const meta = STATUS_META[node.status] ?? STATUS_META.offline;
               return (
                 <div key={node.id}
-                  className="p-4 rounded-xl border border-border hover:border-destructive/40 bg-muted/20 hover:bg-destructive/10/40 transition-all">
+                  className="p-4 rounded-xl border border-border hover:border-destructive/40 bg-muted/20 hover:bg-destructive/10 transition-all">
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex items-center gap-3 min-w-0 flex-1">
                       <span className={`w-2.5 h-2.5 rounded-full shrink-0 mt-1 ${meta.dot} ${node.status === 'healthy' ? 'status-pulse' : ''}`} />
