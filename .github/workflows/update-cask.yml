@@ -1,0 +1,75 @@
+name: Update Homebrew Cask
+
+# After a release publishes its macOS DMGs, bump Casks/watchtower.rb to the new
+# version with the REAL per-arch sha256 checksums (computed from the uploaded
+# assets), and commit it back to main. Keeps `brew install --cask` always
+# pointing at the latest, verified build without any manual checksum fiddling.
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag (e.g. v2.1.0)"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve tag + version
+        id: v
+        run: |
+          TAG="${{ github.event.release.tag_name || github.event.inputs.tag }}"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Download DMGs + compute sha256
+        id: sha
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.v.outputs.tag }}
+          VERSION: ${{ steps.v.outputs.version }}
+        run: |
+          set -e
+          dl() { gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern "$1" --dir . --clobber; }
+          dl "WatchTower-${VERSION}-mac-arm64.dmg"
+          dl "WatchTower-${VERSION}-mac-x64.dmg"
+          echo "arm=$(sha256sum "WatchTower-${VERSION}-mac-arm64.dmg" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+          echo "intel=$(sha256sum "WatchTower-${VERSION}-mac-x64.dmg" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+
+      - name: Rewrite the cask
+        env:
+          VERSION: ${{ steps.v.outputs.version }}
+          ARM: ${{ steps.sha.outputs.arm }}
+          INTEL: ${{ steps.sha.outputs.intel }}
+        run: |
+          python3 - <<'PY'
+          import os, re, pathlib
+          p = pathlib.Path("Casks/watchtower.rb")
+          s = p.read_text()
+          s = re.sub(r'version "[^"]+"', f'version "{os.environ["VERSION"]}"', s, count=1)
+          # Replace the two sha256 lines in order: arm first (on_arm), then intel.
+          shas = iter([os.environ["ARM"], os.environ["INTEL"]])
+          s = re.sub(r'sha256 "[0-9a-f]{64}"',
+                     lambda m: f'sha256 "{next(shas)}"', s, count=2)
+          p.write_text(s)
+          print(s)
+          PY
+
+      - name: Commit
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet; then
+            echo "Cask already current — nothing to commit."
+            exit 0
+          fi
+          git add Casks/watchtower.rb
+          git commit -m "cask: bump to ${{ steps.v.outputs.version }} (auto)"
+          git push
