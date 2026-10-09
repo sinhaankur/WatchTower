@@ -45,6 +45,25 @@ if [[ -n "${EXISTING_VERSION}" ]]; then
     # will succeed; the other is a no-op.
     pipx uninstall watchtower-podman 2>/dev/null || true
     pip3 uninstall -y watchtower 2>/dev/null || true
+
+    # Purge stale caches so the new version never serves OLD code/UI. This is
+    # the fix for the "I updated but nothing changed" class of bug: the Electron
+    # shell caches the SPA aggressively, and an orphaned _web_dist from a wheel
+    # install can shadow a fresh build. Clearing them forces the new bundle.
+    echo "Clearing stale caches (Electron + bundled SPA)…"
+    for cache in \
+        "$HOME/.config/watchtower-desktop/Cache" \
+        "$HOME/.config/watchtower-desktop/Code Cache" \
+        "$HOME/.config/watchtower-desktop/GPUCache" \
+        "$HOME/Library/Application Support/watchtower-desktop/Cache" \
+        "$HOME/Library/Application Support/watchtower-desktop/Code Cache" \
+        "$HOME/Library/Application Support/watchtower-desktop/GPUCache"; do
+        [[ -d "$cache" ]] && rm -rf "$cache" 2>/dev/null || true
+    done
+    # Any orphaned _web_dist left by a previous wheel install (pipx/pip paths
+    # are already gone above, but a manual copy could linger).
+    find "$HOME/.local" -type d -path "*/watchtower/_web_dist" -prune -exec rm -rf {} + 2>/dev/null || true
+
     echo "Old version removed. Installing new version now."
 else
     echo "No existing WatchTower installation found — performing fresh install."

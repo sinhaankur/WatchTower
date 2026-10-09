@@ -557,14 +557,20 @@ async def health():
     gates traffic on the DB actually being reachable. The Docker
     HEALTHCHECK and CI smoke test key off this endpoint + the
     ``watchtower-api`` service marker below — don't change that contract.
+
+    ``version`` is additive: paired-device discovery reads it so one WatchTower
+    can show another's version. Kept out of the liveness contract (callers that
+    only check status/service are unaffected).
     """
-    return {"status": "healthy", "service": "watchtower-api"}
+    from watchtower import __version__
+    return {"status": "healthy", "service": "watchtower-api", "version": __version__}
 
 
 @app.get("/api/health", tags=["Health"], include_in_schema=False)
 async def health_alias():
     """Alias so the frontend apiClient (baseURL=/api) can reach /health."""
-    return {"status": "healthy", "service": "watchtower-api"}
+    from watchtower import __version__
+    return {"status": "healthy", "service": "watchtower-api", "version": __version__}
 
 
 @app.get("/ready", tags=["Health"])

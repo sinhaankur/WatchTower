@@ -3300,8 +3300,37 @@ async function launch() {
   // Hard fallback: services are already up, 5 s is plenty.
   setTimeout(showMain, 5000);
 
-  // Fire-and-forget — visibility is handled by the events above.
-  win.loadURL(frontendUrl).catch(() => showMain());
+  // Fix "I updated but the UI is the old one": Electron caches the SPA hard.
+  // If the app version changed since last launch (or there's no marker), clear
+  // the HTTP cache BEFORE loading so a new build is always picked up. Costs a
+  // one-time re-fetch; invisible otherwise. Fire-and-forget — never block the
+  // window on it.
+  clearCacheOnVersionChange(win)
+    .catch((e) => console.warn('[WatchTower] version-change cache clear skipped:', e?.message || e))
+    .finally(() => {
+      win.loadURL(frontendUrl).catch(() => showMain());
+    });
+}
+
+/**
+ * Clear the window's HTTP cache when the running app version differs from the
+ * version marker stored in userData. Writes the current version back so the
+ * next launch is a no-op. Defensive: any failure just means we load normally.
+ */
+async function clearCacheOnVersionChange(win) {
+  const fs = require('fs');
+  const path = require('path');
+  const marker = path.join(app.getPath('userData'), 'last-version');
+  let last = '';
+  try { last = fs.readFileSync(marker, 'utf8').trim(); } catch { /* first run */ }
+  const current = app.getVersion();
+  if (last === current) return;  // same version → nothing to clear
+  try {
+    await win.webContents.session.clearCache();
+    console.log(`[WatchTower] version changed ${last || '(none)'} → ${current}; cleared SPA cache.`);
+  } finally {
+    try { fs.writeFileSync(marker, current, 'utf8'); } catch { /* best-effort */ }
+  }
 }
 
 function createTray() {
