@@ -178,7 +178,7 @@ function ProviderCard({
 
       {provider.sharing && provider.url && (
         <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 space-y-2">
-          <p className="text-[11px] uppercase tracking-wide text-emerald-700 font-semibold">
+          <p className="text-xs uppercase tracking-wide text-emerald-700 font-semibold">
             Sharing on
           </p>
           <div className="flex items-center gap-2">
@@ -264,7 +264,7 @@ function StatusBadge({ provider }: { provider: RemoteAccessProvider }) {
     cls = 'bg-amber-50 text-amber-800 border-amber-200';
   }
   return (
-    <span className={`text-[11px] px-2 py-0.5 rounded-full border font-medium ${cls}`}>
+    <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${cls}`}>
       {label}
     </span>
   );

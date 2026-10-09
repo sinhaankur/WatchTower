@@ -409,12 +409,12 @@ function ExternalDatabaseCard({ db }: { db: ExternalDatabase }) {
         <div className="min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <h3 className="text-sm font-semibold text-foreground truncate">{db.name}</h3>
-            <span className="text-[11px] px-2 py-0.5 rounded-full border font-medium bg-violet-50 text-violet-700 border-violet-200">
+            <span className="text-xs px-2 py-0.5 rounded-full border font-medium bg-violet-50 text-violet-700 border-violet-200">
               external
             </span>
-            <span className="text-[11px] text-muted-foreground font-mono">{db.engine}</span>
+            <span className="text-xs text-muted-foreground font-mono">{db.engine}</span>
             {db.use_tls && (
-              <span className="text-[11px] px-2 py-0.5 rounded-full border font-medium bg-emerald-50 text-emerald-700 border-emerald-200">
+              <span className="text-xs px-2 py-0.5 rounded-full border font-medium bg-emerald-50 text-emerald-700 border-emerald-200">
                 TLS
               </span>
             )}
@@ -606,7 +606,7 @@ function CreateExternalModal({ onClose }: { onClose: () => void }) {
 
       {adoptable.length > 0 && (
         <div className="mt-3 rounded-lg border border-border-soft bg-surface-soft p-3">
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-2">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
             Found on this PC
           </p>
           <div className="space-y-1.5">
@@ -625,7 +625,7 @@ function CreateExternalModal({ onClose }: { onClose: () => void }) {
               </div>
             ))}
           </div>
-          <p className="text-[10px] text-muted-foreground mt-2">
+          <p className="text-xs text-muted-foreground mt-2">
             Adopt pre-fills the form — just add the password and save.
           </p>
         </div>
@@ -773,7 +773,7 @@ function DatabaseCard({ db }: { db: ManagedDatabase }) {
           <div className="flex items-center gap-2 flex-wrap">
             <h3 className="text-sm font-semibold text-foreground truncate">{db.name}</h3>
             <StatusBadge status={db.status} />
-            <span className="text-[11px] text-muted-foreground font-mono">
+            <span className="text-xs text-muted-foreground font-mono">
               {db.engine} {db.version}
             </span>
           </div>
@@ -964,7 +964,7 @@ function AddReplicaModal({
               configures the primary and generates a compose file you run on the
               remote machine — it handles the <code className="font-mono">pg_basebackup</code> automatically.
             </p>
-            <p className="text-[11px] font-semibold text-foreground/90">Select remote machine:</p>
+            <p className="text-xs font-semibold text-foreground/90">Select remote machine:</p>
             {peersLoading && <p className="text-xs text-muted-foreground">Discovering Tailscale peers…</p>}
             {!peersLoading && peers.length === 0 && (
               <p className="text-xs text-muted-foreground italic">
@@ -985,14 +985,14 @@ function AddReplicaModal({
                   <span className="font-medium text-foreground">{peer.hostname}</span>
                   <div className="flex items-center gap-2 text-muted-foreground">
                     <span className="font-mono">{peer.tailscale_ip}</span>
-                    <span className="text-[10px]">{peer.os}</span>
+                    <span className="text-xs">{peer.os}</span>
                     <span className={`w-1.5 h-1.5 rounded-full ${peer.online ? 'bg-green-500' : 'bg-slate-300'}`} />
                   </div>
                 </button>
               ))}
             </div>
             {selectedPeer && (
-              <p className="text-[11px] text-muted-foreground bg-blue-50 border border-blue-200 rounded-md px-3 py-2">
+              <p className="text-xs text-muted-foreground bg-blue-50 border border-blue-200 rounded-md px-3 py-2">
                 After clicking "Add standby", download the compose file from the replica
                 card and run it on <span className="font-medium">{selectedPeer.hostname}</span>.
               </p>
@@ -1049,13 +1049,13 @@ function ReplicasSection({ primaryDb }: { primaryDb: ManagedDatabase }) {
         <div className="mt-3 space-y-3">
           <ReplicationDiagram />
           <div className="flex items-center justify-between">
-            <p className="text-[11px] text-muted-foreground">
+            <p className="text-xs text-muted-foreground">
               Postgres streaming replication — local pod on this PC, or remote machine via Tailscale.
             </p>
             <button
               onClick={() => setShowAddModal(true)}
               disabled={primaryDb.status !== 'running'}
-              className="px-3 py-1 rounded-md bg-primary hover:bg-primary/90 text-white text-[11px] font-medium border border-border shadow-retro disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-3 py-1 rounded-md bg-primary hover:bg-primary/90 text-white text-xs font-medium border border-border shadow-retro disabled:opacity-50 disabled:cursor-not-allowed"
               title={primaryDb.status !== 'running' ? 'Primary must be running' : ''}
             >
               + Add standby
@@ -1115,12 +1115,12 @@ function ReplicaRow({
           <ReplicaStatusBadge status={replica.status} />
           <ReplicaRoleBadge role={replica.role} />
           {replica.is_remote && (
-            <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 font-medium">
+            <span className="text-xs px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 font-medium">
               Tailscale {replica.node_tailscale_ip}
             </span>
           )}
           {!replica.is_remote && (
-            <span className="text-[11px] text-muted-foreground font-mono">{replica.host}:{replica.port}</span>
+            <span className="text-xs text-muted-foreground font-mono">{replica.host}:{replica.port}</span>
           )}
         </div>
         <div className="flex items-center gap-1">
@@ -1128,7 +1128,7 @@ function ReplicaRow({
             <a
               href={`/api/managed-databases/${primaryDb.id}/replicas/${replica.id}/compose`}
               download
-              className="px-2 py-1 rounded-md border border-blue-300 bg-blue-50 text-[11px] text-blue-800 hover:bg-blue-100 transition-colors"
+              className="px-2 py-1 rounded-md border border-blue-300 bg-blue-50 text-xs text-blue-800 hover:bg-blue-100 transition-colors"
               title="Download compose file and run on the remote machine"
             >
               Download compose
@@ -1138,7 +1138,7 @@ function ReplicaRow({
             <button
               onClick={() => setConfirm('promote')}
               disabled={busy}
-              className="px-2 py-1 rounded-md border border-amber-300 bg-amber-50 text-[11px] text-amber-900 hover:bg-amber-100 transition-colors disabled:opacity-50"
+              className="px-2 py-1 rounded-md border border-amber-300 bg-amber-50 text-xs text-amber-900 hover:bg-amber-100 transition-colors disabled:opacity-50"
               title="Promote this standby to primary (manual failover)"
             >
               Promote
@@ -1147,7 +1147,7 @@ function ReplicaRow({
           <button
             onClick={() => setConfirm('remove')}
             disabled={busy}
-            className="px-2 py-1 rounded-md border border-destructive/30 text-[11px] text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-50"
+            className="px-2 py-1 rounded-md border border-destructive/30 text-xs text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-50"
           >
             Remove
           </button>
@@ -1155,18 +1155,18 @@ function ReplicaRow({
       </div>
 
       {replica.status_message && (
-        <p className="text-[11px] text-muted-foreground break-all">{replica.status_message}</p>
+        <p className="text-xs text-muted-foreground break-all">{replica.status_message}</p>
       )}
 
       {error && (
-        <div className="rounded-md border border-destructive/30 bg-destructive/10 px-2 py-1 text-[11px] text-destructive break-all">
+        <div className="rounded-md border border-destructive/30 bg-destructive/10 px-2 py-1 text-xs text-destructive break-all">
           {error}
         </div>
       )}
 
       {confirm === 'promote' && (
         <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 space-y-2">
-          <p className="text-[11px] text-amber-900">
+          <p className="text-xs text-amber-900">
             Promote <span className="font-mono">{replica.name}</span> to primary? The current primary will be stopped and apps must switch connection strings to <span className="font-mono">{replica.host}:{replica.port}</span>.
           </p>
           <div className="flex items-center gap-2">
@@ -1179,14 +1179,14 @@ function ReplicaRow({
                 });
               }}
               disabled={busy}
-              className="px-2 py-1 rounded-md bg-amber-700 hover:bg-amber-800 text-white text-[11px] font-medium disabled:opacity-50"
+              className="px-2 py-1 rounded-md bg-amber-700 hover:bg-amber-800 text-white text-xs font-medium disabled:opacity-50"
             >
               {promote.isPending ? 'Promoting…' : 'Confirm promote'}
             </button>
             <button
               onClick={() => setConfirm(null)}
               disabled={busy}
-              className="px-2 py-1 rounded-md border border-amber-400 bg-card text-[11px] text-amber-900 disabled:opacity-50"
+              className="px-2 py-1 rounded-md border border-amber-400 bg-card text-xs text-amber-900 disabled:opacity-50"
             >
               Cancel
             </button>
@@ -1196,7 +1196,7 @@ function ReplicaRow({
 
       {confirm === 'remove' && (
         <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 space-y-2">
-          <p className="text-[11px] text-red-900">
+          <p className="text-xs text-red-900">
             Remove <span className="font-mono">{replica.name}</span>? This stops the standby pod and drops the replication slot on the primary. Primary data is untouched.
           </p>
           <div className="flex items-center gap-2">
@@ -1209,14 +1209,14 @@ function ReplicaRow({
                 });
               }}
               disabled={busy}
-              className="px-2 py-1 rounded-md bg-primary hover:bg-primary/90 text-white text-[11px] font-medium disabled:opacity-50"
+              className="px-2 py-1 rounded-md bg-primary hover:bg-primary/90 text-white text-xs font-medium disabled:opacity-50"
             >
               {remove.isPending ? 'Removing…' : 'Confirm remove'}
             </button>
             <button
               onClick={() => setConfirm(null)}
               disabled={busy}
-              className="px-2 py-1 rounded-md border border-destructive/40 bg-card text-[11px] text-destructive disabled:opacity-50"
+              className="px-2 py-1 rounded-md border border-destructive/40 bg-card text-xs text-destructive disabled:opacity-50"
             >
               Cancel
             </button>
@@ -1235,7 +1235,7 @@ function ReplicaStatusBadge({ status }: { status: ManagedDbReplica['status'] }) 
     promoted: 'bg-amber-50 text-amber-800 border-amber-200',
   };
   return (
-    <span className={`text-[10px] px-1.5 py-0.5 rounded-full border font-medium ${map[status]}`}>
+    <span className={`text-xs px-1.5 py-0.5 rounded-full border font-medium ${map[status]}`}>
       {status}
     </span>
   );
@@ -1293,13 +1293,13 @@ function BackupsSection({ primaryDb }: { primaryDb: ManagedDatabase }) {
           <BackupDiagram />
           <ScheduleControls primaryDb={primaryDb} schedule={schedule} />
           <div className="flex items-start justify-between gap-3 flex-wrap">
-            <p className="text-[11px] text-muted-foreground max-w-md">
+            <p className="text-xs text-muted-foreground max-w-md">
               On-demand <code className="font-mono">pg_dump</code> snapshots stored under{' '}
               <code className="font-mono">~/.watchtower/managed_db_backups/</code>.
               Schedule above for automatic recurring backups.
             </p>
             {usage && (
-              <p className="text-[11px] text-muted-foreground whitespace-nowrap">
+              <p className="text-xs text-muted-foreground whitespace-nowrap">
                 Used: <span className="font-mono">{formatBytes(usage.used_bytes)}</span>
                 {' · '}
                 Free: <span className="font-mono">{formatBytes(usage.free_bytes)}</span>
@@ -1317,7 +1317,7 @@ function BackupsSection({ primaryDb }: { primaryDb: ManagedDatabase }) {
             <button
               onClick={onCreate}
               disabled={create.isPending || primaryDb.status !== 'running'}
-              className="px-3 py-1.5 rounded-md bg-primary hover:bg-primary/90 text-white text-[11px] font-medium border border-border shadow-retro disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+              className="px-3 py-1.5 rounded-md bg-primary hover:bg-primary/90 text-white text-xs font-medium border border-border shadow-retro disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
               title={primaryDb.status !== 'running' ? 'Database must be running' : ''}
             >
               {create.isPending ? 'Backing up…' : 'Backup now'}
@@ -1379,9 +1379,9 @@ function BackupRow({
             {backup.file_path.split('/').pop()}
           </span>
           {backup.label && (
-            <span className="text-[11px] text-muted-foreground">— {backup.label}</span>
+            <span className="text-xs text-muted-foreground">— {backup.label}</span>
           )}
-          <span className="text-[11px] text-muted-foreground font-mono">
+          <span className="text-xs text-muted-foreground font-mono">
             {formatBytes(backup.size_bytes)}
           </span>
         </div>
@@ -1394,7 +1394,7 @@ function BackupRow({
                 setConfirm('restore');
               }}
               disabled={busy || primaryDb.status !== 'running'}
-              className="px-2 py-1 rounded-md border border-amber-300 bg-amber-50 text-[11px] text-amber-900 hover:bg-amber-100 transition-colors disabled:opacity-50"
+              className="px-2 py-1 rounded-md border border-amber-300 bg-amber-50 text-xs text-amber-900 hover:bg-amber-100 transition-colors disabled:opacity-50"
               title={primaryDb.status !== 'running' ? 'Target DB must be running' : 'Restore this backup, replacing live data'}
             >
               Restore
@@ -1407,24 +1407,24 @@ function BackupRow({
               setConfirm('delete');
             }}
             disabled={busy}
-            className="px-2 py-1 rounded-md border border-destructive/30 text-[11px] text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-50"
+            className="px-2 py-1 rounded-md border border-destructive/30 text-xs text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-50"
           >
             Delete
           </button>
         </div>
       </div>
       {backup.status_message && (
-        <p className="text-[11px] text-destructive mt-1 break-all">{backup.status_message}</p>
+        <p className="text-xs text-destructive mt-1 break-all">{backup.status_message}</p>
       )}
       {error && (
-        <p className="text-[11px] text-destructive mt-1 break-all">{error}</p>
+        <p className="text-xs text-destructive mt-1 break-all">{error}</p>
       )}
       {restoreSuccess && (
-        <p className="text-[11px] text-emerald-700 mt-1">{restoreSuccess}</p>
+        <p className="text-xs text-emerald-700 mt-1">{restoreSuccess}</p>
       )}
       {confirm === 'delete' && (
         <div className="mt-2 rounded-md border border-destructive/30 bg-destructive/10 px-2 py-1.5 flex items-center gap-2 flex-wrap">
-          <p className="text-[11px] text-red-900 flex-1 min-w-0">Delete this backup file?</p>
+          <p className="text-xs text-red-900 flex-1 min-w-0">Delete this backup file?</p>
           <button
             onClick={() => {
               setError(null);
@@ -1434,14 +1434,14 @@ function BackupRow({
               });
             }}
             disabled={busy}
-            className="px-2 py-1 rounded-md bg-primary hover:bg-primary/90 text-white text-[11px] font-medium disabled:opacity-50"
+            className="px-2 py-1 rounded-md bg-primary hover:bg-primary/90 text-white text-xs font-medium disabled:opacity-50"
           >
             {del.isPending ? 'Deleting…' : 'Confirm'}
           </button>
           <button
             onClick={() => setConfirm(null)}
             disabled={busy}
-            className="px-2 py-1 rounded-md border border-destructive/40 bg-card text-[11px] text-destructive disabled:opacity-50"
+            className="px-2 py-1 rounded-md border border-destructive/40 bg-card text-xs text-destructive disabled:opacity-50"
           >
             Cancel
           </button>
@@ -1583,11 +1583,11 @@ function ScheduleControls({
   return (
     <div className="rounded-lg border border-indigo-200 bg-indigo-50/60 px-3 py-2.5 space-y-2">
       <div className="flex items-center justify-between gap-2 flex-wrap">
-        <div className="text-[11px] font-semibold text-indigo-900">
+        <div className="text-xs font-semibold text-indigo-900">
           Schedule {schedule?.schedule_cron ? '· active' : '· off'}
         </div>
         {schedule?.next_run_at && (
-          <div className="text-[11px] text-indigo-700">
+          <div className="text-xs text-indigo-700">
             Next: <span className="font-mono">{formatNextRun(schedule.next_run_at)}</span>
           </div>
         )}
@@ -1619,7 +1619,7 @@ function ScheduleControls({
         )}
 
         <div className="flex items-center gap-1 whitespace-nowrap">
-          <label className="text-[11px] text-indigo-900">Keep</label>
+          <label className="text-xs text-indigo-900">Keep</label>
           <input
             type="number"
             min={1}
@@ -1633,7 +1633,7 @@ function ScheduleControls({
         <button
           onClick={save}
           disabled={update.isPending || (isCustom && !customCron.trim() && !schedule?.schedule_cron)}
-          className="px-3 py-1 rounded-md bg-indigo-700 hover:bg-indigo-800 text-white text-[11px] font-medium disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+          className="px-3 py-1 rounded-md bg-indigo-700 hover:bg-indigo-800 text-white text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
         >
           {update.isPending ? 'Saving…' : 'Save schedule'}
         </button>
@@ -1641,7 +1641,7 @@ function ScheduleControls({
           <button
             onClick={clear}
             disabled={update.isPending}
-            className="px-2 py-1 rounded-md border border-indigo-300 bg-card text-[11px] text-indigo-800 hover:bg-indigo-100 disabled:opacity-50"
+            className="px-2 py-1 rounded-md border border-indigo-300 bg-card text-xs text-indigo-800 hover:bg-indigo-100 disabled:opacity-50"
           >
             Clear
           </button>
@@ -1649,12 +1649,12 @@ function ScheduleControls({
       </div>
 
       {error && (
-        <p className="text-[11px] text-destructive break-all">{error}</p>
+        <p className="text-xs text-destructive break-all">{error}</p>
       )}
       {savedFlash && (
-        <p className="text-[11px] text-emerald-700">Saved.</p>
+        <p className="text-xs text-emerald-700">Saved.</p>
       )}
-      <p className="text-[11px] text-indigo-800">
+      <p className="text-xs text-indigo-800">
         All times UTC. Manual backups are never auto-deleted. Older scheduled backups beyond the keep count are pruned after each successful run.
       </p>
     </div>
@@ -1694,7 +1694,7 @@ function RestoreConfirm({
   return (
     <div className="mt-2 rounded-md border border-amber-300 bg-amber-50 px-2 py-2 space-y-2">
       {/* Mode picker */}
-      <div className="flex items-center gap-3 text-[11px]">
+      <div className="flex items-center gap-3 text-xs">
         <label className="flex items-center gap-1.5 cursor-pointer">
           <input
             type="radio"
@@ -1719,20 +1719,20 @@ function RestoreConfirm({
 
       {mode === 'in-place' && (
         <>
-          <p className="text-[11px] text-amber-900">
+          <p className="text-xs text-amber-900">
             <span className="font-semibold">Destructive:</span> drops every object in{' '}
             <span className="font-mono">{primaryDb.name}</span> and recreates it from the backup.
             Click <span className="font-semibold">Backup now</span> first if you want a rollback point.
           </p>
           <div className="flex items-center gap-2 flex-wrap">
-            <p className="text-[11px] text-amber-900 whitespace-nowrap">
+            <p className="text-xs text-amber-900 whitespace-nowrap">
               Type <span className="font-mono font-semibold">{primaryDb.name}</span> to confirm:
             </p>
             <input
               value={typed}
               onChange={(e) => setTyped(e.target.value)}
               placeholder={primaryDb.name}
-              className="flex-1 min-w-[140px] rounded-md border border-amber-300 bg-card px-2 py-1 text-[11px] font-mono focus:outline-none focus:ring-2 focus:ring-amber-300"
+              className="flex-1 min-w-[140px] rounded-md border border-amber-300 bg-card px-2 py-1 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-amber-300"
               autoFocus
             />
           </div>
@@ -1741,22 +1741,22 @@ function RestoreConfirm({
 
       {mode === 'new' && (
         <>
-          <p className="text-[11px] text-amber-900">
+          <p className="text-xs text-amber-900">
             Creates a fresh pod alongside <span className="font-mono">{primaryDb.name}</span> and restores into it.
             Nothing existing is touched. <span className="font-semibold">Runs 2× resources</span> until you delete one.
           </p>
           <div className="flex items-center gap-2 flex-wrap">
-            <p className="text-[11px] text-amber-900 whitespace-nowrap">New database name:</p>
+            <p className="text-xs text-amber-900 whitespace-nowrap">New database name:</p>
             <input
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
               placeholder={`${primaryDb.name}-restored`}
-              className="flex-1 min-w-[140px] rounded-md border border-amber-300 bg-card px-2 py-1 text-[11px] font-mono focus:outline-none focus:ring-2 focus:ring-amber-300"
+              className="flex-1 min-w-[140px] rounded-md border border-amber-300 bg-card px-2 py-1 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-amber-300"
               autoFocus
             />
           </div>
           {!newNameValid && newNameClean !== '' && (
-            <p className="text-[11px] text-destructive">
+            <p className="text-xs text-destructive">
               Must contain only letters/numbers/dashes/underscores, and differ from the source name.
             </p>
           )}
@@ -1773,7 +1773,7 @@ function RestoreConfirm({
             )
           }
           disabled={!canSubmit || isPending}
-          className="px-2 py-1 rounded-md bg-amber-700 hover:bg-amber-800 text-white text-[11px] font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+          className="px-2 py-1 rounded-md bg-amber-700 hover:bg-amber-800 text-white text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {isPending
             ? mode === 'new' ? 'Creating + restoring…' : 'Restoring…'
@@ -1782,7 +1782,7 @@ function RestoreConfirm({
         <button
           onClick={onCancel}
           disabled={isPending}
-          className="px-2 py-1 rounded-md border border-amber-400 bg-card text-[11px] text-amber-900 disabled:opacity-50"
+          className="px-2 py-1 rounded-md border border-amber-400 bg-card text-xs text-amber-900 disabled:opacity-50"
         >
           Cancel
         </button>
@@ -1798,7 +1798,7 @@ function BackupStatusBadge({ status }: { status: ManagedDbBackup['status'] }) {
     failed: 'bg-destructive/10 text-destructive border-destructive/30',
   };
   return (
-    <span className={`text-[10px] px-1.5 py-0.5 rounded-full border font-medium ${map[status]}`}>
+    <span className={`text-xs px-1.5 py-0.5 rounded-full border font-medium ${map[status]}`}>
       {status}
     </span>
   );
@@ -1807,13 +1807,13 @@ function BackupStatusBadge({ status }: { status: ManagedDbBackup['status'] }) {
 function ReplicaRoleBadge({ role }: { role: ManagedDbReplica['role'] }) {
   if (role === 'promoted') {
     return (
-      <span className="text-[10px] px-1.5 py-0.5 rounded-full border font-medium bg-amber-100 text-amber-900 border-amber-300">
+      <span className="text-xs px-1.5 py-0.5 rounded-full border font-medium bg-amber-100 text-amber-900 border-amber-300">
         new primary
       </span>
     );
   }
   return (
-    <span className="text-[10px] px-1.5 py-0.5 rounded-full border font-medium bg-muted text-muted-foreground border-border">
+    <span className="text-xs px-1.5 py-0.5 rounded-full border font-medium bg-muted text-muted-foreground border-border">
       standby
     </span>
   );
@@ -1953,7 +1953,7 @@ function CreateModal({
         )}
 
         {isRedis && (
-          <p className="text-[11px] text-muted-foreground">
+          <p className="text-xs text-muted-foreground">
             Redis only uses a password for authentication — no database name or username needed.
           </p>
         )}
@@ -2159,7 +2159,7 @@ function Field({
     <label className="block">
       <span className="text-xs font-medium text-foreground/90">{label}</span>
       {children}
-      {hint && <p className="text-[11px] text-muted-foreground mt-1">{hint}</p>}
+      {hint && <p className="text-xs text-muted-foreground mt-1">{hint}</p>}
     </label>
   );
 }
@@ -2179,7 +2179,7 @@ function CredField({
 }) {
   return (
     <div>
-      <p className="text-[11px] uppercase tracking-wide text-muted-foreground font-semibold mb-1">
+      <p className="text-xs uppercase tracking-wide text-muted-foreground font-semibold mb-1">
         {label}
       </p>
       <div className="flex items-stretch gap-2">
@@ -2208,7 +2208,7 @@ function StatusBadge({ status }: { status: ManagedDatabase['status'] }) {
     deleting: 'bg-amber-50 text-amber-800 border-amber-200',
   };
   return (
-    <span className={`text-[11px] px-2 py-0.5 rounded-full border font-medium ${map[status]}`}>
+    <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${map[status]}`}>
       {status}
     </span>
   );

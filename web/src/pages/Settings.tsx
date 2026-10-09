@@ -67,7 +67,7 @@ function CopyButton({ text }: { text: string }) {
   return (
     <button
       onClick={() => { void navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 1800); }}
-      className="text-[10px] px-2 py-0.5 rounded border border-border hover:border-slate-500 text-muted-foreground hover:text-foreground transition-colors"
+      className="text-xs px-2 py-0.5 rounded border border-border hover:border-slate-500 text-muted-foreground hover:text-foreground transition-colors"
     >
       {copied ? 'Copied!' : 'Copy'}
     </button>
@@ -134,7 +134,7 @@ function VSCodeCard() {
           </p>
           {status && (
             <div className="flex items-center gap-2 p-2 rounded bg-muted border border-border">
-              <code className="text-[11px] font-mono text-foreground/90 flex-1 truncate">{status.root_dir}</code>
+              <code className="text-xs font-mono text-foreground/90 flex-1 truncate">{status.root_dir}</code>
               <CopyButton text={`code ${status.root_dir}`} />
             </div>
           )}
@@ -159,21 +159,21 @@ function VSCodeCard() {
           </p>
           <div className="space-y-2">
             <div>
-              <p className="text-[10px] text-muted-foreground mb-1">Repo → Clone in VS Code</p>
+              <p className="text-xs text-muted-foreground mb-1">Repo → Clone in VS Code</p>
               <div className="flex items-center gap-2 p-2 rounded bg-muted border border-border">
-                <code className="text-[10px] font-mono text-muted-foreground flex-1 truncate">vscode://vscode.git/clone?url=https://github.com/…</code>
+                <code className="text-xs font-mono text-muted-foreground flex-1 truncate">vscode://vscode.git/clone?url=https://github.com/…</code>
                 <CopyButton text="vscode://vscode.git/clone?url=https://github.com/owner/repo" />
               </div>
             </div>
             <div>
-              <p className="text-[10px] text-muted-foreground mb-1">Local folder</p>
+              <p className="text-xs text-muted-foreground mb-1">Local folder</p>
               <div className="flex items-center gap-2 p-2 rounded bg-muted border border-border">
-                <code className="text-[10px] font-mono text-muted-foreground flex-1 truncate">vscode://file/path/to/folder</code>
+                <code className="text-xs font-mono text-muted-foreground flex-1 truncate">vscode://file/path/to/folder</code>
                 <CopyButton text="vscode://file/path/to/folder" />
               </div>
             </div>
           </div>
-          <p className="text-[10px] text-muted-foreground">
+          <p className="text-xs text-muted-foreground">
             Your project cards show an <strong>"Open in VS Code"</strong> button using these links automatically.
           </p>
         </div>
@@ -193,7 +193,7 @@ function VSCodeCard() {
               { step: '4', text: 'Open /path/to/your/project in the remote window' },
             ].map(({ step, text }) => (
               <div key={step} className="flex items-start gap-2">
-                <span className="w-4 h-4 rounded bg-amber-400 text-foreground text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">{step}</span>
+                <span className="w-4 h-4 rounded bg-amber-400 text-foreground text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">{step}</span>
                 <p className="text-xs text-foreground/90">{text}</p>
               </div>
             ))}
@@ -212,7 +212,7 @@ function VSCodeCard() {
             <p className="text-xs font-semibold text-amber-800 uppercase tracking-wide">Install VS Code on Host</p>
             <p className="text-xs text-amber-700">{status?.install_instructions[os] ?? 'Visit https://code.visualstudio.com/download'}</p>
             <div className="flex items-center gap-2 p-2 rounded bg-card border border-amber-200 mt-1">
-              <code className="text-[11px] font-mono text-foreground/90 flex-1">sudo snap install --classic code</code>
+              <code className="text-xs font-mono text-foreground/90 flex-1">sudo snap install --classic code</code>
               <CopyButton text="sudo snap install --classic code" />
             </div>
           </div>
@@ -299,7 +299,7 @@ function UpdateCheckCard() {
             <p className="text-xs text-amber-900">
               <strong>{data.release_name ?? `v${data.latest}`}</strong> is available.
             </p>
-            <p className="text-[11px] text-amber-800 mt-0.5">
+            <p className="text-xs text-amber-800 mt-0.5">
               {isElectron
                 ? 'Click Update Now to download and install in the background — the app will restart when ready.'
                 : 'Open the release page to download the new build.'}
@@ -347,7 +347,7 @@ function UpdateCheckCard() {
         </label>
         <div className="flex items-center gap-3">
           {checked && (
-            <span className="text-[11px] text-muted-foreground" title={`Last checked ${checked}`}>
+            <span className="text-xs text-muted-foreground" title={`Last checked ${checked}`}>
               Checked {checked}
             </span>
           )}
@@ -404,12 +404,12 @@ type DepRowProps = {
 
 function DepRow({ label, found, detail, installCmd, hint, required }: DepRowProps) {
   const okBadge = (
-    <span className="text-[10px] px-2 py-0.5 rounded-full border font-medium border-emerald-300 bg-emerald-50 text-emerald-700">
+    <span className="text-xs px-2 py-0.5 rounded-full border font-medium border-emerald-300 bg-emerald-50 text-emerald-700">
       Found
     </span>
   );
   const missingBadge = (
-    <span className={`text-[10px] px-2 py-0.5 rounded-full border font-medium ${
+    <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${
       required
         ? 'border-destructive/40 bg-destructive/10 text-destructive'
         : 'border-amber-300 bg-amber-50 text-amber-700'
@@ -424,11 +424,11 @@ function DepRow({ label, found, detail, installCmd, hint, required }: DepRowProp
         <p className="text-xs font-semibold text-foreground uppercase tracking-wide flex-1">{label}</p>
         {found ? okBadge : missingBadge}
       </div>
-      {detail && <p className="text-[11px] font-mono text-foreground/90 truncate" title={detail}>{detail}</p>}
-      {hint && <p className="text-[11px] text-muted-foreground">{hint}</p>}
+      {detail && <p className="text-xs font-mono text-foreground/90 truncate" title={detail}>{detail}</p>}
+      {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
       {!found && installCmd && (
         <div className="flex items-center gap-2 p-2 rounded bg-muted border border-border">
-          <code className="text-[11px] font-mono text-foreground/90 flex-1 truncate" title={installCmd}>
+          <code className="text-xs font-mono text-foreground/90 flex-1 truncate" title={installCmd}>
             {installCmd}
           </code>
           <CopyButton text={installCmd} />
@@ -522,7 +522,7 @@ function SystemCard() {
           </p>
         </div>
         {!electron && (
-          <span className="text-[10px] px-2 py-0.5 rounded-full border font-medium border-border bg-muted text-muted-foreground">
+          <span className="text-xs px-2 py-0.5 rounded-full border font-medium border-border bg-muted text-muted-foreground">
             Browser mode
           </span>
         )}
@@ -572,12 +572,12 @@ function SystemCard() {
               <div className="rounded-lg border border-border bg-muted/20 p-4 space-y-2">
                 <p className="text-xs font-semibold text-foreground uppercase tracking-wide">Backend log</p>
                 <div className="flex items-center gap-2 p-2 rounded bg-muted border border-border">
-                  <code className="text-[11px] font-mono text-foreground/90 flex-1 truncate" title={dep.backendLogPath}>
+                  <code className="text-xs font-mono text-foreground/90 flex-1 truncate" title={dep.backendLogPath}>
                     {dep.backendLogPath}
                   </code>
                   <CopyButton text={dep.backendLogPath} />
                 </div>
-                <p className="text-[11px] text-muted-foreground">
+                <p className="text-xs text-muted-foreground">
                   Attached automatically when you send an error report.
                 </p>
               </div>
@@ -590,7 +590,7 @@ function SystemCard() {
                 Installed something just now? Recheck restarts the app so PATH refreshes.
               </p>
               {reportResult && (
-                <p className={`text-[11px] mt-1 ${reportResult.ok ? 'text-emerald-700' : 'text-destructive'}`}>
+                <p className={`text-xs mt-1 ${reportResult.ok ? 'text-emerald-700' : 'text-destructive'}`}>
                   {reportResult.msg}
                 </p>
               )}
@@ -707,7 +707,7 @@ function BackupCard() {
         <>
           <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 mb-3">
             <p className="text-xs text-amber-900 font-medium">⚠ Contains credentials</p>
-            <p className="text-[11px] text-amber-800 mt-0.5">
+            <p className="text-xs text-amber-800 mt-0.5">
               The backup file contains your Fernet encryption key plus the SQLite database
               with all encrypted secrets (GitHub PATs, SSH keys, env var values). Store it
               somewhere as secure as your password manager — anyone with this file can
@@ -718,12 +718,12 @@ function BackupCard() {
           <div className="grid sm:grid-cols-2 gap-3">
             <div className="rounded-lg border border-border bg-muted/20 p-3 space-y-2">
               <p className="text-xs font-semibold text-foreground uppercase tracking-wide">Backup contents</p>
-              <ul className="text-[11px] text-foreground/90 space-y-1">
+              <ul className="text-xs text-foreground/90 space-y-1">
                 <li>{status.has_secret_key ? '✓' : '○'} <code className="font-mono">secret.key</code> (Fernet master key)</li>
                 <li>{status.has_database_file ? '✓' : '○'} <code className="font-mono">watchtower.db</code> (SQLite database)</li>
               </ul>
               {!status.ready_for_backup && (
-                <p className="text-[11px] text-muted-foreground italic">
+                <p className="text-xs text-muted-foreground italic">
                   Fresh install — nothing to back up yet. Create a project or sign in to populate state.
                 </p>
               )}
@@ -731,11 +731,11 @@ function BackupCard() {
 
             <div className="rounded-lg border border-border bg-muted/20 p-3 space-y-2">
               <p className="text-xs font-semibold text-foreground uppercase tracking-wide">Restore (manual)</p>
-              <p className="text-[11px] text-foreground/90">
+              <p className="text-xs text-foreground/90">
                 Restore is manual in v1. Stop WatchTower, extract the tarball over your{' '}
                 <code className="font-mono">~/.watchtower/</code> directory, restart.
               </p>
-              <code className="block text-[10px] font-mono bg-muted rounded px-2 py-1 text-foreground/90">
+              <code className="block text-xs font-mono bg-muted rounded px-2 py-1 text-foreground/90">
                 tar -xzf watchtower-backup-*.tar.gz -C ~/.watchtower/
               </code>
             </div>
@@ -875,7 +875,7 @@ function StorageCard() {
           </button>
 
           {note && <p className="text-xs text-muted-foreground mt-2 text-center">{note}</p>}
-          <p className="text-[11px] text-muted-foreground mt-3">
+          <p className="text-xs text-muted-foreground mt-3">
             Only removes repo clones under <span className="font-mono">{info.build_dir}</span>. Your projects,
             databases, and backups are never touched.
           </p>

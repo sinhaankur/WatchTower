@@ -1,4 +1,5 @@
-import { lazy, Suspense, useEffect, useLayoutEffect, type ReactElement } from 'react';
+import { Suspense, useEffect, useLayoutEffect, type ReactElement } from 'react';
+import { lazyWithRetry } from '@/lib/lazyWithRetry';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { trackPageView } from '@/lib/analytics';
 import { QueryClientProvider, QueryClient, MutationCache, QueryCache } from '@tanstack/react-query';
@@ -21,34 +22,41 @@ import './App.css';
 // page on a desktop, invisible vs. the savings on the cold-start
 // bundle. The Suspense fallback is a faint full-height div so route
 // switches don't flash a giant spinner mid-layout.
-const Dashboard            = lazy(() => import('./pages/Dashboard'));
-const SetupWizard          = lazy(() => import('./pages/SetupWizard'));
-const FirstRun             = lazy(() => import('./pages/FirstRun'));
-const ProjectDetail        = lazy(() => import('./pages/ProjectDetail'));
-const DeploymentDetail     = lazy(() => import('./pages/DeploymentDetail'));
-const Templates            = lazy(() => import('./pages/Templates'));
-const TeamManagement       = lazy(() => import('./pages/TeamManagement'));
-const InviteAccept         = lazy(() => import('./pages/InviteAccept'));
-const Servers              = lazy(() => import('./pages/Servers'));
-const Applications         = lazy(() => import('./pages/Applications'));
-const LocalNode            = lazy(() => import('./pages/LocalNode'));
-const Services             = lazy(() => import('./pages/Services'));
-const Integrations         = lazy(() => import('./pages/Integrations'));
-const Settings             = lazy(() => import('./pages/Settings'));
-const AuditLog             = lazy(() => import('./pages/AuditLog'));
-const Account              = lazy(() => import('./pages/Account'));
-const LocalContainers      = lazy(() => import('./pages/LocalContainers'));
-const HostConnect          = lazy(() => import('./pages/HostConnect'));
-const RemoteAccess         = lazy(() => import('./pages/RemoteAccess'));
-const ManagedDatabases     = lazy(() => import('./pages/ManagedDatabases'));
-const ReportBug            = lazy(() => import('./pages/ReportBug'));
-const GitHubOAuthCallback  = lazy(() => import('./pages/GitHubOAuthCallback'));
-const GitHubLoginCallback  = lazy(() => import('./pages/GitHubLoginCallback'));
+//
+// lazyWithRetry (not bare React.lazy): a user with an already-open tab
+// holds a `no-cache` index.html whose chunk hashes were deleted by a new
+// deploy. Navigating to a route then 404s the dynamic import. The wrapper
+// retries once, then does a one-shot hard reload to pick up fresh hashes —
+// see web/src/lib/lazyWithRetry.ts.
+const Dashboard            = lazyWithRetry(() => import('./pages/Dashboard'), 'Dashboard');
+const SetupWizard          = lazyWithRetry(() => import('./pages/SetupWizard'), 'SetupWizard');
+const FirstRun             = lazyWithRetry(() => import('./pages/FirstRun'), 'FirstRun');
+const ProjectDetail        = lazyWithRetry(() => import('./pages/ProjectDetail'), 'ProjectDetail');
+const DeploymentDetail     = lazyWithRetry(() => import('./pages/DeploymentDetail'), 'DeploymentDetail');
+const Templates            = lazyWithRetry(() => import('./pages/Templates'), 'Templates');
+const TeamManagement       = lazyWithRetry(() => import('./pages/TeamManagement'), 'TeamManagement');
+const InviteAccept         = lazyWithRetry(() => import('./pages/InviteAccept'), 'InviteAccept');
+const Servers              = lazyWithRetry(() => import('./pages/Servers'), 'Servers');
+const Applications         = lazyWithRetry(() => import('./pages/Applications'), 'Applications');
+const LocalNode            = lazyWithRetry(() => import('./pages/LocalNode'), 'LocalNode');
+const Services             = lazyWithRetry(() => import('./pages/Services'), 'Services');
+const Integrations         = lazyWithRetry(() => import('./pages/Integrations'), 'Integrations');
+const Settings             = lazyWithRetry(() => import('./pages/Settings'), 'Settings');
+const AuditLog             = lazyWithRetry(() => import('./pages/AuditLog'), 'AuditLog');
+const Account              = lazyWithRetry(() => import('./pages/Account'), 'Account');
+const LocalContainers      = lazyWithRetry(() => import('./pages/LocalContainers'), 'LocalContainers');
+const HostConnect          = lazyWithRetry(() => import('./pages/HostConnect'), 'HostConnect');
+const RemoteAccess         = lazyWithRetry(() => import('./pages/RemoteAccess'), 'RemoteAccess');
+const ManagedDatabases     = lazyWithRetry(() => import('./pages/ManagedDatabases'), 'ManagedDatabases');
+const ReportBug            = lazyWithRetry(() => import('./pages/ReportBug'), 'ReportBug');
+const GitHubOAuthCallback  = lazyWithRetry(() => import('./pages/GitHubOAuthCallback'), 'GitHubOAuthCallback');
+const GitHubLoginCallback  = lazyWithRetry(() => import('./pages/GitHubLoginCallback'), 'GitHubLoginCallback');
+const OidcLoginCallback    = lazyWithRetry(() => import('./pages/OidcLoginCallback'), 'OidcLoginCallback');
 
 function RouteFallback() {
   // Subtle blank panel — a spinner mid-layout flashes more than it
   // helps. Lazy chunks load in well under 100 ms on local files.
-  return <div className="flex-1 bg-slate-50" aria-busy="true" />;
+  return <div className="flex-1 bg-muted" aria-busy="true" />;
 }
 
 // Surface query/mutation failures via toast so a 500/network error
@@ -154,8 +162,10 @@ function withChrome(pageName: string, element: ReactElement, opts: { bare?: bool
 
 function App() {
   useEffect(() => {
-    // Keep a single light visual system across all pages.
-    document.documentElement.setAttribute('data-theme', 'light');
+    // Apply the saved theme (dark is WatchTower's default identity). The toggle
+    // in the user menu flips `.dark` on <html>; Tailwind's class dark-mode does
+    // the rest. See lib/theme.ts.
+    import('./lib/theme').then((m) => m.applyStoredTheme());
   }, []);
 
   return (
@@ -167,6 +177,7 @@ function App() {
           <Routes>
             <Route path="/login" element={<><PageTitle name="Sign in" /><Login /></>} />
             <Route path="/oauth/github/login/callback" element={<GitHubLoginCallback />} />
+            <Route path="/oauth/oidc/login/callback" element={<OidcLoginCallback />} />
 
             {/* Pages with shared sidebar layout */}
             <Route path="/"                  element={withChrome('Dashboard',        <Dashboard />)} />

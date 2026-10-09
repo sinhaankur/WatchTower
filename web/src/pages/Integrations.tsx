@@ -113,7 +113,7 @@ function PlatformNotApplicable({
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 flex-wrap">
             <h3 className="text-sm font-semibold text-foreground/90">{title}</h3>
-            <span className="text-[10px] px-1.5 py-0.5 rounded-full border bg-muted border-border text-muted-foreground">
+            <span className="text-xs px-1.5 py-0.5 rounded-full border bg-muted border-border text-muted-foreground">
               Not applicable on {platformLabel}
             </span>
           </div>
@@ -157,7 +157,7 @@ function Badge({ ok, label }: { ok: boolean; label?: string }) {
     ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
     : 'bg-muted text-muted-foreground border-border';
   return (
-    <span className={`text-[11px] px-2 py-0.5 rounded-full border font-medium ${cls}`}>
+    <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${cls}`}>
       {text}
     </span>
   );
@@ -178,7 +178,7 @@ function InstallBlock({ cmds }: { cmds: string[] }) {
       ))}
       <button
         onClick={() => void copy()}
-        className="absolute top-2 right-2 text-[10px] px-2 py-0.5 rounded bg-slate-700 hover:bg-slate-600 text-slate-300 transition-colors"
+        className="absolute top-2 right-2 text-xs px-2 py-0.5 rounded bg-slate-700 hover:bg-slate-600 text-slate-300 transition-colors"
       >
         {copied ? 'Copied!' : 'Copy'}
       </button>
@@ -325,19 +325,19 @@ function ServiceControls({ service, running, enabled, supportedActions, onDone }
         </p>
       )}
       {errorDetail?.command && errorDetail.needs_terminal && (
-        <div className="mt-1 rounded-lg bg-slate-900 px-3 py-2 text-[11px] font-mono text-slate-200 flex items-center gap-2 overflow-hidden">
+        <div className="mt-1 rounded-lg bg-slate-900 px-3 py-2 text-xs font-mono text-slate-200 flex items-center gap-2 overflow-hidden">
           <span className="text-muted-foreground shrink-0">$</span>
           <span className="truncate flex-1" title={errorDetail.command}>{errorDetail.command}</span>
           <button
             onClick={() => void copyCommand()}
-            className="shrink-0 text-[10px] px-2 py-0.5 rounded bg-slate-700 hover:bg-slate-600 text-slate-200 transition-colors"
+            className="shrink-0 text-xs px-2 py-0.5 rounded bg-slate-700 hover:bg-slate-600 text-slate-200 transition-colors"
           >
             {copied ? 'Copied' : 'Copy'}
           </button>
           {electronAPI?.openTerminal && (
             <button
               onClick={() => void openInTerminal()}
-              className="shrink-0 text-[10px] px-2 py-0.5 rounded bg-emerald-700 hover:bg-emerald-600 text-white transition-colors"
+              className="shrink-0 text-xs px-2 py-0.5 rounded bg-emerald-700 hover:bg-emerald-600 text-white transition-colors"
               title="Copy this command and open a Terminal window"
             >
               Open Terminal
@@ -386,16 +386,16 @@ function IntegrationCard({
             <Dot ok={connected} />
             <p className="text-sm font-semibold text-foreground">{name}</p>
             <Badge ok={connected} label={badgeLabel} />
-            <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded border border-border">
+            <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded border border-border">
               {category}
             </span>
           </div>
           <p className="text-xs text-muted-foreground mt-1">{description}</p>
           {version && (
-            <p className="text-[11px] text-muted-foreground mt-0.5 font-mono">{version}</p>
+            <p className="text-xs text-muted-foreground mt-0.5 font-mono">{version}</p>
           )}
           {detail && (
-            <p className="text-[11px] text-muted-foreground mt-0.5">{detail}</p>
+            <p className="text-xs text-muted-foreground mt-0.5">{detail}</p>
           )}
           {extra}
           {!connected && installCmds && installCmds.length > 0 && (
@@ -486,7 +486,7 @@ function WatchdogCard({ podmanInstalled }: { podmanInstalled: boolean }) {
               <Dot ok={enabled && active} />
               <p className="text-sm font-semibold text-foreground">Podman Auto-Restart Watchdog</p>
               {loading ? (
-                <span className="text-[11px] text-muted-foreground">checking…</span>
+                <span className="text-xs text-muted-foreground">checking…</span>
               ) : (
                 <Badge
                   ok={enabled}
@@ -538,7 +538,7 @@ function WatchdogCard({ podmanInstalled }: { podmanInstalled: boolean }) {
           <p className="text-xs text-emerald-700 font-medium">
             ✓ Watchdog is active — Podman will auto-restart your containers after any reboot or crash.
           </p>
-          <p className="text-[11px] text-muted-foreground mt-1">
+          <p className="text-xs text-muted-foreground mt-1">
             To restart all containers now: <code className="font-mono bg-muted px-1 rounded">sudo systemctl start podman-restart.service</code>
           </p>
         </div>
@@ -618,7 +618,7 @@ function WatchTowerServiceCard() {
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <h3 className="text-sm font-semibold text-foreground">Auto-Update Daemon</h3>
-              <span className={`text-[10px] px-1.5 py-0.5 rounded-full border ${
+              <span className={`text-xs px-1.5 py-0.5 rounded-full border ${
                 enabled
                   ? 'bg-emerald-50 border-emerald-300 text-emerald-700'
                   : installed
@@ -728,7 +728,7 @@ function WatchtowerConfigCard() {
         <div className="min-w-0">
           <h3 className="text-sm font-semibold text-foreground">Auto-Update Settings</h3>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Edit <code className="font-mono bg-muted px-1 rounded text-[11px]">{cfg.path}</code>.
+            Edit <code className="font-mono bg-muted px-1 rounded text-xs">{cfg.path}</code>.
             Changes apply immediately if the service is running.
           </p>
         </div>
@@ -748,7 +748,7 @@ function WatchtowerConfigCard() {
             onChange={(e) => setDraft({ ...draft, interval: Number(e.target.value) })}
             className="w-full text-sm rounded-md border border-border bg-card px-2 py-1.5"
           />
-          <p className="text-[11px] text-muted-foreground mt-1">
+          <p className="text-xs text-muted-foreground mt-1">
             Default 300 (5 min). Lower = faster updates + more API load.
           </p>
         </div>
@@ -764,7 +764,7 @@ function WatchtowerConfigCard() {
             />
             <span>
               <span className="font-medium">Monitor-only</span>
-              <span className="block text-[11px] text-muted-foreground">Check for updates but don't apply them. Useful for testing.</span>
+              <span className="block text-xs text-muted-foreground">Check for updates but don't apply them. Useful for testing.</span>
             </span>
           </label>
           <label className="flex items-start gap-2 text-xs text-foreground/90 cursor-pointer">
@@ -776,7 +776,7 @@ function WatchtowerConfigCard() {
             />
             <span>
               <span className="font-medium">Clean up old images</span>
-              <span className="block text-[11px] text-muted-foreground">After a successful update, remove the previous image.</span>
+              <span className="block text-xs text-muted-foreground">After a successful update, remove the previous image.</span>
             </span>
           </label>
         </div>
@@ -938,7 +938,7 @@ function CloudflareSection() {
                 autoComplete="off"
                 className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm focus:border-orange-600 focus:ring-1 focus:ring-orange-600 outline-none"
               />
-              <p className="text-[11px] text-muted-foreground mt-1">
+              <p className="text-xs text-muted-foreground mt-1">
                 Create one at{' '}
                 <a
                   href="https://dash.cloudflare.com/profile/api-tokens"
@@ -995,7 +995,7 @@ function CloudflareSection() {
                   <p className="text-sm font-medium text-foreground truncate">
                     {c.label || c.account_name || 'Cloudflare'}
                   </p>
-                  <p className="text-[11px] text-muted-foreground truncate">
+                  <p className="text-xs text-muted-foreground truncate">
                     {c.account_name && <>{c.account_name} · </>}
                     {c.account_id ? <>account <code className="font-mono">{c.account_id.slice(0, 8)}…</code></> : 'no account scope'}
                     {c.last_verified_at && <> · verified {new Date(c.last_verified_at).toLocaleString()}</>}
@@ -1005,14 +1005,14 @@ function CloudflareSection() {
                   <button
                     type="button"
                     onClick={() => void reverify(c.id)}
-                    className="text-[11px] text-muted-foreground hover:text-foreground underline underline-offset-2"
+                    className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2"
                   >
                     Re-verify
                   </button>
                   <button
                     type="button"
                     onClick={() => void remove(c.id)}
-                    className="text-[11px] text-destructive hover:text-destructive underline underline-offset-2"
+                    className="text-xs text-destructive hover:text-destructive underline underline-offset-2"
                   >
                     Remove
                   </button>
@@ -1135,7 +1135,7 @@ function CloudProviderSection() {
             Connect DigitalOcean or Hetzner to auto-provision fresh deploy nodes — WatchTower creates the VM, installs Podman + nginx, and registers it as an OrgNode.
           </p>
         </div>
-        <span className="text-[10px] uppercase tracking-wide font-semibold text-purple-700 bg-purple-100 rounded px-2 py-0.5 shrink-0">
+        <span className="text-xs uppercase tracking-wide font-semibold text-purple-700 bg-purple-100 rounded px-2 py-0.5 shrink-0">
           Phase 5
         </span>
       </header>
@@ -1188,7 +1188,7 @@ function CloudProviderSection() {
                 autoComplete="off"
                 className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm focus:border-slate-600 focus:ring-1 focus:ring-slate-600 outline-none font-mono"
               />
-              <p className="text-[11px] text-muted-foreground mt-1">
+              <p className="text-xs text-muted-foreground mt-1">
                 {meta.tokenHint}{' '}
                 <a
                   href={meta.docsUrl}
@@ -1244,8 +1244,8 @@ function CloudProviderSection() {
                   <p className="text-sm font-medium text-foreground truncate">
                     {c.label || PROVIDER_META[c.provider].name}
                   </p>
-                  <p className="text-[11px] text-muted-foreground truncate">
-                    <span className="inline-block bg-muted rounded px-1.5 py-0.5 mr-1 font-mono text-[10px]">
+                  <p className="text-xs text-muted-foreground truncate">
+                    <span className="inline-block bg-muted rounded px-1.5 py-0.5 mr-1 font-mono text-xs">
                       {PROVIDER_META[c.provider].name}
                     </span>
                     {c.account_email && <>{c.account_email} · </>}
@@ -1258,14 +1258,14 @@ function CloudProviderSection() {
                   <button
                     type="button"
                     onClick={() => void reverify(c.id)}
-                    className="text-[11px] text-muted-foreground hover:text-foreground underline underline-offset-2"
+                    className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2"
                   >
                     Re-verify
                   </button>
                   <button
                     type="button"
                     onClick={() => void remove(c.id)}
-                    className="text-[11px] text-destructive hover:text-destructive underline underline-offset-2"
+                    className="text-xs text-destructive hover:text-destructive underline underline-offset-2"
                   >
                     Remove
                   </button>
@@ -1344,7 +1344,7 @@ function McpSection() {
             Drive WatchTower from your AI chat client via the Model Context Protocol — list projects, trigger deploys, manage domains, sync DNS, without opening this dashboard.
           </p>
         </div>
-        <span className="text-[10px] uppercase tracking-wide font-semibold text-purple-700 bg-purple-100 rounded px-2 py-0.5 shrink-0">
+        <span className="text-xs uppercase tracking-wide font-semibold text-purple-700 bg-purple-100 rounded px-2 py-0.5 shrink-0">
           MCP
         </span>
       </header>
@@ -1352,13 +1352,13 @@ function McpSection() {
       <div className="px-5 py-4 flex flex-col gap-4 text-sm">
         <ol className="text-xs text-foreground/90 space-y-1 list-decimal list-inside">
           <li>
-            Install the MCP extra: <code className="bg-muted rounded px-1.5 py-0.5 font-mono text-[11px]">pip install watchtower-podman[mcp]</code>
+            Install the MCP extra: <code className="bg-muted rounded px-1.5 py-0.5 font-mono text-xs">pip install watchtower-podman[mcp]</code>
           </li>
           <li>
             Paste the JSON below into your client's MCP config file:
             <ul className="list-disc list-inside ml-4 mt-1 text-muted-foreground">
-              <li><span className="font-mono text-[11px]">~/Library/Application Support/Claude/claude_desktop_config.json</span> (macOS)</li>
-              <li><span className="font-mono text-[11px]">%APPDATA%\Claude\claude_desktop_config.json</span> (Windows)</li>
+              <li><span className="font-mono text-xs">~/Library/Application Support/Claude/claude_desktop_config.json</span> (macOS)</li>
+              <li><span className="font-mono text-xs">%APPDATA%\Claude\claude_desktop_config.json</span> (Windows)</li>
               <li>Cursor: Settings → MCP servers</li>
             </ul>
           </li>
@@ -1396,7 +1396,7 @@ function McpSection() {
             readOnly
             value={configJson}
             rows={Math.min(14, configJson.split('\n').length)}
-            className="w-full font-mono text-[11px] leading-snug bg-muted border border-border rounded-md px-3 py-2 resize-none focus:outline-none focus:ring-1 focus:ring-blue-500"
+            className="w-full font-mono text-xs leading-snug bg-muted border border-border rounded-md px-3 py-2 resize-none focus:outline-none focus:ring-1 focus:ring-blue-500"
             onClick={(e) => (e.target as HTMLTextAreaElement).select()}
           />
           <button
@@ -1764,7 +1764,7 @@ const Integrations = () => {
               },
             ].map(({ icon, text }) => (
               <div key={icon} className="flex items-start gap-3 text-xs text-foreground/90">
-                <span className="w-5 h-5 rounded-full bg-blue-600 text-white text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">
+                <span className="w-5 h-5 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">
                   {icon}
                 </span>
                 {text}

@@ -74,7 +74,7 @@ export default function DiscoverNodesCard({
     <div className="rounded-lg border border-border bg-card p-5 shadow-retro">
       <div className="flex items-center justify-between gap-3 mb-1">
         <h2 className="text-sm font-semibold text-foreground">Found on your network</h2>
-        <span className="text-[11px] text-muted-foreground">via Tailscale</span>
+        <span className="text-xs text-muted-foreground">via Tailscale</span>
       </div>
       <p className="text-xs text-muted-foreground mb-3">
         Machines on your Tailnet you can add as deploy targets.
@@ -163,14 +163,14 @@ export default function DiscoverNodesCard({
               <div key={m.addr} className="flex items-center gap-2">
                 <span className={`inline-block w-1.5 h-1.5 rounded-full shrink-0 ${MESH_DOT[m.state]}`} />
                 <span className="font-medium text-foreground truncate">{m.name || m.addr}</span>
-                {m.self && <span className="text-[10px] text-muted-foreground">(this node)</span>}
+                {m.self && <span className="text-xs text-muted-foreground">(this node)</span>}
                 <span className="text-muted-foreground font-mono ml-auto shrink-0">{MESH_LABEL[m.state]}</span>
               </div>
             ))}
           </div>
         </div>
       )}
-      {pairError && <p className="mb-2 text-[11px] text-destructive">{pairError}</p>}
+      {pairError && <p className="mb-2 text-xs text-destructive">{pairError}</p>}
 
       <div className="space-y-1.5">
         {peers.map((p) => {
@@ -181,12 +181,12 @@ export default function DiscoverNodesCard({
               <span className="font-medium text-foreground truncate">{p.hostname}</span>
               <span className="text-muted-foreground font-mono">{p.ip}</span>
               {p.runs_watchtower && (
-                <span className="text-[10px] font-medium text-primary px-1 py-0.5 rounded bg-primary/10 border border-primary/20">
+                <span className="text-xs font-medium text-primary px-1 py-0.5 rounded bg-primary/10 border border-primary/20">
                   WatchTower
                 </span>
               )}
               {isPairedPeer ? (
-                <span className="ml-auto text-[10px] font-medium text-emerald-700 shrink-0">Standby</span>
+                <span className="ml-auto text-xs font-medium text-emerald-700 shrink-0">Standby</span>
               ) : p.runs_watchtower ? (
                 <button
                   type="button"
@@ -198,7 +198,7 @@ export default function DiscoverNodesCard({
                   {pair.isPending ? 'Pairing…' : 'Set up as standby'}
                 </button>
               ) : p.already_added ? (
-                <span className="ml-auto text-[10px] font-medium text-emerald-700 shrink-0">Added</span>
+                <span className="ml-auto text-xs font-medium text-emerald-700 shrink-0">Added</span>
               ) : (
                 <button
                   type="button"

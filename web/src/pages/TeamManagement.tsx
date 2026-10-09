@@ -371,7 +371,7 @@ const TeamManagement = () => {
               </Button>
             </div>
             {!lastInvite.emailSent && (
-              <p className="text-[11px] text-amber-700">
+              <p className="text-xs text-amber-700">
                 Tired of copying links?{' '}
                 <a href="/settings" className="underline font-medium hover:text-amber-900">
                   Set up email in Settings
@@ -415,7 +415,7 @@ const TeamManagement = () => {
                 {inviting ? 'Sending invite…' : offlineMode ? 'Server offline' : !canManageTeam ? 'No permission to invite' : 'Send Invite'}
               </Button>
               {!email.trim() && !inviting && (
-                <p className="text-[11px] text-muted-foreground text-center">Enter an email address to enable the invite.</p>
+                <p className="text-xs text-muted-foreground text-center">Enter an email address to enable the invite.</p>
               )}
             </CardContent>
           </Card>
@@ -432,14 +432,14 @@ const TeamManagement = () => {
                   <p className="text-xs font-medium text-emerald-800">
                     Connected as @{context.github_connection.github_username || 'github-user'}
                   </p>
-                  <p className="text-[11px] text-emerald-700 mt-0.5">
+                  <p className="text-xs text-emerald-700 mt-0.5">
                     Provider: {context.github_connection.provider === 'github_enterprise' ? 'GitHub Enterprise' : 'GitHub.com'}
                   </p>
                 </div>
               ) : (
                 <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2">
                   <p className="text-xs font-medium text-amber-800">No managed GitHub application is connected yet.</p>
-                  <p className="text-[11px] text-amber-700 mt-0.5">Connect one now to keep repository access managed and auditable.</p>
+                  <p className="text-xs text-amber-700 mt-0.5">Connect one now to keep repository access managed and auditable.</p>
                 </div>
               )}
 
@@ -463,9 +463,9 @@ const TeamManagement = () => {
                 </summary>
                 <div className="space-y-2 mt-2">
                 <div>
-                  <p className="text-[11px] text-muted-foreground">
+                  <p className="text-xs text-muted-foreground">
                     The fastest way to enable private repository deploys. Token is encrypted at rest and only used to
-                    clone your repos. Required scopes: <code className="text-[10px]">repo</code>.
+                    clone your repos. Required scopes: <code className="text-xs">repo</code>.
                     {' '}
                     <a
                       href="https://github.com/settings/tokens/new?scopes=repo&description=WatchTower"
@@ -579,7 +579,7 @@ const TeamManagement = () => {
                       <div className="flex items-center gap-2 flex-wrap">
                         <p className="text-sm font-semibold text-gray-900 truncate" title={member.email}>{member.email}</p>
                         {isCurrentUser && (
-                          <span className="text-[10px] px-1.5 py-0.5 rounded border border-blue-200 bg-blue-50 text-blue-700 shrink-0">You</span>
+                          <span className="text-xs px-1.5 py-0.5 rounded border border-blue-200 bg-blue-50 text-blue-700 shrink-0">You</span>
                         )}
                       </div>
                       <div className="flex items-center gap-2 mt-1.5 flex-wrap">
@@ -598,13 +598,13 @@ const TeamManagement = () => {
                           <span className={`text-xs px-2 py-0.5 border rounded-full ${roleMeta.color}`}>{roleMeta.label}</span>
                         )}
                         {member.can_create_projects && (
-                          <span className="text-[11px] px-1.5 py-0.5 rounded border border-border bg-muted text-muted-foreground">Projects</span>
+                          <span className="text-xs px-1.5 py-0.5 rounded border border-border bg-muted text-muted-foreground">Projects</span>
                         )}
                         {member.can_manage_deployments && (
-                          <span className="text-[11px] px-1.5 py-0.5 rounded border border-border bg-muted text-muted-foreground">Deploy</span>
+                          <span className="text-xs px-1.5 py-0.5 rounded border border-border bg-muted text-muted-foreground">Deploy</span>
                         )}
                         {member.can_manage_nodes && (
-                          <span className="text-[11px] px-1.5 py-0.5 rounded border border-border bg-muted text-muted-foreground">Nodes</span>
+                          <span className="text-xs px-1.5 py-0.5 rounded border border-border bg-muted text-muted-foreground">Nodes</span>
                         )}
                       </div>
                     </div>

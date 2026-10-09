@@ -38,7 +38,7 @@ export function ProLock({ feature }: { feature: ProFeatureKey }) {
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <h2 className="text-lg font-bold text-foreground">{name}</h2>
-            <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-600 text-white border border-amber-700">
+            <span className="text-xs font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-600 text-white border border-amber-700">
               Pro
             </span>
           </div>
@@ -64,7 +64,7 @@ export function ProLock({ feature }: { feature: ProFeatureKey }) {
               Settings
             </Link>
           </div>
-          <p className="text-[11px] text-muted-foreground mt-4">
+          <p className="text-xs text-muted-foreground mt-4">
             Currently on the <strong>Free</strong> tier. Pro unlocks
             this feature plus team roles, multi-region failover, SSO, and
             priority support.
@@ -82,8 +82,8 @@ export function ProLock({ feature }: { feature: ProFeatureKey }) {
  */
 export function ProBadge({ size = 'sm' }: { size?: 'sm' | 'xs' }) {
   const cls = size === 'xs'
-    ? 'text-[9px] px-1 py-0'
-    : 'text-[10px] px-1.5 py-0.5';
+    ? 'text-xs px-1 py-0'
+    : 'text-xs px-1.5 py-0.5';
   return (
     <span
       className={`inline-flex items-center gap-0.5 rounded font-bold uppercase tracking-wide bg-amber-100 text-amber-800 border border-amber-300 ${cls}`}

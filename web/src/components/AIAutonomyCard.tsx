@@ -67,27 +67,27 @@ function InterventionRow({ action }: { action: HealingAction }) {
   return (
     <li className="rounded-lg border border-border bg-muted/20 p-3 space-y-2">
       <div className="flex items-center gap-2 flex-wrap">
-        <span className="text-[10px] uppercase tracking-wide font-semibold text-amber-800 bg-amber-100 border border-amber-200 rounded px-1.5 py-0.5">
+        <span className="text-xs uppercase tracking-wide font-semibold text-amber-800 bg-amber-100 border border-amber-200 rounded px-1.5 py-0.5">
           {KIND_LABELS[action.failure_kind] ?? action.failure_kind}
         </span>
         {action.project_name && (
           <span className="text-xs font-medium text-foreground">{action.project_name}</span>
         )}
         {action.created_at && (
-          <span className="text-[10px] text-muted-foreground ml-auto">
+          <span className="text-xs text-muted-foreground ml-auto">
             {new Date(action.created_at).toLocaleString()}
           </span>
         )}
       </div>
       {action.cause && <p className="text-xs text-foreground/90">{action.cause}</p>}
       {action.fix_description && (
-        <p className="text-[11px] text-muted-foreground">
+        <p className="text-xs text-muted-foreground">
           <span className="font-semibold text-muted-foreground">Suggested fix: </span>
           {action.fix_description}
         </p>
       )}
       {action.llm_analysis && (
-        <details className="text-[11px]">
+        <details className="text-xs">
           <summary className="cursor-pointer text-purple-700 hover:text-purple-900 font-medium">
             AI analysis
           </summary>
@@ -97,7 +97,7 @@ function InterventionRow({ action }: { action: HealingAction }) {
         </details>
       )}
       {action.error && (
-        <p className="text-[11px] text-destructive bg-destructive/10 border border-destructive/20 rounded px-2 py-1">{action.error}</p>
+        <p className="text-xs text-destructive bg-destructive/10 border border-destructive/20 rounded px-2 py-1">{action.error}</p>
       )}
       <div className="flex gap-2 pt-1">
         <button
@@ -229,7 +229,7 @@ export default function AIAutonomyCard() {
           </p>
         </div>
         {pending.length > 0 && (
-          <span className="text-[10px] font-semibold text-amber-900 bg-amber-200 border border-amber-300 rounded-full px-2 py-0.5">
+          <span className="text-xs font-semibold text-amber-900 bg-amber-200 border border-amber-300 rounded-full px-2 py-0.5">
             {pending.length} need{pending.length === 1 ? 's' : ''} attention
           </span>
         )}
@@ -263,7 +263,7 @@ export default function AIAutonomyCard() {
 
         <div className="grid sm:grid-cols-2 gap-3">
           <label className="block">
-            <span className="text-[11px] text-muted-foreground">Server URL</span>
+            <span className="text-xs text-muted-foreground">Server URL</span>
             <input
               type="text"
               value={baseUrl}
@@ -273,7 +273,7 @@ export default function AIAutonomyCard() {
             />
           </label>
           <label className="block">
-            <span className="text-[11px] text-muted-foreground">
+            <span className="text-xs text-muted-foreground">
               API key {config?.has_api_key ? '(saved — leave blank to keep)' : '(optional for local servers)'}
             </span>
             <input
@@ -288,7 +288,7 @@ export default function AIAutonomyCard() {
 
         <div className="grid sm:grid-cols-2 gap-3 items-end">
           <label className="block">
-            <span className="text-[11px] text-muted-foreground">Model</span>
+            <span className="text-xs text-muted-foreground">Model</span>
             {models.length > 0 ? (
               <select
                 value={model}
@@ -345,7 +345,7 @@ export default function AIAutonomyCard() {
           </p>
         )}
         {config?.source === 'env' && (
-          <p className="text-[11px] text-muted-foreground">
+          <p className="text-xs text-muted-foreground">
             Currently configured via environment variables — saving here overrides them.
           </p>
         )}
@@ -364,7 +364,7 @@ export default function AIAutonomyCard() {
             />
             <span className="text-xs text-foreground/90">
               <span className="font-semibold">Use a tiny model for autonomous self-heal</span>
-              <span className="block text-[11px] text-muted-foreground mt-0.5">
+              <span className="block text-xs text-muted-foreground mt-0.5">
                 Background failure analysis only needs a small model (0.5–2B) — keep it fast and light
                 while chat uses {model || 'the main model'}. See the{' '}
                 <a href="https://github.com/sinhaankur/WatchTower/blob/main/docs/TINY_LLM_GUIDE.md"

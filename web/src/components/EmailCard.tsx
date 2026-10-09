@@ -150,7 +150,7 @@ export default function EmailCard() {
           </p>
         </div>
         {config?.configured && (
-          <span className="text-[10px] font-semibold text-emerald-800 bg-emerald-100 border border-emerald-300 rounded-full px-2 py-0.5">
+          <span className="text-xs font-semibold text-emerald-800 bg-emerald-100 border border-emerald-300 rounded-full px-2 py-0.5">
             Auto-send on
           </span>
         )}
@@ -176,7 +176,7 @@ export default function EmailCard() {
         </div>
 
         {activePreset.hint && (
-          <p className="text-[11px] text-muted-foreground">
+          <p className="text-xs text-muted-foreground">
             {activePreset.hint}{' '}
             {activePreset.help && (
               <a href={activePreset.help} target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground/90">
@@ -189,7 +189,7 @@ export default function EmailCard() {
         {/* Host + port */}
         <div className="grid sm:grid-cols-3 gap-3">
           <label className="block sm:col-span-2">
-            <span className="text-[11px] text-muted-foreground">SMTP host</span>
+            <span className="text-xs text-muted-foreground">SMTP host</span>
             <input
               type="text"
               value={host}
@@ -199,7 +199,7 @@ export default function EmailCard() {
             />
           </label>
           <label className="block">
-            <span className="text-[11px] text-muted-foreground">Port</span>
+            <span className="text-xs text-muted-foreground">Port</span>
             <input
               type="number"
               value={port}
@@ -212,7 +212,7 @@ export default function EmailCard() {
         {/* User + password */}
         <div className="grid sm:grid-cols-2 gap-3">
           <label className="block">
-            <span className="text-[11px] text-muted-foreground">Username</span>
+            <span className="text-xs text-muted-foreground">Username</span>
             <input
               type="text"
               value={user}
@@ -223,7 +223,7 @@ export default function EmailCard() {
             />
           </label>
           <label className="block">
-            <span className="text-[11px] text-muted-foreground">
+            <span className="text-xs text-muted-foreground">
               Password {config?.has_password ? '(saved — leave blank to keep)' : '(app password)'}
             </span>
             <input
@@ -240,7 +240,7 @@ export default function EmailCard() {
         {/* From + TLS */}
         <div className="grid sm:grid-cols-2 gap-3 items-end">
           <label className="block">
-            <span className="text-[11px] text-muted-foreground">From address</span>
+            <span className="text-xs text-muted-foreground">From address</span>
             <input
               type="text"
               value={from}
@@ -297,7 +297,7 @@ export default function EmailCard() {
           </p>
         )}
         {config?.source === 'env' && (
-          <p className="text-[11px] text-muted-foreground">
+          <p className="text-xs text-muted-foreground">
             Currently configured via environment variables — saving here overrides them.
           </p>
         )}

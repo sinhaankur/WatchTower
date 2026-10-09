@@ -590,7 +590,7 @@ const SetupWizard = () => {
       <header className="electron-card-solid electron-divider border-b">
         <div className="max-w-6xl mx-auto px-6 py-5 flex items-center justify-between">
           <div>
-            <p className="text-[11px] uppercase tracking-[0.16em] electron-accent">Project Setup</p>
+            <p className="text-xs uppercase tracking-[0.16em] electron-accent">Project Setup</p>
             <h1 className="text-lg font-semibold">Create New Project</h1>
           </div>
           <div className="flex items-center gap-2">
@@ -690,7 +690,7 @@ const SetupWizard = () => {
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
                         <p className="font-semibold text-sm text-foreground">This machine (Podman)</p>
-                        <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-200 text-emerald-900 font-bold">
+                        <span className="text-xs uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-200 text-emerald-900 font-bold">
                           Recommended for trying it out
                         </span>
                       </div>
@@ -698,7 +698,7 @@ const SetupWizard = () => {
                         WatchTower builds your project with Nixpacks and runs it in a container on this Linux machine.
                         URL is <code className="font-mono bg-card border border-border px-1 rounded">http://127.0.0.1:&lt;port&gt;</code> — only you can access it.
                       </p>
-                      <ul className="text-[11px] text-muted-foreground mt-2 space-y-0.5">
+                      <ul className="text-xs text-muted-foreground mt-2 space-y-0.5">
                         <li>✅ No external infrastructure, no signup</li>
                         <li>✅ Closes the autonomous-ops loop locally (build → diagnose → auto-fix)</li>
                         <li>⚠ Only running while your machine is on (laptop sleep / reboot pauses the deploy)</li>
@@ -727,7 +727,7 @@ const SetupWizard = () => {
                         WatchTower deploys via rsync + a remote reload command. Works for any Linux box you can
                         SSH into — VPS, home Pi over Tailscale, friend's box.
                       </p>
-                      <ul className="text-[11px] text-muted-foreground mt-2 space-y-0.5">
+                      <ul className="text-xs text-muted-foreground mt-2 space-y-0.5">
                         <li>✅ 24/7 deploy if the box is up 24/7</li>
                         <li>✅ Public URL if the box is publicly addressable</li>
                         <li>⚙ Needs SSH key + reload command (we'll guide you)</li>
@@ -766,7 +766,7 @@ const SetupWizard = () => {
                       </p>
                       {data.deployment_target === 'cloud_setup' && (
                         <div className="mt-3 space-y-2">
-                          <p className="text-[11px] font-semibold text-foreground uppercase tracking-wide">Cheapest viable options</p>
+                          <p className="text-xs font-semibold text-foreground uppercase tracking-wide">Cheapest viable options</p>
                           <div className="grid sm:grid-cols-2 gap-2">
                             <a
                               href="https://www.oracle.com/cloud/free/"
@@ -805,7 +805,7 @@ const SetupWizard = () => {
                               <p className="text-muted-foreground mt-0.5">Free · this machine, accessible privately from anywhere</p>
                             </a>
                           </div>
-                          <p className="text-[11px] text-muted-foreground mt-1">
+                          <p className="text-xs text-muted-foreground mt-1">
                             After you have a Linux box: install Podman, ensure SSH access works,
                             then come back here and switch to <em>"A remote SSH server I already have."</em>
                           </p>
@@ -922,7 +922,7 @@ const SetupWizard = () => {
                       </button>
                     </div>
                     <Input id="repo_url" value={data.repo_url} onChange={(e) => setField('repo_url', e.target.value)} className="mt-1.5 rounded-md border-border bg-card" placeholder="https://github.com/owner/repo" />
-                    <p className="text-[11px] text-muted-foreground">
+                    <p className="text-xs text-muted-foreground">
                       Choosing a repo here fills URL and branch. WatchTower clones/downloads the repository when the first deployment is queued.
                     </p>
 
@@ -1012,10 +1012,10 @@ const SetupWizard = () => {
                                 >
                                   <div className="flex items-center gap-2">
                                     <span className="text-xs font-medium text-foreground">{repo.name}</span>
-                                    {repo.private && <span className="text-[10px] bg-amber-100 text-amber-700 px-1 rounded">private</span>}
+                                    {repo.private && <span className="text-xs bg-amber-100 text-amber-700 px-1 rounded">private</span>}
                                   </div>
                                   {repo.description && (
-                                    <p className="text-[11px] text-muted-foreground truncate mt-0.5">{repo.description}</p>
+                                    <p className="text-xs text-muted-foreground truncate mt-0.5">{repo.description}</p>
                                   )}
                                 </button>
                               ))}
@@ -1290,7 +1290,7 @@ const SetupWizard = () => {
               <ol className="mt-3 space-y-2">
                 {nextSteps.map((item, idx) => (
                   <li key={item} className="flex gap-2 text-xs text-foreground/90">
-                    <span className="w-5 h-5 rounded-full electron-accent-bg flex items-center justify-center text-[10px] shrink-0">{idx + 1}</span>
+                    <span className="w-5 h-5 rounded-full electron-accent-bg flex items-center justify-center text-xs shrink-0">{idx + 1}</span>
                     <span>{item}</span>
                   </li>
                 ))}

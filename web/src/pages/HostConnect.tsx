@@ -96,7 +96,7 @@ function CopyButton({
     <button
       type="button"
       onClick={onClick}
-      className="shrink-0 rounded-md border border-border bg-card px-2.5 py-1 text-[11px] font-medium text-foreground/90 hover:bg-muted"
+      className="shrink-0 rounded-md border border-border bg-card px-2.5 py-1 text-xs font-medium text-foreground/90 hover:bg-muted"
     >
       {copied ? 'Copied' : label}
     </button>
@@ -466,7 +466,7 @@ const HostConnect = () => {
         <section className="mb-6 rounded-2xl border border-border bg-gradient-to-br from-white to-amber-50 p-5">
           <div className="grid gap-4 lg:grid-cols-[1.6fr_1fr]">
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-destructive">Guided Host Setup</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-destructive">Guided Host Setup</p>
               <h2 className="mt-2 text-xl font-bold text-foreground">{TAB_COPY[activeTab].title}</h2>
               <p className="mt-1.5 max-w-2xl text-sm text-muted-foreground">{TAB_COPY[activeTab].description}</p>
               <div className="mt-4 flex flex-wrap gap-2">
@@ -523,7 +523,7 @@ const HostConnect = () => {
               {missingTools.length > 0 && (
                 <div className="mt-3 flex flex-wrap gap-2">
                   {missingTools.map((name) => (
-                    <span key={name} className="rounded-full border border-amber-300 bg-amber-50 px-2 py-1 text-[11px] font-medium text-amber-800">
+                    <span key={name} className="rounded-full border border-amber-300 bg-amber-50 px-2 py-1 text-xs font-medium text-amber-800">
                       {TOOL_LABELS[name]}
                     </span>
                   ))}
@@ -935,7 +935,7 @@ const HostConnect = () => {
                 </div>
                 <div>
                   <p className="text-muted-foreground mb-0.5">Audit log</p>
-                  <code className="font-mono text-[11px] break-all">{terminalPolicy?.audit_log || '.dev/terminal-audit.log.enc'}</code>
+                  <code className="font-mono text-xs break-all">{terminalPolicy?.audit_log || '.dev/terminal-audit.log.enc'}</code>
                 </div>
                 <div>
                   <p className="text-muted-foreground mb-0.5">Max timeout</p>
@@ -949,7 +949,7 @@ const HostConnect = () => {
                   {(terminalPolicy?.allowed_commands || []).map((c) => (
                     <span
                       key={c.command}
-                      className="text-[11px] px-2 py-0.5 rounded-full border border-border bg-card text-foreground/90"
+                      className="text-xs px-2 py-0.5 rounded-full border border-border bg-card text-foreground/90"
                     >
                       {c.command}{c.must_sudo ? ' (sudo required)' : c.allow_sudo ? ' (sudo optional)' : ''}
                     </span>

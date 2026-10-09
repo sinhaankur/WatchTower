@@ -85,7 +85,7 @@ function StatCard({ label, value, sub, accent }: { label: string; value: string 
   const display = isNumber ? animated : value;
   return (
     <div className="group relative overflow-hidden rounded-lg border border-border bg-card p-5 shadow-retro transition-all duration-fast ease-out-soft hover:shadow-retro-hover">
-      <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-[0.12em] mb-2">{label}</p>
+      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-[0.12em] mb-2">{label}</p>
       <p className={`text-3xl font-bold tabular-nums leading-none ${accent ?? 'text-foreground'}`}>{display}</p>
       {sub && <p className="text-xs text-muted-foreground mt-2">{sub}</p>}
       {/* accent bar that grows on hover — subtle motion cue */}
@@ -392,7 +392,7 @@ const Dashboard = () => {
           <>
           <section className="relative overflow-hidden rounded-lg border border-border bg-card p-6 shadow-retro">
             <div className="max-w-xl">
-              <p className="inline-flex items-center gap-1.5 text-[11px] uppercase tracking-[0.18em] text-muted-foreground font-semibold">
+              <p className="inline-flex items-center gap-1.5 text-xs uppercase tracking-[0.18em] text-muted-foreground font-semibold">
                 <span className="h-1.5 w-1.5 rounded-full bg-primary" /> Get started
               </p>
               <h2 className="text-2xl font-bold text-foreground mt-1.5 tracking-tight">Put a site live on this Mac</h2>
@@ -407,10 +407,10 @@ const Dashboard = () => {
                 { n: '3', label: 'It stays up', desc: 'If a deploy breaks, WatchTower fixes it by itself.' },
               ].map(({ n, label, desc }) => (
                 <div key={n} className="flex items-start gap-3 p-3 rounded-md border border-border-soft bg-surface-soft">
-                  <span className="w-5 h-5 rounded-full bg-primary text-primary-foreground text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">{n}</span>
+                  <span className="w-5 h-5 rounded-full bg-primary text-primary-foreground text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">{n}</span>
                   <div>
                     <p className="text-xs font-semibold text-foreground">{label}</p>
-                    <p className="text-[11px] text-muted-foreground mt-0.5">{desc}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">{desc}</p>
                   </div>
                 </div>
               ))}
@@ -728,7 +728,7 @@ function SystemOverviewBanner() {
         ×
       </button>
       <div className="mb-2">
-        <p className="text-[11px] uppercase tracking-[0.18em] text-primary font-semibold">
+        <p className="text-xs uppercase tracking-[0.18em] text-primary font-semibold">
           How WatchTower fits together
         </p>
         <p className="text-xs text-muted-foreground mt-1">

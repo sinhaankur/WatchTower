@@ -214,7 +214,7 @@ export default function SystemResourceMonitor() {
               <div key={label} className="rounded-lg bg-muted/40 p-3 text-center">
                 <p className={`text-base font-bold ${color}`}>{value}</p>
                 <p className="text-xs font-medium text-foreground/90 mt-0.5">{label}</p>
-                <p className="text-[10px] text-muted-foreground">{sub}</p>
+                <p className="text-xs text-muted-foreground">{sub}</p>
               </div>
             ))}
           </div>
@@ -274,7 +274,7 @@ export default function SystemResourceMonitor() {
             <p className="text-xs font-medium text-foreground/90">
               Swap · {fmtMb(swap.used_mb)} / {fmtMb(swap.total_mb)}
             </p>
-            <span className="text-[10px] text-muted-foreground">
+            <span className="text-xs text-muted-foreground">
               Disk space used as overflow RAM
             </span>
           </div>
@@ -287,7 +287,7 @@ export default function SystemResourceMonitor() {
         </div>
       )}
 
-      <p className="text-[10px] text-muted-foreground text-right">Auto-refreshes every 10 s</p>
+      <p className="text-xs text-muted-foreground text-right">Auto-refreshes every 10 s</p>
     </div>
   );
 }

@@ -87,12 +87,12 @@ export default function ToolInstallButton({
   if (!canInstall && state === 'idle') {
     // Not auto-installable here — let the copy-paste recipe handle it.
     return reason ? (
-      <span className="text-[10px] text-muted-foreground" title={reason}>manual install</span>
+      <span className="text-xs text-muted-foreground" title={reason}>manual install</span>
     ) : null;
   }
 
   if (state === 'succeeded') {
-    return <span className="text-[11px] font-medium text-emerald-700">✓ Installed</span>;
+    return <span className="text-xs font-medium text-emerald-700">✓ Installed</span>;
   }
 
   return (
@@ -101,11 +101,11 @@ export default function ToolInstallButton({
         type="button"
         onClick={() => void install()}
         disabled={state === 'running'}
-        className="px-2.5 py-1 rounded-md bg-primary hover:bg-primary/90 text-primary-foreground text-[11px] font-semibold shadow-retro disabled:opacity-60 disabled:cursor-wait"
+        className="px-2.5 py-1 rounded-md bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold shadow-retro disabled:opacity-60 disabled:cursor-wait"
       >
         {state === 'running' ? 'Installing…' : state === 'failed' ? 'Retry install' : 'Install'}
       </button>
-      {error && <span className="text-[10px] text-destructive max-w-[180px] text-right">{error}</span>}
+      {error && <span className="text-xs text-destructive max-w-[180px] text-right">{error}</span>}
     </div>
   );
 }

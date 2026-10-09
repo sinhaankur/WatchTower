@@ -147,11 +147,11 @@ export default function LocalContainers() {
           <table className="w-full text-sm">
             <thead className="bg-muted border-b border-border">
               <tr className="text-left">
-                <th className="px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Project</th>
-                <th className="px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">URL</th>
-                <th className="px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Image</th>
-                <th className="px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Up</th>
-                <th className="px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Actions</th>
+                <th className="px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Project</th>
+                <th className="px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">URL</th>
+                <th className="px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Image</th>
+                <th className="px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Up</th>
+                <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wider text-muted-foreground">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -173,14 +173,14 @@ export default function LocalContainers() {
                       href={c.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-blue-700 hover:underline font-mono text-[12px]"
+                      className="text-blue-700 hover:underline font-mono text-sm"
                     >
                       {c.url} ↗
                     </a>
                   </td>
                   <td className="px-4 py-3">
                     <code
-                      className="text-[11px] text-foreground/90 font-mono truncate inline-block max-w-[280px]"
+                      className="text-xs text-foreground/90 font-mono truncate inline-block max-w-[280px]"
                       title={c.image}
                     >
                       {c.image}
@@ -195,7 +195,7 @@ export default function LocalContainers() {
                         type="button"
                         onClick={() => void restart(c.project_id)}
                         disabled={busyId === c.project_id}
-                        className="text-[11px] px-2 py-1 rounded-md border border-border hover:bg-muted disabled:opacity-50"
+                        className="text-xs px-2 py-1 rounded-md border border-border hover:bg-muted disabled:opacity-50"
                       >
                         Restart
                       </button>
@@ -203,7 +203,7 @@ export default function LocalContainers() {
                         type="button"
                         onClick={() => void stop(c.project_id)}
                         disabled={busyId === c.project_id}
-                        className="text-[11px] px-2 py-1 rounded-md border border-destructive/40 text-destructive hover:bg-destructive/10 disabled:opacity-50"
+                        className="text-xs px-2 py-1 rounded-md border border-destructive/40 text-destructive hover:bg-destructive/10 disabled:opacity-50"
                       >
                         Stop
                       </button>

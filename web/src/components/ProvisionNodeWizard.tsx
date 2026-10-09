@@ -359,7 +359,7 @@ export function ProvisionNodeWizard({ onClose, onRegistered }: Props) {
             maxLength={63}
             className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm font-mono"
           />
-          <p className="text-[11px] text-muted-foreground mt-1">
+          <p className="text-xs text-muted-foreground mt-1">
             Alphanumeric + hyphen/underscore. Becomes the VM hostname and the WatchTower node name.
           </p>
         </div>

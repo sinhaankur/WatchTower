@@ -60,13 +60,13 @@ function TemplateCard({
       className="anim-fade-in-up rounded-xl border border-border bg-card p-4 shadow-retro flex flex-col gap-3 transition-shadow hover:shadow-retro"
     >
       <div className="flex items-start gap-3">
-        <div className="w-9 h-9 rounded-lg border border-border bg-amber-100 flex items-center justify-center text-[11px] font-mono font-bold text-foreground shadow-retro uppercase">
+        <div className="w-9 h-9 rounded-lg border border-border bg-amber-100 flex items-center justify-center text-xs font-mono font-bold text-foreground shadow-retro uppercase">
           {template.slug.slice(0, 2)}
         </div>
         <div className="flex-1 min-w-0">
           <h2 className="text-sm font-semibold text-foreground truncate">{template.name}</h2>
           <span
-            className={`inline-flex text-[10px] px-2 py-0.5 rounded-full border font-medium mt-1 ${
+            className={`inline-flex text-xs px-2 py-0.5 rounded-full border font-medium mt-1 ${
               CATEGORY_BADGE[template.category] ?? CATEGORY_BADGE.other
             }`}
           >
@@ -77,7 +77,7 @@ function TemplateCard({
 
       <p className="text-xs text-foreground/90 leading-relaxed">{template.description}</p>
 
-      <div className="text-[11px] text-muted-foreground space-y-0.5">
+      <div className="text-xs text-muted-foreground space-y-0.5">
         <p>
           Repo: <a href={template.repo_url} target="_blank" rel="noopener noreferrer" className="font-mono text-foreground/90 hover:text-foreground underline-offset-2 hover:underline">{template.repo_url.replace('https://github.com/', '')}</a>
         </p>
@@ -88,7 +88,7 @@ function TemplateCard({
       </div>
 
       {template.notes && (
-        <p className="text-[10px] text-amber-800 bg-amber-50 border border-amber-200 rounded px-2 py-1">
+        <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded px-2 py-1">
           {template.notes}
         </p>
       )}
@@ -99,7 +99,7 @@ function TemplateCard({
       {open ? (
         <div className="rounded-lg border border-border bg-muted p-3 space-y-2.5">
           <label className="block">
-            <span className="text-[11px] font-medium text-muted-foreground">Project name</span>
+            <span className="text-xs font-medium text-muted-foreground">Project name</span>
             <input
               autoFocus
               value={name}
@@ -108,13 +108,13 @@ function TemplateCard({
               className="mt-1 w-full text-xs font-mono rounded border border-border px-2 py-1.5 focus:border-border focus:outline-none"
             />
             {name && !validName && (
-              <span className="text-[10px] text-destructive">Name needs at least 2 letters/digits.</span>
+              <span className="text-xs text-destructive">Name needs at least 2 letters/digits.</span>
             )}
           </label>
 
           {placeholders.length > 0 && (
             <div>
-              <p className="text-[11px] font-medium text-muted-foreground mb-1">You'll set these after creating:</p>
+              <p className="text-xs font-medium text-muted-foreground mb-1">You'll set these after creating:</p>
               <ul className="space-y-1">
                 {placeholders.map((v) => (
                   <li key={v.key} className="text-[10.5px] text-muted-foreground flex items-start gap-1.5">
@@ -137,7 +137,7 @@ function TemplateCard({
             <button
               onClick={() => setOpen(false)}
               disabled={creating}
-              className="text-[11px] px-2.5 py-1.5 rounded-lg border border-border text-muted-foreground hover:border-accent/50 disabled:opacity-50"
+              className="text-xs px-2.5 py-1.5 rounded-lg border border-border text-muted-foreground hover:border-accent/50 disabled:opacity-50"
             >
               Cancel
             </button>
@@ -156,7 +156,7 @@ function TemplateCard({
               href={template.documentation_url}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-[11px] text-muted-foreground hover:text-foreground"
+              className="text-xs text-muted-foreground hover:text-foreground"
               title="Open upstream documentation"
             >
               docs ↗
@@ -296,7 +296,7 @@ export default function Templates() {
             {error.status === 401 && (
               <Link
                 to="/login"
-                className="shrink-0 px-2.5 py-1 rounded-md bg-slate-900 text-white text-[11px] font-medium hover:bg-slate-800"
+                className="shrink-0 px-2.5 py-1 rounded-md bg-slate-900 text-white text-xs font-medium hover:bg-slate-800"
               >
                 Sign in →
               </Link>
@@ -305,7 +305,7 @@ export default function Templates() {
               <button
                 type="button"
                 onClick={() => window.location.reload()}
-                className="shrink-0 px-2.5 py-1 rounded-md border border-destructive/40 text-destructive text-[11px] font-medium hover:bg-red-100"
+                className="shrink-0 px-2.5 py-1 rounded-md border border-destructive/40 text-destructive text-xs font-medium hover:bg-red-100"
               >
                 Retry
               </button>

@@ -128,14 +128,14 @@ function ConnectionCard() {
               : 'Podman not installed'}
         </p>
         {status.machine && (
-          <p className="text-[11px] text-muted-foreground mt-0.5">
+          <p className="text-xs text-muted-foreground mt-0.5">
             Machine <code className="font-mono">{status.machine.name}</code>{' '}
             {status.machine.running ? 'running' : 'stopped'}
             {status.machine.cpus ? ` · ${status.machine.cpus} CPUs` : ''}
           </p>
         )}
         {!status.connected && status.hint && (
-          <p className="text-[11px] text-amber-700 mt-0.5">{status.hint}</p>
+          <p className="text-xs text-amber-700 mt-0.5">{status.hint}</p>
         )}
       </div>
       {status.available && !status.connected && status.machine && !status.machine.running && (
@@ -188,7 +188,7 @@ function PortsEditor({ ports, onChange }: { ports: PodmanPort[]; onChange: (p: P
           <button onClick={() => onChange(ports.filter((_, j) => j !== i))} className="text-muted-foreground hover:text-destructive text-sm px-1">×</button>
         </div>
       ))}
-      <button onClick={() => onChange([...ports, { host: 0, container: 0 }])} className="text-[11px] text-blue-700 hover:underline">
+      <button onClick={() => onChange([...ports, { host: 0, container: 0 }])} className="text-xs text-blue-700 hover:underline">
         + Add port mapping
       </button>
     </div>
@@ -249,39 +249,39 @@ function CreateContainerForm({ pods, onDone }: { pods: PodmanPod[]; onDone: () =
     <div className="rounded-xl border border-border bg-muted p-4 space-y-3">
       <div className="grid sm:grid-cols-2 gap-3">
         <label className="block">
-          <span className="text-[11px] text-muted-foreground">Name</span>
+          <span className="text-xs text-muted-foreground">Name</span>
           <input value={name} onChange={(e) => setName(e.target.value)} placeholder="my-redis"
             className="mt-1 w-full text-xs font-mono rounded border border-border px-2 py-1.5" />
         </label>
         <label className="block">
-          <span className="text-[11px] text-muted-foreground">Image</span>
+          <span className="text-xs text-muted-foreground">Image</span>
           <input value={image} onChange={(e) => setImage(e.target.value)} placeholder="docker.io/library/redis:7"
             className="mt-1 w-full text-xs font-mono rounded border border-border px-2 py-1.5" />
         </label>
       </div>
       <div className="grid sm:grid-cols-2 gap-3">
         <div>
-          <span className="text-[11px] text-muted-foreground">Run inside pod (optional)</span>
+          <span className="text-xs text-muted-foreground">Run inside pod (optional)</span>
           <select value={pod} onChange={(e) => setPod(e.target.value)}
             className="mt-1 w-full text-xs rounded border border-border px-2 py-1.5 bg-card">
             <option value="">Standalone container</option>
             {pods.map((p) => <option key={p.name} value={p.name}>{p.name}</option>)}
           </select>
-          {pod && <p className="text-[10px] text-muted-foreground mt-1">Ports are managed by the pod.</p>}
+          {pod && <p className="text-xs text-muted-foreground mt-1">Ports are managed by the pod.</p>}
         </div>
         <div>
-          <span className="text-[11px] text-muted-foreground">Link to project (optional)</span>
+          <span className="text-xs text-muted-foreground">Link to project (optional)</span>
           <div className="mt-1"><ProjectPicker value={projectId} onChange={setProjectId} /></div>
         </div>
       </div>
       {!pod && (
         <div>
-          <span className="text-[11px] text-muted-foreground">Ports (host → container)</span>
+          <span className="text-xs text-muted-foreground">Ports (host → container)</span>
           <div className="mt-1"><PortsEditor ports={ports} onChange={setPorts} /></div>
         </div>
       )}
       <label className="block">
-        <span className="text-[11px] text-muted-foreground">Environment variables (one KEY=value per line)</span>
+        <span className="text-xs text-muted-foreground">Environment variables (one KEY=value per line)</span>
         <textarea value={envText} onChange={(e) => setEnvText(e.target.value)} rows={2} placeholder={'REDIS_PASSWORD=secret'}
           className="mt-1 w-full text-xs font-mono rounded border border-border px-2 py-1.5" />
       </label>
@@ -311,17 +311,17 @@ function CreatePodForm({ onDone }: { onDone: () => void }) {
     <div className="rounded-xl border border-border bg-muted p-4 space-y-3">
       <div className="grid sm:grid-cols-2 gap-3">
         <label className="block">
-          <span className="text-[11px] text-muted-foreground">Pod name</span>
+          <span className="text-xs text-muted-foreground">Pod name</span>
           <input value={name} onChange={(e) => setName(e.target.value)} placeholder="my-app"
             className="mt-1 w-full text-xs font-mono rounded border border-border px-2 py-1.5" />
         </label>
         <div>
-          <span className="text-[11px] text-muted-foreground">Link to project (optional)</span>
+          <span className="text-xs text-muted-foreground">Link to project (optional)</span>
           <div className="mt-1"><ProjectPicker value={projectId} onChange={setProjectId} /></div>
         </div>
       </div>
       <div>
-        <span className="text-[11px] text-muted-foreground">Published ports (host → container) — shared by every container in the pod</span>
+        <span className="text-xs text-muted-foreground">Published ports (host → container) — shared by every container in the pod</span>
         <div className="mt-1"><PortsEditor ports={ports} onChange={setPorts} /></div>
       </div>
       <div className="flex gap-2 justify-end">
@@ -366,31 +366,31 @@ function ContainerRow({ c }: { c: PodmanContainer }) {
         <td className="px-4 py-2.5">
           <p className="font-mono text-xs text-foreground">{c.name}</p>
           <div className="flex items-center gap-1.5 mt-0.5">
-            {c.pod && <span className="text-[10px] text-purple-700 bg-purple-50 border border-purple-200 rounded px-1">pod: {c.pod}</span>}
+            {c.pod && <span className="text-xs text-purple-700 bg-purple-50 border border-purple-200 rounded px-1">pod: {c.pod}</span>}
             {c.project_id && (
-              <Link to={`/projects/${c.project_id}`} className="text-[10px] text-blue-700 bg-blue-50 border border-blue-200 rounded px-1 hover:underline">
+              <Link to={`/projects/${c.project_id}`} className="text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded px-1 hover:underline">
                 {c.project_name || 'project'}
               </Link>
             )}
           </div>
         </td>
-        <td className="px-4 py-2.5"><code className="text-[11px] text-muted-foreground font-mono truncate inline-block max-w-[220px]" title={c.image}>{c.image}</code></td>
+        <td className="px-4 py-2.5"><code className="text-xs text-muted-foreground font-mono truncate inline-block max-w-[220px]" title={c.image}>{c.image}</code></td>
         <td className="px-4 py-2.5">
-          <span className={`text-[10px] border rounded px-1.5 py-0.5 ${stateBadge(c.state)}`}>{c.status || c.state}</span>
+          <span className={`text-xs border rounded px-1.5 py-0.5 ${stateBadge(c.state)}`}>{c.status || c.state}</span>
         </td>
-        <td className="px-4 py-2.5 text-[11px] font-mono text-muted-foreground">
+        <td className="px-4 py-2.5 text-xs font-mono text-muted-foreground">
           {c.ports.map((p) => `${p.host}→${p.container}`).join(', ') || '—'}
         </td>
         <td className="px-4 py-2.5 text-right whitespace-nowrap">
           <div className="inline-flex items-center gap-1">
             {running
               ? <>
-                  <button onClick={() => run('restart')} disabled={act.isPending} className="text-[11px] px-2 py-1 rounded border border-border hover:bg-muted disabled:opacity-50">Restart</button>
-                  <button onClick={() => run('stop')} disabled={act.isPending} className="text-[11px] px-2 py-1 rounded border border-border hover:bg-muted disabled:opacity-50">Stop</button>
+                  <button onClick={() => run('restart')} disabled={act.isPending} className="text-xs px-2 py-1 rounded border border-border hover:bg-muted disabled:opacity-50">Restart</button>
+                  <button onClick={() => run('stop')} disabled={act.isPending} className="text-xs px-2 py-1 rounded border border-border hover:bg-muted disabled:opacity-50">Stop</button>
                 </>
-              : <button onClick={() => run('start')} disabled={act.isPending} className="text-[11px] px-2 py-1 rounded border border-emerald-300 text-emerald-700 hover:bg-emerald-50 disabled:opacity-50">Start</button>}
-            <button onClick={() => setShowLogPanel((v) => !v)} className={`text-[11px] px-2 py-1 rounded border ${showLogPanel ? 'border-slate-400 bg-muted' : 'border-border hover:bg-muted'}`}>Logs</button>
-            <button onClick={() => run('remove')} disabled={act.isPending} className="text-[11px] px-2 py-1 rounded border border-destructive/40 text-destructive hover:bg-destructive/10 disabled:opacity-50">Remove</button>
+              : <button onClick={() => run('start')} disabled={act.isPending} className="text-xs px-2 py-1 rounded border border-emerald-300 text-emerald-700 hover:bg-emerald-50 disabled:opacity-50">Start</button>}
+            <button onClick={() => setShowLogPanel((v) => !v)} className={`text-xs px-2 py-1 rounded border ${showLogPanel ? 'border-slate-400 bg-muted' : 'border-border hover:bg-muted'}`}>Logs</button>
+            <button onClick={() => run('remove')} disabled={act.isPending} className="text-xs px-2 py-1 rounded border border-destructive/40 text-destructive hover:bg-destructive/10 disabled:opacity-50">Remove</button>
           </div>
         </td>
       </tr>
@@ -427,16 +427,16 @@ function LiveLogPanel({ name }: { name: string }) {
   return (
     <div className="rounded-lg overflow-hidden border border-slate-800">
       <div className="flex items-center justify-between bg-slate-800 px-3 py-1.5">
-        <span className="text-[10px] font-mono text-slate-300 flex items-center gap-1.5">
+        <span className="text-xs font-mono text-slate-300 flex items-center gap-1.5">
           <span className={`inline-block w-1.5 h-1.5 rounded-full ${connected ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'}`} />
           {connected ? 'live' : 'connecting…'} · {name}
         </span>
-        {!stick && <span className="text-[10px] text-amber-400">paused — scroll down to resume</span>}
+        {!stick && <span className="text-xs text-amber-400">paused — scroll down to resume</span>}
       </div>
       <pre
         ref={preRef}
         onScroll={onScroll}
-        className="text-[10px] font-mono bg-slate-900 text-slate-100 p-3 max-h-72 overflow-auto whitespace-pre-wrap"
+        className="text-xs font-mono bg-slate-900 text-slate-100 p-3 max-h-72 overflow-auto whitespace-pre-wrap"
       >
         {error
           ? `⚠ ${error}`
@@ -464,20 +464,20 @@ function PodCard({ p }: { p: PodmanPod }) {
     <div className="rounded-xl border border-border bg-card p-4">
       <div className="flex items-center gap-2 flex-wrap">
         <p className="font-mono text-xs font-semibold text-foreground">{p.name}</p>
-        <span className={`text-[10px] border rounded px-1.5 py-0.5 ${stateBadge(p.status)}`}>{p.status}</span>
+        <span className={`text-xs border rounded px-1.5 py-0.5 ${stateBadge(p.status)}`}>{p.status}</span>
         {p.project_id && (
-          <Link to={`/projects/${p.project_id}`} className="text-[10px] text-blue-700 bg-blue-50 border border-blue-200 rounded px-1 hover:underline">
+          <Link to={`/projects/${p.project_id}`} className="text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded px-1 hover:underline">
             {p.project_name || 'project'}
           </Link>
         )}
         <div className="ml-auto inline-flex items-center gap-1">
           {running
-            ? <button onClick={() => run('stop')} disabled={act.isPending} className="text-[11px] px-2 py-1 rounded border border-border hover:bg-muted disabled:opacity-50">Stop</button>
-            : <button onClick={() => run('start')} disabled={act.isPending} className="text-[11px] px-2 py-1 rounded border border-emerald-300 text-emerald-700 hover:bg-emerald-50 disabled:opacity-50">Start</button>}
-          <button onClick={() => run('remove')} disabled={act.isPending} className="text-[11px] px-2 py-1 rounded border border-destructive/40 text-destructive hover:bg-destructive/10 disabled:opacity-50">Remove</button>
+            ? <button onClick={() => run('stop')} disabled={act.isPending} className="text-xs px-2 py-1 rounded border border-border hover:bg-muted disabled:opacity-50">Stop</button>
+            : <button onClick={() => run('start')} disabled={act.isPending} className="text-xs px-2 py-1 rounded border border-emerald-300 text-emerald-700 hover:bg-emerald-50 disabled:opacity-50">Start</button>}
+          <button onClick={() => run('remove')} disabled={act.isPending} className="text-xs px-2 py-1 rounded border border-destructive/40 text-destructive hover:bg-destructive/10 disabled:opacity-50">Remove</button>
         </div>
       </div>
-      <p className="text-[11px] text-muted-foreground mt-2">
+      <p className="text-xs text-muted-foreground mt-2">
         {p.containers.length === 0
           ? 'Empty pod — use "New container" above and pick this pod.'
           : p.containers.map((c) => c.names).join(', ')}
@@ -530,11 +530,11 @@ export default function PodmanManager() {
             <table className="w-full text-sm">
               <thead className="bg-muted border-b border-border">
                 <tr className="text-left">
-                  <th className="px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Container</th>
-                  <th className="px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Image</th>
-                  <th className="px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">State</th>
-                  <th className="px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Ports</th>
-                  <th className="px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Actions</th>
+                  <th className="px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Container</th>
+                  <th className="px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Image</th>
+                  <th className="px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">State</th>
+                  <th className="px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Ports</th>
+                  <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wider text-muted-foreground">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">

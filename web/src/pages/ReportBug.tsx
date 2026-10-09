@@ -188,7 +188,7 @@ function ReportBug() {
 
       <main className="px-4 sm:px-6 lg:px-8 py-6 max-w-4xl mx-auto w-full space-y-4">
         <section className="rounded-xl border border-border bg-card p-5 shadow-retro space-y-4">
-          <div className="rounded-lg border border-border bg-muted p-3 text-[11px] text-muted-foreground">
+          <div className="rounded-lg border border-border bg-muted p-3 text-xs text-muted-foreground">
             <p className="font-medium text-foreground">Before submitting</p>
             <div className="mt-2 space-y-1.5">
               <label className="flex items-center gap-2">
@@ -283,7 +283,7 @@ function ReportBug() {
             </label>
           </div>
 
-          <div className="rounded-lg border border-border bg-muted p-3 text-[11px] text-muted-foreground">
+          <div className="rounded-lg border border-border bg-muted p-3 text-xs text-muted-foreground">
             <p>
               Last X-Request-ID:{' '}
               <span className="font-mono text-foreground">{requestId ?? '(none captured yet)'}</span>

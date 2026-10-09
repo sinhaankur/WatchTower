@@ -133,7 +133,7 @@ function ServiceCard({ svc, connected }: { svc: ServiceDef; connected: boolean }
           </span>
           <p className="text-sm font-semibold text-foreground">{svc.name}</p>
         </div>
-        <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground border border-border shrink-0">{svc.category}</span>
+        <span className="text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground border border-border shrink-0">{svc.category}</span>
       </div>
       <p className="text-xs text-muted-foreground flex-1">{svc.desc}</p>
 
@@ -144,7 +144,7 @@ function ServiceCard({ svc, connected }: { svc: ServiceDef; connected: boolean }
           </Link>
         ) : running ? (
           <>
-            <span className="text-[10px] px-1.5 py-0.5 rounded border text-emerald-700 bg-emerald-50 border-emerald-200">Running</span>
+            <span className="text-xs px-1.5 py-0.5 rounded border text-emerald-700 bg-emerald-50 border-emerald-200">Running</span>
             {svc.openPort && (
               <a
                 href={`http://localhost:${svc.openPort}`}
@@ -169,7 +169,7 @@ function ServiceCard({ svc, connected }: { svc: ServiceDef; connected: boolean }
           </button>
         )}
         {svc.image && !running && svc.openPort && (
-          <span className="text-[10px] text-muted-foreground font-mono ml-auto">:{svc.openPort}</span>
+          <span className="text-xs text-muted-foreground font-mono ml-auto">:{svc.openPort}</span>
         )}
       </div>
     </div>

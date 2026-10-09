@@ -179,7 +179,7 @@ export function CommandPalette() {
             placeholder="Jump to a page or project…"
             className="flex-1 text-sm text-foreground placeholder:text-muted-foreground outline-none bg-transparent"
           />
-          <kbd className="text-[10px] font-mono text-muted-foreground border border-border px-1.5 py-0.5 rounded">Esc</kbd>
+          <kbd className="text-xs font-mono text-muted-foreground border border-border px-1.5 py-0.5 rounded">Esc</kbd>
         </div>
         <div className="max-h-80 overflow-y-auto py-1">
           {filtered.length === 0 && (
@@ -191,7 +191,7 @@ export function CommandPalette() {
             if (groupItems.length === 0) return null;
             return (
               <div key={group} className="py-1">
-                <div className="px-4 pt-1 pb-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                <div className="px-4 pt-1 pb-1 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
                   {group}
                 </div>
                 {groupItems.map((it) => {
@@ -208,7 +208,7 @@ export function CommandPalette() {
                     >
                       <span className="truncate">{it.label}</span>
                       {it.hint && (
-                        <span className={`text-[11px] ml-3 truncate ${active ? 'text-slate-300' : 'text-muted-foreground'}`}>
+                        <span className={`text-xs ml-3 truncate ${active ? 'text-slate-300' : 'text-muted-foreground'}`}>
                           {it.hint}
                         </span>
                       )}
@@ -219,7 +219,7 @@ export function CommandPalette() {
             );
           })}
         </div>
-        <div className="flex items-center justify-between px-4 py-2 border-t border-slate-100 text-[10px] text-muted-foreground">
+        <div className="flex items-center justify-between px-4 py-2 border-t border-slate-100 text-xs text-muted-foreground">
           <div className="flex items-center gap-3">
             <span><kbd className="font-mono border border-border px-1 rounded">↑↓</kbd> navigate</span>
             <span><kbd className="font-mono border border-border px-1 rounded">↵</kbd> jump</span>

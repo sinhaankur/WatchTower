@@ -406,7 +406,7 @@ const Applications = () => {
                         >
                           {p.name}
                         </Link>
-                        <span className={`text-[11px] px-2 py-0.5 rounded-full border font-medium ${meta.color}`}>
+                        <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${meta.color}`}>
                           {meta.label}
                         </span>
                         {p.lastDeployment && (
@@ -419,7 +419,7 @@ const Applications = () => {
                           </Link>
                         )}
                         {!p.lastDeployment && (
-                          <span className="text-[11px] px-2 py-0.5 rounded-full border border-border bg-muted text-muted-foreground font-medium">
+                          <span className="text-xs px-2 py-0.5 rounded-full border border-border bg-muted text-muted-foreground font-medium">
                             never deployed
                           </span>
                         )}

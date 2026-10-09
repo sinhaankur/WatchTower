@@ -232,7 +232,7 @@ export default function FirstRun() {
                     className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-left text-xs hover:bg-muted transition-colors"
                   >
                     <span className="font-medium text-foreground truncate">{r.full_name}</span>
-                    {r.private && <span className="text-[10px] text-muted-foreground border border-border rounded px-1">private</span>}
+                    {r.private && <span className="text-xs text-muted-foreground border border-border rounded px-1">private</span>}
                   </button>
                 ))}
               </div>
@@ -273,7 +273,7 @@ export default function FirstRun() {
             {phase === 'deploying' && <>Creating your site…</>}
           </button>
 
-          <p className="text-[11px] text-muted-foreground text-center">
+          <p className="text-xs text-muted-foreground text-center">
             Takes about a minute. You’ll watch it build and go live on the next screen.
           </p>
         </div>

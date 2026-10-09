@@ -110,7 +110,7 @@ export default function UseThisPcCard({ onRegistered }: { onRegistered?: () => v
           <div className="flex items-center gap-2 flex-wrap">
             <h2 className="text-sm font-semibold text-foreground">Use this PC as a server</h2>
             {status.registered && (
-              <span className="text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+              <span className="text-xs font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
                 Registered
               </span>
             )}

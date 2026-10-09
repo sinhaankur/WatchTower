@@ -154,7 +154,7 @@ export default function AuditLog() {
         {/* Filters */}
         <div className="rounded-xl border border-border bg-card p-4 grid grid-cols-1 md:grid-cols-4 gap-3">
           <div>
-            <label className="block text-[11px] font-medium text-muted-foreground mb-1">Action</label>
+            <label className="block text-xs font-medium text-muted-foreground mb-1">Action</label>
             <select
               value={action}
               onChange={(e) => setAction(e.target.value)}
@@ -166,7 +166,7 @@ export default function AuditLog() {
             </select>
           </div>
           <div>
-            <label className="block text-[11px] font-medium text-muted-foreground mb-1">Entity</label>
+            <label className="block text-xs font-medium text-muted-foreground mb-1">Entity</label>
             <select
               value={entityType}
               onChange={(e) => setEntityType(e.target.value)}
@@ -178,7 +178,7 @@ export default function AuditLog() {
             </select>
           </div>
           <div>
-            <label className="block text-[11px] font-medium text-muted-foreground mb-1">Window</label>
+            <label className="block text-xs font-medium text-muted-foreground mb-1">Window</label>
             <select
               value={days}
               onChange={(e) => setDays(Number(e.target.value))}
@@ -192,7 +192,7 @@ export default function AuditLog() {
             </select>
           </div>
           <div>
-            <label className="block text-[11px] font-medium text-muted-foreground mb-1">Search</label>
+            <label className="block text-xs font-medium text-muted-foreground mb-1">Search</label>
             <input
               type="text"
               value={search}
@@ -229,20 +229,20 @@ export default function AuditLog() {
                   onClick={() => setExpanded(isOpen ? null : e.id)}
                   className="w-full grid grid-cols-12 items-center gap-3 px-4 py-3 hover:bg-muted transition-colors text-left"
                 >
-                  <span className={`col-span-3 sm:col-span-2 text-[11px] font-mono px-2 py-0.5 rounded ${tone.bg} ${tone.text} truncate`}>
+                  <span className={`col-span-3 sm:col-span-2 text-xs font-mono px-2 py-0.5 rounded ${tone.bg} ${tone.text} truncate`}>
                     {e.action}
                   </span>
                   <span className="col-span-5 sm:col-span-3 text-xs text-foreground/90 truncate">
                     {e.actor_email ?? <em className="text-muted-foreground">unknown actor</em>}
                   </span>
-                  <span className="hidden sm:block col-span-2 text-[11px] text-muted-foreground font-mono truncate">
+                  <span className="hidden sm:block col-span-2 text-xs text-muted-foreground font-mono truncate">
                     {e.entity_type ?? '—'}
                   </span>
-                  <span className="hidden sm:block col-span-3 text-[11px] text-muted-foreground font-mono truncate" title={e.entity_id ?? ''}>
+                  <span className="hidden sm:block col-span-3 text-xs text-muted-foreground font-mono truncate" title={e.entity_id ?? ''}>
                     {e.entity_id ?? '—'}
                   </span>
                   <span
-                    className="col-span-4 sm:col-span-2 text-[11px] text-muted-foreground text-right"
+                    className="col-span-4 sm:col-span-2 text-xs text-muted-foreground text-right"
                     title={e.created_at ?? ''}
                   >
                     {formatRelative(e.created_at)}
@@ -259,7 +259,7 @@ export default function AuditLog() {
                     <div>
                       <div className="text-muted-foreground mb-1">Metadata</div>
                       {extraText ? (
-                        <pre className="bg-card border border-border rounded p-2 text-[11px] font-mono text-foreground/90 overflow-auto max-h-48">
+                        <pre className="bg-card border border-border rounded p-2 text-xs font-mono text-foreground/90 overflow-auto max-h-48">
                           {extraText}
                         </pre>
                       ) : (
@@ -273,7 +273,7 @@ export default function AuditLog() {
           })}
         </div>
 
-        <p className="text-[11px] text-muted-foreground px-1">
+        <p className="text-xs text-muted-foreground px-1">
           Audit events are append-only and never store secret values (e.g. environment variable values are never recorded).
           Older events fall outside the read window — increase it above to see them.
         </p>

@@ -68,7 +68,7 @@ export default function SelfHealingCard() {
           <span aria-hidden>🩹</span> Self-healing activity
         </h2>
         {autoFixed > 0 && (
-          <span className="text-[11px] font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+          <span className="text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
             {autoFixed} auto-fixed
           </span>
         )}
@@ -95,11 +95,11 @@ export default function SelfHealingCard() {
                   <span className={`ml-auto font-medium ${m.text}`}>{m.label}</span>
                 </div>
                 {a.fix_description && (
-                  <p className="text-[11px] text-muted-foreground mt-0.5 truncate" title={a.fix_description}>
+                  <p className="text-xs text-muted-foreground mt-0.5 truncate" title={a.fix_description}>
                     {a.status === 'auto_applied' || a.status === 'approved' ? '↳ ' : ''}{a.fix_description}
                   </p>
                 )}
-                <p className="text-[10px] text-muted-foreground/70 mt-0.5">{fmtWhen(a.created_at)}</p>
+                <p className="text-xs text-muted-foreground/70 mt-0.5">{fmtWhen(a.created_at)}</p>
               </div>
             </div>
           );

@@ -157,7 +157,7 @@ export function UserMenu({ rail }: Props) {
           <>
             {avatarNode}
             <div className="min-w-0 flex-1">
-              <p className="text-[11px] font-medium text-foreground truncate flex items-center gap-1" title={me?.email ?? ''}>
+              <p className="text-xs font-medium text-foreground truncate flex items-center gap-1" title={me?.email ?? ''}>
                 <span className="truncate">
                   {me?.name ?? me?.email ?? (me?.is_guest ? 'Guest' : 'Signed in')}
                 </span>
@@ -168,7 +168,7 @@ export function UserMenu({ rail }: Props) {
                   </svg>
                 )}
               </p>
-              <p className="text-[10px] text-muted-foreground truncate" title={me?.org_name ?? ''}>
+              <p className="text-xs text-muted-foreground truncate" title={me?.org_name ?? ''}>
                 {me?.is_guest
                   ? 'Guest mode · sign in for full features'
                   : me?.org_name
@@ -211,6 +211,10 @@ type DropdownPanelProps = {
 };
 
 function DropdownPanel({ me, onSignOut, onClose, anchor }: DropdownPanelProps) {
+  // live reflection of the current theme for the toggle's label/icon
+  const [isDark, setIsDark] = useState(
+    typeof document !== 'undefined' && document.documentElement.classList.contains('dark'),
+  );
   // Position:
   //   full: open upward (anchor at sidebar bottom; downward would clip).
   //   rail: open to the right of the avatar (rail is too narrow for
@@ -242,19 +246,19 @@ function DropdownPanel({ me, onSignOut, onClose, anchor }: DropdownPanelProps) {
               {me?.name ?? me?.email ?? 'Signed in'}
             </p>
             {me?.email && me?.name && (
-              <p className="text-[10px] text-muted-foreground truncate" title={me.email}>{me.email}</p>
+              <p className="text-xs text-muted-foreground truncate" title={me.email}>{me.email}</p>
             )}
           </div>
         </div>
         {me?.org_name && (
-          <p className="mt-2 text-[10px] text-muted-foreground truncate">
+          <p className="mt-2 text-xs text-muted-foreground truncate">
             <span className="text-muted-foreground">org · </span>
             <span className="font-medium text-foreground/90">{me.org_name}</span>
             {me.role && <> · <span className="capitalize">{me.role}</span></>}
           </p>
         )}
         {me?.is_guest && (
-          <p className="mt-2 text-[10px] text-amber-700 bg-amber-50 border border-amber-200 px-2 py-1 rounded">
+          <p className="mt-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 px-2 py-1 rounded">
             Guest mode — sign in with GitHub for full access
           </p>
         )}
@@ -286,9 +290,22 @@ function DropdownPanel({ me, onSignOut, onClose, anchor }: DropdownPanelProps) {
           </svg>
           App settings
         </Link>
+        <button
+          type="button"
+          role="menuitem"
+          onClick={() => { void import('../lib/theme').then((m) => { m.toggleTheme(); setIsDark((d) => !d); }); }}
+          className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-foreground/90 hover:bg-muted transition-colors"
+        >
+          {isDark ? (
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-muted-foreground"><circle cx="12" cy="12" r="5" /><line x1="12" y1="1" x2="12" y2="3" /><line x1="12" y1="21" x2="12" y2="23" /><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" /><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" /><line x1="1" y1="12" x2="3" y2="12" /><line x1="21" y1="12" x2="23" y2="12" /><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" /><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" /></svg>
+          ) : (
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-muted-foreground"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" /></svg>
+          )}
+          {isDark ? 'Light mode' : 'Dark mode'}
+        </button>
       </div>
 
-      <div className="border-t border-slate-100 py-1">
+      <div className="border-t border-border py-1">
         <button
           type="button"
           role="menuitem"

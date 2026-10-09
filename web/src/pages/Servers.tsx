@@ -449,7 +449,7 @@ const Servers = () => {
                     <button
                       key={st}
                       onClick={() => setFilter((f) => f === st ? 'all' : st)}
-                      className={`text-[11px] px-2 py-0.5 rounded-full border font-medium transition-colors ${
+                      className={`text-xs px-2 py-0.5 rounded-full border font-medium transition-colors ${
                         filterStatus === st ? m.badge + ' ring-1 ring-offset-1 ring-current' : m.badge
                       }`}
                     >
@@ -460,7 +460,7 @@ const Servers = () => {
                 {filterStatus !== 'all' && (
                   <button
                     onClick={() => setFilter('all')}
-                    className="text-[11px] text-muted-foreground hover:text-foreground/90 transition-colors"
+                    className="text-xs text-muted-foreground hover:text-foreground/90 transition-colors"
                   >
                     ✕ clear
                   </button>

@@ -236,7 +236,7 @@ export default function LocalNode() {
             return (
               <div key={idx} className="flex items-center flex-1 last:flex-none">
                 <div className="flex items-center gap-1.5">
-                  <span className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-semibold border transition-colors ${
+                  <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-semibold border transition-colors ${
                     done    ? 'bg-primary text-white border-primary' :
                     active  ? 'bg-card text-destructive border-red-400' :
                               'bg-card text-muted-foreground border-border'
@@ -260,7 +260,7 @@ export default function LocalNode() {
                 WatchTower will run as a background service. Pick the resource profile that fits your machine.
               </p>
               {autoDetectedProfile && (
-                <p className="text-[11px] text-emerald-700 mt-2 inline-flex items-center gap-1">
+                <p className="text-xs text-emerald-700 mt-2 inline-flex items-center gap-1">
                   <span>✓</span>
                   Auto-detected: <strong>{autoDetectedProfile}</strong> based on your CPU + RAM. Override below if you prefer.
                 </p>
@@ -288,10 +288,10 @@ export default function LocalNode() {
                     <div className="flex items-center gap-2">
                       <span className="text-lg">{p.icon}</span>
                       <span className="font-semibold text-sm text-foreground">{p.label}</span>
-                      <span className="text-[11px] text-muted-foreground ml-auto">{p.concurrency} concurrent job{p.concurrency > 1 ? 's' : ''}</span>
+                      <span className="text-xs text-muted-foreground ml-auto">{p.concurrency} concurrent job{p.concurrency > 1 ? 's' : ''}</span>
                     </div>
                     <p className="text-xs text-muted-foreground mt-1">{p.desc}</p>
-                    <div className="flex gap-4 mt-2 text-[11px] text-muted-foreground">
+                    <div className="flex gap-4 mt-2 text-xs text-muted-foreground">
                       <span>CPU: <b>{p.cpu}</b></span>
                       <span>RAM: <b>{p.ram}</b></span>
                     </div>
@@ -450,12 +450,12 @@ export default function LocalNode() {
                 {cmd}
                 <button
                   onClick={() => void copyCmd(cmd)}
-                  className="absolute top-2 right-2 px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 text-slate-200 text-[10px] transition-colors"
+                  className="absolute top-2 right-2 px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs transition-colors"
                 >
                   {copied ? '✓ Copied' : 'Copy'}
                 </button>
               </div>
-              <p className="text-[11px] text-muted-foreground mt-2">
+              <p className="text-xs text-muted-foreground mt-2">
                 The agent runs as a systemd (Linux), launchd (macOS) or Windows Service — it starts automatically on boot.
               </p>
             </div>
@@ -472,7 +472,7 @@ export default function LocalNode() {
             </div>
 
             {nodeId && (
-              <div className="text-[11px] text-muted-foreground font-mono">
+              <div className="text-xs text-muted-foreground font-mono">
                 Node ID: {nodeId}
               </div>
             )}

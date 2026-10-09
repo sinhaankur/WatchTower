@@ -235,7 +235,7 @@ function DiagramFrame({
         {children}
       </svg>
       {caption && (
-        <p className="text-[11px] text-muted-foreground mt-1.5 text-center">{caption}</p>
+        <p className="text-xs text-muted-foreground mt-1.5 text-center">{caption}</p>
       )}
     </div>
   );

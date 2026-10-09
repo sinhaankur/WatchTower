@@ -125,7 +125,7 @@ export function DiagnosticsCard() {
           </p>
         </div>
         {report?.summary && (
-          <div className="shrink-0 flex items-center gap-1 text-[10px] font-medium uppercase tracking-wide">
+          <div className="shrink-0 flex items-center gap-1 text-xs font-medium uppercase tracking-wide">
             {(report.summary.fail ?? 0) > 0 && (
               <span className={`px-2 py-0.5 rounded-full border ${STATUS_BADGE.fail}`}>
                 {report.summary.fail} fail
@@ -175,13 +175,13 @@ export function DiagnosticsCard() {
                 <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
                   <span className="text-xs font-medium text-foreground">{c.name}</span>
                   {c.detail && (
-                    <span className="text-[11px] text-muted-foreground font-mono break-all">
+                    <span className="text-xs text-muted-foreground font-mono break-all">
                       {c.detail}
                     </span>
                   )}
                 </div>
                 {c.hint && (
-                  <p className="text-[11px] text-muted-foreground mt-0.5">
+                  <p className="text-xs text-muted-foreground mt-0.5">
                     <span className="text-muted-foreground">↳ </span>
                     {c.hint}
                   </p>
@@ -197,7 +197,7 @@ export function DiagnosticsCard() {
           type="button"
           onClick={() => void load()}
           disabled={loading}
-          className="text-[11px] px-2.5 py-1 rounded border border-border text-foreground/90 hover:bg-muted disabled:opacity-50"
+          className="text-xs px-2.5 py-1 rounded border border-border text-foreground/90 hover:bg-muted disabled:opacity-50"
         >
           {loading ? 'Re-running…' : 'Re-run'}
         </button>
@@ -205,12 +205,12 @@ export function DiagnosticsCard() {
           type="button"
           onClick={() => void copyReport()}
           disabled={!report}
-          className="text-[11px] px-2.5 py-1 rounded border border-border text-foreground/90 hover:bg-muted disabled:opacity-50"
+          className="text-xs px-2.5 py-1 rounded border border-border text-foreground/90 hover:bg-muted disabled:opacity-50"
         >
           {copied ? 'Copied' : 'Copy report'}
         </button>
         {report && (
-          <span className="ml-auto text-[10px] text-muted-foreground font-mono">
+          <span className="ml-auto text-xs text-muted-foreground font-mono">
             v{report.version}
           </span>
         )}

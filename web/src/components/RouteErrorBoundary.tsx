@@ -95,7 +95,7 @@ export class RouteErrorBoundary extends Component<Props, State> {
                 The rest of the app is fine — only this page failed to render.
               </p>
             </div>
-            <span className="shrink-0 inline-flex text-[10px] px-2 py-0.5 rounded-full border border-destructive/40 bg-destructive/10 text-destructive font-medium uppercase tracking-wide">
+            <span className="shrink-0 inline-flex text-xs px-2 py-0.5 rounded-full border border-destructive/40 bg-destructive/10 text-destructive font-medium uppercase tracking-wide">
               Render error
             </span>
           </div>
@@ -119,7 +119,7 @@ export class RouteErrorBoundary extends Component<Props, State> {
           </div>
 
           <div className="rounded-md bg-muted border border-border p-3 mb-3">
-            <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1">
+            <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">
               {error.name || 'Error'}
             </p>
             <p className="text-sm font-mono text-foreground break-all">
@@ -131,7 +131,7 @@ export class RouteErrorBoundary extends Component<Props, State> {
             <summary className="text-xs text-foreground/90 cursor-pointer select-none hover:text-foreground">
               Stack trace
             </summary>
-            <pre className="mt-2 text-[11px] bg-slate-900 text-slate-100 rounded-md p-3 overflow-auto max-h-64 font-mono whitespace-pre-wrap">
+            <pre className="mt-2 text-xs bg-slate-900 text-slate-100 rounded-md p-3 overflow-auto max-h-64 font-mono whitespace-pre-wrap">
               {error.stack || '(no stack)'}
             </pre>
           </details>
@@ -141,7 +141,7 @@ export class RouteErrorBoundary extends Component<Props, State> {
               <summary className="text-xs text-foreground/90 cursor-pointer select-none hover:text-foreground">
                 Component stack
               </summary>
-              <pre className="mt-2 text-[11px] bg-slate-900 text-slate-100 rounded-md p-3 overflow-auto max-h-48 font-mono whitespace-pre-wrap">
+              <pre className="mt-2 text-xs bg-slate-900 text-slate-100 rounded-md p-3 overflow-auto max-h-48 font-mono whitespace-pre-wrap">
                 {componentStack}
               </pre>
             </details>

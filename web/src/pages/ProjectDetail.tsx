@@ -327,7 +327,7 @@ function HealthCheckCard({ projectId }: { projectId: string }) {
     <div className="rounded-xl border border-border bg-card overflow-hidden">
       <div className="px-5 py-4 border-b border-border bg-muted/30 flex items-center gap-3">
         <h2 className="text-sm font-semibold flex-1">Health Check</h2>
-        <span className="text-[10px] text-muted-foreground">on-demand probe</span>
+        <span className="text-xs text-muted-foreground">on-demand probe</span>
       </div>
       <div className="px-5 py-4 space-y-3">
         <p className="text-xs text-muted-foreground">
@@ -335,7 +335,7 @@ function HealthCheckCard({ projectId }: { projectId: string }) {
           monitoring + auto-rollback ship in v2 — this is the foundation.
         </p>
         <div className="flex items-center gap-2">
-          <label className="text-[11px] text-muted-foreground w-20 shrink-0">Path</label>
+          <label className="text-xs text-muted-foreground w-20 shrink-0">Path</label>
           <input
             type="text"
             value={path}
@@ -355,29 +355,29 @@ function HealthCheckCard({ projectId }: { projectId: string }) {
         {result && (
           <div className={`rounded border p-3 space-y-1 ${statusColor}`}>
             <div className="flex items-center gap-2">
-              <span className="text-[10px] uppercase font-bold tracking-wide">{result.status.replace('_', ' ')}</span>
+              <span className="text-xs uppercase font-bold tracking-wide">{result.status.replace('_', ' ')}</span>
               {result.response_code !== null && (
-                <span className="text-[10px] font-mono">HTTP {result.response_code}</span>
+                <span className="text-xs font-mono">HTTP {result.response_code}</span>
               )}
               {result.latency_ms !== null && result.latency_ms > 0 && (
-                <span className="text-[10px] font-mono">{result.latency_ms} ms</span>
+                <span className="text-xs font-mono">{result.latency_ms} ms</span>
               )}
             </div>
             {result.url && (
-              <p className="text-[11px] font-mono break-all opacity-80">{result.url}</p>
+              <p className="text-xs font-mono break-all opacity-80">{result.url}</p>
             )}
             {result.error && (
-              <p className="text-[11px] opacity-80">{result.error}</p>
+              <p className="text-xs opacity-80">{result.error}</p>
             )}
             {(() => {
               const hint = _healthCheckHint(result);
               if (!hint) return null;
               return (
                 <div className="mt-2 pt-2 border-t border-current/20 space-y-1">
-                  <p className="text-[10px] uppercase font-bold tracking-wide opacity-70">
+                  <p className="text-xs uppercase font-bold tracking-wide opacity-70">
                     Suggested fix
                   </p>
-                  <p className="text-[11px] opacity-90">{hint}</p>
+                  <p className="text-xs opacity-90">{hint}</p>
                 </div>
               );
             })()}
@@ -630,7 +630,7 @@ function GoLiveCard({ project }: { project: Project }) {
                       <span className="font-medium">{s.title}</span>
                       {s.detail && <span className="text-muted-foreground"> — {s.detail}</span>}
                       {s.instructions && s.instructions.length > 0 && (
-                        <pre className="mt-1 p-2 bg-slate-950 text-slate-100 rounded text-[11px] overflow-auto whitespace-pre-wrap">
+                        <pre className="mt-1 p-2 bg-slate-950 text-slate-100 rounded text-xs overflow-auto whitespace-pre-wrap">
                           {s.instructions.join('\n')}
                         </pre>
                       )}
@@ -846,7 +846,7 @@ function DatabaseLinksCard({ project }: { project: { id: string } }) {
             {error && (
               <p className="text-xs text-destructive break-all">{error}</p>
             )}
-            <p className="text-[11px] text-muted-foreground">
+            <p className="text-xs text-muted-foreground">
               The env var is injected fresh on every deploy — password rotations on the DB are picked up automatically.
             </p>
           </div>
@@ -885,10 +885,10 @@ function ProjectDbLinkRow({
         <span className="text-xs font-semibold text-foreground truncate">
           {link.database_name}
         </span>
-        <span className="text-[11px] px-1.5 py-0.5 rounded-full border font-medium bg-muted text-muted-foreground border-border">
+        <span className="text-xs px-1.5 py-0.5 rounded-full border font-medium bg-muted text-muted-foreground border-border">
           {link.database_engine}
         </span>
-        <span className={`text-[11px] px-1.5 py-0.5 rounded-full border font-medium ${
+        <span className={`text-xs px-1.5 py-0.5 rounded-full border font-medium ${
           link.database_kind === 'managed'
             ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
             : 'bg-violet-50 text-violet-700 border-violet-200'
@@ -896,7 +896,7 @@ function ProjectDbLinkRow({
           {link.database_kind}
         </span>
         {!link.is_active && (
-          <span className="text-[11px] px-1.5 py-0.5 rounded-full border font-medium bg-amber-50 text-amber-800 border-amber-200">
+          <span className="text-xs px-1.5 py-0.5 rounded-full border font-medium bg-amber-50 text-amber-800 border-amber-200">
             paused
           </span>
         )}
@@ -905,7 +905,7 @@ function ProjectDbLinkRow({
         <button
           onClick={onToggleActive}
           disabled={disabled}
-          className="px-2 py-1 rounded-md border border-border text-[11px] text-foreground/90 hover:bg-muted transition-colors disabled:opacity-50"
+          className="px-2 py-1 rounded-md border border-border text-xs text-foreground/90 hover:bg-muted transition-colors disabled:opacity-50"
           title={link.is_active ? 'Pause injection (does not unlink)' : 'Resume injection'}
         >
           {link.is_active ? 'Pause' : 'Resume'}
@@ -913,7 +913,7 @@ function ProjectDbLinkRow({
         <button
           onClick={onRemove}
           disabled={disabled}
-          className="px-2 py-1 rounded-md border border-destructive/30 text-[11px] text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-50"
+          className="px-2 py-1 rounded-md border border-destructive/30 text-xs text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-50"
         >
           Unlink
         </button>
@@ -1181,7 +1181,7 @@ function RunAsContainerCard({ project }: { project: Project }) {
     <div className="rounded-xl border border-border bg-card overflow-hidden">
       <div className="px-5 py-4 border-b border-border bg-muted/30 flex items-center justify-between">
         <h2 className="text-sm font-semibold">Run as Container</h2>
-        <span className="text-[10px] uppercase tracking-wide font-semibold text-amber-700 bg-amber-100 rounded px-2 py-0.5">
+        <span className="text-xs uppercase tracking-wide font-semibold text-amber-700 bg-amber-100 rounded px-2 py-0.5">
           Phase 1
         </span>
       </div>
@@ -1321,7 +1321,7 @@ function AutonomousModeCard({ project }: { project: Project }) {
     <div className="rounded-xl border border-border bg-card overflow-hidden">
       <div className="px-5 py-4 border-b border-border bg-muted/30 flex items-center justify-between">
         <h2 className="text-sm font-semibold">Autonomous Mode</h2>
-        <span className="text-[10px] uppercase tracking-wide font-semibold text-purple-700 bg-purple-100 rounded px-2 py-0.5">
+        <span className="text-xs uppercase tracking-wide font-semibold text-purple-700 bg-purple-100 rounded px-2 py-0.5">
           Phase 4
         </span>
       </div>
@@ -1347,7 +1347,7 @@ function AutonomousModeCard({ project }: { project: Project }) {
         {enabled && status && status.entries.length > 0 && (
           <details className="text-xs">
             <summary className="cursor-pointer text-muted-foreground hover:text-foreground">Per-node detail ({status.entries.length})</summary>
-            <ul className="mt-2 space-y-1 font-mono text-[11px]">
+            <ul className="mt-2 space-y-1 font-mono text-xs">
               {status.entries.map((e) => (
                 <li key={`${e.project_id}:${e.node_id}`} className="flex gap-4">
                   <span className="text-muted-foreground">node {e.node_id.slice(0, 8)}</span>
@@ -1539,7 +1539,7 @@ function DeploymentsTab({ projectId }: { projectId: string }) {
                       {(d.commit_sha || '—').slice(0, 8)}
                     </Link>
                     {d.commit_message && (
-                      <div className="text-[11px] text-muted-foreground truncate max-w-[14rem]" title={d.commit_message}>
+                      <div className="text-xs text-muted-foreground truncate max-w-[14rem]" title={d.commit_message}>
                         {d.commit_message}
                       </div>
                     )}
@@ -1563,7 +1563,7 @@ function DeploymentsTab({ projectId }: { projectId: string }) {
                       {isFailed && (
                         <button
                           onClick={() => void runDiagnose(d.id)}
-                          className="text-[11px] px-2 py-1 rounded border border-border hover:border-slate-500 text-muted-foreground hover:text-foreground transition-colors"
+                          className="text-xs px-2 py-1 rounded border border-border hover:border-slate-500 text-muted-foreground hover:text-foreground transition-colors"
                         >
                           {diag ? 'Hide' : 'Diagnose'}
                         </button>
@@ -1573,7 +1573,7 @@ function DeploymentsTab({ projectId }: { projectId: string }) {
                           onClick={() => void runRollback(d.id)}
                           disabled={isRollingBack}
                           title="Roll back to the previous successful deployment"
-                          className="text-[11px] px-2 py-1 rounded border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-800 transition-colors disabled:opacity-50"
+                          className="text-xs px-2 py-1 rounded border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-800 transition-colors disabled:opacity-50"
                         >
                           {isRollingBack ? 'Rolling back…' : '↶ Rollback'}
                         </button>
@@ -1680,7 +1680,7 @@ function DiagnosisPanel({ state, deploymentId, onApplied }: DiagnosisPanelProps)
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-2">
-        <span className={`text-[10px] px-2 py-0.5 rounded-full border font-medium ${
+        <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${
           isUnknown
             ? 'border-border bg-muted text-foreground/90'
             : 'border-amber-300 bg-amber-50 text-amber-800'
@@ -1688,7 +1688,7 @@ function DiagnosisPanel({ state, deploymentId, onApplied }: DiagnosisPanelProps)
           {KIND_LABEL[d.kind]}
         </span>
         {d.fix.auto_applicable && (
-          <span className="text-[10px] px-2 py-0.5 rounded-full border font-medium border-emerald-300 bg-emerald-50 text-emerald-700">
+          <span className="text-xs px-2 py-0.5 rounded-full border font-medium border-emerald-300 bg-emerald-50 text-emerald-700">
             Auto-fixable
           </span>
         )}
@@ -1697,10 +1697,10 @@ function DiagnosisPanel({ state, deploymentId, onApplied }: DiagnosisPanelProps)
       <p className="text-xs text-foreground">{d.cause}</p>
 
       <div className="rounded border border-border bg-card p-3 space-y-2">
-        <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Suggested fix</p>
+        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Suggested fix</p>
         <p className="text-xs text-foreground">{d.fix.description}</p>
         {d.fix.command && (
-          <code className="block text-[11px] font-mono bg-muted rounded px-2 py-1 text-foreground/90">
+          <code className="block text-xs font-mono bg-muted rounded px-2 py-1 text-foreground/90">
             {d.fix.command}
           </code>
         )}
@@ -1709,13 +1709,13 @@ function DiagnosisPanel({ state, deploymentId, onApplied }: DiagnosisPanelProps)
             <button
               onClick={() => void applyFix()}
               disabled={applying}
-              className="text-[11px] px-3 py-1 rounded border border-border bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-retro disabled:opacity-60"
+              className="text-xs px-3 py-1 rounded border border-border bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-retro disabled:opacity-60"
               title="Apply the suggested fix and trigger a fresh deployment"
             >
               {applying ? 'Applying…' : 'Apply fix'}
             </button>
             {applyResult && (
-              <span className={`text-[11px] ${applyResult.ok ? 'text-emerald-700' : 'text-destructive'}`}>
+              <span className={`text-xs ${applyResult.ok ? 'text-emerald-700' : 'text-destructive'}`}>
                 {applyResult.msg}
               </span>
             )}
@@ -1724,9 +1724,9 @@ function DiagnosisPanel({ state, deploymentId, onApplied }: DiagnosisPanelProps)
       </div>
 
       {d.matched_text && (
-        <details className="text-[11px] text-muted-foreground">
+        <details className="text-xs text-muted-foreground">
           <summary className="cursor-pointer">Matched log line</summary>
-          <pre className="mt-1 px-2 py-1 bg-muted rounded font-mono text-[10px] text-foreground/90 whitespace-pre-wrap">
+          <pre className="mt-1 px-2 py-1 bg-muted rounded font-mono text-xs text-foreground/90 whitespace-pre-wrap">
             {d.matched_text}
           </pre>
         </details>
@@ -1734,7 +1734,7 @@ function DiagnosisPanel({ state, deploymentId, onApplied }: DiagnosisPanelProps)
 
       {isUnknown && (
         <div className="space-y-2">
-          <p className="text-[11px] text-muted-foreground">
+          <p className="text-xs text-muted-foreground">
             No automatic pattern matched this failure.
             {d.agent_prompt && ' With an LLM connected (Settings → AI & Autonomy), WatchTower analyzes failures like this automatically — or copy the prompt for any AI assistant.'}
           </p>
@@ -1749,14 +1749,14 @@ function DiagnosisPanel({ state, deploymentId, onApplied }: DiagnosisPanelProps)
                 catch { /* clipboard blocked — user can re-copy from log */ }
                 window.location.assign('/settings');
               }}
-              className="text-[11px] px-3 py-1 rounded border border-border bg-card hover:bg-muted text-foreground font-semibold shadow-retro"
+              className="text-xs px-3 py-1 rounded border border-border bg-card hover:bg-muted text-foreground font-semibold shadow-retro"
               title="Copy the diagnosis prompt and open AI & Autonomy settings"
             >
               Copy prompt & open AI settings →
             </button>
           )}
           {!d.agent_prompt && (
-            <p className="text-[11px] text-muted-foreground">
+            <p className="text-xs text-muted-foreground">
               Open the Build Logs tab to investigate manually.
             </p>
           )}
@@ -2137,7 +2137,7 @@ function WebhooksTab({ projectId }: { projectId: string }) {
           <button
             type="button"
             onClick={() => setShowGuide((v) => !v)}
-            className="text-[11px] text-blue-700 hover:underline whitespace-nowrap"
+            className="text-xs text-blue-700 hover:underline whitespace-nowrap"
           >
             {showGuide ? 'Hide setup guide' : 'How do I get a webhook URL?'}
           </button>
@@ -2208,7 +2208,7 @@ function WebhooksTab({ projectId }: { projectId: string }) {
             value={url}
             onChange={e => { setUrl(e.target.value); setTestResult(null); }}
             placeholder={provider === 'slack' ? 'https://hooks.slack.com/services/…' : provider === 'discord' ? 'https://discord.com/api/webhooks/…' : 'https://ntfy.sh/your-topic'}
-            className="flex-1 min-w-[280px] border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 bg-background font-mono text-[12px]"
+            className="flex-1 min-w-[280px] border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 bg-background font-mono text-sm"
           />
           <input
             value={label}
@@ -2571,13 +2571,13 @@ function DomainsTab({ projectId }: { projectId: string }) {
 
       <section className="rounded-xl border border-border bg-card p-4 space-y-3">
         <h2 className="text-sm font-semibold text-foreground">Add a domain</h2>
-        <p className="text-[11px] text-muted-foreground">
+        <p className="text-xs text-muted-foreground">
           Adding a domain here records it on the project. Automatic DNS sync to Cloudflare requires a Cloudflare API token configured under{' '}
           <a href="/integrations" className="underline hover:text-foreground/90">Integrations → Cloudflare</a>.
           Without it, you'll still need to point the DNS record at this server manually.
         </p>
         {creds && creds.length === 0 && (
-          <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-2 text-[11px] text-amber-800">
+          <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-2 text-xs text-amber-800">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="mt-0.5 shrink-0">
               <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
               <line x1="12" y1="9" x2="12" y2="13" />
@@ -2733,7 +2733,7 @@ function DomainRow({
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
           <p className="text-sm font-medium text-foreground">{domain.domain}</p>
-          <p className="text-[11px] text-muted-foreground">
+          <p className="text-xs text-muted-foreground">
             {synced ? (
               <>
                 ✓ Cloudflare DNS → <code className="font-mono">{domain.cloudflare_target_ip}</code>
@@ -2754,7 +2754,7 @@ function DomainRow({
             <button
               type="button"
               onClick={() => setShowSync(true)}
-              className="text-[11px] px-2 py-1 rounded bg-orange-600 hover:bg-orange-700 text-white font-medium"
+              className="text-xs px-2 py-1 rounded bg-orange-600 hover:bg-orange-700 text-white font-medium"
             >
               Sync to Cloudflare
             </button>
@@ -2765,7 +2765,7 @@ function DomainRow({
               onClick={() => void loadStats()}
               disabled={statsBusy}
               title="See how much traffic Cloudflare's edge served instead of this machine"
-              className="text-[11px] px-2 py-1 rounded border border-border text-foreground/90 hover:bg-muted disabled:opacity-50 font-medium"
+              className="text-xs px-2 py-1 rounded border border-border text-foreground/90 hover:bg-muted disabled:opacity-50 font-medium"
             >
               {statsBusy ? 'Loading…' : statsOpen ? 'Hide CDN stats' : 'CDN stats'}
             </button>
@@ -2776,7 +2776,7 @@ function DomainRow({
               onClick={() => void purge()}
               disabled={busy}
               title="Clear Cloudflare's edge cache so visitors see the latest deploy immediately"
-              className="text-[11px] px-2 py-1 rounded border border-orange-300 text-orange-700 hover:bg-orange-50 disabled:opacity-50 font-medium"
+              className="text-xs px-2 py-1 rounded border border-orange-300 text-orange-700 hover:bg-orange-50 disabled:opacity-50 font-medium"
             >
               {busy ? 'Purging…' : 'Purge cache'}
             </button>
@@ -2786,7 +2786,7 @@ function DomainRow({
               type="button"
               onClick={() => void unsync()}
               disabled={busy}
-              className="text-[11px] text-destructive hover:text-destructive underline underline-offset-2 disabled:opacity-50"
+              className="text-xs text-destructive hover:text-destructive underline underline-offset-2 disabled:opacity-50"
             >
               Remove from CF
             </button>
@@ -2797,7 +2797,7 @@ function DomainRow({
       {showSync && (
         <div className="mt-3 rounded-md border border-orange-200 bg-orange-50 p-3 space-y-2">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            <label className="block text-[11px] text-foreground/90">
+            <label className="block text-xs text-foreground/90">
               Cloudflare account
               <select
                 value={credId}
@@ -2809,7 +2809,7 @@ function DomainRow({
                 ))}
               </select>
             </label>
-            <label className="block text-[11px] text-foreground/90">
+            <label className="block text-xs text-foreground/90">
               Target IP (A record)
               <input
                 type="text"
@@ -2820,7 +2820,7 @@ function DomainRow({
               />
             </label>
           </div>
-          <label className="flex items-start gap-2 text-[11px] text-foreground/90">
+          <label className="flex items-start gap-2 text-xs text-foreground/90">
             <input
               type="checkbox"
               checked={proxied}
@@ -2834,12 +2834,12 @@ function DomainRow({
               deploy. Turn off for direct-connection services (SSH, game servers).
             </span>
           </label>
-          {error && <p className="text-[11px] text-destructive">{error}</p>}
+          {error && <p className="text-xs text-destructive">{error}</p>}
           <div className="flex gap-2 justify-end">
             <button
               type="button"
               onClick={() => { setShowSync(false); setError(null); }}
-              className="text-[11px] px-2 py-1 rounded border border-border text-foreground/90 hover:bg-muted"
+              className="text-xs px-2 py-1 rounded border border-border text-foreground/90 hover:bg-muted"
             >
               Cancel
             </button>
@@ -2847,7 +2847,7 @@ function DomainRow({
               type="button"
               onClick={() => void sync()}
               disabled={busy || !credId || !targetIp.trim()}
-              className="text-[11px] px-2 py-1 rounded bg-orange-600 hover:bg-orange-700 disabled:opacity-50 text-white font-medium"
+              className="text-xs px-2 py-1 rounded bg-orange-600 hover:bg-orange-700 disabled:opacity-50 text-white font-medium"
             >
               {busy ? 'Syncing…' : 'Verify & sync'}
             </button>
@@ -2858,24 +2858,24 @@ function DomainRow({
       {statsOpen && stats && (
         <div className="mt-3 rounded-md border border-border bg-muted p-3">
           {stats.note ? (
-            <p className="text-[11px] text-muted-foreground">{stats.note}</p>
+            <p className="text-xs text-muted-foreground">{stats.note}</p>
           ) : (
             <>
               <div className="grid grid-cols-3 gap-3 text-center">
                 <div>
                   <p className="text-lg font-semibold text-orange-600">{Math.round(stats.cache_hit_ratio * 100)}%</p>
-                  <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Served from edge</p>
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Served from edge</p>
                 </div>
                 <div>
                   <p className="text-lg font-semibold text-emerald-600">{_fmtBytes(stats.bytes_saved)}</p>
-                  <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Off your uplink</p>
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Off your uplink</p>
                 </div>
                 <div>
                   <p className="text-lg font-semibold text-foreground">{stats.total_requests.toLocaleString()}</p>
-                  <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Requests</p>
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Requests</p>
                 </div>
               </div>
-              <p className="mt-2 text-[10px] text-muted-foreground text-center">
+              <p className="mt-2 text-xs text-muted-foreground text-center">
                 Cloudflare served <strong>{_fmtBytes(stats.bytes_saved)}</strong> of{' '}
                 {_fmtBytes(stats.total_bytes)} from its edge — bandwidth this machine didn’t have to.
                 {stats.since && <> · last {stats.since.slice(0, 10)} → {stats.until?.slice(0, 10)}</>}
@@ -3035,7 +3035,7 @@ function RunLocallyCard({ projectId }: { projectId: string }) {
       <div className="px-5 py-4 border-b border-border bg-muted/30 flex items-center justify-between">
         <div>
           <h2 className="text-sm font-semibold">Run Locally</h2>
-          <p className="text-[11px] text-muted-foreground mt-0.5">
+          <p className="text-xs text-muted-foreground mt-0.5">
             Serve the latest build on a localhost URL. Static sites work
             without any extra tooling — WatchTower spins up a built-in
             preview server.
@@ -3089,12 +3089,12 @@ function RunLocallyCard({ projectId }: { projectId: string }) {
                 {run.url} ↗
               </a>
               {run.started_at && (
-                <span className="text-[11px] text-muted-foreground">
+                <span className="text-xs text-muted-foreground">
                   Up <span className="tabular-nums">{_uptimeLabel(run.started_at)}</span>
                 </span>
               )}
             </div>
-            <p className="text-[11px] text-muted-foreground">
+            <p className="text-xs text-muted-foreground">
               {run.kind === 'python-http-server' ? (
                 <>
                   Mode: <code className="font-mono">python http.server</code>
@@ -3148,13 +3148,13 @@ function RunLocallyCard({ projectId }: { projectId: string }) {
             {logsOpen && (
               <div className="rounded-lg border border-border bg-slate-950 overflow-hidden">
                 <div className="px-3 py-2 border-b border-border bg-slate-900 flex items-center justify-between">
-                  <div className="flex items-center gap-3 text-[11px] text-slate-300">
+                  <div className="flex items-center gap-3 text-xs text-slate-300">
                     <span className="font-medium">Container logs</span>
                     <span className="text-muted-foreground">last 200 lines</span>
                     {logsLoading && <span className="text-muted-foreground">refreshing…</span>}
                   </div>
                   <div className="flex items-center gap-3">
-                    <label className="flex items-center gap-1.5 text-[11px] text-slate-300 cursor-pointer">
+                    <label className="flex items-center gap-1.5 text-xs text-slate-300 cursor-pointer">
                       <input
                         type="checkbox"
                         checked={autoFollow}
@@ -3166,13 +3166,13 @@ function RunLocallyCard({ projectId }: { projectId: string }) {
                     <button
                       type="button"
                       onClick={() => void fetchLogs()}
-                      className="text-[11px] text-slate-300 hover:text-white"
+                      className="text-xs text-slate-300 hover:text-white"
                     >
                       Refresh
                     </button>
                   </div>
                 </div>
-                <pre className="p-3 m-0 text-[11px] leading-snug text-slate-200 font-mono overflow-auto max-h-72 whitespace-pre-wrap break-words">
+                <pre className="p-3 m-0 text-xs leading-snug text-slate-200 font-mono overflow-auto max-h-72 whitespace-pre-wrap break-words">
                   {logs || (logsLoading ? '' : '(no output yet — try refreshing or trigger some traffic)')}
                 </pre>
               </div>

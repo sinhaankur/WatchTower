@@ -557,7 +557,7 @@ const Login = () => {
               <button
                 type="button"
                 onClick={() => setLoggedInUser({ name: 'Test User', email: 'test@example.com', isTest: true })}
-                className="text-[11px] text-muted-foreground hover:text-foreground underline underline-offset-2"
+                className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2"
               >
                 Test logged-in success screen
               </button>
@@ -733,13 +733,13 @@ const Login = () => {
                           ? '✓ Click → GitHub gives you a short code to enter'
                           : '✓ Click → browser opens GitHub → returns here automatically'}
                       </p>
-                      <p className="text-[11px] text-muted-foreground">
+                      <p className="text-xs text-muted-foreground">
                         Method: <span className="font-medium">{deviceFlowReady ? 'Device Flow' : 'OAuth redirect'}</span>
                         {deviceFlowReady && oauthReady && ' (Device Flow preferred — no callback URL needed)'}
                       </p>
                     </div>
                   ) : (
-                    <p className="text-[11px] text-muted-foreground text-center">
+                    <p className="text-xs text-muted-foreground text-center">
                       To enable: set <code className="font-mono bg-muted px-1 rounded">WATCHTOWER_GITHUB_DEVICE_CLIENT_ID</code> in <code className="font-mono bg-muted px-1 rounded">.env</code>, then restart. Sign in with the API token below in the meantime.
                     </p>
                   )}
@@ -775,7 +775,7 @@ const Login = () => {
                   >
                     Continue as Guest →
                   </button>
-                  <p className="text-[11px] text-muted-foreground mt-0.5">
+                  <p className="text-xs text-muted-foreground mt-0.5">
                     No sign-in. Can browse projects + deploy to localhost only. No remote SSH nodes, no team management, no private repos.
                   </p>
                 </div>
@@ -791,7 +791,7 @@ const Login = () => {
                     >
                       Quick dev login →
                     </button>
-                    <p className="text-[11px] text-amber-700 mt-0.5">
+                    <p className="text-xs text-amber-700 mt-0.5">
                       ⚠ Server has <code className="font-mono bg-amber-50 px-1 rounded">WATCHTOWER_ALLOW_INSECURE_DEV_AUTH=true</code>. Skip in production.
                     </p>
                   </div>
@@ -827,7 +827,7 @@ const Login = () => {
                       </span>
                     ) : 'Sign in with API token'}
                   </Button>
-                  <details className="mt-1.5 text-[11px] text-muted-foreground">
+                  <details className="mt-1.5 text-xs text-muted-foreground">
                     <summary className="cursor-pointer hover:text-foreground/90">What is this?</summary>
                     <div className="mt-1.5 space-y-1 text-muted-foreground">
                       <p>The <code className="font-mono bg-muted px-1 rounded">WATCHTOWER_API_TOKEN</code> set on the server. <strong>Not</strong> a GitHub PAT.</p>
@@ -841,7 +841,7 @@ const Login = () => {
             {/* Per-login consent line — every sign-in reaffirms agreement.
                 The full documents render in the post-login LegalGate and
                 live in legal/ on GitHub. */}
-            <p className="mt-4 text-[11px] text-muted-foreground text-center leading-relaxed">
+            <p className="mt-4 text-xs text-muted-foreground text-center leading-relaxed">
               By signing in you agree to this installation's{' '}
               <a href="https://github.com/sinhaankur/WatchTower/blob/main/legal/TERMS_OF_USE.md" target="_blank" rel="noopener noreferrer" className="underline hover:text-muted-foreground">Terms of Use</a>,{' '}
               <a href="https://github.com/sinhaankur/WatchTower/blob/main/legal/ACCEPTABLE_USE.md" target="_blank" rel="noopener noreferrer" className="underline hover:text-muted-foreground">Acceptable Use Policy</a>, and{' '}

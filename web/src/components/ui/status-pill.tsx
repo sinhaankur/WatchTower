@@ -98,7 +98,7 @@ export function StatusPill({
 }) {
   const t = TONE[tone];
   const padding = size === 'xs' ? 'px-1.5 py-0' : 'px-2 py-0.5';
-  const text = size === 'xs' ? 'text-[10px]' : 'text-xs';
+  const text = size === 'xs' ? 'text-xs' : 'text-xs';
   return (
     <span
       className={`inline-flex items-center gap-1 rounded-full border font-medium ${padding} ${text} ${t.bg} ${t.text} ${t.border} ${className}`}

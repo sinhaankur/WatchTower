@@ -88,7 +88,7 @@ function UpdateBanner() {
 
   return (
     <div className="flex items-center gap-3 px-4 py-2 bg-amber-50 border-b border-amber-200 text-amber-900 text-xs">
-      <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-amber-400 text-amber-900 text-[10px] font-bold">!</span>
+      <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-amber-400 text-amber-900 text-xs font-bold">!</span>
       <span className="flex-1">
         <strong>WatchTower {data.latest}</strong> is available
         {data.current && <> — you're on <span className="font-mono">{data.current}</span></>}.
@@ -319,7 +319,7 @@ const ADVANCED_ITEMS: NavItem[] = [
 // things" mental map without screaming for attention.
 function NavSectionLabel({ children }: { children: ReactNode }) {
   return (
-    <div className="px-3 pt-3 pb-1.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/70">
+    <div className="px-3 pt-3 pb-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground/70">
       {children}
     </div>
   );
@@ -335,7 +335,7 @@ function NavBadge({ count, active }: { count: number; active: boolean }) {
   return (
     <span
       aria-label={`${count} active`}
-      className={`ml-auto text-[10px] font-semibold tabular-nums px-1.5 py-0.5 rounded-full transition-colors ${
+      className={`ml-auto text-xs font-semibold tabular-nums px-1.5 py-0.5 rounded-full transition-colors ${
         active
           ? 'bg-primary/15 text-primary'
           : 'bg-muted text-muted-foreground'
@@ -368,7 +368,7 @@ function NavLink({ item, pathname, onClick, rail, badge }: NavLinkProps) {
       onClick={onClick}
       title={tooltip}
       aria-label={rail ? item.label : undefined}
-      className={`group flex items-center gap-2.5 rounded-md text-[13px] font-medium transition-colors duration-instant ${
+      className={`group flex items-center gap-2.5 rounded-md text-sm font-medium transition-colors duration-instant ${
         rail ? 'justify-center px-2 py-2' : 'px-3 py-1.5'
       } ${
         active
@@ -489,7 +489,7 @@ export default function Layout({ children }: { children: ReactNode }) {
           title={rail ? 'New site' : undefined}
           className={`flex items-center justify-center gap-2 w-full ${
             rail ? 'py-2' : 'py-1.5 px-3'
-          } rounded-md bg-primary hover:bg-primary/90 transition-colors text-primary-foreground text-[13px] font-semibold shadow-retro`}
+          } rounded-md bg-primary hover:bg-primary/90 transition-colors text-primary-foreground text-sm font-semibold shadow-retro`}
         >
           <IconPlus />
           {!rail && <>New site</>}
@@ -500,13 +500,13 @@ export default function Layout({ children }: { children: ReactNode }) {
         <button
           type="button"
           onClick={openCommandPalette}
-          className="mx-3 mb-2 flex items-center gap-2 px-3 py-1.5 rounded-md border border-border bg-card hover:bg-muted text-[12px] text-muted-foreground hover:text-foreground transition-colors"
+          className="mx-3 mb-2 flex items-center gap-2 px-3 py-1.5 rounded-md border border-border bg-card hover:bg-muted text-sm text-muted-foreground hover:text-foreground transition-colors"
         >
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
           </svg>
           <span className="flex-1 text-left">Search…</span>
-          <kbd className="text-[10px] font-mono text-muted-foreground border border-border px-1 rounded">⌘K</kbd>
+          <kbd className="text-xs font-mono text-muted-foreground border border-border px-1 rounded">⌘K</kbd>
         </button>
       )}
 
@@ -550,7 +550,7 @@ export default function Layout({ children }: { children: ReactNode }) {
               type="button"
               onClick={toggleMore}
               aria-expanded={moreExpanded}
-              className="w-full flex items-center gap-2.5 rounded-md px-3 py-1.5 text-[13px] font-medium text-muted-foreground/70 hover:text-foreground transition-colors"
+              className="w-full flex items-center gap-2.5 rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground/70 hover:text-foreground transition-colors"
             >
               <svg
                 width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"
@@ -611,7 +611,7 @@ export default function Layout({ children }: { children: ReactNode }) {
             href="https://github.com/sponsors/sinhaankur"
             target="_blank"
             rel="noopener noreferrer"
-            className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-md border border-border-soft px-2 py-1.5 text-[11px] font-medium text-foreground hover:bg-muted transition-colors"
+            className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-md border border-border-soft px-2 py-1.5 text-xs font-medium text-foreground hover:bg-muted transition-colors"
             title="Support WatchTower's development"
           >
             <span className="text-primary">♥</span> Support
@@ -619,7 +619,7 @@ export default function Layout({ children }: { children: ReactNode }) {
           <Link
             to="/report-bug"
             onClick={onNavClick}
-            className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-md border border-border-soft px-2 py-1.5 text-[11px] font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors [&_svg]:size-3.5"
+            className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-md border border-border-soft px-2 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors [&_svg]:size-3.5"
             title="Report a bug"
           >
             <IconBug /> Report Bug
@@ -629,11 +629,11 @@ export default function Layout({ children }: { children: ReactNode }) {
             a thin top border. The "update available" affordance is the
             only thing meant to draw the eye when relevant. */}
         <div className="mt-3 pt-2 px-1 border-t border-border-soft flex items-center justify-between">
-          <span className="text-[10px] text-muted-foreground tracking-wide flex items-center gap-1.5">
+          <span className="text-xs text-muted-foreground tracking-wide flex items-center gap-1.5">
             <span>WatchTower{versionLabel ? ` ${versionLabel}` : ''}</span>
             {envInfo && (envInfo.mode !== 'desktop' || envInfo.env !== 'production' || envInfo.insecure_dev_auth) && (
               <span
-                className={`px-1 py-px rounded text-[9px] font-semibold uppercase tracking-wider ${
+                className={`px-1 py-px rounded text-xs font-semibold uppercase tracking-wider ${
                   envInfo.insecure_dev_auth
                     ? 'bg-red-100 text-destructive border border-destructive/40'
                     : envInfo.env === 'production'
@@ -650,7 +650,7 @@ export default function Layout({ children }: { children: ReactNode }) {
             <button
               type="button"
               onClick={() => void triggerUpdate(updateData.release_url)}
-              className="text-[10px] text-amber-700 hover:text-amber-900 font-medium inline-flex items-center gap-1"
+              className="text-xs text-amber-700 hover:text-amber-900 font-medium inline-flex items-center gap-1"
               title={`Update to ${updateData.latest} — click to install`}
             >
               <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />

@@ -2,6 +2,8 @@ import animate from 'tailwindcss-animate';
 
 /** @type {import('tailwindcss').Config} */
 export default {
+  // class-based dark mode: a `.dark` class on <html> flips the whole token set.
+  darkMode: 'class',
   content: [
     "./index.html",
     "./src/**/*.{js,ts,jsx,tsx}",

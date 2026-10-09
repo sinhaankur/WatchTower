@@ -19,12 +19,12 @@ export default function BrandLogo({ size = 'md', withLabel = false, subtitle = '
         className={`${classes.box} rounded-md border-2 border-slate-900 bg-amber-200 flex items-center justify-center shadow-[2px_2px_0_0_#0f172a]`}
         aria-hidden
       >
-        <span className="text-[0.68rem] font-extrabold tracking-tight text-destructive">Wt</span>
+        <span className="text-xs font-extrabold tracking-tight text-destructive">Wt</span>
       </div>
       {withLabel && (
         <div className="leading-tight">
           <p className="text-sm font-semibold tracking-tight text-foreground">WatchTower</p>
-          <p className="text-[10px] text-muted-foreground">{subtitle}</p>
+          <p className="text-xs text-muted-foreground">{subtitle}</p>
         </div>
       )}
     </div>

@@ -143,7 +143,7 @@ export default function BackupDestinationsCard() {
                 <button type="button" onClick={() => void remove(d.id)} className="text-muted-foreground hover:text-destructive transition-colors shrink-0">Remove</button>
               </div>
               {testResult?.id === d.id && (
-                <p className={`text-[11px] mt-1 ${testResult.ok ? 'text-emerald-600' : 'text-destructive'}`}>
+                <p className={`text-xs mt-1 ${testResult.ok ? 'text-emerald-600' : 'text-destructive'}`}>
                   {testResult.ok ? 'Connectivity OK — probe file delivered.' : (testResult.detail || 'Test failed.')}
                 </p>
               )}

@@ -23,7 +23,7 @@ function CopyBtn({ text, label }: { text: string; label: string }) {
           window.setTimeout(() => setCopied(false), 1500);
         } catch { /* ignore */ }
       }}
-      className="px-2 py-0.5 rounded border border-border bg-card text-foreground text-[11px] hover:bg-muted transition-colors shrink-0"
+      className="px-2 py-0.5 rounded border border-border bg-card text-foreground text-xs hover:bg-muted transition-colors shrink-0"
     >
       {copied ? 'Copied' : label}
     </button>
@@ -50,9 +50,9 @@ export default function GuidedSshSetup({ onUseKey }: { onUseKey: (path: string) 
 
       {open && (
         <div className="px-3 pb-3 space-y-3">
-          {isLoading && <p className="text-[11px] text-muted-foreground">Preparing key…</p>}
+          {isLoading && <p className="text-xs text-muted-foreground">Preparing key…</p>}
           {error && (
-            <p className="text-[11px] text-destructive">
+            <p className="text-xs text-destructive">
               Could not prepare an SSH key (is ssh-keygen available on the host?).
             </p>
           )}
@@ -60,15 +60,15 @@ export default function GuidedSshSetup({ onUseKey }: { onUseKey: (path: string) 
             <>
               <div>
                 <div className="flex items-center justify-between gap-2 mb-1">
-                  <p className="text-[11px] font-medium text-foreground">
+                  <p className="text-xs font-medium text-foreground">
                     1. Authorize this key on the remote machine
                   </p>
                   <CopyBtn text={data.authorize_command} label="Copy command" />
                 </div>
-                <pre className="text-[10px] text-muted-foreground bg-card border border-border rounded p-2 whitespace-pre-wrap break-all">
+                <pre className="text-xs text-muted-foreground bg-card border border-border rounded p-2 whitespace-pre-wrap break-all">
                   {data.authorize_command}
                 </pre>
-                <p className="text-[10px] text-muted-foreground mt-1">
+                <p className="text-xs text-muted-foreground mt-1">
                   Run it once on the server (over your existing access), or paste the key into{' '}
                   <span className="font-mono">~/.ssh/authorized_keys</span>.
                 </p>
@@ -76,7 +76,7 @@ export default function GuidedSshSetup({ onUseKey }: { onUseKey: (path: string) 
 
               <div>
                 <div className="flex items-center justify-between gap-2 mb-1">
-                  <p className="text-[11px] font-medium text-foreground">2. Use it for this server</p>
+                  <p className="text-xs font-medium text-foreground">2. Use it for this server</p>
                   <CopyBtn text={data.public_key} label="Copy public key" />
                 </div>
                 <button
@@ -86,7 +86,7 @@ export default function GuidedSshSetup({ onUseKey }: { onUseKey: (path: string) 
                 >
                   Use this key
                 </button>
-                <p className="text-[10px] text-muted-foreground mt-1">
+                <p className="text-xs text-muted-foreground mt-1">
                   Fills the SSH key path below with WatchTower's managed key. Then add the server.
                 </p>
               </div>
