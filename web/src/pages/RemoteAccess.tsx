@@ -12,18 +12,24 @@
  */
 
 import { useEffect, useState } from 'react';
-import { ExternalLink, Activity, Monitor, RefreshCw, CheckCircle2, XCircle } from 'lucide-react';
+import { ExternalLink, Activity, Monitor, RefreshCw, CheckCircle2, XCircle, Link2, Boxes } from 'lucide-react';
 import { RemoteAccessDiagram } from '@/components/SectionDiagrams';
 import {
   type RemoteAccessProvider,
   type TailnetPeer,
   type PeerHealth,
+  type ManagedDevice,
+  type DeviceView,
   useDisableRemoteAccess,
   useEnableRemoteAccess,
   useRemoteAccessDefaultPort,
   useRemoteAccessProviders,
   useTailnetDevices,
   usePeerHealth,
+  useManagedDevices,
+  usePairDevice,
+  useUnpairDevice,
+  useDeviceView,
 } from '@/hooks/queries';
 
 export default function RemoteAccess() {
@@ -186,17 +192,17 @@ function ProviderCard({
       )}
 
       {provider.sharing && provider.url && (
-        <div className="rounded-lg border border-emerald-200 bg-emerald-500/15 px-3 py-2 space-y-2">
+        <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 space-y-2">
           <p className="text-xs uppercase tracking-wide text-emerald-500 dark:text-emerald-400 font-semibold">
             Sharing on
           </p>
           <div className="flex items-center gap-2">
-            <code className="flex-1 font-mono text-xs text-emerald-900 break-all">
+            <code className="flex-1 font-mono text-xs text-emerald-700 dark:text-emerald-300 break-all">
               {provider.url}
             </code>
             <button
               onClick={copyUrl}
-              className="px-2 py-1 rounded-md border border-emerald-300 bg-card text-xs text-emerald-800 hover:bg-emerald-100 transition-colors"
+              className="px-2 py-1 rounded-md border border-emerald-500/30 bg-card text-xs text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/10 transition-colors"
             >
               {copied ? 'Copied' : 'Copy'}
             </button>
@@ -289,9 +295,15 @@ function StatusBadge({ provider }: { provider: RemoteAccessProvider }) {
  */
 function TailnetDevices() {
   const { data, isLoading, error, refetch, isFetching } = useTailnetDevices();
+  const { data: paired } = useManagedDevices();
+  const [consoleDevice, setConsoleDevice] = useState<ManagedDevice | null>(null);
+  const [pairing, setPairing] = useState<TailnetPeer | null>(null);
   const peers = data?.peers ?? [];
   const managed = peers.filter((p) => p.runs_watchtower);
   const others = peers.filter((p) => !p.runs_watchtower);
+
+  // Map a peer's IP → its paired record (if we've paired it for management).
+  const pairedByIp = new Map((paired ?? []).map((d) => [d.ip, d]));
 
   return (
     <section className="rounded-xl border border-border bg-card p-5 space-y-4">
@@ -333,7 +345,13 @@ function TailnetDevices() {
       {managed.length > 0 && (
         <div className="space-y-2">
           {managed.map((peer) => (
-            <DeviceRow key={peer.ip} peer={peer} />
+            <DeviceRow
+              key={peer.ip}
+              peer={peer}
+              paired={pairedByIp.get(peer.ip) ?? null}
+              onPair={() => setPairing(peer)}
+              onManage={(dev) => setConsoleDevice(dev)}
+            />
           ))}
         </div>
       )}
@@ -355,11 +373,28 @@ function TailnetDevices() {
           </div>
         </details>
       )}
+
+      {pairing && (
+        <PairDialog peer={pairing} onClose={() => setPairing(null)} onPaired={(d) => { setPairing(null); setConsoleDevice(d); }} />
+      )}
+      {consoleDevice && (
+        <RemoteConsole device={consoleDevice} onClose={() => setConsoleDevice(null)} />
+      )}
     </section>
   );
 }
 
-function DeviceRow({ peer }: { peer: TailnetPeer }) {
+function DeviceRow({
+  peer,
+  paired,
+  onPair,
+  onManage,
+}: {
+  peer: TailnetPeer;
+  paired: ManagedDevice | null;
+  onPair: () => void;
+  onManage: (device: ManagedDevice) => void;
+}) {
   const health = usePeerHealth();
   const [live, setLive] = useState<PeerHealth | null>(null);
 
@@ -411,11 +446,31 @@ function DeviceRow({ peer }: { peer: TailnetPeer }) {
             )}
             Health
           </button>
+          {paired ? (
+            <button
+              onClick={() => onManage(paired)}
+              title="Open this device inside WatchTower"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent text-accent-foreground text-xs font-medium hover:bg-accent/90 transition-colors"
+            >
+              <Boxes size={13} />
+              Manage
+            </button>
+          ) : (
+            <button
+              onClick={onPair}
+              title="Pair this device so you can manage it from here"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-accent/40 text-accent text-xs font-medium hover:bg-accent/10 transition-colors"
+            >
+              <Link2 size={13} />
+              Pair
+            </button>
+          )}
           <a
             href={peer.watchtower_url}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent text-accent-foreground text-xs font-medium hover:bg-accent/90 transition-colors"
+            title="Open this device's UI in a new browser tab"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-foreground text-xs font-medium hover:border-accent/50 hover:bg-muted transition-colors"
           >
             Open
             <ExternalLink size={13} />
@@ -426,5 +481,181 @@ function DeviceRow({ peer }: { peer: TailnetPeer }) {
         <p className="mt-2 text-xs text-destructive">Couldn’t reach this device to check health.</p>
       )}
     </div>
+  );
+}
+
+/* ---------------------------------------------------------------- pairing + console */
+
+function Overlay({ children, onClose }: { children: React.ReactNode; onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={onClose}>
+      <div
+        className="bg-card rounded-2xl border border-border shadow-xl w-full max-w-2xl mx-4 max-h-[85vh] overflow-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function PairDialog({
+  peer,
+  onClose,
+  onPaired,
+}: {
+  peer: TailnetPeer;
+  onClose: () => void;
+  onPaired: (device: ManagedDevice) => void;
+}) {
+  const pair = usePairDevice();
+  const [token, setToken] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const port = Number(new URL(peer.watchtower_url).port) || 8000;
+
+  const submit = () => {
+    if (!token.trim()) return setError('Paste the device’s API token.');
+    setError(null);
+    pair.mutate(
+      { name: peer.hostname, ip: peer.ip, port, token: token.trim() },
+      {
+        onSuccess: onPaired,
+        onError: (err) => {
+          const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+          setError(typeof detail === 'string' ? detail : 'Could not pair this device.');
+        },
+      },
+    );
+  };
+
+  return (
+    <Overlay onClose={onClose}>
+      <div className="p-6">
+        <h2 className="text-base font-semibold text-foreground">Pair {peer.hostname}</h2>
+        <p className="text-xs text-muted-foreground mt-1">
+          To manage <span className="font-mono">{peer.ip}</span> from here, paste its API token once.
+          It’s stored encrypted and used to authenticate over your tailnet — nothing leaves this machine.
+        </p>
+        <p className="text-xs text-muted-foreground mt-2">
+          On that device: open its WatchTower → Settings → copy the API token.
+        </p>
+        <input
+          type="password"
+          value={token}
+          onChange={(e) => setToken(e.target.value)}
+          placeholder="Paste API token"
+          autoComplete="off"
+          spellCheck={false}
+          className="mt-4 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-accent/50"
+        />
+        {error && (
+          <div className="mt-3 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive break-all">
+            {error}
+          </div>
+        )}
+        <div className="mt-5 flex items-center justify-end gap-2">
+          <button
+            onClick={onClose}
+            disabled={pair.isPending}
+            className="px-3 py-1.5 rounded-lg border border-border text-xs text-foreground/90 hover:bg-muted transition-colors disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={submit}
+            disabled={pair.isPending}
+            className="px-4 py-1.5 rounded-lg bg-accent text-accent-foreground text-xs font-medium hover:bg-accent/90 transition-colors disabled:opacity-50"
+          >
+            {pair.isPending ? 'Pairing…' : 'Pair device'}
+          </button>
+        </div>
+      </div>
+    </Overlay>
+  );
+}
+
+const CONSOLE_VIEWS: { id: DeviceView; label: string }[] = [
+  { id: 'projects', label: 'Projects' },
+  { id: 'containers', label: 'Containers' },
+  { id: 'deployments', label: 'Deployments' },
+];
+
+/**
+ * RemoteConsole — the single-pane, VMware-style inline view of a paired device.
+ * Read-first: it shows the remote box's projects / containers / deploys, fetched
+ * through the token-authed proxy. Write actions are a deliberate follow-up.
+ */
+function RemoteConsole({ device, onClose }: { device: ManagedDevice; onClose: () => void }) {
+  const unpair = useUnpairDevice();
+  const [view, setView] = useState<DeviceView>('projects');
+  const { data, isLoading, error } = useDeviceView(device.id, view, true);
+
+  const rows = Array.isArray(data?.data) ? (data!.data as Record<string, unknown>[]) : [];
+  const upstreamError = data && data.status >= 400;
+
+  return (
+    <Overlay onClose={onClose}>
+      <div className="flex items-center justify-between gap-3 px-5 py-4 border-b border-border sticky top-0 bg-card">
+        <div className="flex items-center gap-2 min-w-0">
+          <Monitor size={16} className="text-accent shrink-0" />
+          <div className="min-w-0">
+            <h2 className="text-base font-semibold text-foreground truncate">{device.name}</h2>
+            <p className="text-xs text-muted-foreground font-mono">{device.ip}:{device.port}</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={() => { if (confirm(`Unpair ${device.name}? You can re-pair it anytime.`)) unpair.mutate(device.id, { onSuccess: onClose }); }}
+            className="px-2.5 py-1.5 rounded-lg border border-border text-xs text-muted-foreground hover:text-destructive hover:border-destructive/40 transition-colors"
+          >
+            Unpair
+          </button>
+          <button onClick={onClose} className="px-2.5 py-1.5 rounded-lg border border-border text-xs text-foreground hover:bg-muted transition-colors">
+            Close
+          </button>
+        </div>
+      </div>
+
+      <div className="px-5 pt-3 flex items-center gap-1 border-b border-border">
+        {CONSOLE_VIEWS.map((v) => (
+          <button
+            key={v.id}
+            onClick={() => setView(v.id)}
+            className={`px-3 py-2 text-xs font-medium border-b-2 -mb-px transition-colors ${
+              view === v.id ? 'border-accent text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            {v.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="p-5 min-h-[160px]">
+        {isLoading && <p className="text-xs text-muted-foreground">Loading {view} from {device.name}…</p>}
+        {error && <p className="text-xs text-destructive">Couldn’t reach {device.name}. Is it online on the tailnet?</p>}
+        {upstreamError && !error && (
+          <p className="text-xs text-destructive">
+            {device.name} returned an error ({data?.status}). The stored token may have changed — try re-pairing.
+          </p>
+        )}
+        {!isLoading && !error && !upstreamError && rows.length === 0 && (
+          <p className="text-xs text-muted-foreground">No {view} on {device.name}.</p>
+        )}
+        {!isLoading && !error && !upstreamError && rows.length > 0 && (
+          <div className="space-y-1.5">
+            {rows.map((row, i) => (
+              <div key={(row.id as string) ?? i} className="flex items-center gap-3 rounded-lg border border-border bg-background/60 px-3 py-2 text-xs">
+                <span className="font-medium text-foreground truncate">
+                  {(row.name as string) ?? (row.id as string) ?? `item ${i + 1}`}
+                </span>
+                {typeof row.status === 'string' && (
+                  <span className="ml-auto font-mono text-muted-foreground">{row.status}</span>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </Overlay>
   );
 }

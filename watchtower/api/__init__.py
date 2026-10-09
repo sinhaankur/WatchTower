@@ -634,6 +634,8 @@ from watchtower.api import podman  # noqa: E402
 app.include_router(podman.router)
 from watchtower.api import this_pc  # noqa: E402
 app.include_router(this_pc.router)
+from watchtower.api import managed_devices  # noqa: E402
+app.include_router(managed_devices.router)
 
 # ── Serve React SPA from web/dist (same-origin, no proxy needed) ──────────────
 # Resolution order:

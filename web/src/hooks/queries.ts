@@ -1138,6 +1138,61 @@ export function usePeerHealth() {
   });
 }
 
+// ── Managed devices — pair + operate another WatchTower box from this console ─
+
+export type ManagedDevice = {
+  id: string;
+  name: string;
+  ip: string;
+  port: number;
+  has_token: boolean;
+};
+
+export function useManagedDevices() {
+  return useQuery<ManagedDevice[]>({
+    queryKey: ['managed-devices'],
+    queryFn: async () => (await apiClient.get<ManagedDevice[]>('/managed-devices')).data,
+    staleTime: 15_000,
+  });
+}
+
+export function usePairDevice() {
+  const qc = useQueryClient();
+  return useMutation<ManagedDevice, unknown, { name: string; ip: string; port: number; token: string }>({
+    mutationFn: async (body) => (await apiClient.post<ManagedDevice>('/managed-devices', body)).data,
+    onSuccess: () => { void qc.invalidateQueries({ queryKey: ['managed-devices'] }); },
+  });
+}
+
+export function useUnpairDevice() {
+  const qc = useQueryClient();
+  return useMutation<{ ok: boolean; id: string }, unknown, string>({
+    mutationFn: async (id) => (await apiClient.delete<{ ok: boolean; id: string }>(`/managed-devices/${id}`)).data,
+    onSuccess: () => { void qc.invalidateQueries({ queryKey: ['managed-devices'] }); },
+  });
+}
+
+export type DeviceView = 'projects' | 'containers' | 'deployments' | 'health' | 'me';
+
+export type DeviceViewResult = {
+  device_id: string;
+  view: DeviceView;
+  status: number;
+  data: unknown;
+};
+
+/** Read one of a paired device's resources inline (proxied with its token). */
+export function useDeviceView(deviceId: string | null, view: DeviceView, enabled: boolean) {
+  return useQuery<DeviceViewResult>({
+    queryKey: ['managed-devices', deviceId, 'view', view],
+    queryFn: async () =>
+      (await apiClient.get<DeviceViewResult>(`/managed-devices/${deviceId}/view/${view}`)).data,
+    enabled: enabled && !!deviceId,
+    staleTime: 10_000,
+    retry: false,
+  });
+}
+
 export function useSetAutoFailover() {
   const qc = useQueryClient();
   return useMutation<
