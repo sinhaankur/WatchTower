@@ -358,10 +358,12 @@ async def lifespan(_app: FastAPI):
 
 _enable_docs = os.getenv("WATCHTOWER_ENABLE_DOCS", "false").lower() == "true"
 
+from watchtower import __version__ as _wt_version  # single source of truth
+
 app = FastAPI(
     title="WatchTower API",
     description="Unified deployment platform - Netlify + Vercel + Self-hosted",
-    version="2.0.0",
+    version=_wt_version,
     lifespan=lifespan,
     docs_url="/docs" if _enable_docs else None,
     redoc_url="/redoc" if _enable_docs else None,
@@ -543,7 +545,7 @@ async def root():
     index = _WEB_DIST / "index.html"
     if index.is_file():
         return FileResponse(str(index), headers=_INDEX_NO_CACHE_HEADERS)
-    return {"message": "WatchTower API", "version": "2.0.0", "docs": "/docs"}
+    return {"message": "WatchTower API", "version": _wt_version, "docs": "/docs"}
 
 
 @app.get("/health", tags=["Health"])
