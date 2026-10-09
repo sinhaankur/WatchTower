@@ -50,8 +50,8 @@ export default function NetworkMap({ nodes }: { nodes: MapNode[] }) {
   return (
     <section className="rounded-xl border border-border bg-card px-5 py-4 mb-5">
       <div className="flex items-baseline justify-between gap-3 flex-wrap">
-        <h2 className="text-sm font-semibold text-slate-900">Your network</h2>
-        <p className="text-[11px] text-slate-500">
+        <h2 className="text-sm font-semibold text-foreground">Your network</h2>
+        <p className="text-[11px] text-muted-foreground">
           Dashed lines are encrypted connections from this PC. Nothing here is public unless you publish it.
         </p>
       </div>
@@ -116,7 +116,7 @@ export default function NetworkMap({ nodes }: { nodes: MapNode[] }) {
         )}
       </svg>
 
-      <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-slate-500">
+      <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-muted-foreground">
         <span className="inline-flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" /> healthy</span>
         <span className="inline-flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-red-500 inline-block" /> unhealthy</span>
         <span className="inline-flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-slate-400 inline-block" /> offline</span>

@@ -144,8 +144,8 @@ export default function EmailCard() {
           </svg>
         </div>
         <div className="flex-1 min-w-0">
-          <h2 className="text-sm font-semibold text-slate-900">Email (SMTP)</h2>
-          <p className="text-xs text-slate-500">
+          <h2 className="text-sm font-semibold text-foreground">Email (SMTP)</h2>
+          <p className="text-xs text-muted-foreground">
             Connect a mail server so team invitations send automatically instead of you sharing a link.
           </p>
         </div>
@@ -167,7 +167,7 @@ export default function EmailCard() {
               className={`text-xs px-3 py-1 rounded-full border transition-colors ${
                 activePreset.id === p.id
                   ? 'border-border bg-slate-900 text-white'
-                  : 'border-slate-300 text-slate-600 hover:border-slate-500 hover:text-slate-900'
+                  : 'border-border text-muted-foreground hover:border-slate-500 hover:text-foreground'
               }`}
             >
               {p.label}
@@ -176,10 +176,10 @@ export default function EmailCard() {
         </div>
 
         {activePreset.hint && (
-          <p className="text-[11px] text-slate-500">
+          <p className="text-[11px] text-muted-foreground">
             {activePreset.hint}{' '}
             {activePreset.help && (
-              <a href={activePreset.help} target="_blank" rel="noopener noreferrer" className="underline hover:text-slate-700">
+              <a href={activePreset.help} target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground/90">
                 Set one up →
               </a>
             )}
@@ -189,22 +189,22 @@ export default function EmailCard() {
         {/* Host + port */}
         <div className="grid sm:grid-cols-3 gap-3">
           <label className="block sm:col-span-2">
-            <span className="text-[11px] text-slate-600">SMTP host</span>
+            <span className="text-[11px] text-muted-foreground">SMTP host</span>
             <input
               type="text"
               value={host}
               placeholder="smtp.gmail.com"
               onChange={(e) => { setHost(e.target.value); setDirty(true); setTestResult(null); }}
-              className="mt-1 w-full text-xs font-mono rounded-lg border border-slate-300 px-3 py-2 focus:outline-none focus:border-slate-700"
+              className="mt-1 w-full text-xs font-mono rounded-lg border border-border px-3 py-2 focus:outline-none focus:border-slate-700"
             />
           </label>
           <label className="block">
-            <span className="text-[11px] text-slate-600">Port</span>
+            <span className="text-[11px] text-muted-foreground">Port</span>
             <input
               type="number"
               value={port}
               onChange={(e) => { setPort(Number(e.target.value) || 0); setDirty(true); setTestResult(null); }}
-              className="mt-1 w-full text-xs font-mono rounded-lg border border-slate-300 px-3 py-2 focus:outline-none focus:border-slate-700"
+              className="mt-1 w-full text-xs font-mono rounded-lg border border-border px-3 py-2 focus:outline-none focus:border-slate-700"
             />
           </label>
         </div>
@@ -212,18 +212,18 @@ export default function EmailCard() {
         {/* User + password */}
         <div className="grid sm:grid-cols-2 gap-3">
           <label className="block">
-            <span className="text-[11px] text-slate-600">Username</span>
+            <span className="text-[11px] text-muted-foreground">Username</span>
             <input
               type="text"
               value={user}
               placeholder="you@example.com"
               autoComplete="off"
               onChange={(e) => { setUser(e.target.value); setDirty(true); setTestResult(null); }}
-              className="mt-1 w-full text-xs font-mono rounded-lg border border-slate-300 px-3 py-2 focus:outline-none focus:border-slate-700"
+              className="mt-1 w-full text-xs font-mono rounded-lg border border-border px-3 py-2 focus:outline-none focus:border-slate-700"
             />
           </label>
           <label className="block">
-            <span className="text-[11px] text-slate-600">
+            <span className="text-[11px] text-muted-foreground">
               Password {config?.has_password ? '(saved — leave blank to keep)' : '(app password)'}
             </span>
             <input
@@ -232,7 +232,7 @@ export default function EmailCard() {
               placeholder={config?.has_password ? '••••••••' : 'app password'}
               autoComplete="new-password"
               onChange={(e) => { setPassword(e.target.value); setDirty(true); setTestResult(null); }}
-              className="mt-1 w-full text-xs font-mono rounded-lg border border-slate-300 px-3 py-2 focus:outline-none focus:border-slate-700"
+              className="mt-1 w-full text-xs font-mono rounded-lg border border-border px-3 py-2 focus:outline-none focus:border-slate-700"
             />
           </label>
         </div>
@@ -240,13 +240,13 @@ export default function EmailCard() {
         {/* From + TLS */}
         <div className="grid sm:grid-cols-2 gap-3 items-end">
           <label className="block">
-            <span className="text-[11px] text-slate-600">From address</span>
+            <span className="text-[11px] text-muted-foreground">From address</span>
             <input
               type="text"
               value={from}
               placeholder="you@example.com"
               onChange={(e) => { setFrom(e.target.value); setDirty(true); setTestResult(null); }}
-              className="mt-1 w-full text-xs font-mono rounded-lg border border-slate-300 px-3 py-2 focus:outline-none focus:border-slate-700"
+              className="mt-1 w-full text-xs font-mono rounded-lg border border-border px-3 py-2 focus:outline-none focus:border-slate-700"
             />
           </label>
           <label className="flex items-center gap-2 cursor-pointer pb-2">
@@ -256,7 +256,7 @@ export default function EmailCard() {
               onChange={(e) => { setUseTls(e.target.checked); setDirty(true); setTestResult(null); }}
               className="accent-sky-500"
             />
-            <span className="text-xs text-slate-700">Use STARTTLS (leave on unless using a port-25 relay)</span>
+            <span className="text-xs text-foreground/90">Use STARTTLS (leave on unless using a port-25 relay)</span>
           </label>
         </div>
 
@@ -266,14 +266,14 @@ export default function EmailCard() {
             onClick={() => void handleTest()}
             disabled={testEmail.isPending || !config?.configured || dirty}
             title={dirty ? 'Save your changes first' : 'Send yourself a test email'}
-            className="text-xs px-3 py-2 rounded-lg border border-slate-300 text-slate-700 hover:border-slate-500 hover:text-slate-900 disabled:opacity-50"
+            className="text-xs px-3 py-2 rounded-lg border border-border text-foreground/90 hover:border-slate-500 hover:text-foreground disabled:opacity-50"
           >
             {testEmail.isPending ? 'Sending…' : 'Send test email'}
           </button>
           <button
             onClick={() => void handleSave()}
             disabled={updateConfig.isPending || !dirty}
-            className="text-xs px-4 py-2 rounded-lg border border-border bg-amber-400 hover:bg-amber-500 text-slate-900 font-semibold shadow-retro disabled:opacity-50"
+            className="text-xs px-4 py-2 rounded-lg border border-border bg-amber-400 hover:bg-amber-500 text-foreground font-semibold shadow-retro disabled:opacity-50"
           >
             {updateConfig.isPending ? 'Saving…' : 'Save'}
           </button>
@@ -283,21 +283,21 @@ export default function EmailCard() {
           <p className={`text-xs rounded px-3 py-2 border ${
             testResult.ok
               ? 'text-emerald-700 bg-emerald-50 border-emerald-200'
-              : 'text-red-700 bg-red-50 border-red-200'
+              : 'text-destructive bg-destructive/10 border-destructive/30'
           }`}>
             {testResult.msg}
           </p>
         )}
 
         {!isLoading && !config?.configured && !testResult && (
-          <p className="text-xs text-slate-500 bg-slate-50 border border-slate-200 rounded px-3 py-2">
+          <p className="text-xs text-muted-foreground bg-muted border border-border rounded px-3 py-2">
             No mail server connected yet. Until you add one, team invitations still work — WatchTower
             gives you a secure link to share manually. Add SMTP here to have invitations delivered by
             email automatically. Pick a provider above, fill in your credentials, then Save → Send test email.
           </p>
         )}
         {config?.source === 'env' && (
-          <p className="text-[11px] text-slate-400">
+          <p className="text-[11px] text-muted-foreground">
             Currently configured via environment variables — saving here overrides them.
           </p>
         )}

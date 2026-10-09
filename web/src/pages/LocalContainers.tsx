@@ -101,8 +101,8 @@ export default function LocalContainers() {
     <div className="max-w-5xl mx-auto px-6 py-8">
       <header className="mb-6 flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-xl font-semibold text-slate-900">Containers</h1>
-          <p className="mt-1 text-sm text-slate-500">
+          <h1 className="text-xl font-semibold text-foreground">Containers</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
             Manage Podman on this machine: create containers and pods, start/stop anything,
             and see what WatchTower projects are running locally. Auto-refreshes.
           </p>
@@ -110,7 +110,7 @@ export default function LocalContainers() {
         <button
           type="button"
           onClick={() => void load()}
-          className="text-xs px-3 py-1.5 rounded-md border border-slate-300 hover:bg-slate-50"
+          className="text-xs px-3 py-1.5 rounded-md border border-border hover:bg-muted"
         >
           Refresh
         </button>
@@ -121,50 +121,50 @@ export default function LocalContainers() {
         <PodmanManager />
       </div>
 
-      <h2 className="text-sm font-semibold text-slate-900 mb-3">WatchTower project containers</h2>
+      <h2 className="text-sm font-semibold text-foreground mb-3">WatchTower project containers</h2>
 
       {error && (
-        <div className="rounded-lg border border-red-300 bg-red-50 p-3 mb-4 text-xs text-red-800">
+        <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-3 mb-4 text-xs text-destructive">
           {error}
         </div>
       )}
 
       {items === null ? (
-        <div className="rounded-xl border border-slate-200 bg-white overflow-hidden" aria-busy="true">
+        <div className="rounded-xl border border-border bg-card overflow-hidden" aria-busy="true">
           <Skeleton.Row />
           <Skeleton.Row />
           <Skeleton.Row />
         </div>
       ) : items.length === 0 ? (
-        <div className="rounded-xl border border-slate-200 bg-white p-8 text-center">
-          <p className="text-sm font-medium text-slate-900">No containers running</p>
-          <p className="mt-1 text-xs text-slate-500">
+        <div className="rounded-xl border border-border bg-card p-8 text-center">
+          <p className="text-sm font-medium text-foreground">No containers running</p>
+          <p className="mt-1 text-xs text-muted-foreground">
             Open any project's detail page and click <strong>Run Locally</strong> to spin up a Podman container here.
           </p>
         </div>
       ) : (
-        <div className="rounded-xl border border-slate-200 bg-white overflow-hidden shadow-retro">
+        <div className="rounded-xl border border-border bg-card overflow-hidden shadow-retro">
           <table className="w-full text-sm">
-            <thead className="bg-slate-50 border-b border-slate-200">
+            <thead className="bg-muted border-b border-border">
               <tr className="text-left">
-                <th className="px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500">Project</th>
-                <th className="px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500">URL</th>
-                <th className="px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500">Image</th>
-                <th className="px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500">Up</th>
-                <th className="px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wider text-slate-500">Actions</th>
+                <th className="px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Project</th>
+                <th className="px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">URL</th>
+                <th className="px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Image</th>
+                <th className="px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Up</th>
+                <th className="px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {items.map((c) => (
-                <tr key={c.project_id} className="hover:bg-slate-50/50">
+                <tr key={c.project_id} className="hover:bg-muted/50">
                   <td className="px-4 py-3">
                     <Link
                       to={`/projects/${c.project_id}`}
-                      className="text-slate-900 font-medium hover:underline"
+                      className="text-foreground font-medium hover:underline"
                     >
                       {c.project_name}
                     </Link>
-                    <p className="text-[10.5px] text-slate-500 font-mono mt-0.5">
+                    <p className="text-[10.5px] text-muted-foreground font-mono mt-0.5">
                       {c.container_name}
                     </p>
                   </td>
@@ -180,13 +180,13 @@ export default function LocalContainers() {
                   </td>
                   <td className="px-4 py-3">
                     <code
-                      className="text-[11px] text-slate-700 font-mono truncate inline-block max-w-[280px]"
+                      className="text-[11px] text-foreground/90 font-mono truncate inline-block max-w-[280px]"
                       title={c.image}
                     >
                       {c.image}
                     </code>
                   </td>
-                  <td className="px-4 py-3 text-xs text-slate-600 tabular-nums">
+                  <td className="px-4 py-3 text-xs text-muted-foreground tabular-nums">
                     {uptimeLabel(c.started_at)}
                   </td>
                   <td className="px-4 py-3 text-right">
@@ -195,7 +195,7 @@ export default function LocalContainers() {
                         type="button"
                         onClick={() => void restart(c.project_id)}
                         disabled={busyId === c.project_id}
-                        className="text-[11px] px-2 py-1 rounded-md border border-slate-300 hover:bg-slate-100 disabled:opacity-50"
+                        className="text-[11px] px-2 py-1 rounded-md border border-border hover:bg-muted disabled:opacity-50"
                       >
                         Restart
                       </button>
@@ -203,7 +203,7 @@ export default function LocalContainers() {
                         type="button"
                         onClick={() => void stop(c.project_id)}
                         disabled={busyId === c.project_id}
-                        className="text-[11px] px-2 py-1 rounded-md border border-red-300 text-red-700 hover:bg-red-50 disabled:opacity-50"
+                        className="text-[11px] px-2 py-1 rounded-md border border-destructive/40 text-destructive hover:bg-destructive/10 disabled:opacity-50"
                       >
                         Stop
                       </button>

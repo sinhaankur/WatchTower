@@ -63,7 +63,7 @@ function DeviceFlowCountdown({ started, expiresIn }: { started: number; expiresI
   const m = Math.floor(remaining / 60);
   const s = String(remaining % 60).padStart(2, '0');
   // Last 60 seconds gets a red highlight so the user knows time's running out.
-  const tone = remaining <= 60 ? 'text-red-600 font-semibold' : 'text-slate-500';
+  const tone = remaining <= 60 ? 'text-destructive font-semibold' : 'text-muted-foreground';
   return (
     <span className={`tabular-nums ${tone}`}>
       {remaining > 0 ? `expires in ${m}:${s}` : 'expired'}
@@ -79,6 +79,7 @@ const Login = () => {
   const [error, setError] = useState('');
   const [tokenInput, setTokenInput] = useState('');
   const [authStatus, setAuthStatus] = useState<AuthStatus | null>(null);
+  const [oidcStatus, setOidcStatus] = useState<{ configured: boolean; provider_name?: string | null } | null>(null);
   const [statusLoading, setStatusLoading] = useState(true);
   // Other-ways-to-sign-in (guest, dev, API token) collapsed by default
   // so the GitHub button is the unmistakable primary CTA. Earlier UI
@@ -176,9 +177,15 @@ const Login = () => {
     const loadAuthStatus = async () => {
       setStatusLoading(true);
       try {
-        const resp = await apiClient.get('/auth/status');
+        const [resp, oidcResp] = await Promise.all([
+          apiClient.get('/auth/status'),
+          apiClient.get('/auth/oidc/status').catch(() => null),
+        ]);
         const status = resp.data as AuthStatus;
         setAuthStatus(status);
+        if (oidcResp) {
+          setOidcStatus(oidcResp.data as { configured: boolean; provider_name?: string | null });
+        }
       } catch {
         setAuthStatus(null);
       } finally {
@@ -300,6 +307,40 @@ const Login = () => {
       }
     } catch {
       setError('Unable to start GitHub login. Ask your administrator to configure GitHub OAuth on the server, or use Device Flow / API token sign-in below.');
+      setLoading(false);
+    }
+  };
+
+  const loginWithOidc = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const redirectUri = `${window.location.origin}/oauth/oidc/login/callback`;
+      const fromState = (location.state as { from?: string } | null)?.from;
+      const fromQuery = searchParams.get('next') || undefined;
+      const nextPath = fromQuery || fromState || '/';
+
+      const baseUrl = (import.meta as any).env?.VITE_API_URL || '/api';
+      const cleanBase = String(baseUrl).replace(/\/+$/, '');
+      let loginUrl = `${cleanBase}/auth/oidc/login`;
+      if (!cleanBase.endsWith('/api')) {
+        loginUrl = `${cleanBase}/api/auth/oidc/login`;
+      }
+
+      const params = new URLSearchParams({ redirect_uri: redirectUri, next_path: nextPath });
+      const oauthUrl = `${loginUrl}?${params.toString()}`;
+
+      const electron = (window as any).electronAPI;
+      if (electron?.openOAuth) {
+        electron.openOAuth(oauthUrl);
+        trackEvent('login', { method: 'oidc' });
+        setLoading(false);
+      } else {
+        trackEvent('login', { method: 'oidc' });
+        window.location.assign(oauthUrl);
+      }
+    } catch {
+      setError('Unable to start SSO login. Ask your administrator to check the OIDC configuration.');
       setLoading(false);
     }
   };
@@ -427,7 +468,7 @@ const Login = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center px-6 bg-transparent">
-      <div className="w-full max-w-md rounded-2xl px-8 py-10 text-center border border-border bg-white/95 backdrop-blur-sm shadow-sm fade-in-up">
+      <div className="w-full max-w-md rounded-2xl px-8 py-10 text-center border border-border bg-card/95 backdrop-blur-sm shadow-sm fade-in-up">
         {loggedInUser ? (
           <div className="space-y-6 py-8">
             <div className="flex justify-center">
@@ -438,8 +479,8 @@ const Login = () => {
               </div>
             </div>
             <div>
-              <h2 className="text-2xl font-bold text-slate-900 mb-2">✓ Logged In</h2>
-              <p className="text-sm text-slate-600">
+              <h2 className="text-2xl font-bold text-foreground mb-2">✓ Logged In</h2>
+              <p className="text-sm text-muted-foreground">
                 {loggedInUser.name
                   ? `Welcome, ${loggedInUser.name}!`
                   : (() => {
@@ -462,7 +503,7 @@ const Login = () => {
                     })()}
               </p>
               {loggedInUser.email && (
-                <p className="text-xs text-slate-500 mt-1">{loggedInUser.email}</p>
+                <p className="text-xs text-muted-foreground mt-1">{loggedInUser.email}</p>
               )}
             </div>
             {loggedInUser.isTest ? (
@@ -487,7 +528,7 @@ const Login = () => {
                 </div>
               </div>
             ) : (
-              <div className="text-xs text-slate-500">
+              <div className="text-xs text-muted-foreground">
                 Redirecting to dashboard...
               </div>
             )}
@@ -497,13 +538,13 @@ const Login = () => {
             <div className="mb-4 flex justify-center">
               <BrandLogo size="lg" withLabel subtitle="Secure Team Access" />
             </div>
-            <h1 className="text-2xl font-semibold mb-2 text-slate-900">Sign in to WatchTower</h1>
-            <p className="text-sm text-slate-600 mb-3">
+            <h1 className="text-2xl font-semibold mb-2 text-foreground">Sign in to WatchTower</h1>
+            <p className="text-sm text-muted-foreground mb-3">
               Use GitHub to authenticate, or enter the server's API token below.
             </p>
-            <details className="mb-5 text-left text-xs text-slate-500">
-              <summary className="cursor-pointer hover:text-slate-700 text-center">Why does WatchTower need a sign-in?</summary>
-              <div className="mt-2 px-2 space-y-1.5 text-slate-600">
+            <details className="mb-5 text-left text-xs text-muted-foreground">
+              <summary className="cursor-pointer hover:text-foreground/90 text-center">Why does WatchTower need a sign-in?</summary>
+              <div className="mt-2 px-2 space-y-1.5 text-muted-foreground">
                 <p>WatchTower deploys your projects across machines you own. To do that safely it needs to know <strong>who</strong> triggered each action.</p>
                 <p><strong>If you sign in with GitHub:</strong> WatchTower can clone your repos (including private ones if you authorize it later), attribute audit-log entries to your real identity, and deploy under team-scoped permissions.</p>
                 <p><strong>If you use the API token:</strong> WatchTower runs locally as the operator who installed the server. Most single-user desktop installs work this way.</p>
@@ -516,7 +557,7 @@ const Login = () => {
               <button
                 type="button"
                 onClick={() => setLoggedInUser({ name: 'Test User', email: 'test@example.com', isTest: true })}
-                className="text-[11px] text-slate-500 hover:text-slate-800 underline underline-offset-2"
+                className="text-[11px] text-muted-foreground hover:text-foreground underline underline-offset-2"
               >
                 Test logged-in success screen
               </button>
@@ -538,15 +579,15 @@ const Login = () => {
         )}
 
         {error && (
-            <div className="text-sm text-red-700 border border-red-200 bg-red-50 rounded-lg px-3 py-2.5 mb-4 text-left">
+            <div className="text-sm text-destructive border border-destructive/30 bg-destructive/10 rounded-lg px-3 py-2.5 mb-4 text-left">
             {error}
             </div>
         )}
 
         {/* Auth methods */}
         {statusLoading ? (
-            <div className="py-6 flex items-center justify-center gap-2 text-slate-400 text-sm">
-            <span className="inline-block w-4 h-4 border-2 border-slate-300 border-t-slate-600 rounded-full animate-spin" />
+            <div className="py-6 flex items-center justify-center gap-2 text-muted-foreground text-sm">
+            <span className="inline-block w-4 h-4 border-2 border-border border-t-slate-600 rounded-full animate-spin" />
             Checking server…
             </div>
           ) : (
@@ -575,27 +616,27 @@ const Login = () => {
 
               {/* Device Flow active panel */}
               {deviceFlow ? (
-                <div className="text-left rounded-xl border-2 border-slate-900 bg-slate-50 px-4 py-4 space-y-3">
-                  <p className="text-sm font-semibold text-slate-900">Authorize WatchTower on GitHub</p>
-                  <ol className="list-decimal list-inside text-xs text-slate-700 space-y-1">
+                <div className="text-left rounded-xl border-2 border-slate-900 bg-muted px-4 py-4 space-y-3">
+                  <p className="text-sm font-semibold text-foreground">Authorize WatchTower on GitHub</p>
+                  <ol className="list-decimal list-inside text-xs text-foreground/90 space-y-1">
                     <li>A browser opened at <span className="font-mono">{deviceFlow.verification_uri}</span></li>
                     <li>Enter the code below if not pre-filled</li>
                     <li>Approve access — this page will sign you in automatically</li>
                   </ol>
-                  <div className="flex items-center justify-between bg-white border border-slate-300 rounded-lg px-4 py-3">
-                    <code className="text-2xl font-mono tracking-widest font-bold text-slate-900">
+                  <div className="flex items-center justify-between bg-card border border-border rounded-lg px-4 py-3">
+                    <code className="text-2xl font-mono tracking-widest font-bold text-foreground">
                       {deviceFlow.user_code}
                     </code>
                     <button
                       type="button"
                       onClick={() => void copyUserCode()}
-                      className="text-xs text-slate-600 hover:text-slate-900 underline"
+                      className="text-xs text-muted-foreground hover:text-foreground underline"
                     >
                       Copy
                     </button>
                   </div>
-                  <div className="flex items-center gap-2 text-xs text-slate-500">
-                    <span className="inline-block w-3 h-3 border-2 border-slate-300 border-t-slate-700 rounded-full animate-spin" />
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <span className="inline-block w-3 h-3 border-2 border-border border-t-slate-700 rounded-full animate-spin" />
                     <span className="flex-1">{devicePolling ? 'Waiting for GitHub authorization…' : 'Starting…'}</span>
                     <DeviceFlowCountdown started={deviceFlow.started} expiresIn={deviceFlow.expires_in} />
                   </div>
@@ -611,7 +652,7 @@ const Login = () => {
                     <button
                       type="button"
                       onClick={cancelDeviceFlow}
-                      className="text-xs border border-slate-300 hover:bg-slate-100 text-slate-700 rounded-md px-3 py-2"
+                      className="text-xs border border-border hover:bg-muted text-foreground/90 rounded-md px-3 py-2"
                     >
                       Cancel
                     </button>
@@ -644,7 +685,7 @@ const Login = () => {
                     className={`w-full rounded-lg gap-2 py-6 text-base font-semibold flex items-center justify-center ${
                       (oauthReady || deviceFlowReady)
                         ? 'bg-slate-900 hover:bg-slate-800 text-white'
-                        : 'bg-slate-200 text-slate-700 hover:bg-border border border-slate-300'
+                        : 'bg-slate-200 text-foreground/90 hover:bg-border border border-border'
                     }`}
                     title={
                       (oauthReady || deviceFlowReady)
@@ -666,21 +707,40 @@ const Login = () => {
                         </span>
                     )}
                   </Button>
+
+                  {/* Generic OIDC / SSO — shown only when the operator has
+                      configured a provider (Google, GitLab, Okta, …). Sits
+                      right under GitHub as a co-equal primary option. */}
+                  {oidcStatus?.configured && (
+                    <Button
+                      onClick={() => void loginWithOidc()}
+                      disabled={loading}
+                      className="w-full rounded-lg gap-2 py-6 text-base font-semibold flex items-center justify-center bg-slate-900 hover:bg-slate-800 text-white"
+                    >
+                      <span className="inline-flex items-center gap-2">
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                          <path d="M12 2a10 10 0 100 20 10 10 0 000-20zM2 12h20M12 2a15 15 0 010 20M12 2a15 15 0 000 20" strokeLinecap="round" />
+                        </svg>
+                        <span>Sign in with {oidcStatus.provider_name || 'SSO'}</span>
+                      </span>
+                    </Button>
+                  )}
+
                   {(oauthReady || deviceFlowReady) ? (
-                    <div className="text-xs text-slate-600 text-center space-y-1">
+                    <div className="text-xs text-muted-foreground text-center space-y-1">
                       <p>
                         {deviceFlowReady
                           ? '✓ Click → GitHub gives you a short code to enter'
                           : '✓ Click → browser opens GitHub → returns here automatically'}
                       </p>
-                      <p className="text-[11px] text-slate-500">
+                      <p className="text-[11px] text-muted-foreground">
                         Method: <span className="font-medium">{deviceFlowReady ? 'Device Flow' : 'OAuth redirect'}</span>
                         {deviceFlowReady && oauthReady && ' (Device Flow preferred — no callback URL needed)'}
                       </p>
                     </div>
                   ) : (
-                    <p className="text-[11px] text-slate-500 text-center">
-                      To enable: set <code className="font-mono bg-slate-100 px-1 rounded">WATCHTOWER_GITHUB_DEVICE_CLIENT_ID</code> in <code className="font-mono bg-slate-100 px-1 rounded">.env</code>, then restart. Sign in with the API token below in the meantime.
+                    <p className="text-[11px] text-muted-foreground text-center">
+                      To enable: set <code className="font-mono bg-muted px-1 rounded">WATCHTOWER_GITHUB_DEVICE_CLIENT_ID</code> in <code className="font-mono bg-muted px-1 rounded">.env</code>, then restart. Sign in with the API token below in the meantime.
                     </p>
                   )}
                 </>
@@ -693,29 +753,29 @@ const Login = () => {
                 buttons, which caused users to default to those paths
                 and then get stuck (guest mode can't deploy to remote
                 nodes; dev login should never fire in prod). */}
-            <div className="mt-5 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-xs text-slate-500">
+            <div className="mt-5 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-xs text-muted-foreground">
               <button
                 type="button"
                 onClick={() => setShowAdvanced((v) => !v)}
-                className="hover:text-slate-800 underline underline-offset-2"
+                className="hover:text-foreground underline underline-offset-2"
               >
                 {showAdvanced ? 'Hide other options' : 'Other ways to sign in'}
               </button>
             </div>
 
             {showAdvanced && (
-              <div className="mt-4 pt-4 border-t border-slate-200 text-left space-y-4">
+              <div className="mt-4 pt-4 border-t border-border text-left space-y-4">
                 {/* Continue as Guest — small, clearly marked as limited. */}
                 <div>
                   <button
                     type="button"
                     onClick={() => void continueAsGuest()}
                     disabled={loading}
-                    className="text-sm text-slate-700 hover:text-red-700 underline underline-offset-2 disabled:opacity-50"
+                    className="text-sm text-foreground/90 hover:text-destructive underline underline-offset-2 disabled:opacity-50"
                   >
                     Continue as Guest →
                   </button>
-                  <p className="text-[11px] text-slate-500 mt-0.5">
+                  <p className="text-[11px] text-muted-foreground mt-0.5">
                     No sign-in. Can browse projects + deploy to localhost only. No remote SSH nodes, no team management, no private repos.
                   </p>
                 </div>
@@ -741,7 +801,7 @@ const Login = () => {
                     block of explanation moved into a collapsed details
                     so users who don't need it aren't slowed down. */}
                 <div>
-                  <label htmlFor="api-token" className="block text-sm font-medium text-slate-700 mb-1">
+                  <label htmlFor="api-token" className="block text-sm font-medium text-foreground/90 mb-1">
                     Sign in with server API token
                   </label>
                   <input
@@ -750,7 +810,7 @@ const Login = () => {
                     value={tokenInput}
                     onChange={(e) => setTokenInput(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && void continueWithToken()}
-                    className="w-full rounded-lg border border-slate-300 focus:border-primary focus:ring-1 focus:ring-red-700 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition"
+                    className="w-full rounded-lg border border-border focus:border-primary focus:ring-1 focus:ring-red-700 bg-card px-3 py-2 text-sm text-foreground outline-none transition"
                     placeholder="WATCHTOWER_API_TOKEN"
                     autoComplete="current-password"
                   />
@@ -758,7 +818,7 @@ const Login = () => {
                     onClick={() => void continueWithToken()}
                     disabled={loading || !tokenInput.trim()}
                     variant="outline"
-                    className="w-full mt-2 rounded-lg text-slate-700"
+                    className="w-full mt-2 rounded-lg text-foreground/90"
                   >
                     {loading ? (
                       <span className="inline-flex items-center gap-2 justify-center">
@@ -767,11 +827,11 @@ const Login = () => {
                       </span>
                     ) : 'Sign in with API token'}
                   </Button>
-                  <details className="mt-1.5 text-[11px] text-slate-500">
-                    <summary className="cursor-pointer hover:text-slate-700">What is this?</summary>
-                    <div className="mt-1.5 space-y-1 text-slate-600">
-                      <p>The <code className="font-mono bg-slate-100 px-1 rounded">WATCHTOWER_API_TOKEN</code> set on the server. <strong>Not</strong> a GitHub PAT.</p>
-                      <p>If you installed via <code className="font-mono bg-slate-100 px-1 rounded">./run.sh</code>, the dev token is <code className="font-mono bg-slate-100 px-1 rounded">dev-watchtower-token</code>.</p>
+                  <details className="mt-1.5 text-[11px] text-muted-foreground">
+                    <summary className="cursor-pointer hover:text-foreground/90">What is this?</summary>
+                    <div className="mt-1.5 space-y-1 text-muted-foreground">
+                      <p>The <code className="font-mono bg-muted px-1 rounded">WATCHTOWER_API_TOKEN</code> set on the server. <strong>Not</strong> a GitHub PAT.</p>
+                      <p>If you installed via <code className="font-mono bg-muted px-1 rounded">./run.sh</code>, the dev token is <code className="font-mono bg-muted px-1 rounded">dev-watchtower-token</code>.</p>
                     </div>
                   </details>
                 </div>
@@ -781,19 +841,19 @@ const Login = () => {
             {/* Per-login consent line — every sign-in reaffirms agreement.
                 The full documents render in the post-login LegalGate and
                 live in legal/ on GitHub. */}
-            <p className="mt-4 text-[11px] text-slate-400 text-center leading-relaxed">
+            <p className="mt-4 text-[11px] text-muted-foreground text-center leading-relaxed">
               By signing in you agree to this installation's{' '}
-              <a href="https://github.com/sinhaankur/WatchTower/blob/main/legal/TERMS_OF_USE.md" target="_blank" rel="noopener noreferrer" className="underline hover:text-slate-600">Terms of Use</a>,{' '}
-              <a href="https://github.com/sinhaankur/WatchTower/blob/main/legal/ACCEPTABLE_USE.md" target="_blank" rel="noopener noreferrer" className="underline hover:text-slate-600">Acceptable Use Policy</a>, and{' '}
-              <a href="https://github.com/sinhaankur/WatchTower/blob/main/legal/PRIVACY.md" target="_blank" rel="noopener noreferrer" className="underline hover:text-slate-600">Privacy Policy</a>.
+              <a href="https://github.com/sinhaankur/WatchTower/blob/main/legal/TERMS_OF_USE.md" target="_blank" rel="noopener noreferrer" className="underline hover:text-muted-foreground">Terms of Use</a>,{' '}
+              <a href="https://github.com/sinhaankur/WatchTower/blob/main/legal/ACCEPTABLE_USE.md" target="_blank" rel="noopener noreferrer" className="underline hover:text-muted-foreground">Acceptable Use Policy</a>, and{' '}
+              <a href="https://github.com/sinhaankur/WatchTower/blob/main/legal/PRIVACY.md" target="_blank" rel="noopener noreferrer" className="underline hover:text-muted-foreground">Privacy Policy</a>.
             </p>
 
             {/* Server-state advisories tucked at the bottom — surfaced
                 so the user can see them, but no longer competing with
                 the primary CTA. */}
             {!statusLoading && (authStatus?.dev_auth?.allow_insecure || authStatus?.installation?.owner_mode_enabled) && (
-              <details className="mt-5 pt-4 border-t border-slate-200 text-left text-xs text-slate-500">
-                <summary className="cursor-pointer hover:text-slate-700">Server status</summary>
+              <details className="mt-5 pt-4 border-t border-border text-left text-xs text-muted-foreground">
+                <summary className="cursor-pointer hover:text-foreground/90">Server status</summary>
                 <div className="mt-2 space-y-2">
                   {authStatus?.dev_auth?.allow_insecure && (
                     <p className="text-amber-700">⚠ <strong>Insecure dev mode enabled</strong> — set <code className="font-mono bg-amber-50 px-1 rounded">WATCHTOWER_ALLOW_INSECURE_DEV_AUTH=false</code> in production.</p>

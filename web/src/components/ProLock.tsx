@@ -15,7 +15,7 @@ export function ProLock({ feature }: { feature: ProFeatureKey }) {
 
   if (isLoading) {
     return (
-      <div className="rounded-xl border border-border bg-card p-8 text-center text-sm text-slate-500">
+      <div className="rounded-xl border border-border bg-card p-8 text-center text-sm text-muted-foreground">
         Checking your edition…
       </div>
     );
@@ -37,12 +37,12 @@ export function ProLock({ feature }: { feature: ProFeatureKey }) {
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <h2 className="text-lg font-bold text-slate-900">{name}</h2>
+            <h2 className="text-lg font-bold text-foreground">{name}</h2>
             <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-600 text-white border border-amber-700">
               Pro
             </span>
           </div>
-          <p className="text-sm text-slate-700 mt-2 leading-relaxed">
+          <p className="text-sm text-foreground/90 mt-2 leading-relaxed">
             {description}
           </p>
           <div className="mt-5 flex flex-wrap gap-2">
@@ -59,12 +59,12 @@ export function ProLock({ feature }: { feature: ProFeatureKey }) {
             </a>
             <Link
               to="/settings"
-              className="inline-flex items-center px-4 py-2 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-sm font-medium transition-colors"
+              className="inline-flex items-center px-4 py-2 rounded-lg border border-border bg-card hover:bg-muted text-foreground/90 text-sm font-medium transition-colors"
             >
               Settings
             </Link>
           </div>
-          <p className="text-[11px] text-slate-500 mt-4">
+          <p className="text-[11px] text-muted-foreground mt-4">
             Currently on the <strong>Free</strong> tier. Pro unlocks
             this feature plus team roles, multi-region failover, SSO, and
             priority support.

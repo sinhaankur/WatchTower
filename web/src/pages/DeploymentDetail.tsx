@@ -51,9 +51,9 @@ const STATUS_COLOR: Record<string, string> = {
   deploying:   'bg-indigo-100 text-indigo-700 border-indigo-200',
   running:     'bg-blue-100 text-blue-700 border-blue-200',
   pending:     'bg-amber-100 text-amber-700 border-amber-200',
-  failed:      'bg-red-100 text-red-700 border-red-200',
-  cancelled:   'bg-slate-100 text-slate-500 border-slate-200',
-  rolled_back: 'bg-slate-100 text-slate-500 border-slate-200',
+  failed:      'bg-red-100 text-destructive border-destructive/30',
+  cancelled:   'bg-muted text-muted-foreground border-border',
+  rolled_back: 'bg-muted text-muted-foreground border-border',
 };
 
 const ACTIVE = new Set(['pending', 'building', 'deploying', 'running']);
@@ -61,7 +61,7 @@ const isActive = (s: string | null | undefined) => ACTIVE.has((s ?? '').toLowerC
 
 function Badge({ status }: { status: string | null | undefined }) {
   const s = (status ?? 'unknown').toLowerCase();
-  const cls = STATUS_COLOR[s] ?? 'bg-slate-100 text-slate-600 border-slate-200';
+  const cls = STATUS_COLOR[s] ?? 'bg-muted text-muted-foreground border-border';
   return (
     <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${cls}`}>
       {(status ?? 'unknown').replace(/_/g, ' ')}
@@ -127,7 +127,7 @@ const DOT_CLASS: Record<PhaseState, string> = {
   done:    'bg-emerald-500 border-emerald-500',
   active:  'bg-blue-500 border-blue-500 status-pulse',
   failed:  'bg-red-500 border-red-500',
-  pending: 'bg-white border-slate-300',
+  pending: 'bg-card border-border',
 };
 
 function Timeline({ d, now }: { d: Deployment; now: number }) {
@@ -144,13 +144,13 @@ function Timeline({ d, now }: { d: Deployment; now: number }) {
           </div>
           <div className="pb-4 -mt-0.5">
             <div className={`text-sm font-medium ${
-              p.state === 'failed' ? 'text-red-700'
+              p.state === 'failed' ? 'text-destructive'
               : p.state === 'active' ? 'text-blue-700'
-              : p.state === 'pending' ? 'text-slate-400'
-              : 'text-slate-900'}`}>
+              : p.state === 'pending' ? 'text-muted-foreground'
+              : 'text-foreground'}`}>
               {p.label}
               {p.state === 'active' && <span className="ml-2 text-xs text-blue-600">in progress…</span>}
-              {p.state === 'failed' && <span className="ml-2 text-xs text-red-600">failed here</span>}
+              {p.state === 'failed' && <span className="ml-2 text-xs text-destructive">failed here</span>}
             </div>
             {p.at && <div className="text-xs text-muted-foreground tabular-nums">{fmtDate(p.at)}</div>}
           </div>
@@ -215,7 +215,7 @@ export default function DeploymentDetail() {
 
   if (error || !detail) return (
     <div className="max-w-xl mx-auto mt-16 text-center">
-      <p className="text-red-600 font-medium">{error ?? 'Deployment not found'}</p>
+      <p className="text-destructive font-medium">{error ?? 'Deployment not found'}</p>
       <button onClick={() => navigate(-1)} className="text-sm text-blue-600 hover:underline mt-2 inline-block">
         ← Back
       </button>
@@ -282,12 +282,12 @@ export default function DeploymentDetail() {
           <div className="flex items-center gap-2 shrink-0">
             {isFailed && (
               <button onClick={() => void action('diagnose')} disabled={!!busy}
-                className="text-xs px-3 py-1.5 rounded-lg border border-slate-300 hover:bg-slate-50 disabled:opacity-50">
+                className="text-xs px-3 py-1.5 rounded-lg border border-border hover:bg-muted disabled:opacity-50">
                 {busy === 'diagnose' ? 'Diagnosing…' : 'Diagnose'}
               </button>
             )}
             <button onClick={() => void action('redeploy')} disabled={!!busy}
-              className="text-xs px-3 py-1.5 rounded-lg border border-slate-300 hover:bg-slate-50 disabled:opacity-50">
+              className="text-xs px-3 py-1.5 rounded-lg border border-border hover:bg-muted disabled:opacity-50">
               {busy === 'redeploy' ? 'Queuing…' : '↻ Redeploy'}
             </button>
             {isLive && (

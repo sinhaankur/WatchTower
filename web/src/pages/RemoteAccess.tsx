@@ -33,15 +33,15 @@ export default function RemoteAccess() {
         style={{ borderColor: 'hsl(var(--border-soft))', background: 'hsl(var(--surface-soft) / 0.9)' }}
       >
         <div>
-          <h1 className="text-lg font-semibold text-slate-900">Remote Access</h1>
-          <p className="text-xs text-slate-600 mt-0.5 hidden sm:block">
+          <h1 className="text-lg font-semibold text-foreground">Remote Access</h1>
+          <p className="text-xs text-muted-foreground mt-0.5 hidden sm:block">
             Reach this WatchTower install from outside your network — phones, laptops, other servers.
           </p>
         </div>
         <button
           onClick={() => refetch()}
           disabled={isFetching}
-          className="px-3 py-1.5 rounded-lg border border-border text-xs text-slate-700 hover:bg-slate-100 transition-colors disabled:opacity-50"
+          className="px-3 py-1.5 rounded-lg border border-border text-xs text-foreground/90 hover:bg-muted transition-colors disabled:opacity-50"
         >
           {isFetching ? 'Refreshing…' : 'Refresh'}
         </button>
@@ -59,13 +59,13 @@ export default function RemoteAccess() {
         </div>
 
         {isLoading && (
-          <div className="rounded-xl border border-border bg-card p-6 text-sm text-slate-600">
+          <div className="rounded-xl border border-border bg-card p-6 text-sm text-muted-foreground">
             Loading providers…
           </div>
         )}
 
         {error && (
-          <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+          <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
             Could not load remote-access providers. Is the API reachable?
           </div>
         )}
@@ -75,8 +75,8 @@ export default function RemoteAccess() {
         ))}
 
         {/* Placeholder for future providers — purely informational. */}
-        <div className="rounded-xl border border-dashed border-border bg-transparent p-5 text-xs text-slate-500">
-          <p className="font-semibold text-slate-600">Coming next</p>
+        <div className="rounded-xl border border-dashed border-border bg-transparent p-5 text-xs text-muted-foreground">
+          <p className="font-semibold text-muted-foreground">Coming next</p>
           <p className="mt-1">
             Cloudflare Tunnel (public sharing under your own domain) and direct SSH reverse tunnels
             will appear here as additional providers.
@@ -150,11 +150,11 @@ function ProviderCard({
       <div className="flex items-start justify-between gap-3">
         <div>
           <div className="flex items-center gap-2">
-            <h2 className="text-base font-semibold text-slate-900">{provider.name}</h2>
+            <h2 className="text-base font-semibold text-foreground">{provider.name}</h2>
             <StatusBadge provider={provider} />
           </div>
           {provider.detail && (
-            <p className="text-xs text-slate-600 mt-1">{provider.detail}</p>
+            <p className="text-xs text-muted-foreground mt-1">{provider.detail}</p>
           )}
         </div>
       </div>
@@ -170,7 +170,7 @@ function ProviderCard({
           href={provider.install_url}
           target="_blank"
           rel="noreferrer"
-          className="inline-block px-3 py-1.5 rounded-lg border border-border text-xs text-slate-700 hover:bg-slate-100 transition-colors"
+          className="inline-block px-3 py-1.5 rounded-lg border border-border text-xs text-foreground/90 hover:bg-muted transition-colors"
         >
           Install {provider.name} →
         </a>
@@ -187,7 +187,7 @@ function ProviderCard({
             </code>
             <button
               onClick={copyUrl}
-              className="px-2 py-1 rounded-md border border-emerald-300 bg-white text-xs text-emerald-800 hover:bg-emerald-100 transition-colors"
+              className="px-2 py-1 rounded-md border border-emerald-300 bg-card text-xs text-emerald-800 hover:bg-emerald-100 transition-colors"
             >
               {copied ? 'Copied' : 'Copy'}
             </button>
@@ -195,7 +195,7 @@ function ProviderCard({
               href={provider.url}
               target="_blank"
               rel="noreferrer"
-              className="px-2 py-1 rounded-md border border-emerald-300 bg-white text-xs text-emerald-800 hover:bg-emerald-100 transition-colors"
+              className="px-2 py-1 rounded-md border border-emerald-300 bg-card text-xs text-emerald-800 hover:bg-emerald-100 transition-colors"
             >
               Open
             </a>
@@ -205,23 +205,23 @@ function ProviderCard({
 
       {provider.ready && !provider.sharing && (
         <div className="flex items-center gap-3">
-          <label className="text-xs text-slate-600">Local port</label>
+          <label className="text-xs text-muted-foreground">Local port</label>
           <input
             type="number"
             min={1}
             max={65535}
             value={port}
             onChange={(e) => setPort(Number(e.target.value) || defaultPort)}
-            className="w-24 rounded-lg border border-border bg-white px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-300"
+            className="w-24 rounded-lg border border-border bg-card px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-300"
           />
-          <span className="text-xs text-slate-500">
+          <span className="text-xs text-muted-foreground">
             (WatchTower itself is on <code className="font-mono">{defaultPort}</code>)
           </span>
         </div>
       )}
 
       {actionError && (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 break-all">
+        <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive break-all">
           {actionError}
         </div>
       )}
@@ -240,7 +240,7 @@ function ProviderCard({
           <button
             onClick={doDisable}
             disabled={busy}
-            className="px-3 py-1.5 rounded-lg border border-border text-xs text-slate-700 hover:bg-slate-100 transition-colors disabled:opacity-50"
+            className="px-3 py-1.5 rounded-lg border border-border text-xs text-foreground/90 hover:bg-muted transition-colors disabled:opacity-50"
           >
             {disable.isPending ? 'Stopping…' : 'Stop sharing'}
           </button>
@@ -252,7 +252,7 @@ function ProviderCard({
 
 function StatusBadge({ provider }: { provider: RemoteAccessProvider }) {
   let label = 'Not installed';
-  let cls = 'bg-slate-100 text-slate-500 border-slate-200';
+  let cls = 'bg-muted text-muted-foreground border-border';
   if (provider.sharing) {
     label = 'Sharing';
     cls = 'bg-emerald-50 text-emerald-700 border-emerald-200';

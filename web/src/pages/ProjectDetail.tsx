@@ -90,13 +90,13 @@ const STATUS_COLOR: Record<string, string> = {
   building:   'bg-blue-100 text-blue-700 border-blue-200',
   deploying:  'bg-indigo-100 text-indigo-700 border-indigo-200',
   pending:    'bg-amber-100 text-amber-700 border-amber-200',
-  failed:     'bg-red-100 text-red-700 border-red-200',
-  cancelled:  'bg-slate-100 text-slate-500 border-slate-200',
-  rolled_back:'bg-slate-100 text-slate-500 border-slate-200',
+  failed:     'bg-red-100 text-destructive border-destructive/30',
+  cancelled:  'bg-muted text-muted-foreground border-border',
+  rolled_back:'bg-muted text-muted-foreground border-border',
 };
 
 function Badge({ status }: { status: string }) {
-  const cls = STATUS_COLOR[status.toLowerCase()] ?? 'bg-slate-100 text-slate-600 border-slate-200';
+  const cls = STATUS_COLOR[status.toLowerCase()] ?? 'bg-muted text-muted-foreground border-border';
   return (
     <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${cls}`}>
       {status.replace(/_/g, ' ')}
@@ -179,7 +179,7 @@ export default function ProjectDetail() {
   );
   if (error || !project) return (
     <div className="max-w-xl mx-auto mt-16 text-center">
-      <p className="text-red-600 font-medium">{error ?? 'Project not found'}</p>
+      <p className="text-destructive font-medium">{error ?? 'Project not found'}</p>
       <Link to="/" className="text-sm text-blue-600 hover:underline mt-2 inline-block">← Back to dashboard</Link>
     </div>
   );
@@ -212,7 +212,7 @@ export default function ProjectDetail() {
             onClick={() => setTab(t)}
             className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
               tab === t
-                ? 'border-red-600 text-red-700'
+                ? 'border-red-600 text-destructive'
                 : 'border-transparent text-muted-foreground hover:text-foreground'
             }`}
           >
@@ -268,7 +268,7 @@ function TriggerDeployButton({ projectId, branch }: { projectId: string; branch:
       >
         {busy ? 'Queueing…' : 'Deploy Now'}
       </button>
-      {msg && <p className={`text-xs ${msg.startsWith('Failed') ? 'text-red-600' : 'text-emerald-600'}`}>{msg}</p>}
+      {msg && <p className={`text-xs ${msg.startsWith('Failed') ? 'text-destructive' : 'text-emerald-600'}`}>{msg}</p>}
     </div>
   );
 }
@@ -320,8 +320,8 @@ function HealthCheckCard({ projectId }: { projectId: string }) {
       : result?.status === 'unhealthy'
         ? 'border-amber-300 bg-amber-50 text-amber-800'
         : result?.status === 'unreachable'
-          ? 'border-red-300 bg-red-50 text-red-700'
-          : 'border-slate-300 bg-slate-50 text-slate-600';
+          ? 'border-destructive/40 bg-destructive/10 text-destructive'
+          : 'border-border bg-muted text-muted-foreground';
 
   return (
     <div className="rounded-xl border border-border bg-card overflow-hidden">
@@ -330,23 +330,23 @@ function HealthCheckCard({ projectId }: { projectId: string }) {
         <span className="text-[10px] text-muted-foreground">on-demand probe</span>
       </div>
       <div className="px-5 py-4 space-y-3">
-        <p className="text-xs text-slate-600">
+        <p className="text-xs text-muted-foreground">
           Probe the deployed app's health endpoint synchronously. Continuous
           monitoring + auto-rollback ship in v2 — this is the foundation.
         </p>
         <div className="flex items-center gap-2">
-          <label className="text-[11px] text-slate-600 w-20 shrink-0">Path</label>
+          <label className="text-[11px] text-muted-foreground w-20 shrink-0">Path</label>
           <input
             type="text"
             value={path}
             onChange={(e) => setPath(e.target.value)}
             placeholder="/health"
-            className="flex-1 text-xs px-2 py-1.5 rounded border border-slate-300 focus:border-border focus:outline-none font-mono"
+            className="flex-1 text-xs px-2 py-1.5 rounded border border-border focus:border-border focus:outline-none font-mono"
           />
           <button
             onClick={() => void runProbe()}
             disabled={checking}
-            className="text-xs px-3 py-1.5 rounded-lg border border-border bg-amber-400 hover:bg-amber-500 text-slate-900 font-semibold shadow-retro disabled:opacity-50 disabled:cursor-wait"
+            className="text-xs px-3 py-1.5 rounded-lg border border-border bg-amber-400 hover:bg-amber-500 text-foreground font-semibold shadow-retro disabled:opacity-50 disabled:cursor-wait"
           >
             {checking ? 'Probing…' : 'Check health'}
           </button>
@@ -489,7 +489,7 @@ const STEP_ICON: Record<GoLiveStep['status'], string> = {
   ok: '✓', skipped: '–', failed: '✗', manual: '➜',
 };
 const STEP_COLOR: Record<GoLiveStep['status'], string> = {
-  ok: 'text-emerald-600', skipped: 'text-slate-400', failed: 'text-red-600', manual: 'text-amber-600',
+  ok: 'text-emerald-600', skipped: 'text-muted-foreground', failed: 'text-destructive', manual: 'text-amber-600',
 };
 
 function GoLiveCard({ project }: { project: Project }) {
@@ -570,7 +570,7 @@ function GoLiveCard({ project }: { project: Project }) {
             {(['dns', 'tunnel'] as const).map(m => (
               <button key={m} type="button" onClick={() => setMode(m)}
                 className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${
-                  mode === m ? 'border-red-600 bg-red-50 text-red-700 font-medium' : 'border-border hover:bg-muted/50'}`}>
+                  mode === m ? 'border-red-600 bg-destructive/10 text-destructive font-medium' : 'border-border hover:bg-muted/50'}`}>
                 {m === 'dns' ? 'Cloudflare DNS' : 'Cloudflare Tunnel'}
               </button>
             ))}
@@ -603,11 +603,11 @@ function GoLiveCard({ project }: { project: Project }) {
           )}
         </div>
 
-        {error && <p className="text-xs text-red-700 bg-red-50 border border-red-200 rounded-md p-2">{error}</p>}
+        {error && <p className="text-xs text-destructive bg-destructive/10 border border-destructive/30 rounded-md p-2">{error}</p>}
 
         <button
           type="button" onClick={() => void submit()} disabled={running}
-          className="self-start text-sm px-4 py-2 rounded-lg border border-border bg-amber-400 hover:bg-amber-500 text-slate-900 font-semibold shadow-retro disabled:opacity-50 disabled:cursor-wait">
+          className="self-start text-sm px-4 py-2 rounded-lg border border-border bg-amber-400 hover:bg-amber-500 text-foreground font-semibold shadow-retro disabled:opacity-50 disabled:cursor-wait">
           {running ? 'Going live…' : '🚀 Go Live'}
         </button>
 
@@ -617,7 +617,7 @@ function GoLiveCard({ project }: { project: Project }) {
               Result: <span className={
                 result.overall === 'live' ? 'text-emerald-700'
                 : result.overall === 'manual' ? 'text-amber-700'
-                : result.overall === 'partial' ? 'text-amber-700' : 'text-red-700'}>
+                : result.overall === 'partial' ? 'text-amber-700' : 'text-destructive'}>
                 {result.overall}
               </span>
             </div>
@@ -794,19 +794,19 @@ function DatabaseLinksCard({ project }: { project: { id: string } }) {
         {totalDbs === 0 ? (
           <div className="rounded-md border border-dashed border-border bg-muted/40 px-3 py-3 text-xs text-muted-foreground">
             No databases yet. Visit{' '}
-            <Link to="/managed-databases" className="text-red-700 underline">
+            <Link to="/managed-databases" className="text-destructive underline">
               Databases
             </Link>{' '}
             to create a managed Postgres or connect an external database, then return here to link it.
           </div>
         ) : (
           <div className="border-t border-border pt-3 flex flex-col gap-2">
-            <p className="text-xs font-semibold text-slate-700">Link a database</p>
+            <p className="text-xs font-semibold text-foreground/90">Link a database</p>
             <div className="flex flex-col sm:flex-row gap-2">
               <select
                 value={picker}
                 onChange={(e) => setPicker(e.target.value)}
-                className="flex-1 text-sm px-3 py-2 rounded border border-border bg-white focus:outline-none focus:border-blue-500"
+                className="flex-1 text-sm px-3 py-2 rounded border border-border bg-card focus:outline-none focus:border-blue-500"
               >
                 <option value="">— Choose database —</option>
                 {(managedDbs ?? []).length > 0 && (
@@ -832,7 +832,7 @@ function DatabaseLinksCard({ project }: { project: { id: string } }) {
                 value={envVarName}
                 onChange={(e) => setEnvVarName(e.target.value)}
                 placeholder="DATABASE_URL"
-                className="w-full sm:w-44 text-sm font-mono px-3 py-2 rounded border border-border bg-white focus:outline-none focus:border-blue-500"
+                className="w-full sm:w-44 text-sm font-mono px-3 py-2 rounded border border-border bg-card focus:outline-none focus:border-blue-500"
                 aria-label="Env var name"
               />
               <button
@@ -844,7 +844,7 @@ function DatabaseLinksCard({ project }: { project: { id: string } }) {
               </button>
             </div>
             {error && (
-              <p className="text-xs text-red-600 break-all">{error}</p>
+              <p className="text-xs text-destructive break-all">{error}</p>
             )}
             <p className="text-[11px] text-muted-foreground">
               The env var is injected fresh on every deploy — password rotations on the DB are picked up automatically.
@@ -876,16 +876,16 @@ function ProjectDbLinkRow({
   disabled: boolean;
 }) {
   return (
-    <div className="rounded-lg border border-border bg-white px-3 py-2 flex items-center justify-between gap-2 flex-wrap">
+    <div className="rounded-lg border border-border bg-card px-3 py-2 flex items-center justify-between gap-2 flex-wrap">
       <div className="min-w-0 flex items-center gap-2 flex-wrap">
-        <code className="text-xs font-mono font-semibold text-slate-900 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded">
+        <code className="text-xs font-mono font-semibold text-foreground bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded">
           ${link.env_var_name}
         </code>
-        <span className="text-xs text-slate-500">→</span>
-        <span className="text-xs font-semibold text-slate-800 truncate">
+        <span className="text-xs text-muted-foreground">→</span>
+        <span className="text-xs font-semibold text-foreground truncate">
           {link.database_name}
         </span>
-        <span className="text-[11px] px-1.5 py-0.5 rounded-full border font-medium bg-slate-100 text-slate-600 border-slate-200">
+        <span className="text-[11px] px-1.5 py-0.5 rounded-full border font-medium bg-muted text-muted-foreground border-border">
           {link.database_engine}
         </span>
         <span className={`text-[11px] px-1.5 py-0.5 rounded-full border font-medium ${
@@ -905,7 +905,7 @@ function ProjectDbLinkRow({
         <button
           onClick={onToggleActive}
           disabled={disabled}
-          className="px-2 py-1 rounded-md border border-border text-[11px] text-slate-700 hover:bg-slate-100 transition-colors disabled:opacity-50"
+          className="px-2 py-1 rounded-md border border-border text-[11px] text-foreground/90 hover:bg-muted transition-colors disabled:opacity-50"
           title={link.is_active ? 'Pause injection (does not unlink)' : 'Resume injection'}
         >
           {link.is_active ? 'Pause' : 'Resume'}
@@ -913,7 +913,7 @@ function ProjectDbLinkRow({
         <button
           onClick={onRemove}
           disabled={disabled}
-          className="px-2 py-1 rounded-md border border-red-200 text-[11px] text-red-700 hover:bg-red-50 transition-colors disabled:opacity-50"
+          className="px-2 py-1 rounded-md border border-destructive/30 text-[11px] text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-50"
         >
           Unlink
         </button>
@@ -1011,12 +1011,12 @@ function LiveUrlCard({ project }: { project: Project }) {
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
               placeholder={placeholder}
-              className="w-full text-sm font-mono px-3 py-2 rounded border border-border bg-white focus:outline-none focus:border-blue-500"
+              className="w-full text-sm font-mono px-3 py-2 rounded border border-border bg-card focus:outline-none focus:border-blue-500"
             />
             <p className="text-xs text-muted-foreground">
               Leave blank to clear. Must start with http:// or https://.
             </p>
-            {error && <p className="text-xs text-red-600">{error}</p>}
+            {error && <p className="text-xs text-destructive">{error}</p>}
             <div className="flex items-center gap-2">
               <button
                 onClick={save}
@@ -1115,12 +1115,12 @@ function BuildCommandCard({ project }: { project: Project }) {
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
               placeholder={placeholder}
-              className="w-full text-sm font-mono px-3 py-2 rounded border border-border bg-white focus:outline-none focus:border-blue-500"
+              className="w-full text-sm font-mono px-3 py-2 rounded border border-border bg-card focus:outline-none focus:border-blue-500"
             />
             <p className="text-xs text-muted-foreground">
               Leave blank to fall back to auto-detect.
             </p>
-            {error && <p className="text-xs text-red-600">{error}</p>}
+            {error && <p className="text-xs text-destructive">{error}</p>}
             <div className="flex gap-2">
               <button
                 onClick={save}
@@ -1201,7 +1201,7 @@ function RunAsContainerCard({ project }: { project: Project }) {
             Set a host port on this project before enabling container mode — the container needs a port to bind.
           </p>
         )}
-        {error && <p className="text-xs text-red-600">{error}</p>}
+        {error && <p className="text-xs text-destructive">{error}</p>}
         <div className="flex items-center gap-3">
           <button
             onClick={toggle}
@@ -1310,11 +1310,11 @@ function AutonomousModeCard({ project }: { project: Project }) {
   })();
 
   const toneClass: Record<string, string> = {
-    idle:       'text-slate-700 bg-slate-100 border-slate-200',
+    idle:       'text-foreground/90 bg-muted border-border',
     healthy:    'text-emerald-700 bg-emerald-50 border-emerald-200',
     flaky:      'text-amber-700 bg-amber-50 border-amber-200',
     restarting: 'text-orange-700 bg-orange-50 border-orange-200',
-    rollback:   'text-red-700 bg-red-50 border-red-200',
+    rollback:   'text-destructive bg-destructive/10 border-destructive/30',
   };
 
   return (
@@ -1346,20 +1346,20 @@ function AutonomousModeCard({ project }: { project: Project }) {
 
         {enabled && status && status.entries.length > 0 && (
           <details className="text-xs">
-            <summary className="cursor-pointer text-slate-600 hover:text-slate-900">Per-node detail ({status.entries.length})</summary>
+            <summary className="cursor-pointer text-muted-foreground hover:text-foreground">Per-node detail ({status.entries.length})</summary>
             <ul className="mt-2 space-y-1 font-mono text-[11px]">
               {status.entries.map((e) => (
                 <li key={`${e.project_id}:${e.node_id}`} className="flex gap-4">
-                  <span className="text-slate-500">node {e.node_id.slice(0, 8)}</span>
+                  <span className="text-muted-foreground">node {e.node_id.slice(0, 8)}</span>
                   <span>fails: {e.consecutive_failures}</span>
-                  {e.quarantined && <span className="text-red-600">quarantined</span>}
+                  {e.quarantined && <span className="text-destructive">quarantined</span>}
                 </li>
               ))}
             </ul>
           </details>
         )}
 
-        {error && <p className="text-xs text-red-600">{error}</p>}
+        {error && <p className="text-xs text-destructive">{error}</p>}
 
         <div className="flex items-center gap-3">
           <button
@@ -1535,7 +1535,7 @@ function DeploymentsTab({ projectId }: { projectId: string }) {
               <Fragment key={d.id}>
                 <tr className={`hover:bg-muted/30 transition-colors ${isActive ? 'bg-blue-50/40' : ''}`}>
                   <td className="px-4 py-3">
-                    <Link to={`/deployments/${d.id}`} className="font-mono text-red-700 hover:underline">
+                    <Link to={`/deployments/${d.id}`} className="font-mono text-destructive hover:underline">
                       {(d.commit_sha || '—').slice(0, 8)}
                     </Link>
                     {d.commit_message && (
@@ -1563,7 +1563,7 @@ function DeploymentsTab({ projectId }: { projectId: string }) {
                       {isFailed && (
                         <button
                           onClick={() => void runDiagnose(d.id)}
-                          className="text-[11px] px-2 py-1 rounded border border-slate-300 hover:border-slate-500 text-slate-600 hover:text-slate-900 transition-colors"
+                          className="text-[11px] px-2 py-1 rounded border border-border hover:border-slate-500 text-muted-foreground hover:text-foreground transition-colors"
                         >
                           {diag ? 'Hide' : 'Diagnose'}
                         </button>
@@ -1583,7 +1583,7 @@ function DeploymentsTab({ projectId }: { projectId: string }) {
                 </tr>
                 {diag && (
                   <tr>
-                    <td colSpan={7} className="px-4 py-3 bg-slate-50">
+                    <td colSpan={7} className="px-4 py-3 bg-muted">
                       <DiagnosisPanel
                         state={diag}
                         deploymentId={d.id}
@@ -1642,10 +1642,10 @@ function DiagnosisPanel({ state, deploymentId, onApplied }: DiagnosisPanelProps)
   const [applyResult, setApplyResult] = useState<{ ok: boolean; msg: string } | null>(null);
 
   if (state.state === 'loading') {
-    return <p className="text-xs text-slate-600">Diagnosing failed deployment…</p>;
+    return <p className="text-xs text-muted-foreground">Diagnosing failed deployment…</p>;
   }
   if (state.state === 'error') {
-    return <p className="text-xs text-red-600">{state.error}</p>;
+    return <p className="text-xs text-destructive">{state.error}</p>;
   }
   const d = state.data!;
   const isUnknown = d.kind === 'unknown';
@@ -1682,7 +1682,7 @@ function DiagnosisPanel({ state, deploymentId, onApplied }: DiagnosisPanelProps)
       <div className="flex items-center gap-2">
         <span className={`text-[10px] px-2 py-0.5 rounded-full border font-medium ${
           isUnknown
-            ? 'border-slate-300 bg-slate-100 text-slate-700'
+            ? 'border-border bg-muted text-foreground/90'
             : 'border-amber-300 bg-amber-50 text-amber-800'
         }`}>
           {KIND_LABEL[d.kind]}
@@ -1694,13 +1694,13 @@ function DiagnosisPanel({ state, deploymentId, onApplied }: DiagnosisPanelProps)
         )}
       </div>
 
-      <p className="text-xs text-slate-800">{d.cause}</p>
+      <p className="text-xs text-foreground">{d.cause}</p>
 
-      <div className="rounded border border-border bg-white p-3 space-y-2">
-        <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Suggested fix</p>
-        <p className="text-xs text-slate-800">{d.fix.description}</p>
+      <div className="rounded border border-border bg-card p-3 space-y-2">
+        <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Suggested fix</p>
+        <p className="text-xs text-foreground">{d.fix.description}</p>
         {d.fix.command && (
-          <code className="block text-[11px] font-mono bg-slate-100 rounded px-2 py-1 text-slate-700">
+          <code className="block text-[11px] font-mono bg-muted rounded px-2 py-1 text-foreground/90">
             {d.fix.command}
           </code>
         )}
@@ -1715,7 +1715,7 @@ function DiagnosisPanel({ state, deploymentId, onApplied }: DiagnosisPanelProps)
               {applying ? 'Applying…' : 'Apply fix'}
             </button>
             {applyResult && (
-              <span className={`text-[11px] ${applyResult.ok ? 'text-emerald-700' : 'text-red-600'}`}>
+              <span className={`text-[11px] ${applyResult.ok ? 'text-emerald-700' : 'text-destructive'}`}>
                 {applyResult.msg}
               </span>
             )}
@@ -1724,9 +1724,9 @@ function DiagnosisPanel({ state, deploymentId, onApplied }: DiagnosisPanelProps)
       </div>
 
       {d.matched_text && (
-        <details className="text-[11px] text-slate-500">
+        <details className="text-[11px] text-muted-foreground">
           <summary className="cursor-pointer">Matched log line</summary>
-          <pre className="mt-1 px-2 py-1 bg-slate-100 rounded font-mono text-[10px] text-slate-700 whitespace-pre-wrap">
+          <pre className="mt-1 px-2 py-1 bg-muted rounded font-mono text-[10px] text-foreground/90 whitespace-pre-wrap">
             {d.matched_text}
           </pre>
         </details>
@@ -1734,7 +1734,7 @@ function DiagnosisPanel({ state, deploymentId, onApplied }: DiagnosisPanelProps)
 
       {isUnknown && (
         <div className="space-y-2">
-          <p className="text-[11px] text-slate-500">
+          <p className="text-[11px] text-muted-foreground">
             No automatic pattern matched this failure.
             {d.agent_prompt && ' With an LLM connected (Settings → AI & Autonomy), WatchTower analyzes failures like this automatically — or copy the prompt for any AI assistant.'}
           </p>
@@ -1749,14 +1749,14 @@ function DiagnosisPanel({ state, deploymentId, onApplied }: DiagnosisPanelProps)
                 catch { /* clipboard blocked — user can re-copy from log */ }
                 window.location.assign('/settings');
               }}
-              className="text-[11px] px-3 py-1 rounded border border-border bg-white hover:bg-slate-50 text-slate-800 font-semibold shadow-retro"
+              className="text-[11px] px-3 py-1 rounded border border-border bg-card hover:bg-muted text-foreground font-semibold shadow-retro"
               title="Copy the diagnosis prompt and open AI & Autonomy settings"
             >
               Copy prompt & open AI settings →
             </button>
           )}
           {!d.agent_prompt && (
-            <p className="text-[11px] text-slate-500">
+            <p className="text-[11px] text-muted-foreground">
               Open the Build Logs tab to investigate manually.
             </p>
           )}
@@ -1978,7 +1978,7 @@ function EnvVarsTab({ projectId }: { projectId: string }) {
       {/* Add form */}
       <div className="rounded-xl border border-border bg-card p-5">
         <h3 className="text-sm font-semibold mb-4">Add Variable</h3>
-        {error && <p className="text-xs text-red-600 mb-3">{error}</p>}
+        {error && <p className="text-xs text-destructive mb-3">{error}</p>}
         <div className="flex gap-2 flex-wrap">
           <input
             value={newKey}
@@ -2035,7 +2035,7 @@ function EnvVarsTab({ projectId }: { projectId: string }) {
                   <td className="px-4 py-3 text-right">
                     <button
                       onClick={() => deleteVar(v.id)}
-                      className="text-xs text-red-600 hover:text-red-700 hover:underline"
+                      className="text-xs text-destructive hover:text-destructive hover:underline"
                     >
                       Delete
                     </button>
@@ -2179,13 +2179,13 @@ function WebhooksTab({ projectId }: { projectId: string }) {
           </div>
         )}
 
-        {error && <p className="text-xs text-red-600 mb-3">{error}</p>}
+        {error && <p className="text-xs text-destructive mb-3">{error}</p>}
         {testResult && (
           <div
             className={`rounded-md border p-2.5 mb-3 text-xs ${
               testResult.ok
                 ? 'border-emerald-300 bg-emerald-50 text-emerald-800'
-                : 'border-red-300 bg-red-50 text-red-800'
+                : 'border-destructive/40 bg-destructive/10 text-destructive'
             }`}
           >
             {testResult.ok
@@ -2219,7 +2219,7 @@ function WebhooksTab({ projectId }: { projectId: string }) {
           <button
             onClick={testHook}
             disabled={testing || saving || !url.trim()}
-            className="px-3 py-2 rounded-lg border border-border text-slate-700 hover:bg-slate-50 text-sm disabled:opacity-50"
+            className="px-3 py-2 rounded-lg border border-border text-foreground/90 hover:bg-muted text-sm disabled:opacity-50"
             title="Send a synthetic test message to verify the webhook URL works before saving"
           >
             {testing ? 'Testing…' : 'Test'}
@@ -2256,7 +2256,7 @@ function WebhooksTab({ projectId }: { projectId: string }) {
                   <td className="px-4 py-3 text-right">
                     <button
                       onClick={() => deleteHook(h.id)}
-                      className="text-xs text-red-600 hover:text-red-700 hover:underline"
+                      className="text-xs text-destructive hover:text-destructive hover:underline"
                     >
                       Remove
                     </button>
@@ -2354,7 +2354,7 @@ function RelatedTab({ projectId }: { projectId: string }) {
             {running ? 'Queueing…' : 'Run with Related'}
           </button>
         </div>
-        {error && <p className="text-xs text-red-600 mt-3">{error}</p>}
+        {error && <p className="text-xs text-destructive mt-3">{error}</p>}
 
         {runResults && (
           <div className="mt-4 rounded-lg border border-border overflow-hidden">
@@ -2373,7 +2373,7 @@ function RelatedTab({ projectId }: { projectId: string }) {
                     <td className="px-3 py-2">
                       <span className={
                         r.status === 'queued' ? 'text-emerald-700' :
-                        r.status === 'error'  ? 'text-red-700' :
+                        r.status === 'error'  ? 'text-destructive' :
                                                 'text-amber-700'
                       }>
                         {r.status}
@@ -2457,7 +2457,7 @@ function RelatedTab({ projectId }: { projectId: string }) {
                   <td className="px-4 py-3 text-right">
                     <button
                       onClick={() => remove(r.related_project_id)}
-                      className="text-xs text-red-600 hover:text-red-700 hover:underline"
+                      className="text-xs text-destructive hover:text-destructive hover:underline"
                     >
                       Remove
                     </button>
@@ -2491,7 +2491,31 @@ type CustomDomain = {
   cloudflare_record_id: string | null;
   cloudflare_target_ip: string | null;
   cloudflare_synced_at: string | null;
+  cloudflare_proxied?: boolean;
 };
+
+type CdnAnalytics = {
+  domain: string;
+  proxied: boolean;
+  since: string | null;
+  until: string | null;
+  total_requests: number;
+  cached_requests: number;
+  total_bytes: number;
+  cached_bytes: number;
+  cache_hit_ratio: number;
+  bytes_saved: number;
+  note: string | null;
+};
+
+// Human-readable bytes — the CDN "bytes saved off your uplink" number is the
+// payoff metric, so it needs to read as "11.3 GB", not "11280000000".
+function _fmtBytes(n: number): string {
+  if (!n) return '0 B';
+  const units = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'];
+  const i = Math.min(Math.floor(Math.log(n) / Math.log(1024)), units.length - 1);
+  return `${(n / Math.pow(1024, i)).toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
+}
 
 type CfCredential = {
   id: string;
@@ -2542,14 +2566,14 @@ function DomainsTab({ projectId }: { projectId: string }) {
   return (
     <div className="space-y-4">
       {error && (
-        <div className="rounded-lg border border-red-300 bg-red-50 p-3 text-xs text-red-800">{error}</div>
+        <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-xs text-destructive">{error}</div>
       )}
 
-      <section className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
-        <h2 className="text-sm font-semibold text-slate-900">Add a domain</h2>
-        <p className="text-[11px] text-slate-500">
+      <section className="rounded-xl border border-border bg-card p-4 space-y-3">
+        <h2 className="text-sm font-semibold text-foreground">Add a domain</h2>
+        <p className="text-[11px] text-muted-foreground">
           Adding a domain here records it on the project. Automatic DNS sync to Cloudflare requires a Cloudflare API token configured under{' '}
-          <a href="/integrations" className="underline hover:text-slate-700">Integrations → Cloudflare</a>.
+          <a href="/integrations" className="underline hover:text-foreground/90">Integrations → Cloudflare</a>.
           Without it, you'll still need to point the DNS record at this server manually.
         </p>
         {creds && creds.length === 0 && (
@@ -2572,7 +2596,7 @@ function DomainsTab({ projectId }: { projectId: string }) {
             onChange={(e) => setNewDomain(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && void addDomain()}
             placeholder="app.example.com"
-            className="flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-border focus:ring-1 focus:ring-slate-800 outline-none"
+            className="flex-1 rounded-md border border-border px-3 py-2 text-sm focus:border-border focus:ring-1 focus:ring-slate-800 outline-none"
           />
           <button
             type="button"
@@ -2585,16 +2609,16 @@ function DomainsTab({ projectId }: { projectId: string }) {
         </div>
       </section>
 
-      <section className="rounded-xl border border-slate-200 bg-white">
+      <section className="rounded-xl border border-border bg-card">
         <header className="px-4 py-3 border-b border-slate-100">
-          <h2 className="text-sm font-semibold text-slate-900">Domains</h2>
+          <h2 className="text-sm font-semibold text-foreground">Domains</h2>
         </header>
         {!domains ? (
           <div className="px-4 py-3">
             <Skeleton.Line className="h-3 w-32" />
           </div>
         ) : domains.length === 0 ? (
-          <p className="px-4 py-3 text-xs text-slate-500">No domains yet. Add one above.</p>
+          <p className="px-4 py-3 text-xs text-muted-foreground">No domains yet. Add one above.</p>
         ) : (
           <ul className="divide-y divide-slate-100">
             {domains.map((d) => (
@@ -2627,10 +2651,35 @@ function DomainRow({
   const [showSync, setShowSync] = useState(false);
   const [credId, setCredId] = useState<string>(domain.cloudflare_credential_id ?? creds[0]?.id ?? '');
   const [targetIp, setTargetIp] = useState<string>(domain.cloudflare_target_ip ?? '');
+  // Default the CDN on for a fresh sync — proxying through Cloudflare is the
+  // whole point of "host from your own PC" (edge cache + TLS + DDoS). An
+  // already-synced domain keeps whatever it had.
+  const [proxied, setProxied] = useState<boolean>(domain.cloudflare_proxied ?? true);
   const [busy, setBusy] = useState(false);
+  const [purgeMsg, setPurgeMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [stats, setStats] = useState<CdnAnalytics | null>(null);
+  const [statsOpen, setStatsOpen] = useState(false);
+  const [statsBusy, setStatsBusy] = useState(false);
 
   const synced = Boolean(domain.cloudflare_record_id);
+  const isProxied = Boolean(domain.cloudflare_proxied);
+
+  const loadStats = async () => {
+    if (statsOpen) { setStatsOpen(false); return; }
+    setStatsOpen(true);
+    if (stats) return;  // cached from a prior open
+    setStatsBusy(true);
+    try {
+      const r = await apiClient.get(`/integrations/cloudflare/projects/${projectId}/domains/${domain.id}/analytics`);
+      setStats(r.data as CdnAnalytics);
+    } catch (e) {
+      setError(extractDetail(e, 'Could not load CDN analytics'));
+      setStatsOpen(false);
+    } finally {
+      setStatsBusy(false);
+    }
+  };
 
   const sync = async () => {
     if (!credId || !targetIp.trim()) return;
@@ -2640,11 +2689,26 @@ function DomainRow({
       await apiClient.post(`/integrations/cloudflare/projects/${projectId}/domains/${domain.id}/sync`, {
         credential_id: credId,
         target_ip: targetIp.trim(),
+        proxied,
       });
       setShowSync(false);
       onChanged();
     } catch (e) {
       setError(extractDetail(e, 'Sync failed'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const purge = async () => {
+    setBusy(true);
+    setError(null);
+    setPurgeMsg(null);
+    try {
+      const r = await apiClient.post(`/integrations/cloudflare/projects/${projectId}/domains/${domain.id}/purge-cache`);
+      setPurgeMsg(r.data?.detail || 'Edge cache purged.');
+    } catch (e) {
+      setError(extractDetail(e, 'Purge failed'));
     } finally {
       setBusy(false);
     }
@@ -2668,16 +2732,21 @@ function DomainRow({
     <li className="px-4 py-3">
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-sm font-medium text-slate-900">{domain.domain}</p>
-          <p className="text-[11px] text-slate-500">
+          <p className="text-sm font-medium text-foreground">{domain.domain}</p>
+          <p className="text-[11px] text-muted-foreground">
             {synced ? (
               <>
                 ✓ Cloudflare DNS → <code className="font-mono">{domain.cloudflare_target_ip}</code>
+                {' · '}
+                {isProxied
+                  ? <span className="text-orange-600 font-medium">CDN on (proxied)</span>
+                  : <span className="text-muted-foreground">DNS-only</span>}
                 {domain.cloudflare_synced_at && <> · synced {new Date(domain.cloudflare_synced_at).toLocaleString()}</>}
               </>
             ) : (
               creds.length > 0 ? 'DNS not managed by WatchTower.' : 'Connect Cloudflare in Integrations to manage DNS automatically.'
             )}
+            {purgeMsg && <> · <span className="text-emerald-600">{purgeMsg}</span></>}
           </p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
@@ -2690,12 +2759,34 @@ function DomainRow({
               Sync to Cloudflare
             </button>
           )}
+          {synced && isProxied && (
+            <button
+              type="button"
+              onClick={() => void loadStats()}
+              disabled={statsBusy}
+              title="See how much traffic Cloudflare's edge served instead of this machine"
+              className="text-[11px] px-2 py-1 rounded border border-border text-foreground/90 hover:bg-muted disabled:opacity-50 font-medium"
+            >
+              {statsBusy ? 'Loading…' : statsOpen ? 'Hide CDN stats' : 'CDN stats'}
+            </button>
+          )}
+          {synced && isProxied && (
+            <button
+              type="button"
+              onClick={() => void purge()}
+              disabled={busy}
+              title="Clear Cloudflare's edge cache so visitors see the latest deploy immediately"
+              className="text-[11px] px-2 py-1 rounded border border-orange-300 text-orange-700 hover:bg-orange-50 disabled:opacity-50 font-medium"
+            >
+              {busy ? 'Purging…' : 'Purge cache'}
+            </button>
+          )}
           {synced && (
             <button
               type="button"
               onClick={() => void unsync()}
               disabled={busy}
-              className="text-[11px] text-red-600 hover:text-red-800 underline underline-offset-2 disabled:opacity-50"
+              className="text-[11px] text-destructive hover:text-destructive underline underline-offset-2 disabled:opacity-50"
             >
               Remove from CF
             </button>
@@ -2706,35 +2797,49 @@ function DomainRow({
       {showSync && (
         <div className="mt-3 rounded-md border border-orange-200 bg-orange-50 p-3 space-y-2">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            <label className="block text-[11px] text-slate-700">
+            <label className="block text-[11px] text-foreground/90">
               Cloudflare account
               <select
                 value={credId}
                 onChange={(e) => setCredId(e.target.value)}
-                className="mt-1 w-full rounded border border-slate-300 bg-white px-2 py-1 text-xs"
+                className="mt-1 w-full rounded border border-border bg-card px-2 py-1 text-xs"
               >
                 {creds.map((c) => (
                   <option key={c.id} value={c.id}>{c.label || c.account_name || 'Cloudflare'}</option>
                 ))}
               </select>
             </label>
-            <label className="block text-[11px] text-slate-700">
+            <label className="block text-[11px] text-foreground/90">
               Target IP (A record)
               <input
                 type="text"
                 value={targetIp}
                 onChange={(e) => setTargetIp(e.target.value)}
                 placeholder="203.0.113.10"
-                className="mt-1 w-full rounded border border-slate-300 bg-white px-2 py-1 text-xs font-mono"
+                className="mt-1 w-full rounded border border-border bg-card px-2 py-1 text-xs font-mono"
               />
             </label>
           </div>
-          {error && <p className="text-[11px] text-red-700">{error}</p>}
+          <label className="flex items-start gap-2 text-[11px] text-foreground/90">
+            <input
+              type="checkbox"
+              checked={proxied}
+              onChange={(e) => setProxied(e.target.checked)}
+              className="mt-0.5"
+            />
+            <span>
+              <span className="font-medium">Route through Cloudflare CDN</span> (proxied / “orange cloud”).
+              Adds edge caching, TLS, and DDoS protection — and lets your site stay fast without
+              hammering this machine’s connection. WatchTower auto-purges the edge cache on every
+              deploy. Turn off for direct-connection services (SSH, game servers).
+            </span>
+          </label>
+          {error && <p className="text-[11px] text-destructive">{error}</p>}
           <div className="flex gap-2 justify-end">
             <button
               type="button"
               onClick={() => { setShowSync(false); setError(null); }}
-              className="text-[11px] px-2 py-1 rounded border border-slate-300 text-slate-700 hover:bg-slate-100"
+              className="text-[11px] px-2 py-1 rounded border border-border text-foreground/90 hover:bg-muted"
             >
               Cancel
             </button>
@@ -2747,6 +2852,36 @@ function DomainRow({
               {busy ? 'Syncing…' : 'Verify & sync'}
             </button>
           </div>
+        </div>
+      )}
+
+      {statsOpen && stats && (
+        <div className="mt-3 rounded-md border border-border bg-muted p-3">
+          {stats.note ? (
+            <p className="text-[11px] text-muted-foreground">{stats.note}</p>
+          ) : (
+            <>
+              <div className="grid grid-cols-3 gap-3 text-center">
+                <div>
+                  <p className="text-lg font-semibold text-orange-600">{Math.round(stats.cache_hit_ratio * 100)}%</p>
+                  <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Served from edge</p>
+                </div>
+                <div>
+                  <p className="text-lg font-semibold text-emerald-600">{_fmtBytes(stats.bytes_saved)}</p>
+                  <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Off your uplink</p>
+                </div>
+                <div>
+                  <p className="text-lg font-semibold text-foreground">{stats.total_requests.toLocaleString()}</p>
+                  <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Requests</p>
+                </div>
+              </div>
+              <p className="mt-2 text-[10px] text-muted-foreground text-center">
+                Cloudflare served <strong>{_fmtBytes(stats.bytes_saved)}</strong> of{' '}
+                {_fmtBytes(stats.total_bytes)} from its edge — bandwidth this machine didn’t have to.
+                {stats.since && <> · last {stats.since.slice(0, 10)} → {stats.until?.slice(0, 10)}</>}
+              </p>
+            </>
+          )}
         </div>
       )}
     </li>
@@ -2906,10 +3041,10 @@ function RunLocallyCard({ projectId }: { projectId: string }) {
             preview server.
             <br />
             <span className="text-[10.5px]">
-              For Dockerfile-based projects you'll need <a href="https://podman.io/docs/installation" target="_blank" rel="noopener noreferrer" className="underline hover:text-slate-700">Podman</a>
+              For Dockerfile-based projects you'll need <a href="https://podman.io/docs/installation" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground/90">Podman</a>
               {' '}(<code className="font-mono">brew install podman</code> on macOS,
               {' '}<code className="font-mono">apt install podman</code> on Linux,
-              {' '}<a href="https://podman.io/docs/installation#windows" target="_blank" rel="noopener noreferrer" className="underline hover:text-slate-700">winget install RedHat.Podman</a> on Windows).
+              {' '}<a href="https://podman.io/docs/installation#windows" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground/90">winget install RedHat.Podman</a> on Windows).
             </span>
           </p>
         </div>
@@ -2926,7 +3061,7 @@ function RunLocallyCard({ projectId }: { projectId: string }) {
       </div>
       <div className="px-5 py-4">
         {error && (
-          <div className="rounded-lg border border-red-300 bg-red-50 p-3 mb-3 text-xs text-red-800">
+          <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-3 mb-3 text-xs text-destructive">
             {error}
           </div>
         )}
@@ -3003,7 +3138,7 @@ function RunLocallyCard({ projectId }: { projectId: string }) {
                 type="button"
                 onClick={() => void stop()}
                 disabled={busy}
-                className="text-xs px-3 py-1.5 rounded-md border border-red-300 text-red-700 hover:bg-red-50 disabled:opacity-50"
+                className="text-xs px-3 py-1.5 rounded-md border border-destructive/40 text-destructive hover:bg-destructive/10 disabled:opacity-50"
               >
                 {busyAction === 'stop' ? 'Stopping…' : 'Stop'}
               </button>
@@ -3011,12 +3146,12 @@ function RunLocallyCard({ projectId }: { projectId: string }) {
 
             {/* Logs panel — collapsible, polls every 3s while open + follow */}
             {logsOpen && (
-              <div className="rounded-lg border border-slate-300 bg-slate-950 overflow-hidden">
+              <div className="rounded-lg border border-border bg-slate-950 overflow-hidden">
                 <div className="px-3 py-2 border-b border-border bg-slate-900 flex items-center justify-between">
                   <div className="flex items-center gap-3 text-[11px] text-slate-300">
                     <span className="font-medium">Container logs</span>
-                    <span className="text-slate-500">last 200 lines</span>
-                    {logsLoading && <span className="text-slate-500">refreshing…</span>}
+                    <span className="text-muted-foreground">last 200 lines</span>
+                    {logsLoading && <span className="text-muted-foreground">refreshing…</span>}
                   </div>
                   <div className="flex items-center gap-3">
                     <label className="flex items-center gap-1.5 text-[11px] text-slate-300 cursor-pointer">

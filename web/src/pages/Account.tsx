@@ -35,8 +35,8 @@ export default function Account() {
     return (
       <div className="max-w-3xl mx-auto px-6 py-8">
         <div className="h-7 w-40 bg-slate-200 rounded animate-pulse" />
-        <div className="mt-2 h-4 w-72 bg-slate-100 rounded animate-pulse" />
-        <div className="mt-8 h-48 bg-white border border-slate-200 rounded-xl animate-pulse" />
+        <div className="mt-2 h-4 w-72 bg-muted rounded animate-pulse" />
+        <div className="mt-8 h-48 bg-card border border-border rounded-xl animate-pulse" />
       </div>
     );
   }
@@ -52,33 +52,33 @@ export default function Account() {
     <div className="max-w-3xl mx-auto px-6 py-8">
       {/* Page header */}
       <header className="mb-6">
-        <h1 className="text-xl font-semibold text-slate-900">Account &amp; security</h1>
-        <p className="mt-1 text-sm text-slate-500">
+        <h1 className="text-xl font-semibold text-foreground">Account &amp; security</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
           Your identity, organization membership, and session controls for this WatchTower install.
         </p>
       </header>
 
       {/* Profile card */}
-      <section className="rounded-xl border border-border bg-white shadow-retro mb-6">
+      <section className="rounded-xl border border-border bg-card shadow-retro mb-6">
         <div className="flex items-start gap-4 p-5">
           {me?.avatar_url ? (
             <img
               src={me.avatar_url}
               alt=""
-              className="w-16 h-16 rounded-full border border-slate-300 shrink-0"
+              className="w-16 h-16 rounded-full border border-border shrink-0"
             />
           ) : (
-            <div className="w-16 h-16 rounded-full bg-slate-200 text-slate-600 text-xl font-semibold flex items-center justify-center shrink-0 uppercase">
+            <div className="w-16 h-16 rounded-full bg-slate-200 text-muted-foreground text-xl font-semibold flex items-center justify-center shrink-0 uppercase">
               {initial}
             </div>
           )}
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 flex-wrap">
-              <h2 className="text-base font-semibold text-slate-900 truncate">
+              <h2 className="text-base font-semibold text-foreground truncate">
                 {me?.name ?? me?.email ?? 'Signed in'}
               </h2>
               {me?.is_github_authenticated && (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 border border-slate-200 text-[10px] font-medium text-slate-700">
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-muted border border-border text-[10px] font-medium text-foreground/90">
                   <svg viewBox="0 0 16 16" width="11" height="11" fill="currentColor" aria-hidden="true">
                     <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z" />
                   </svg>
@@ -102,10 +102,10 @@ export default function Account() {
       </section>
 
       {/* Organization & role */}
-      <section className="rounded-xl border border-border bg-white shadow-retro mb-6">
-        <div className="px-5 py-4 border-b border-slate-200">
-          <h2 className="text-sm font-semibold text-slate-900">Organization</h2>
-          <p className="mt-0.5 text-xs text-slate-500">
+      <section className="rounded-xl border border-border bg-card shadow-retro mb-6">
+        <div className="px-5 py-4 border-b border-border">
+          <h2 className="text-sm font-semibold text-foreground">Organization</h2>
+          <p className="mt-0.5 text-xs text-muted-foreground">
             Which tenant of WatchTower you belong to and what role gives you which permissions.
           </p>
         </div>
@@ -124,20 +124,20 @@ export default function Account() {
       </section>
 
       {/* Session security */}
-      <section className="rounded-xl border border-border bg-white shadow-retro mb-6">
-        <div className="px-5 py-4 border-b border-slate-200">
-          <h2 className="text-sm font-semibold text-slate-900">Session</h2>
-          <p className="mt-0.5 text-xs text-slate-500">
+      <section className="rounded-xl border border-border bg-card shadow-retro mb-6">
+        <div className="px-5 py-4 border-b border-border">
+          <h2 className="text-sm font-semibold text-foreground">Session</h2>
+          <p className="mt-0.5 text-xs text-muted-foreground">
             Sessions persist across {IS_ELECTRON ? 'app restarts' : 'browser restarts'} for up to 30 days.
-            The session signing key lives at <code className="font-mono text-[10.5px] bg-slate-100 border border-slate-200 px-1 py-0.5 rounded">~/.watchtower/auth-signing.key</code> on this install.
+            The session signing key lives at <code className="font-mono text-[10.5px] bg-muted border border-border px-1 py-0.5 rounded">~/.watchtower/auth-signing.key</code> on this install.
           </p>
         </div>
         <div className="p-5 space-y-3">
-          <div className="flex items-start gap-3 p-3 rounded-lg bg-slate-50 border border-slate-200">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-slate-500 mt-0.5 shrink-0">
+          <div className="flex items-start gap-3 p-3 rounded-lg bg-muted border border-border">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-muted-foreground mt-0.5 shrink-0">
               <rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" />
             </svg>
-            <div className="text-xs text-slate-600">
+            <div className="text-xs text-muted-foreground">
               Sign out clears the stored session token on this device. Other devices remain signed in until their tokens expire or you delete the install's signing key.
             </div>
           </div>
@@ -145,7 +145,7 @@ export default function Account() {
             type="button"
             onClick={handleSignOut}
             disabled={signingOut}
-            className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-red-300 bg-white text-red-700 text-xs font-medium hover:bg-red-50 hover:border-red-400 transition-colors disabled:opacity-60 disabled:cursor-wait"
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-destructive/40 bg-card text-destructive text-xs font-medium hover:bg-destructive/10 hover:border-red-400 transition-colors disabled:opacity-60 disabled:cursor-wait"
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
@@ -175,9 +175,9 @@ function Field({
 }) {
   return (
     <div className="min-w-0">
-      <dt className="text-[10px] uppercase tracking-wider font-semibold text-slate-500">{label}</dt>
+      <dt className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground">{label}</dt>
       <dd
-        className={`mt-0.5 truncate text-slate-900 ${mono ? 'font-mono' : ''} ${
+        className={`mt-0.5 truncate text-foreground ${mono ? 'font-mono' : ''} ${
           small ? 'text-[11px]' : 'text-sm'
         } ${capitalize ? 'capitalize' : ''}`}
         title={value}
@@ -194,7 +194,7 @@ function Capability({ ok, label }: { ok?: boolean; label: string }) {
       className={`flex items-center gap-1.5 px-2 py-1.5 rounded-md border text-[11px] ${
         ok
           ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
-          : 'bg-slate-50 border-slate-200 text-slate-400'
+          : 'bg-muted border-border text-muted-foreground'
       }`}
       title={ok ? `You can ${label.toLowerCase()}` : `You cannot ${label.toLowerCase()}`}
     >

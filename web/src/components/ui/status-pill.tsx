@@ -55,7 +55,7 @@ const TONE: Record<
   },
   error: {
     label: 'Failed',
-    bg: 'bg-red-50', text: 'text-red-700', border: 'border-red-300',
+    bg: 'bg-destructive/10', text: 'text-destructive', border: 'border-destructive/40',
     icon: (
       <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
         <line x1="18" y1="6" x2="6" y2="18" />
@@ -65,7 +65,7 @@ const TONE: Record<
   },
   idle: {
     label: 'Idle',
-    bg: 'bg-slate-100', text: 'text-slate-700', border: 'border-slate-300',
+    bg: 'bg-muted', text: 'text-foreground/90', border: 'border-border',
     icon: (
       <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
         <rect x="6" y="4" width="4" height="16" /><rect x="14" y="4" width="4" height="16" />
@@ -74,7 +74,7 @@ const TONE: Record<
   },
   info: {
     label: 'Info',
-    bg: 'bg-slate-50', text: 'text-slate-700', border: 'border-slate-300',
+    bg: 'bg-muted', text: 'text-foreground/90', border: 'border-border',
     icon: (
       <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
         <circle cx="12" cy="12" r="10" />

@@ -47,8 +47,8 @@ const GitHubOAuthCallback = () => {
   }, [navigate, searchParams]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-6 bg-slate-50">
-      <div className="w-full max-w-md rounded-xl px-8 py-10 text-center border border-border bg-white shadow-sm">
+    <div className="min-h-screen flex items-center justify-center px-6 bg-muted">
+      <div className="w-full max-w-md rounded-xl px-8 py-10 text-center border border-border bg-card shadow-sm">
 
         {status === 'loading' && (
           <>
@@ -56,7 +56,7 @@ const GitHubOAuthCallback = () => {
               <Spinner size={32} label="Connecting GitHub" />
             </div>
             <h1 className="text-base font-semibold mb-1">Connecting GitHub…</h1>
-            <p className="text-sm text-slate-600">Completing your GitHub authorization. Please wait.</p>
+            <p className="text-sm text-muted-foreground">Completing your GitHub authorization. Please wait.</p>
           </>
         )}
 
@@ -64,7 +64,7 @@ const GitHubOAuthCallback = () => {
           <>
             <div className="text-5xl mb-4">✅</div>
             <h1 className="text-base font-semibold mb-1">GitHub Connected!</h1>
-            <p className="text-sm text-slate-600 mb-6">Your GitHub account has been linked to WatchTower. You can now pull repositories for deployments.</p>
+            <p className="text-sm text-muted-foreground mb-6">Your GitHub account has been linked to WatchTower. You can now pull repositories for deployments.</p>
             <div className="flex flex-col gap-2">
               <Link to="/team">
                 <Button className="w-full rounded-md">→ Go to Team Management</Button>
@@ -81,9 +81,9 @@ const GitHubOAuthCallback = () => {
             <div className="text-5xl mb-4">❌</div>
             <h1 className="text-base font-semibold mb-1">Connection failed</h1>
             {detail && (
-              <p className="text-sm text-red-700 mb-4 bg-red-50 border border-red-200 rounded-md px-3 py-2 text-left">{detail}</p>
+              <p className="text-sm text-destructive mb-4 bg-destructive/10 border border-destructive/30 rounded-md px-3 py-2 text-left">{detail}</p>
             )}
-            <p className="text-xs text-slate-600 mb-6">If the problem persists, check that the API server is running and environment variables are configured correctly.</p>
+            <p className="text-xs text-muted-foreground mb-6">If the problem persists, check that the API server is running and environment variables are configured correctly.</p>
             <div className="flex flex-col gap-2">
               <Link to="/team">
                 <Button className="w-full rounded-md">← Try again from Team page</Button>

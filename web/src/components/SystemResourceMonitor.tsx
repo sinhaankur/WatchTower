@@ -53,7 +53,7 @@ function barBg(pct: number): string {
 function statusLabel(pct: number): { text: string; color: string } {
   if (pct < 60) return { text: 'Healthy', color: 'text-emerald-600' };
   if (pct < 80) return { text: 'Moderate', color: 'text-amber-600' };
-  return { text: 'High', color: 'text-red-600' };
+  return { text: 'High', color: 'text-destructive' };
 }
 
 // ── Sub-components ────────────────────────────────────────────────────────────
@@ -62,7 +62,7 @@ function UsageBar({ pct, label }: { pct: number; label: string }) {
   const clamped = Math.min(100, Math.max(0, pct));
   return (
     <div className="space-y-1">
-      <div className="flex justify-between text-xs text-slate-600">
+      <div className="flex justify-between text-xs text-muted-foreground">
         <span>{label}</span>
         <span className="font-medium">{clamped.toFixed(1)}%</span>
       </div>
@@ -110,7 +110,7 @@ function SegmentedBar({ ram }: { ram: RamStats }) {
       </div>
 
       {/* legend */}
-      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-600">
+      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
         <span className="flex items-center gap-1.5">
           <span className="w-2.5 h-2.5 rounded-sm bg-blue-500 inline-block" />
           Used · {fmtMb(Math.max(0, ram.used_mb - ram.buffers_mb - ram.cached_mb))}
@@ -124,7 +124,7 @@ function SegmentedBar({ ram }: { ram: RamStats }) {
           Buffers · {fmtMb(ram.buffers_mb)}
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="w-2.5 h-2.5 rounded-sm bg-slate-200 inline-block border border-slate-300" />
+          <span className="w-2.5 h-2.5 rounded-sm bg-slate-200 inline-block border border-border" />
           Free · {fmtMb(ram.free_mb)}
         </span>
       </div>
@@ -169,8 +169,8 @@ export default function SystemResourceMonitor() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-sm font-semibold text-slate-900">System Memory</h2>
-          <p className="text-xs text-slate-500 mt-0.5">
+          <h2 className="text-sm font-semibold text-foreground">System Memory</h2>
+          <p className="text-xs text-muted-foreground mt-0.5">
             How your PC&apos;s RAM is being used right now
           </p>
         </div>
@@ -182,7 +182,7 @@ export default function SystemResourceMonitor() {
           )}
           <button
             onClick={() => void fetchMetrics()}
-            className="text-xs text-slate-500 hover:text-slate-800 transition-colors"
+            className="text-xs text-muted-foreground hover:text-foreground transition-colors"
             title="Refresh"
           >
             ↻ {lastUpdated ? lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : 'Refresh'}
@@ -191,13 +191,13 @@ export default function SystemResourceMonitor() {
       </div>
 
       {loading && !metrics && (
-        <div className="h-20 flex items-center justify-center text-sm text-slate-400">
+        <div className="h-20 flex items-center justify-center text-sm text-muted-foreground">
           Loading…
         </div>
       )}
 
       {error && (
-        <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-600">
+        <div className="rounded-lg bg-destructive/10 border border-destructive/30 p-3 text-sm text-destructive">
           {error} — metrics require Linux /proc access
         </div>
       )}
@@ -207,21 +207,21 @@ export default function SystemResourceMonitor() {
           {/* Total / overview row */}
           <div className="grid grid-cols-3 gap-3">
             {[
-              { label: 'Total RAM',  value: fmtMb(ram.total_mb),     sub: 'installed',         color: 'text-slate-700' },
-              { label: 'In Use',     value: fmtMb(ram.used_mb),      sub: `${ram.percent_used}% used`, color: ram.percent_used > 80 ? 'text-red-600' : ram.percent_used > 60 ? 'text-amber-600' : 'text-emerald-600' },
-              { label: 'Available',  value: fmtMb(ram.available_mb), sub: 'for new apps',      color: 'text-slate-700' },
+              { label: 'Total RAM',  value: fmtMb(ram.total_mb),     sub: 'installed',         color: 'text-foreground/90' },
+              { label: 'In Use',     value: fmtMb(ram.used_mb),      sub: `${ram.percent_used}% used`, color: ram.percent_used > 80 ? 'text-destructive' : ram.percent_used > 60 ? 'text-amber-600' : 'text-emerald-600' },
+              { label: 'Available',  value: fmtMb(ram.available_mb), sub: 'for new apps',      color: 'text-foreground/90' },
             ].map(({ label, value, sub, color }) => (
               <div key={label} className="rounded-lg bg-muted/40 p-3 text-center">
                 <p className={`text-base font-bold ${color}`}>{value}</p>
-                <p className="text-xs font-medium text-slate-700 mt-0.5">{label}</p>
-                <p className="text-[10px] text-slate-500">{sub}</p>
+                <p className="text-xs font-medium text-foreground/90 mt-0.5">{label}</p>
+                <p className="text-[10px] text-muted-foreground">{sub}</p>
               </div>
             ))}
           </div>
 
           {/* Segmented visual bar */}
           <div className="space-y-1">
-            <p className="text-xs font-medium text-slate-700">RAM breakdown</p>
+            <p className="text-xs font-medium text-foreground/90">RAM breakdown</p>
             <SegmentedBar ram={ram} />
           </div>
 
@@ -230,7 +230,7 @@ export default function SystemResourceMonitor() {
 
           {/* What uses the memory — explanations */}
           <div className="rounded-lg border border-border bg-muted/30 p-3 space-y-2">
-            <p className="text-xs font-semibold text-slate-700 mb-2">What each section means</p>
+            <p className="text-xs font-semibold text-foreground/90 mb-2">What each section means</p>
             {[
               { dot: 'bg-blue-500',    title: 'Used',    desc: 'Apps and processes actively holding data in memory.' },
               { dot: 'bg-indigo-300',  title: 'Cache',   desc: 'Recently used files kept in RAM to speed up future reads. OS frees this instantly when an app needs more memory.' },
@@ -240,8 +240,8 @@ export default function SystemResourceMonitor() {
               <div key={title} className="flex gap-2.5 items-start">
                 <span className={`w-2.5 h-2.5 rounded-sm ${dot} border border-black/10 shrink-0 mt-0.5`} />
                 <div>
-                  <span className="text-xs font-medium text-slate-800">{title}: </span>
-                  <span className="text-xs text-slate-500">{desc}</span>
+                  <span className="text-xs font-medium text-foreground">{title}: </span>
+                  <span className="text-xs text-muted-foreground">{desc}</span>
                 </div>
               </div>
             ))}
@@ -271,10 +271,10 @@ export default function SystemResourceMonitor() {
       {swap && swap.total_mb > 0 && (
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-medium text-slate-700">
+            <p className="text-xs font-medium text-foreground/90">
               Swap · {fmtMb(swap.used_mb)} / {fmtMb(swap.total_mb)}
             </p>
-            <span className="text-[10px] text-slate-500">
+            <span className="text-[10px] text-muted-foreground">
               Disk space used as overflow RAM
             </span>
           </div>
@@ -287,7 +287,7 @@ export default function SystemResourceMonitor() {
         </div>
       )}
 
-      <p className="text-[10px] text-slate-400 text-right">Auto-refreshes every 10 s</p>
+      <p className="text-[10px] text-muted-foreground text-right">Auto-refreshes every 10 s</p>
     </div>
   );
 }

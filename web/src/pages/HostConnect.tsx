@@ -96,7 +96,7 @@ function CopyButton({
     <button
       type="button"
       onClick={onClick}
-      className="shrink-0 rounded-md border border-slate-300 bg-white px-2.5 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-50"
+      className="shrink-0 rounded-md border border-border bg-card px-2.5 py-1 text-[11px] font-medium text-foreground/90 hover:bg-muted"
     >
       {copied ? 'Copied' : label}
     </button>
@@ -403,15 +403,15 @@ const HostConnect = () => {
   };
 
   return (
-    <div className="flex-1 overflow-auto bg-slate-50">
+    <div className="flex-1 overflow-auto bg-muted">
       {/* Header */}
       <header
-        className="px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between border-b sticky top-0 z-10 bg-white/95 backdrop-blur-sm"
+        className="px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between border-b sticky top-0 z-10 bg-card/95 backdrop-blur-sm"
         style={{ borderColor: 'hsl(var(--border-soft))' }}
       >
         <div>
-          <h1 className="text-lg font-semibold text-slate-900">Host Connect</h1>
-          <p className="text-xs text-slate-600 mt-0.5 hidden sm:block">
+          <h1 className="text-lg font-semibold text-foreground">Host Connect</h1>
+          <p className="text-xs text-muted-foreground mt-0.5 hidden sm:block">
             Set up tools, domains, databases, and secure terminal access.
           </p>
         </div>
@@ -422,14 +422,14 @@ const HostConnect = () => {
               ? 'bg-emerald-500/10 text-emerald-700 border-emerald-300'
               : readiness >= 2
                 ? 'bg-amber-500/10 text-amber-700 border-amber-300'
-                : 'bg-red-500/10 text-red-700 border-red-300'
+                : 'bg-red-500/10 text-destructive border-destructive/40'
           }`}>
             {readiness}/6 ready
           </span>
           <button
             onClick={() => void loadAll()}
             disabled={loading}
-            className="px-3 py-1.5 rounded-lg border border-border text-xs text-slate-700 hover:bg-slate-100 disabled:opacity-50"
+            className="px-3 py-1.5 rounded-lg border border-border text-xs text-foreground/90 hover:bg-muted disabled:opacity-50"
           >
             {loading ? 'Loading…' : 'Refresh'}
           </button>
@@ -447,8 +447,8 @@ const HostConnect = () => {
             onClick={() => setActiveTab(tab)}
             className={`px-4 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
               activeTab === tab
-                ? 'border-primary text-red-700'
-                : 'border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300'
+                ? 'border-primary text-destructive'
+                : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'
             }`}
           >
             {tab}
@@ -458,7 +458,7 @@ const HostConnect = () => {
 
       <main className="px-4 sm:px-6 lg:px-8 py-6 max-w-6xl mx-auto w-full">
         {error && (
-          <div className="mb-4 rounded-lg border border-red-300 bg-red-50 text-red-700 px-4 py-3 text-sm">
+          <div className="mb-4 rounded-lg border border-destructive/40 bg-destructive/10 text-destructive px-4 py-3 text-sm">
             {error}
           </div>
         )}
@@ -466,9 +466,9 @@ const HostConnect = () => {
         <section className="mb-6 rounded-2xl border border-border bg-gradient-to-br from-white to-amber-50 p-5">
           <div className="grid gap-4 lg:grid-cols-[1.6fr_1fr]">
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-red-700">Guided Host Setup</p>
-              <h2 className="mt-2 text-xl font-bold text-slate-900">{TAB_COPY[activeTab].title}</h2>
-              <p className="mt-1.5 max-w-2xl text-sm text-slate-600">{TAB_COPY[activeTab].description}</p>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-destructive">Guided Host Setup</p>
+              <h2 className="mt-2 text-xl font-bold text-foreground">{TAB_COPY[activeTab].title}</h2>
+              <p className="mt-1.5 max-w-2xl text-sm text-muted-foreground">{TAB_COPY[activeTab].description}</p>
               <div className="mt-4 flex flex-wrap gap-2">
                 {TABS.map((tab) => (
                   <button
@@ -478,7 +478,7 @@ const HostConnect = () => {
                     className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
                       activeTab === tab
                         ? 'border-primary bg-primary text-white'
-                        : 'border-slate-300 bg-white text-slate-700 hover:border-slate-400 hover:bg-slate-50'
+                        : 'border-border bg-card text-foreground/90 hover:border-accent/50 hover:bg-muted'
                     }`}
                   >
                     {tab}
@@ -488,7 +488,7 @@ const HostConnect = () => {
               <div className="mt-4 flex flex-wrap gap-2">
                 <Link
                   to="/servers"
-                  className="rounded-lg border border-border bg-white px-3 py-2 text-xs font-semibold text-slate-900 shadow-retro hover:bg-amber-50"
+                  className="rounded-lg border border-border bg-card px-3 py-2 text-xs font-semibold text-foreground shadow-retro hover:bg-amber-50"
                 >
                   Open Servers
                 </Link>
@@ -501,14 +501,14 @@ const HostConnect = () => {
               </div>
             </div>
 
-            <div className="rounded-xl border border-amber-200 bg-white/80 p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Recommended Next Step</p>
-              <p className="mt-2 text-sm font-semibold text-slate-900">
+            <div className="rounded-xl border border-amber-200 bg-card/80 p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Recommended Next Step</p>
+              <p className="mt-2 text-sm font-semibold text-foreground">
                 {missingTools.length > 0
                   ? `Install ${TOOL_LABELS[missingTools[0]]} first`
                   : 'Your host is ready to connect apps'}
               </p>
-              <p className="mt-1 text-xs text-slate-600">
+              <p className="mt-1 text-xs text-muted-foreground">
                 {missingTools.length > 0
                   ? `${missingTools.length} dependency${missingTools.length === 1 ? '' : 'ies'} still missing. Finish the tools tab, then connect a domain or deploy an app.`
                   : 'Move on to Domain, Nginx, or Deploy an App depending on how you want traffic to reach the host.'}
@@ -516,7 +516,7 @@ const HostConnect = () => {
               <button
                 type="button"
                 onClick={() => setTab(recommendedTab)}
-                className="mt-3 rounded-lg border border-border bg-white px-3 py-2 text-xs font-semibold text-slate-900 shadow-retro hover:bg-slate-50"
+                className="mt-3 rounded-lg border border-border bg-card px-3 py-2 text-xs font-semibold text-foreground shadow-retro hover:bg-muted"
               >
                 Open {recommendedTab}
               </button>
@@ -540,19 +540,19 @@ const HostConnect = () => {
             <section className="rounded-xl border border-border bg-card p-5">
               <div className="flex items-center justify-between mb-3">
                 <div>
-                  <h2 className="text-sm font-semibold text-slate-900">Setup Readiness</h2>
-                  <p className="text-xs text-slate-600 mt-0.5">Install all tools below to unlock full WatchTower capabilities.</p>
+                  <h2 className="text-sm font-semibold text-foreground">Setup Readiness</h2>
+                  <p className="text-xs text-muted-foreground mt-0.5">Install all tools below to unlock full WatchTower capabilities.</p>
                 </div>
-                <span className="text-xs text-slate-600 shrink-0">{readiness} / 6 tools</span>
+                <span className="text-xs text-muted-foreground shrink-0">{readiness} / 6 tools</span>
               </div>
-              <div className="h-2.5 rounded-full bg-slate-100 border border-slate-200 overflow-hidden">
+              <div className="h-2.5 rounded-full bg-muted border border-border overflow-hidden">
                 <div
                   className={`h-full transition-all rounded-full ${readiness >= 5 ? 'bg-emerald-500' : readiness >= 3 ? 'bg-amber-500' : 'bg-primary'}`}
                   style={{ width: `${Math.round((readiness / 6) * 100)}%` }}
                 />
               </div>
               {readiness === 0 && !loading && (
-                <p className="text-xs text-slate-600 mt-2">
+                <p className="text-xs text-muted-foreground mt-2">
                   No tools detected. Use the <strong>Install Commands</strong> below to get started.
                 </p>
               )}
@@ -566,9 +566,9 @@ const HostConnect = () => {
             <div className="grid lg:grid-cols-2 gap-4">
               {/* Tool status */}
               <div className="rounded-xl border border-border bg-card p-5">
-                <h2 className="text-sm font-semibold text-slate-900 mb-3">Tool Status</h2>
+                <h2 className="text-sm font-semibold text-foreground mb-3">Tool Status</h2>
                 {loading ? (
-                  <p className="text-xs text-slate-500 py-4 text-center">Checking tools…</p>
+                  <p className="text-xs text-muted-foreground py-4 text-center">Checking tools…</p>
                 ) : (
                   <div className="space-y-2">
                     {TOOL_ORDER.map((name) => {
@@ -578,8 +578,8 @@ const HostConnect = () => {
                         <div key={name} className="rounded-lg border border-border bg-muted/30 px-3 py-2.5">
                           <div className="flex items-center justify-between gap-3">
                             <div className="min-w-0 flex-1">
-                              <p className="text-sm font-medium text-slate-900 capitalize">{name}</p>
-                              <p className="text-xs text-slate-600 truncate" title={row?.version ?? 'Not installed'}>{row?.version || 'Not installed'}</p>
+                              <p className="text-sm font-medium text-foreground capitalize">{name}</p>
+                              <p className="text-xs text-muted-foreground truncate" title={row?.version ?? 'Not installed'}>{row?.version || 'Not installed'}</p>
                             </div>
                             <div className="flex items-center gap-2 shrink-0">
                               {!installed && (
@@ -597,19 +597,19 @@ const HostConnect = () => {
 
               {/* Install commands */}
               <div className="rounded-xl border border-border bg-card p-5">
-                <h2 className="text-sm font-semibold text-slate-900 mb-1">Install Commands</h2>
-                <p className="text-xs text-slate-600 mb-3">Copy and run these commands on your Linux server to install each tool.</p>
+                <h2 className="text-sm font-semibold text-foreground mb-1">Install Commands</h2>
+                <p className="text-xs text-muted-foreground mb-3">Copy and run these commands on your Linux server to install each tool.</p>
                 <div className="space-y-3 max-h-[420px] overflow-y-auto pr-1">
                   {TOOL_ORDER.map((name) => (
                     <div key={name} className="rounded-lg border border-border bg-muted/30 p-3">
                       <div className="mb-2 flex items-center justify-between gap-2">
-                        <p className="text-xs font-semibold uppercase tracking-wider text-slate-700">{name}</p>
+                        <p className="text-xs font-semibold uppercase tracking-wider text-foreground/90">{name}</p>
                         <CopyButton
                           copied={copiedKey === `install-${name}`}
                           onClick={() => void copyText(`install-${name}`, (commands?.commands?.[name] || ['No command recipe available.']).join('\n'))}
                         />
                       </div>
-                      <pre className="text-xs text-slate-700 whitespace-pre-wrap break-words">
+                      <pre className="text-xs text-foreground/90 whitespace-pre-wrap break-words">
                         {(commands?.commands?.[name] || ['No command recipe available.']).join('\n')}
                       </pre>
                     </div>
@@ -625,15 +625,15 @@ const HostConnect = () => {
           <div className="space-y-6">
             <section className="rounded-xl border border-border bg-card p-5 space-y-4">
               <div>
-                <h2 className="text-sm font-semibold text-slate-900">Cloudflare Domain Connect</h2>
-                <p className="text-xs text-slate-600 mt-1">
+                <h2 className="text-sm font-semibold text-foreground">Cloudflare Domain Connect</h2>
+                <p className="text-xs text-muted-foreground mt-1">
                   Generate copy-ready tunnel commands to expose your hosted apps with a custom domain via Cloudflare Tunnel.
                   No open ports required — works behind NAT and firewalls.
                 </p>
               </div>
 
               <div className="grid sm:grid-cols-3 gap-3">
-                <label className="text-xs text-slate-700">
+                <label className="text-xs text-foreground/90">
                   Domain
                   <input
                     value={domain}
@@ -641,11 +641,11 @@ const HostConnect = () => {
                       setDomain(e.target.value);
                       setDomainPlan(null);
                     }}
-                    className="mt-1.5 w-full bg-white border border-border rounded-md px-3 py-2 text-slate-900"
+                    className="mt-1.5 w-full bg-card border border-border rounded-md px-3 py-2 text-foreground"
                     placeholder="example.com"
                   />
                 </label>
-                <label className="text-xs text-slate-700">
+                <label className="text-xs text-foreground/90">
                   Subdomain
                   <input
                     value={subdomain}
@@ -653,11 +653,11 @@ const HostConnect = () => {
                       setSubdomain(e.target.value);
                       setDomainPlan(null);
                     }}
-                    className="mt-1.5 w-full bg-white border border-border rounded-md px-3 py-2 text-slate-900"
+                    className="mt-1.5 w-full bg-card border border-border rounded-md px-3 py-2 text-foreground"
                     placeholder="app"
                   />
                 </label>
-                <label className="text-xs text-slate-700">
+                <label className="text-xs text-foreground/90">
                   Target Host
                   <input
                     value={targetHost}
@@ -665,7 +665,7 @@ const HostConnect = () => {
                       setTargetHost(e.target.value);
                       setDomainPlan(null);
                     }}
-                    className="mt-1.5 w-full bg-white border border-border rounded-md px-3 py-2 text-slate-900"
+                    className="mt-1.5 w-full bg-card border border-border rounded-md px-3 py-2 text-foreground"
                     placeholder="localhost:3000"
                   />
                 </label>
@@ -682,24 +682,24 @@ const HostConnect = () => {
               {domainPlan && (
                 <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-3">
                   <div>
-                    <p className="text-xs text-slate-600">Hostname</p>
-                    <p className="text-sm text-slate-900 font-medium">{domainPlan.hostname}</p>
+                    <p className="text-xs text-muted-foreground">Hostname</p>
+                    <p className="text-sm text-foreground font-medium">{domainPlan.hostname}</p>
                   </div>
                   <div>
                     <div className="mb-1 flex items-center justify-between gap-2">
-                      <p className="text-xs text-slate-600">Commands</p>
+                      <p className="text-xs text-muted-foreground">Commands</p>
                       <CopyButton
                         copied={copiedKey === 'domain-commands'}
                         onClick={() => void copyText('domain-commands', domainPlan.commands.join('\n'))}
                       />
                     </div>
-                    <pre className="text-xs text-slate-800 whitespace-pre-wrap break-words">
+                    <pre className="text-xs text-foreground whitespace-pre-wrap break-words">
                       {domainPlan.commands.join('\n')}
                     </pre>
                   </div>
                   <div>
-                    <p className="text-xs text-slate-600 mb-1">Notes</p>
-                    <ul className="text-xs text-slate-700 list-disc pl-4 space-y-1">
+                    <p className="text-xs text-muted-foreground mb-1">Notes</p>
+                    <ul className="text-xs text-foreground/90 list-disc pl-4 space-y-1">
                       {domainPlan.notes.map((note) => (
                         <li key={note}>{note}</li>
                       ))}
@@ -716,15 +716,15 @@ const HostConnect = () => {
           <div className="space-y-6">
             <section className="rounded-xl border border-border bg-card p-5 space-y-4">
               <div>
-                <h2 className="text-sm font-semibold text-slate-900">Managed Database Setup</h2>
-                <p className="text-xs text-slate-600 mt-1">
+                <h2 className="text-sm font-semibold text-foreground">Managed Database Setup</h2>
+                <p className="text-xs text-muted-foreground mt-1">
                   Generate step-by-step setup guides and environment variables for cloud databases.
                   Supports MongoDB Atlas, AWS RDS, Oracle FreeDB, and Supabase.
                 </p>
               </div>
 
               <div className="grid sm:grid-cols-2 gap-3">
-                <label className="text-xs text-slate-700">
+                <label className="text-xs text-foreground/90">
                   Provider
                   <select
                     value={provider}
@@ -732,14 +732,14 @@ const HostConnect = () => {
                       setProvider(e.target.value);
                       setDbPlan(null);
                     }}
-                    className="mt-1.5 w-full bg-white border border-border rounded-md px-3 py-2 text-slate-900"
+                    className="mt-1.5 w-full bg-card border border-border rounded-md px-3 py-2 text-foreground"
                   >
                     {DATABASE_PROVIDERS.map((p) => (
                       <option key={p.id} value={p.id}>{p.label}</option>
                     ))}
                   </select>
                 </label>
-                <label className="text-xs text-slate-700">
+                <label className="text-xs text-foreground/90">
                   App Name
                   <input
                     value={appName}
@@ -747,10 +747,10 @@ const HostConnect = () => {
                       setAppName(e.target.value);
                       setDbPlan(null);
                     }}
-                    className="mt-1.5 w-full bg-white border border-border rounded-md px-3 py-2 text-slate-900"
+                    className="mt-1.5 w-full bg-card border border-border rounded-md px-3 py-2 text-foreground"
                   />
                 </label>
-                <label className="text-xs text-slate-700">
+                <label className="text-xs text-foreground/90">
                   DB Name
                   <input
                     value={dbName}
@@ -758,10 +758,10 @@ const HostConnect = () => {
                       setDbName(e.target.value);
                       setDbPlan(null);
                     }}
-                    className="mt-1.5 w-full bg-white border border-border rounded-md px-3 py-2 text-slate-900"
+                    className="mt-1.5 w-full bg-card border border-border rounded-md px-3 py-2 text-foreground"
                   />
                 </label>
-                <label className="text-xs text-slate-700">
+                <label className="text-xs text-foreground/90">
                   Username
                   <input
                     value={dbUser}
@@ -769,10 +769,10 @@ const HostConnect = () => {
                       setDbUser(e.target.value);
                       setDbPlan(null);
                     }}
-                    className="mt-1.5 w-full bg-white border border-border rounded-md px-3 py-2 text-slate-900"
+                    className="mt-1.5 w-full bg-card border border-border rounded-md px-3 py-2 text-foreground"
                   />
                 </label>
-                <label className="text-xs text-slate-700 sm:col-span-2">
+                <label className="text-xs text-foreground/90 sm:col-span-2">
                   Region (for AWS RDS plans)
                   <input
                     value={dbRegion}
@@ -780,7 +780,7 @@ const HostConnect = () => {
                       setDbRegion(e.target.value);
                       setDbPlan(null);
                     }}
-                    className="mt-1.5 w-full bg-white border border-border rounded-md px-3 py-2 text-slate-900"
+                    className="mt-1.5 w-full bg-card border border-border rounded-md px-3 py-2 text-foreground"
                   />
                 </label>
               </div>
@@ -795,30 +795,30 @@ const HostConnect = () => {
 
               {dbPlan && (
                 <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-3">
-                  <p className="text-sm font-semibold text-slate-900">{dbPlan.provider}</p>
+                  <p className="text-sm font-semibold text-foreground">{dbPlan.provider}</p>
                   <div>
-                    <p className="text-xs text-slate-600 mb-1">Steps</p>
-                    <ol className="text-xs text-slate-700 list-decimal pl-4 space-y-1">
+                    <p className="text-xs text-muted-foreground mb-1">Steps</p>
+                    <ol className="text-xs text-foreground/90 list-decimal pl-4 space-y-1">
                       {dbPlan.steps.map((step) => (
                         <li key={step}>{step}</li>
                       ))}
                     </ol>
                   </div>
                   <div>
-                    <p className="text-xs text-slate-600 mb-1">Connection Example</p>
+                    <p className="text-xs text-muted-foreground mb-1">Connection Example</p>
                     <div className="mb-1 flex items-center justify-end">
                       <CopyButton
                         copied={copiedKey === 'db-connection'}
                         onClick={() => void copyText('db-connection', dbPlan.connection_example)}
                       />
                     </div>
-                    <pre className="text-xs text-slate-800 whitespace-pre-wrap break-words">
+                    <pre className="text-xs text-foreground whitespace-pre-wrap break-words">
                       {dbPlan.connection_example}
                     </pre>
                   </div>
                   <div>
                     <div className="mb-1 flex items-center justify-between gap-2">
-                      <p className="text-xs text-slate-600">Env Variables</p>
+                      <p className="text-xs text-muted-foreground">Env Variables</p>
                       <CopyButton
                         copied={copiedKey === 'db-env'}
                         onClick={() => void copyText(
@@ -829,7 +829,7 @@ const HostConnect = () => {
                         )}
                       />
                     </div>
-                    <pre className="text-xs text-slate-800 whitespace-pre-wrap break-words">
+                    <pre className="text-xs text-foreground whitespace-pre-wrap break-words">
                       {Object.entries(dbPlan.env)
                         .map(([k, v]) => `${k}=${v}`)
                         .join('\n')}
@@ -846,15 +846,15 @@ const HostConnect = () => {
           <div className="space-y-6">
             <section className="rounded-xl border border-border bg-card p-5 space-y-4">
               <div>
-                <h2 className="text-sm font-semibold text-slate-900">Nginx Reverse Proxy Setup</h2>
-                <p className="text-xs text-slate-600 mt-1">
+                <h2 className="text-sm font-semibold text-foreground">Nginx Reverse Proxy Setup</h2>
+                <p className="text-xs text-muted-foreground mt-1">
                   Generate a production-ready Nginx config that proxies traffic from your domain to your app.
                   Includes SSL, compression, and security headers.
                 </p>
               </div>
 
               <div className="grid sm:grid-cols-2 gap-3">
-                <label className="text-xs text-slate-700">
+                <label className="text-xs text-foreground/90">
                   Server Name (domain)
                   <input
                     value={nginxServerName}
@@ -862,11 +862,11 @@ const HostConnect = () => {
                       setNginxServerName(e.target.value);
                       setNginxPlan(null);
                     }}
-                    className="mt-1.5 w-full bg-white border border-border rounded-md px-3 py-2 text-slate-900"
+                    className="mt-1.5 w-full bg-card border border-border rounded-md px-3 py-2 text-foreground"
                     placeholder="app.example.com"
                   />
                 </label>
-                <label className="text-xs text-slate-700">
+                <label className="text-xs text-foreground/90">
                   Upstream Host (where your app runs)
                   <input
                     value={nginxUpstream}
@@ -874,7 +874,7 @@ const HostConnect = () => {
                       setNginxUpstream(e.target.value);
                       setNginxPlan(null);
                     }}
-                    className="mt-1.5 w-full bg-white border border-border rounded-md px-3 py-2 text-slate-900"
+                    className="mt-1.5 w-full bg-card border border-border rounded-md px-3 py-2 text-foreground"
                     placeholder="127.0.0.1:3000"
                   />
                 </label>
@@ -892,19 +892,19 @@ const HostConnect = () => {
                 <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-3">
                   <div>
                     <div className="mb-1 flex items-center justify-between gap-2">
-                      <p className="text-xs text-slate-600">Config file — copy to <code className="font-mono bg-slate-100 px-1 rounded">/etc/nginx/sites-available/{nginxServerName}</code></p>
+                      <p className="text-xs text-muted-foreground">Config file — copy to <code className="font-mono bg-muted px-1 rounded">/etc/nginx/sites-available/{nginxServerName}</code></p>
                       <CopyButton
                         copied={copiedKey === 'nginx-config'}
                         onClick={() => void copyText('nginx-config', nginxPlan.config)}
                       />
                     </div>
-                    <pre className="text-xs text-slate-800 whitespace-pre-wrap break-words max-h-72 overflow-y-auto">
+                    <pre className="text-xs text-foreground whitespace-pre-wrap break-words max-h-72 overflow-y-auto">
                       {nginxPlan.config}
                     </pre>
                   </div>
                   <div>
-                    <p className="text-xs text-slate-600 mb-1">Steps to apply</p>
-                    <ol className="text-xs text-slate-700 list-decimal pl-4 space-y-1">
+                    <p className="text-xs text-muted-foreground mb-1">Steps to apply</p>
+                    <ol className="text-xs text-foreground/90 list-decimal pl-4 space-y-1">
                       {nginxPlan.steps.map((s) => (
                         <li key={s}>{s}</li>
                       ))}
@@ -921,47 +921,47 @@ const HostConnect = () => {
           <div className="space-y-6">
             <section className="rounded-xl border border-border bg-card p-5 space-y-4">
               <div>
-                <h2 className="text-sm font-semibold text-slate-900">Secure Terminal</h2>
-                <p className="text-xs text-slate-600 mt-1">
+                <h2 className="text-sm font-semibold text-foreground">Secure Terminal</h2>
+                <p className="text-xs text-muted-foreground mt-1">
                   Run allow-listed commands on your WatchTower host with encrypted audit logging.
                   This is safer than raw shell access — only pre-approved commands can execute.
                 </p>
               </div>
 
-              <div className="rounded-lg border border-border bg-muted/30 p-3 grid sm:grid-cols-3 gap-3 text-xs text-slate-700">
+              <div className="rounded-lg border border-border bg-muted/30 p-3 grid sm:grid-cols-3 gap-3 text-xs text-foreground/90">
                 <div>
-                  <p className="text-slate-500 mb-0.5">Encryption</p>
+                  <p className="text-muted-foreground mb-0.5">Encryption</p>
                   <p className="font-medium">{terminalPolicy?.enabled ? (terminalPolicy.encryption_required ? 'Required' : 'Enabled') : 'Disabled'}</p>
                 </div>
                 <div>
-                  <p className="text-slate-500 mb-0.5">Audit log</p>
+                  <p className="text-muted-foreground mb-0.5">Audit log</p>
                   <code className="font-mono text-[11px] break-all">{terminalPolicy?.audit_log || '.dev/terminal-audit.log.enc'}</code>
                 </div>
                 <div>
-                  <p className="text-slate-500 mb-0.5">Max timeout</p>
+                  <p className="text-muted-foreground mb-0.5">Max timeout</p>
                   <p className="font-medium">{terminalPolicy?.max_timeout_seconds ?? 120}s</p>
                 </div>
               </div>
 
               <div className="rounded-lg border border-border bg-muted/30 p-3">
-                <p className="text-xs font-semibold text-slate-700 mb-2">Allowed Commands</p>
+                <p className="text-xs font-semibold text-foreground/90 mb-2">Allowed Commands</p>
                 <div className="flex flex-wrap gap-2">
                   {(terminalPolicy?.allowed_commands || []).map((c) => (
                     <span
                       key={c.command}
-                      className="text-[11px] px-2 py-0.5 rounded-full border border-slate-300 bg-white text-slate-700"
+                      className="text-[11px] px-2 py-0.5 rounded-full border border-border bg-card text-foreground/90"
                     >
                       {c.command}{c.must_sudo ? ' (sudo required)' : c.allow_sudo ? ' (sudo optional)' : ''}
                     </span>
                   ))}
                   {(!terminalPolicy?.allowed_commands || terminalPolicy.allowed_commands.length === 0) && (
-                    <span className="text-xs text-slate-500 italic">Loading policy…</span>
+                    <span className="text-xs text-muted-foreground italic">Loading policy…</span>
                   )}
                 </div>
               </div>
 
               <div className="grid sm:grid-cols-4 gap-3">
-                <label className="text-xs text-slate-700 sm:col-span-2">
+                <label className="text-xs text-foreground/90 sm:col-span-2">
                   Command
                   <input
                     value={terminalCommand}
@@ -969,11 +969,11 @@ const HostConnect = () => {
                       setTerminalCommand(e.target.value);
                       setTerminalResult(null);
                     }}
-                    className="mt-1.5 w-full bg-white border border-border rounded-md px-3 py-2 text-slate-900"
+                    className="mt-1.5 w-full bg-card border border-border rounded-md px-3 py-2 text-foreground"
                     placeholder="docker ps"
                   />
                 </label>
-                <label className="text-xs text-slate-700">
+                <label className="text-xs text-foreground/90">
                   Timeout (seconds)
                   <input
                     type="number"
@@ -984,10 +984,10 @@ const HostConnect = () => {
                       setTerminalTimeout(Number(e.target.value || 20));
                       setTerminalResult(null);
                     }}
-                    className="mt-1.5 w-full bg-white border border-border rounded-md px-3 py-2 text-slate-900"
+                    className="mt-1.5 w-full bg-card border border-border rounded-md px-3 py-2 text-foreground"
                   />
                 </label>
-                <label className="text-xs text-slate-700 flex items-end">
+                <label className="text-xs text-foreground/90 flex items-end">
                   <span className="inline-flex items-center gap-2 mb-2">
                     <input
                       type="checkbox"
@@ -1013,19 +1013,19 @@ const HostConnect = () => {
 
               {terminalResult && (
                 <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-3">
-                  <p className={`text-xs font-medium ${terminalResult.ok ? 'text-emerald-700' : 'text-red-600'}`}>
+                  <p className={`text-xs font-medium ${terminalResult.ok ? 'text-emerald-700' : 'text-destructive'}`}>
                     {terminalResult.ok ? '✓ Success' : '✗ Failed'} · Exit code {terminalResult.exit_code}
                   </p>
                   {terminalResult.stdout && (
                     <div>
                       <div className="mb-1 flex items-center justify-between gap-2">
-                        <p className="text-xs text-slate-600">Output</p>
+                        <p className="text-xs text-muted-foreground">Output</p>
                         <CopyButton
                           copied={copiedKey === 'terminal-stdout'}
                           onClick={() => void copyText('terminal-stdout', terminalResult.stdout)}
                         />
                       </div>
-                      <pre className="text-xs text-slate-800 whitespace-pre-wrap break-words max-h-48 overflow-y-auto">
+                      <pre className="text-xs text-foreground whitespace-pre-wrap break-words max-h-48 overflow-y-auto">
                         {terminalResult.stdout}
                       </pre>
                     </div>
@@ -1033,13 +1033,13 @@ const HostConnect = () => {
                   {terminalResult.stderr && (
                     <div>
                       <div className="mb-1 flex items-center justify-between gap-2">
-                        <p className="text-xs text-slate-600">Errors</p>
+                        <p className="text-xs text-muted-foreground">Errors</p>
                         <CopyButton
                           copied={copiedKey === 'terminal-stderr'}
                           onClick={() => void copyText('terminal-stderr', terminalResult.stderr)}
                         />
                       </div>
-                      <pre className="text-xs text-red-700 whitespace-pre-wrap break-words max-h-32 overflow-y-auto">
+                      <pre className="text-xs text-destructive whitespace-pre-wrap break-words max-h-32 overflow-y-auto">
                         {terminalResult.stderr}
                       </pre>
                     </div>

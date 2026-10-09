@@ -133,7 +133,7 @@ export default function UseThisPcCard({ onRegistered }: { onRegistered?: () => v
             </span>
           </div>
 
-          {error && <p className="text-xs text-red-600 mt-2">{error}</p>}
+          {error && <p className="text-xs text-destructive mt-2">{error}</p>}
 
           <div className="mt-4 flex items-center gap-2">
             {status.registered ? (

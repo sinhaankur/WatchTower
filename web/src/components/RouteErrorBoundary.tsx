@@ -84,51 +84,51 @@ export class RouteErrorBoundary extends Component<Props, State> {
 
     const reqId = getLastRequestId();
     return (
-      <div className="flex-1 overflow-auto bg-slate-50 p-6">
-        <div className="max-w-3xl mx-auto rounded-xl border border-red-200 bg-white p-6 shadow-sm">
+      <div className="flex-1 overflow-auto bg-muted p-6">
+        <div className="max-w-3xl mx-auto rounded-xl border border-destructive/30 bg-card p-6 shadow-sm">
           <div className="flex items-start justify-between gap-3 mb-3">
             <div>
-              <h1 className="text-lg font-semibold text-slate-900">
+              <h1 className="text-lg font-semibold text-foreground">
                 {this.props.pageName} hit an error
               </h1>
-              <p className="text-xs text-slate-600 mt-0.5">
+              <p className="text-xs text-muted-foreground mt-0.5">
                 The rest of the app is fine — only this page failed to render.
               </p>
             </div>
-            <span className="shrink-0 inline-flex text-[10px] px-2 py-0.5 rounded-full border border-red-300 bg-red-50 text-red-700 font-medium uppercase tracking-wide">
+            <span className="shrink-0 inline-flex text-[10px] px-2 py-0.5 rounded-full border border-destructive/40 bg-destructive/10 text-destructive font-medium uppercase tracking-wide">
               Render error
             </span>
           </div>
 
-          <div className="text-xs text-slate-500 mb-3 space-y-0.5">
+          <div className="text-xs text-muted-foreground mb-3 space-y-0.5">
             {reqId && (
               <p>
                 Request ID:{' '}
-                <code className="font-mono text-slate-800">{reqId}</code>{' '}
-                <span className="text-slate-400">
+                <code className="font-mono text-foreground">{reqId}</code>{' '}
+                <span className="text-muted-foreground">
                   (use this when reporting; backend logs are searchable by it)
                 </span>
               </p>
             )}
             <p>
               When:{' '}
-              <code className="font-mono text-slate-800">
+              <code className="font-mono text-foreground">
                 {new Date().toISOString()}
               </code>
             </p>
           </div>
 
-          <div className="rounded-md bg-slate-50 border border-slate-200 p-3 mb-3">
-            <p className="text-[11px] uppercase tracking-wide text-slate-500 mb-1">
+          <div className="rounded-md bg-muted border border-border p-3 mb-3">
+            <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1">
               {error.name || 'Error'}
             </p>
-            <p className="text-sm font-mono text-slate-900 break-all">
+            <p className="text-sm font-mono text-foreground break-all">
               {error.message || '(no message)'}
             </p>
           </div>
 
           <details className="mb-3">
-            <summary className="text-xs text-slate-700 cursor-pointer select-none hover:text-slate-900">
+            <summary className="text-xs text-foreground/90 cursor-pointer select-none hover:text-foreground">
               Stack trace
             </summary>
             <pre className="mt-2 text-[11px] bg-slate-900 text-slate-100 rounded-md p-3 overflow-auto max-h-64 font-mono whitespace-pre-wrap">
@@ -138,7 +138,7 @@ export class RouteErrorBoundary extends Component<Props, State> {
 
           {componentStack && (
             <details className="mb-3">
-              <summary className="text-xs text-slate-700 cursor-pointer select-none hover:text-slate-900">
+              <summary className="text-xs text-foreground/90 cursor-pointer select-none hover:text-foreground">
                 Component stack
               </summary>
               <pre className="mt-2 text-[11px] bg-slate-900 text-slate-100 rounded-md p-3 overflow-auto max-h-48 font-mono whitespace-pre-wrap">
@@ -158,20 +158,20 @@ export class RouteErrorBoundary extends Component<Props, State> {
             <button
               type="button"
               onClick={this.reset}
-              className="px-3 py-1.5 rounded-md border border-slate-300 hover:bg-slate-100 text-xs font-medium text-slate-800"
+              className="px-3 py-1.5 rounded-md border border-border hover:bg-muted text-xs font-medium text-foreground"
             >
               Try again
             </button>
             <button
               type="button"
               onClick={() => window.location.reload()}
-              className="px-3 py-1.5 rounded-md border border-slate-300 hover:bg-slate-100 text-xs font-medium text-slate-800"
+              className="px-3 py-1.5 rounded-md border border-border hover:bg-muted text-xs font-medium text-foreground"
             >
               Reload app
             </button>
             <Link
               to="/"
-              className="px-3 py-1.5 rounded-md border border-slate-300 hover:bg-slate-100 text-xs font-medium text-slate-800"
+              className="px-3 py-1.5 rounded-md border border-border hover:bg-muted text-xs font-medium text-foreground"
             >
               Go to dashboard
             </Link>

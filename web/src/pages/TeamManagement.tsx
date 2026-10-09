@@ -63,7 +63,7 @@ const ROLE_META: Record<TeamMember['role'], { label: string; color: string }> = 
   owner:     { label: 'Owner',     color: 'bg-amber-50 text-amber-700 border-amber-200' },
   admin:     { label: 'Admin',     color: 'bg-purple-50 text-purple-700 border-purple-200' },
   developer: { label: 'Developer', color: 'bg-blue-50 text-blue-700 border-blue-200' },
-  viewer:    { label: 'Viewer',    color: 'bg-gray-50 text-gray-600 border-gray-200' },
+  viewer:    { label: 'Viewer',    color: 'bg-muted text-muted-foreground border-border' },
 };
 
 const TeamManagement = () => {
@@ -283,7 +283,7 @@ const TeamManagement = () => {
         <div className="px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
           <div>
             <h1 className="text-base font-semibold text-gray-900">Team</h1>
-            <p className="text-xs text-gray-400 mt-0.5">
+            <p className="text-xs text-muted-foreground mt-0.5">
               {loading ? 'Loading…' : orgName ? `Organization: ${orgName}` : offlineMode ? 'Server offline — showing cached data' : ''}
             </p>
           </div>
@@ -297,7 +297,7 @@ const TeamManagement = () => {
               <button
                 onClick={() => { void loadContext(); }}
                 disabled={loading}
-                className="px-3 py-1.5 rounded-lg border border-border text-xs text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+                className="px-3 py-1.5 rounded-lg border border-border text-xs text-muted-foreground hover:bg-muted disabled:opacity-50"
               >
                 {loading ? 'Loading…' : 'Refresh'}
               </button>
@@ -337,9 +337,9 @@ const TeamManagement = () => {
         )}
 
         {actionError && (
-          <div className="flex items-start gap-2 border border-red-200 bg-red-50 rounded-md px-4 py-3">
+          <div className="flex items-start gap-2 border border-destructive/30 bg-destructive/10 rounded-md px-4 py-3">
             <span className="text-red-500 mt-0.5">✗</span>
-            <p className="text-sm text-red-700">{actionError}</p>
+            <p className="text-sm text-destructive">{actionError}</p>
           </div>
         )}
 
@@ -364,7 +364,7 @@ const TeamManagement = () => {
                 readOnly
                 value={lastInvite.url}
                 onFocus={(e) => e.currentTarget.select()}
-                className="font-mono text-xs bg-white"
+                className="font-mono text-xs bg-card"
               />
               <Button type="button" variant="outline" onClick={copyInviteUrl}>
                 {inviteCopied ? '✓ Copied' : 'Copy link'}
@@ -402,7 +402,7 @@ const TeamManagement = () => {
                 <Label htmlFor="invite_role">Role</Label>
                 <select id="invite_role" value={role}
                   onChange={(e) => setRole(e.target.value as TeamMember['role'])}
-                  className="mt-1.5 w-full border border-border rounded-md h-10 px-3 text-sm bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-red-700 focus:ring-offset-2">
+                  className="mt-1.5 w-full border border-border rounded-md h-10 px-3 text-sm bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-red-700 focus:ring-offset-2">
                   <option value="developer">Developer — can create projects & deploy</option>
                   <option value="viewer">Viewer — read-only access</option>
                   <option value="admin">Admin — manage nodes, team & deployments</option>
@@ -411,11 +411,11 @@ const TeamManagement = () => {
               </div>
               <Button onClick={() => void inviteMember()}
                 disabled={inviting || offlineMode || !orgId || !email.trim() || !canManageTeam}
-                className="w-full rounded-lg border border-border bg-amber-400 hover:bg-amber-500 text-slate-900 font-semibold shadow-retro disabled:opacity-40 disabled:shadow-none">
+                className="w-full rounded-lg border border-border bg-amber-400 hover:bg-amber-500 text-foreground font-semibold shadow-retro disabled:opacity-40 disabled:shadow-none">
                 {inviting ? 'Sending invite…' : offlineMode ? 'Server offline' : !canManageTeam ? 'No permission to invite' : 'Send Invite'}
               </Button>
               {!email.trim() && !inviting && (
-                <p className="text-[11px] text-slate-400 text-center">Enter an email address to enable the invite.</p>
+                <p className="text-[11px] text-muted-foreground text-center">Enter an email address to enable the invite.</p>
               )}
             </CardContent>
           </Card>
@@ -446,7 +446,7 @@ const TeamManagement = () => {
               <div className="flex flex-col gap-2">
                 <Button onClick={() => void startOAuth('github_com')}
                   disabled={loading || !orgId || offlineMode}
-                  className="w-full rounded-lg border border-border bg-amber-400 hover:bg-amber-500 text-slate-900 font-semibold shadow-retro disabled:opacity-40 disabled:shadow-none text-sm">
+                  className="w-full rounded-lg border border-border bg-amber-400 hover:bg-amber-500 text-foreground font-semibold shadow-retro disabled:opacity-40 disabled:shadow-none text-sm">
                   Connect GitHub.com App
                 </Button>
                 <Button onClick={() => void startOAuth('github_enterprise')}
@@ -455,15 +455,15 @@ const TeamManagement = () => {
                   Connect GitHub Enterprise instead
                 </Button>
               </div>
-              <p className="text-xs text-gray-400">You'll be redirected to GitHub to authorize access.</p>
+              <p className="text-xs text-muted-foreground">You'll be redirected to GitHub to authorize access.</p>
 
-              <details className="border-t border-dashed border-gray-200 pt-3 mt-3">
-                <summary className="text-xs font-semibold text-gray-700 cursor-pointer hover:text-gray-900">
+              <details className="border-t border-dashed border-border pt-3 mt-3">
+                <summary className="text-xs font-semibold text-foreground/90 cursor-pointer hover:text-gray-900">
                   Or paste a Personal Access Token instead
                 </summary>
                 <div className="space-y-2 mt-2">
                 <div>
-                  <p className="text-[11px] text-gray-500">
+                  <p className="text-[11px] text-muted-foreground">
                     The fastest way to enable private repository deploys. Token is encrypted at rest and only used to
                     clone your repos. Required scopes: <code className="text-[10px]">repo</code>.
                     {' '}
@@ -481,7 +481,7 @@ const TeamManagement = () => {
                   <select
                     value={patProvider}
                     onChange={(e) => setPatProvider(e.target.value as 'github_com' | 'github_enterprise')}
-                    className="text-xs border border-slate-300 rounded-md h-9 px-2 bg-white text-slate-900 focus:outline-none focus:ring-1 focus:ring-red-600"
+                    className="text-xs border border-border rounded-md h-9 px-2 bg-card text-foreground focus:outline-none focus:ring-1 focus:ring-red-600"
                   >
                     <option value="github_com">GitHub.com</option>
                     <option value="github_enterprise">GitHub Enterprise</option>
@@ -521,8 +521,8 @@ const TeamManagement = () => {
               </details>
 
               {connections.length === 0 && !loading && (
-                <div className="py-4 text-center border border-dashed border-gray-200 rounded-lg">
-                  <p className="text-xs text-gray-400">No GitHub accounts connected yet.</p>
+                <div className="py-4 text-center border border-dashed border-border rounded-lg">
+                  <p className="text-xs text-muted-foreground">No GitHub accounts connected yet.</p>
                 </div>
               )}
               <div className="space-y-2">
@@ -530,18 +530,18 @@ const TeamManagement = () => {
                   <div key={conn.id} className="electron-card-solid rounded-md px-3 py-2.5 flex items-center justify-between">
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-semibold text-gray-900 truncate" title={`@${conn.github_username}`}>@{conn.github_username}</p>
-                      <p className="text-xs text-gray-500 mt-0.5">
+                      <p className="text-xs text-muted-foreground mt-0.5">
                         {conn.provider === 'github_enterprise' ? (conn.enterprise_name ?? 'GitHub Enterprise') : 'GitHub.com'}
                         {conn.is_primary && <span className="ml-2 text-blue-600">· Primary</span>}
                       </p>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
-                      <span className={`text-xs px-2 py-0.5 border rounded-full ${conn.is_active ? 'bg-green-50 text-green-700 border-green-200' : 'bg-gray-100 text-gray-400 border-gray-200'}`}>
+                      <span className={`text-xs px-2 py-0.5 border rounded-full ${conn.is_active ? 'bg-green-50 text-green-700 border-green-200' : 'bg-muted text-muted-foreground border-border'}`}>
                         {conn.is_active ? 'Active' : 'Inactive'}
                       </span>
                       <button
                         onClick={() => void removeConnection(conn.id, `@${conn.github_username}`)}
-                        className="text-xs px-2 py-1 rounded border border-red-200 text-red-600 hover:bg-red-50 transition-colors"
+                        className="text-xs px-2 py-1 rounded border border-destructive/30 text-destructive hover:bg-destructive/10 transition-colors"
                       >
                         Remove
                       </button>
@@ -563,9 +563,9 @@ const TeamManagement = () => {
           </CardHeader>
           <CardContent>
             {!loading && members.length === 0 && (
-              <div className="py-10 text-center border border-dashed border-gray-200 rounded-lg">
-                <p className="text-sm font-medium text-gray-600">It's just you so far</p>
-                <p className="text-xs text-gray-400 mt-1">Invite a teammate with the form above — they'll get an email (or a link you can share).</p>
+              <div className="py-10 text-center border border-dashed border-border rounded-lg">
+                <p className="text-sm font-medium text-muted-foreground">It's just you so far</p>
+                <p className="text-xs text-muted-foreground mt-1">Invite a teammate with the form above — they'll get an email (or a link you can share).</p>
               </div>
             )}
             <div className="space-y-2">
@@ -598,25 +598,25 @@ const TeamManagement = () => {
                           <span className={`text-xs px-2 py-0.5 border rounded-full ${roleMeta.color}`}>{roleMeta.label}</span>
                         )}
                         {member.can_create_projects && (
-                          <span className="text-[11px] px-1.5 py-0.5 rounded border border-gray-200 bg-gray-50 text-gray-500">Projects</span>
+                          <span className="text-[11px] px-1.5 py-0.5 rounded border border-border bg-muted text-muted-foreground">Projects</span>
                         )}
                         {member.can_manage_deployments && (
-                          <span className="text-[11px] px-1.5 py-0.5 rounded border border-gray-200 bg-gray-50 text-gray-500">Deploy</span>
+                          <span className="text-[11px] px-1.5 py-0.5 rounded border border-border bg-muted text-muted-foreground">Deploy</span>
                         )}
                         {member.can_manage_nodes && (
-                          <span className="text-[11px] px-1.5 py-0.5 rounded border border-gray-200 bg-gray-50 text-gray-500">Nodes</span>
+                          <span className="text-[11px] px-1.5 py-0.5 rounded border border-border bg-muted text-muted-foreground">Nodes</span>
                         )}
                       </div>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
-                      <span className={`text-xs px-2 py-0.5 border rounded-full ${member.is_active ? 'bg-green-50 text-green-700 border-green-200' : 'bg-gray-50 text-gray-400 border-gray-200'}`}>
+                      <span className={`text-xs px-2 py-0.5 border rounded-full ${member.is_active ? 'bg-green-50 text-green-700 border-green-200' : 'bg-muted text-muted-foreground border-border'}`}>
                         {member.is_active ? 'Active' : 'Inactive'}
                       </span>
                       {canEdit && member.is_active && (
                         <button
                           onClick={() => void deactivateMember(member.id, member.email)}
                           disabled={removingMember === member.id}
-                          className="text-xs px-2 py-1 rounded border border-red-200 text-red-600 hover:bg-red-50 disabled:opacity-50 transition-colors"
+                          className="text-xs px-2 py-1 rounded border border-destructive/30 text-destructive hover:bg-destructive/10 disabled:opacity-50 transition-colors"
                         >
                           {removingMember === member.id ? '…' : 'Remove'}
                         </button>

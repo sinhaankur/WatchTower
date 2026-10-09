@@ -212,14 +212,14 @@ export default function LocalNode() {
         style={{ borderColor: 'hsl(var(--border-soft))', background: 'hsl(var(--surface-soft) / 0.9)' }}
       >
         <div>
-          <h1 className="text-lg font-semibold text-slate-900">Use This PC as a Server</h1>
-          <p className="text-xs text-slate-600 mt-0.5 hidden sm:block">
+          <h1 className="text-lg font-semibold text-foreground">Use This PC as a Server</h1>
+          <p className="text-xs text-muted-foreground mt-0.5 hidden sm:block">
             Register your machine as a local deployment node in the background
           </p>
         </div>
         <Link
           to="/servers"
-          className="px-3 py-1.5 rounded-lg border border-border text-xs text-slate-700 hover:bg-slate-100 transition-colors"
+          className="px-3 py-1.5 rounded-lg border border-border text-xs text-foreground/90 hover:bg-muted transition-colors"
         >
           ← Back to Servers
         </Link>
@@ -238,12 +238,12 @@ export default function LocalNode() {
                 <div className="flex items-center gap-1.5">
                   <span className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-semibold border transition-colors ${
                     done    ? 'bg-primary text-white border-primary' :
-                    active  ? 'bg-white text-red-700 border-red-400' :
-                              'bg-white text-slate-400 border-slate-300'
+                    active  ? 'bg-card text-destructive border-red-400' :
+                              'bg-card text-muted-foreground border-border'
                   }`}>
                     {done ? '✓' : idx}
                   </span>
-                  <span className={`text-xs hidden sm:block ${active ? 'text-slate-900 font-medium' : 'text-slate-400'}`}>{label}</span>
+                  <span className={`text-xs hidden sm:block ${active ? 'text-foreground font-medium' : 'text-muted-foreground'}`}>{label}</span>
                 </div>
                 {i < 2 && <div className={`flex-1 h-px mx-2 transition-colors ${done ? 'bg-red-300' : 'bg-slate-200'}`} />}
               </div>
@@ -255,8 +255,8 @@ export default function LocalNode() {
         {step === 1 && (
           <div className="rounded-xl border border-border bg-card p-6 space-y-4">
             <div>
-              <h2 className="text-base font-semibold text-slate-900">How much of this PC do you want to use?</h2>
-              <p className="text-xs text-slate-600 mt-1">
+              <h2 className="text-base font-semibold text-foreground">How much of this PC do you want to use?</h2>
+              <p className="text-xs text-muted-foreground mt-1">
                 WatchTower will run as a background service. Pick the resource profile that fits your machine.
               </p>
               {autoDetectedProfile && (
@@ -273,8 +273,8 @@ export default function LocalNode() {
                   key={p.id}
                   className={`flex gap-4 items-start border rounded-lg p-4 cursor-pointer transition-colors ${
                     profile.id === p.id
-                      ? 'border-red-300 bg-red-50'
-                      : 'border-border bg-white hover:border-red-200'
+                      ? 'border-destructive/40 bg-destructive/10'
+                      : 'border-border bg-card hover:border-destructive/30'
                   }`}
                 >
                   <input
@@ -287,11 +287,11 @@ export default function LocalNode() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <span className="text-lg">{p.icon}</span>
-                      <span className="font-semibold text-sm text-slate-900">{p.label}</span>
-                      <span className="text-[11px] text-slate-500 ml-auto">{p.concurrency} concurrent job{p.concurrency > 1 ? 's' : ''}</span>
+                      <span className="font-semibold text-sm text-foreground">{p.label}</span>
+                      <span className="text-[11px] text-muted-foreground ml-auto">{p.concurrency} concurrent job{p.concurrency > 1 ? 's' : ''}</span>
                     </div>
-                    <p className="text-xs text-slate-600 mt-1">{p.desc}</p>
-                    <div className="flex gap-4 mt-2 text-[11px] text-slate-500">
+                    <p className="text-xs text-muted-foreground mt-1">{p.desc}</p>
+                    <div className="flex gap-4 mt-2 text-[11px] text-muted-foreground">
                       <span>CPU: <b>{p.cpu}</b></span>
                       <span>RAM: <b>{p.ram}</b></span>
                     </div>
@@ -301,13 +301,13 @@ export default function LocalNode() {
             </div>
 
             {/* OS hint */}
-            <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+            <div className="rounded-lg border border-border bg-muted px-3 py-2 text-xs text-muted-foreground">
               Detected OS: <strong>{os === 'linux' ? 'Linux' : os === 'macos' ? 'macOS' : 'Windows'}</strong>.
               The install command and service runner will be tailored accordingly.{' '}
               {os !== 'linux' && (
                 <button
                   onClick={() => setOs('linux')}
-                  className="text-red-700 underline"
+                  className="text-destructive underline"
                 >
                   Switch to Linux
                 </button>
@@ -323,7 +323,7 @@ export default function LocalNode() {
                   onChange={(e) => setAutoRegister(e.target.checked)}
                   className="w-4 h-4 rounded border-border"
                 />
-                <label htmlFor="auto-register" className="text-xs text-slate-600 cursor-pointer">
+                <label htmlFor="auto-register" className="text-xs text-muted-foreground cursor-pointer">
                   Skip confirmation — register immediately
                 </label>
               </div>
@@ -341,20 +341,20 @@ export default function LocalNode() {
         {step === 2 && (
           <div className="rounded-xl border border-border bg-card p-6 space-y-5">
             <div>
-              <h2 className="text-base font-semibold text-slate-900">Confirm configuration</h2>
-              <p className="text-xs text-slate-600 mt-1">
-                This machine will be registered as <code className="font-mono bg-slate-100 px-1 rounded">127.0.0.1</code> in your organisation.
+              <h2 className="text-base font-semibold text-foreground">Confirm configuration</h2>
+              <p className="text-xs text-muted-foreground mt-1">
+                This machine will be registered as <code className="font-mono bg-muted px-1 rounded">127.0.0.1</code> in your organisation.
               </p>
             </div>
 
             {/* Node name */}
             <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1" htmlFor="nodeName">
+              <label className="block text-xs font-medium text-foreground/90 mb-1" htmlFor="nodeName">
                 Node display name
               </label>
               <input
                 id="nodeName"
-                className="w-full rounded-lg border border-border bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-300"
+                className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-300"
                 value={nodeName}
                 onChange={(e) => setNodeName(e.target.value)}
                 placeholder="my-laptop"
@@ -363,31 +363,31 @@ export default function LocalNode() {
 
             {/* Deploy path */}
             <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1" htmlFor="deployPath">
+              <label className="block text-xs font-medium text-foreground/90 mb-1" htmlFor="deployPath">
                 Deployment working directory
               </label>
               <input
                 id="deployPath"
-                className="w-full rounded-lg border border-border bg-white px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-red-300"
+                className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-red-300"
                 value={deployPath}
                 onChange={(e) => setDeployPath(e.target.value)}
                 placeholder="/opt/watchtower/agent"
               />
-              <p className="text-xs text-slate-500 mt-1">
+              <p className="text-xs text-muted-foreground mt-1">
                 WatchTower will check out and build apps in this folder. It must be writable by the agent user.
               </p>
             </div>
 
             {/* Summary card */}
-            <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-xs space-y-1">
-              <div className="flex justify-between"><span className="text-slate-500">Host</span><span className="font-mono text-slate-800">127.0.0.1</span></div>
-              <div className="flex justify-between"><span className="text-slate-500">Profile</span><span className="text-slate-800">{profile.icon} {profile.label} ({profile.concurrency} job{profile.concurrency > 1 ? 's' : ''})</span></div>
-              <div className="flex justify-between"><span className="text-slate-500">Deploy path</span><span className="font-mono text-slate-800 truncate ml-4">{deployPath}</span></div>
-              <div className="flex justify-between"><span className="text-slate-500">OS</span><span className="text-slate-800">{os}</span></div>
+            <div className="rounded-lg border border-border bg-muted px-4 py-3 text-xs space-y-1">
+              <div className="flex justify-between"><span className="text-muted-foreground">Host</span><span className="font-mono text-foreground">127.0.0.1</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Profile</span><span className="text-foreground">{profile.icon} {profile.label} ({profile.concurrency} job{profile.concurrency > 1 ? 's' : ''})</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Deploy path</span><span className="font-mono text-foreground truncate ml-4">{deployPath}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">OS</span><span className="text-foreground">{os}</span></div>
             </div>
 
             {error && (
-              <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+              <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
                 {error}
               </div>
             )}
@@ -395,7 +395,7 @@ export default function LocalNode() {
             <div className="flex justify-between">
               <button
                 onClick={() => { setError(''); setStep(1); }}
-                className="px-4 py-2 rounded-lg border border-border text-sm text-slate-700 hover:bg-slate-100 transition-colors"
+                className="px-4 py-2 rounded-lg border border-border text-sm text-foreground/90 hover:bg-muted transition-colors"
               >
                 ← Back
               </button>
@@ -421,8 +421,8 @@ export default function LocalNode() {
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-emerald-100 border border-emerald-300 flex items-center justify-center text-lg">✓</div>
               <div>
-                <h2 className="text-base font-semibold text-slate-900">Node registered!</h2>
-                <p className="text-xs text-slate-600">Now start the background agent on this machine.</p>
+                <h2 className="text-base font-semibold text-foreground">Node registered!</h2>
+                <p className="text-xs text-muted-foreground">Now start the background agent on this machine.</p>
               </div>
             </div>
 
@@ -443,10 +443,10 @@ export default function LocalNode() {
 
             {/* Install command */}
             <div>
-              <p className="text-xs font-medium text-slate-700 mb-2">
+              <p className="text-xs font-medium text-foreground/90 mb-2">
                 Run this command on <strong>this machine</strong> to install and start the WatchTower agent as a background service:
               </p>
-              <div className="relative rounded-lg border border-slate-300 bg-slate-950 px-4 py-3 pr-16 font-mono text-xs text-emerald-300 whitespace-pre-wrap overflow-x-auto">
+              <div className="relative rounded-lg border border-border bg-slate-950 px-4 py-3 pr-16 font-mono text-xs text-emerald-300 whitespace-pre-wrap overflow-x-auto">
                 {cmd}
                 <button
                   onClick={() => void copyCmd(cmd)}
@@ -455,16 +455,16 @@ export default function LocalNode() {
                   {copied ? '✓ Copied' : 'Copy'}
                 </button>
               </div>
-              <p className="text-[11px] text-slate-500 mt-2">
+              <p className="text-[11px] text-muted-foreground mt-2">
                 The agent runs as a systemd (Linux), launchd (macOS) or Windows Service — it starts automatically on boot.
               </p>
             </div>
 
             {/* What happens next */}
-            <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-xs space-y-2">
-              <p className="font-medium text-slate-800">What happens next</p>
-              <ol className="space-y-1 list-decimal list-inside text-slate-600">
-                <li>The install script creates a <code className="font-mono bg-white border px-1 rounded">watchtower-agent</code> system user</li>
+            <div className="rounded-lg border border-border bg-muted px-4 py-3 text-xs space-y-2">
+              <p className="font-medium text-foreground">What happens next</p>
+              <ol className="space-y-1 list-decimal list-inside text-muted-foreground">
+                <li>The install script creates a <code className="font-mono bg-card border px-1 rounded">watchtower-agent</code> system user</li>
                 <li>It registers a background service and starts it immediately</li>
                 <li>The agent polls the WatchTower API and picks up deployments automatically</li>
                 <li>Health metrics (CPU / RAM / disk) will appear on the Servers page</li>
@@ -472,7 +472,7 @@ export default function LocalNode() {
             </div>
 
             {nodeId && (
-              <div className="text-[11px] text-slate-500 font-mono">
+              <div className="text-[11px] text-muted-foreground font-mono">
                 Node ID: {nodeId}
               </div>
             )}
@@ -480,7 +480,7 @@ export default function LocalNode() {
             <div className="flex gap-3">
               <Link
                 to="/servers"
-                className="flex-1 text-center px-4 py-2 rounded-lg border border-border text-sm text-slate-700 hover:bg-slate-100 transition-colors"
+                className="flex-1 text-center px-4 py-2 rounded-lg border border-border text-sm text-foreground/90 hover:bg-muted transition-colors"
               >
                 ← View Servers
               </Link>

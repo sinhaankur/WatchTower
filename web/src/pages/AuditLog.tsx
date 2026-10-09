@@ -36,12 +36,12 @@ const ENTITY_PRESETS: { label: string; value: string }[] = [
 ];
 
 function actionTone(action: string): { bg: string; text: string } {
-  if (action.endsWith('.delete')) return { bg: 'bg-red-50', text: 'text-red-700' };
+  if (action.endsWith('.delete')) return { bg: 'bg-destructive/10', text: 'text-destructive' };
   if (action.endsWith('.create')) return { bg: 'bg-emerald-50', text: 'text-emerald-700' };
   if (action.endsWith('.update')) return { bg: 'bg-amber-50', text: 'text-amber-800' };
   if (action.endsWith('.trigger')) return { bg: 'bg-blue-50', text: 'text-blue-700' };
   if (action.endsWith('.rollback')) return { bg: 'bg-orange-50', text: 'text-orange-700' };
-  return { bg: 'bg-slate-100', text: 'text-slate-700' };
+  return { bg: 'bg-muted', text: 'text-foreground/90' };
 }
 
 function formatRelative(iso: string | null): string {
@@ -116,13 +116,13 @@ export default function AuditLog() {
   // sees an Audit Log page, not a generic paywall).
   if (!isPro) {
     return (
-      <div className="flex-1 overflow-auto bg-slate-50">
+      <div className="flex-1 overflow-auto bg-muted">
         <header
           className="px-4 sm:px-6 lg:px-8 py-4 border-b"
           style={{ borderColor: 'hsl(var(--border-soft))' }}
         >
-          <h1 className="text-lg font-semibold text-slate-900">Audit Log</h1>
-          <p className="text-xs text-slate-600 mt-0.5">
+          <h1 className="text-lg font-semibold text-foreground">Audit Log</h1>
+          <p className="text-xs text-muted-foreground mt-0.5">
             Append-only record of who changed what, scoped to your organization.
           </p>
         </header>
@@ -134,18 +134,18 @@ export default function AuditLog() {
   }
 
   return (
-    <div className="flex-1 overflow-auto bg-slate-50">
+    <div className="flex-1 overflow-auto bg-muted">
       <header
         className="px-4 sm:px-6 lg:px-8 py-4 border-b flex items-center justify-between gap-4"
         style={{ borderColor: 'hsl(var(--border-soft))' }}
       >
         <div>
-          <h1 className="text-lg font-semibold text-slate-900">Audit Log</h1>
-          <p className="text-xs text-slate-600 mt-0.5">
+          <h1 className="text-lg font-semibold text-foreground">Audit Log</h1>
+          <p className="text-xs text-muted-foreground mt-0.5">
             Append-only record of who changed what, scoped to your organization.
           </p>
         </div>
-        <div className="text-xs text-slate-500">
+        <div className="text-xs text-muted-foreground">
           {loading ? 'Loading…' : `${filtered.length} event${filtered.length === 1 ? '' : 's'}`}
         </div>
       </header>
@@ -154,11 +154,11 @@ export default function AuditLog() {
         {/* Filters */}
         <div className="rounded-xl border border-border bg-card p-4 grid grid-cols-1 md:grid-cols-4 gap-3">
           <div>
-            <label className="block text-[11px] font-medium text-slate-600 mb-1">Action</label>
+            <label className="block text-[11px] font-medium text-muted-foreground mb-1">Action</label>
             <select
               value={action}
               onChange={(e) => setAction(e.target.value)}
-              className="w-full text-sm rounded-md border border-border bg-white px-2 py-1.5"
+              className="w-full text-sm rounded-md border border-border bg-card px-2 py-1.5"
             >
               {ACTION_PRESETS.map((opt) => (
                 <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -166,11 +166,11 @@ export default function AuditLog() {
             </select>
           </div>
           <div>
-            <label className="block text-[11px] font-medium text-slate-600 mb-1">Entity</label>
+            <label className="block text-[11px] font-medium text-muted-foreground mb-1">Entity</label>
             <select
               value={entityType}
               onChange={(e) => setEntityType(e.target.value)}
-              className="w-full text-sm rounded-md border border-border bg-white px-2 py-1.5"
+              className="w-full text-sm rounded-md border border-border bg-card px-2 py-1.5"
             >
               {ENTITY_PRESETS.map((opt) => (
                 <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -178,11 +178,11 @@ export default function AuditLog() {
             </select>
           </div>
           <div>
-            <label className="block text-[11px] font-medium text-slate-600 mb-1">Window</label>
+            <label className="block text-[11px] font-medium text-muted-foreground mb-1">Window</label>
             <select
               value={days}
               onChange={(e) => setDays(Number(e.target.value))}
-              className="w-full text-sm rounded-md border border-border bg-white px-2 py-1.5"
+              className="w-full text-sm rounded-md border border-border bg-card px-2 py-1.5"
             >
               <option value={1}>Last 24 hours</option>
               <option value={7}>Last 7 days</option>
@@ -192,19 +192,19 @@ export default function AuditLog() {
             </select>
           </div>
           <div>
-            <label className="block text-[11px] font-medium text-slate-600 mb-1">Search</label>
+            <label className="block text-[11px] font-medium text-muted-foreground mb-1">Search</label>
             <input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="email, entity ID, request ID…"
-              className="w-full text-sm rounded-md border border-border bg-white px-2 py-1.5"
+              className="w-full text-sm rounded-md border border-border bg-card px-2 py-1.5"
             />
           </div>
         </div>
 
         {error && (
-          <div className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-700">
+          <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
             {error}
           </div>
         )}
@@ -227,43 +227,43 @@ export default function AuditLog() {
                 <button
                   type="button"
                   onClick={() => setExpanded(isOpen ? null : e.id)}
-                  className="w-full grid grid-cols-12 items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors text-left"
+                  className="w-full grid grid-cols-12 items-center gap-3 px-4 py-3 hover:bg-muted transition-colors text-left"
                 >
                   <span className={`col-span-3 sm:col-span-2 text-[11px] font-mono px-2 py-0.5 rounded ${tone.bg} ${tone.text} truncate`}>
                     {e.action}
                   </span>
-                  <span className="col-span-5 sm:col-span-3 text-xs text-slate-700 truncate">
-                    {e.actor_email ?? <em className="text-slate-400">unknown actor</em>}
+                  <span className="col-span-5 sm:col-span-3 text-xs text-foreground/90 truncate">
+                    {e.actor_email ?? <em className="text-muted-foreground">unknown actor</em>}
                   </span>
-                  <span className="hidden sm:block col-span-2 text-[11px] text-slate-500 font-mono truncate">
+                  <span className="hidden sm:block col-span-2 text-[11px] text-muted-foreground font-mono truncate">
                     {e.entity_type ?? '—'}
                   </span>
-                  <span className="hidden sm:block col-span-3 text-[11px] text-slate-500 font-mono truncate" title={e.entity_id ?? ''}>
+                  <span className="hidden sm:block col-span-3 text-[11px] text-muted-foreground font-mono truncate" title={e.entity_id ?? ''}>
                     {e.entity_id ?? '—'}
                   </span>
                   <span
-                    className="col-span-4 sm:col-span-2 text-[11px] text-slate-500 text-right"
+                    className="col-span-4 sm:col-span-2 text-[11px] text-muted-foreground text-right"
                     title={e.created_at ?? ''}
                   >
                     {formatRelative(e.created_at)}
                   </span>
                 </button>
                 {isOpen && (
-                  <div className="px-4 pb-4 pt-1 bg-slate-50/60 grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                  <div className="px-4 pb-4 pt-1 bg-muted/60 grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
                     <div className="space-y-1">
-                      <div><span className="text-slate-500">When:</span> <span className="font-mono text-slate-700">{e.created_at ?? '—'}</span></div>
-                      <div><span className="text-slate-500">Actor:</span> <span className="text-slate-800">{e.actor_email ?? '—'}</span></div>
-                      <div><span className="text-slate-500">IP:</span> <span className="font-mono text-slate-700">{e.ip_address ?? '—'}</span></div>
-                      <div><span className="text-slate-500">Request ID:</span> <span className="font-mono text-slate-700 break-all">{e.request_id ?? '—'}</span></div>
+                      <div><span className="text-muted-foreground">When:</span> <span className="font-mono text-foreground/90">{e.created_at ?? '—'}</span></div>
+                      <div><span className="text-muted-foreground">Actor:</span> <span className="text-foreground">{e.actor_email ?? '—'}</span></div>
+                      <div><span className="text-muted-foreground">IP:</span> <span className="font-mono text-foreground/90">{e.ip_address ?? '—'}</span></div>
+                      <div><span className="text-muted-foreground">Request ID:</span> <span className="font-mono text-foreground/90 break-all">{e.request_id ?? '—'}</span></div>
                     </div>
                     <div>
-                      <div className="text-slate-500 mb-1">Metadata</div>
+                      <div className="text-muted-foreground mb-1">Metadata</div>
                       {extraText ? (
-                        <pre className="bg-white border border-border rounded p-2 text-[11px] font-mono text-slate-700 overflow-auto max-h-48">
+                        <pre className="bg-card border border-border rounded p-2 text-[11px] font-mono text-foreground/90 overflow-auto max-h-48">
                           {extraText}
                         </pre>
                       ) : (
-                        <div className="text-slate-400 italic">none</div>
+                        <div className="text-muted-foreground italic">none</div>
                       )}
                     </div>
                   </div>
@@ -273,7 +273,7 @@ export default function AuditLog() {
           })}
         </div>
 
-        <p className="text-[11px] text-slate-500 px-1">
+        <p className="text-[11px] text-muted-foreground px-1">
           Audit events are append-only and never store secret values (e.g. environment variable values are never recorded).
           Older events fall outside the read window — increase it above to see them.
         </p>

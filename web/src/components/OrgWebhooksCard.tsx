@@ -107,7 +107,7 @@ export default function OrgWebhooksCard() {
               <button
                 type="button"
                 onClick={() => void remove(h.id)}
-                className="text-muted-foreground hover:text-red-600 transition-colors shrink-0"
+                className="text-muted-foreground hover:text-destructive transition-colors shrink-0"
               >
                 Remove
               </button>
@@ -148,7 +148,7 @@ export default function OrgWebhooksCard() {
           {saving ? 'Adding…' : 'Add'}
         </button>
       </div>
-      {error && <p className="text-xs text-red-600 mt-2">{error}</p>}
+      {error && <p className="text-xs text-destructive mt-2">{error}</p>}
     </div>
   );
 }

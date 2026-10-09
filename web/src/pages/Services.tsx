@@ -52,7 +52,7 @@ const SERVICES: ServiceDef[] = [
     ports: [{ host: 3300, container: 3000 }], openPort: 3300,
   },
   {
-    slug: 'prometheus', name: 'Prometheus', category: 'Monitoring', tone: 'bg-red-100 text-red-700',
+    slug: 'prometheus', name: 'Prometheus', category: 'Monitoring', tone: 'bg-red-100 text-destructive',
     desc: 'Metrics collection, alerting, and time-series data.',
     image: 'docker.io/prom/prometheus:latest',
     ports: [{ host: 9090, container: 9090 }], openPort: 9090,
@@ -125,21 +125,21 @@ function ServiceCard({ svc, connected }: { svc: ServiceDef; connected: boolean }
   };
 
   return (
-    <div className="p-4 rounded-xl border border-border bg-muted/20 hover:border-slate-300 transition-all flex flex-col">
+    <div className="p-4 rounded-xl border border-border bg-muted/20 hover:border-border transition-all flex flex-col">
       <div className="flex items-start justify-between gap-2 mb-2">
         <div className="flex items-center gap-2.5">
           <span className={`w-8 h-8 rounded-lg border border-border flex items-center justify-center text-sm font-bold ${svc.tone}`}>
             {svc.name[0]}
           </span>
-          <p className="text-sm font-semibold text-slate-900">{svc.name}</p>
+          <p className="text-sm font-semibold text-foreground">{svc.name}</p>
         </div>
-        <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 border border-border shrink-0">{svc.category}</span>
+        <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground border border-border shrink-0">{svc.category}</span>
       </div>
-      <p className="text-xs text-slate-600 flex-1">{svc.desc}</p>
+      <p className="text-xs text-muted-foreground flex-1">{svc.desc}</p>
 
       <div className="mt-3 flex items-center gap-2">
         {!svc.image ? (
-          <Link to="/setup" className="text-xs px-3 py-1.5 rounded-lg border border-slate-300 text-slate-700 hover:border-slate-500">
+          <Link to="/setup" className="text-xs px-3 py-1.5 rounded-lg border border-border text-foreground/90 hover:border-slate-500">
             Open Setup Wizard →
           </Link>
         ) : running ? (
@@ -149,12 +149,12 @@ function ServiceCard({ svc, connected }: { svc: ServiceDef; connected: boolean }
               <a
                 href={`http://localhost:${svc.openPort}`}
                 target="_blank" rel="noopener noreferrer"
-                className="text-xs px-3 py-1.5 rounded-lg border border-border bg-amber-400 hover:bg-amber-500 text-slate-900 font-semibold shadow-retro"
+                className="text-xs px-3 py-1.5 rounded-lg border border-border bg-amber-400 hover:bg-amber-500 text-foreground font-semibold shadow-retro"
               >
                 Open ↗
               </a>
             )}
-            <Link to="/local-containers" className="text-xs text-slate-500 hover:text-slate-800 underline ml-auto">
+            <Link to="/local-containers" className="text-xs text-muted-foreground hover:text-foreground underline ml-auto">
               manage
             </Link>
           </>
@@ -163,13 +163,13 @@ function ServiceCard({ svc, connected }: { svc: ServiceDef; connected: boolean }
             onClick={() => void runNow()}
             disabled={busy || !connected}
             title={connected ? `podman run ${svc.image}` : 'Start Podman first (Containers page)'}
-            className="text-xs px-3 py-1.5 rounded-lg border border-border bg-amber-400 hover:bg-amber-500 text-slate-900 font-semibold shadow-retro disabled:opacity-50 disabled:cursor-not-allowed"
+            className="text-xs px-3 py-1.5 rounded-lg border border-border bg-amber-400 hover:bg-amber-500 text-foreground font-semibold shadow-retro disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {busy ? 'Starting…' : existing ? 'Start' : 'Run locally'}
           </button>
         )}
         {svc.image && !running && svc.openPort && (
-          <span className="text-[10px] text-slate-400 font-mono ml-auto">:{svc.openPort}</span>
+          <span className="text-[10px] text-muted-foreground font-mono ml-auto">:{svc.openPort}</span>
         )}
       </div>
     </div>
@@ -181,16 +181,16 @@ const Services = () => {
   const connected = Boolean(podman?.connected);
 
   return (
-    <div className="flex-1 overflow-auto bg-slate-50">
+    <div className="flex-1 overflow-auto bg-muted">
       <header
-        className="px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between border-b sticky top-0 z-10 bg-white/95 backdrop-blur-sm"
+        className="px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between border-b sticky top-0 z-10 bg-card/95 backdrop-blur-sm"
         style={{ borderColor: 'hsl(var(--border-soft))' }}
       >
         <div>
-          <h1 className="text-lg font-semibold text-slate-900">Services</h1>
-          <p className="text-xs text-slate-600 mt-0.5 hidden sm:block">One-click self-hosted services, run on this machine via Podman</p>
+          <h1 className="text-lg font-semibold text-foreground">Services</h1>
+          <p className="text-xs text-muted-foreground mt-0.5 hidden sm:block">One-click self-hosted services, run on this machine via Podman</p>
         </div>
-        <span className="text-xs text-slate-500 bg-slate-100 px-2 py-1 rounded-full border border-border">{SERVICES.length} available</span>
+        <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded-full border border-border">{SERVICES.length} available</span>
       </header>
 
       <main className="px-4 sm:px-6 lg:px-8 py-6 max-w-5xl mx-auto w-full space-y-6">
@@ -207,9 +207,9 @@ const Services = () => {
 
         <div className="rounded-xl border border-border bg-card p-5">
           <div className="flex items-center justify-between mb-1">
-            <h2 className="text-sm font-semibold text-slate-900">Available Services</h2>
+            <h2 className="text-sm font-semibold text-foreground">Available Services</h2>
           </div>
-          <p className="text-xs text-slate-500 mb-4">
+          <p className="text-xs text-muted-foreground mb-4">
             "Run locally" pulls the image and starts it on this machine — try anything in one click.
             Containers are managed on the <Link to="/local-containers" className="underline">Containers page</Link>;
             for a production deploy to a server, use the <Link to="/setup" className="underline">Setup Wizard</Link>.

@@ -140,10 +140,10 @@ export default function BackupDestinationsCard() {
                 {!d.is_enabled && <span className="text-amber-600 shrink-0">paused</span>}
                 <button type="button" onClick={() => void test(d.id)} className="text-muted-foreground hover:text-foreground transition-colors shrink-0">Test</button>
                 <button type="button" onClick={() => void toggle(d)} className="text-muted-foreground hover:text-foreground transition-colors shrink-0">{d.is_enabled ? 'Pause' : 'Enable'}</button>
-                <button type="button" onClick={() => void remove(d.id)} className="text-muted-foreground hover:text-red-600 transition-colors shrink-0">Remove</button>
+                <button type="button" onClick={() => void remove(d.id)} className="text-muted-foreground hover:text-destructive transition-colors shrink-0">Remove</button>
               </div>
               {testResult?.id === d.id && (
-                <p className={`text-[11px] mt-1 ${testResult.ok ? 'text-emerald-600' : 'text-red-600'}`}>
+                <p className={`text-[11px] mt-1 ${testResult.ok ? 'text-emerald-600' : 'text-destructive'}`}>
                   {testResult.ok ? 'Connectivity OK — probe file delivered.' : (testResult.detail || 'Test failed.')}
                 </p>
               )}
@@ -196,7 +196,7 @@ export default function BackupDestinationsCard() {
           {saving ? 'Adding…' : 'Add'}
         </button>
       </div>
-      {error && <p className="text-xs text-red-600 mt-2">{error}</p>}
+      {error && <p className="text-xs text-destructive mt-2">{error}</p>}
     </div>
   );
 }

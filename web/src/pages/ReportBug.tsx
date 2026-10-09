@@ -168,7 +168,7 @@ function ReportBug() {
   };
 
   return (
-    <div className="flex-1 overflow-auto bg-slate-50">
+    <div className="flex-1 overflow-auto bg-muted">
       <header
         className="px-4 sm:px-6 lg:px-8 py-4 border-b"
         style={{ borderColor: 'hsl(var(--border-soft))' }}
@@ -178,8 +178,8 @@ function ReportBug() {
             <IconBug />
           </div>
           <div>
-            <h1 className="text-lg font-semibold text-slate-900">Report a Bug</h1>
-            <p className="text-xs text-slate-600 mt-0.5">
+            <h1 className="text-lg font-semibold text-foreground">Report a Bug</h1>
+            <p className="text-xs text-muted-foreground mt-0.5">
               High-signal report with request id and diagnostics so issues can be fixed faster.
             </p>
           </div>
@@ -187,9 +187,9 @@ function ReportBug() {
       </header>
 
       <main className="px-4 sm:px-6 lg:px-8 py-6 max-w-4xl mx-auto w-full space-y-4">
-        <section className="rounded-xl border border-border bg-white p-5 shadow-retro space-y-4">
-          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-[11px] text-slate-600">
-            <p className="font-medium text-slate-800">Before submitting</p>
+        <section className="rounded-xl border border-border bg-card p-5 shadow-retro space-y-4">
+          <div className="rounded-lg border border-border bg-muted p-3 text-[11px] text-muted-foreground">
+            <p className="font-medium text-foreground">Before submitting</p>
             <div className="mt-2 space-y-1.5">
               <label className="flex items-center gap-2">
                 <input
@@ -214,11 +214,11 @@ function ReportBug() {
 
           <div className="grid sm:grid-cols-2 gap-3">
             <label className="block">
-              <span className="text-xs font-medium text-slate-700">Area</span>
+              <span className="text-xs font-medium text-foreground/90">Area</span>
               <select
                 value={area}
                 onChange={(e) => setArea(e.target.value as Area)}
-                className="mt-1 w-full text-sm px-3 py-2 rounded-lg border border-slate-300 focus:border-border focus:outline-none bg-white"
+                className="mt-1 w-full text-sm px-3 py-2 rounded-lg border border-border focus:border-border focus:outline-none bg-card"
               >
                 {AREAS.map((option) => (
                   <option key={option} value={option}>{option}</option>
@@ -227,11 +227,11 @@ function ReportBug() {
             </label>
 
             <label className="block">
-              <span className="text-xs font-medium text-slate-700">Severity</span>
+              <span className="text-xs font-medium text-foreground/90">Severity</span>
               <select
                 value={severity}
                 onChange={(e) => setSeverity(e.target.value as Severity)}
-                className="mt-1 w-full text-sm px-3 py-2 rounded-lg border border-slate-300 focus:border-border focus:outline-none bg-white"
+                className="mt-1 w-full text-sm px-3 py-2 rounded-lg border border-border focus:border-border focus:outline-none bg-card"
               >
                 {SEVERITIES.map((option) => (
                   <option key={option} value={option}>{option}</option>
@@ -240,53 +240,53 @@ function ReportBug() {
             </label>
 
             <label className="block sm:col-span-2">
-              <span className="text-xs font-medium text-slate-700">Short title *</span>
+              <span className="text-xs font-medium text-foreground/90">Short title *</span>
               <input
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="Example: Auto-update restarts repeatedly after install"
-                className="mt-1 w-full text-sm px-3 py-2 rounded-lg border border-slate-300 focus:border-border focus:outline-none"
+                className="mt-1 w-full text-sm px-3 py-2 rounded-lg border border-border focus:border-border focus:outline-none"
               />
             </label>
 
             <label className="block">
-              <span className="text-xs font-medium text-slate-700">What happened *</span>
+              <span className="text-xs font-medium text-foreground/90">What happened *</span>
               <textarea
                 value={whatHappened}
                 onChange={(e) => setWhatHappened(e.target.value)}
                 rows={4}
                 placeholder="What did you see?"
-                className="mt-1 w-full text-sm px-3 py-2 rounded-lg border border-slate-300 focus:border-border focus:outline-none resize-y"
+                className="mt-1 w-full text-sm px-3 py-2 rounded-lg border border-border focus:border-border focus:outline-none resize-y"
               />
             </label>
 
             <label className="block">
-              <span className="text-xs font-medium text-slate-700">Expected behavior</span>
+              <span className="text-xs font-medium text-foreground/90">Expected behavior</span>
               <textarea
                 value={expected}
                 onChange={(e) => setExpected(e.target.value)}
                 rows={4}
                 placeholder="What should have happened instead?"
-                className="mt-1 w-full text-sm px-3 py-2 rounded-lg border border-slate-300 focus:border-border focus:outline-none resize-y"
+                className="mt-1 w-full text-sm px-3 py-2 rounded-lg border border-border focus:border-border focus:outline-none resize-y"
               />
             </label>
 
             <label className="block sm:col-span-2">
-              <span className="text-xs font-medium text-slate-700">Steps to reproduce *</span>
+              <span className="text-xs font-medium text-foreground/90">Steps to reproduce *</span>
               <textarea
                 value={reproduce}
                 onChange={(e) => setReproduce(e.target.value)}
                 rows={4}
                 placeholder="1. Open Settings\n2. Click Update\n3. App restarts twice"
-                className="mt-1 w-full text-sm px-3 py-2 rounded-lg border border-slate-300 focus:border-border focus:outline-none resize-y"
+                className="mt-1 w-full text-sm px-3 py-2 rounded-lg border border-border focus:border-border focus:outline-none resize-y"
               />
             </label>
           </div>
 
-          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-[11px] text-slate-600">
+          <div className="rounded-lg border border-border bg-muted p-3 text-[11px] text-muted-foreground">
             <p>
               Last X-Request-ID:{' '}
-              <span className="font-mono text-slate-800">{requestId ?? '(none captured yet)'}</span>
+              <span className="font-mono text-foreground">{requestId ?? '(none captured yet)'}</span>
             </p>
             <p className="mt-1">
               In desktop mode, the report email automatically includes log snippets and diagnostics.
@@ -297,7 +297,7 @@ function ReportBug() {
           </div>
 
           {result && (
-            <p className={`text-xs ${result.ok ? 'text-emerald-700' : 'text-red-600'}`}>
+            <p className={`text-xs ${result.ok ? 'text-emerald-700' : 'text-destructive'}`}>
               {result.msg}
             </p>
           )}
@@ -315,7 +315,7 @@ function ReportBug() {
             <button
               type="button"
               onClick={() => void handleCopy()}
-              className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-800 font-medium"
+              className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-border bg-card hover:bg-muted text-foreground font-medium"
             >
               <IconClipboard />
               {copied ? 'Copied' : 'Copy Report Text'}
@@ -324,7 +324,7 @@ function ReportBug() {
               href={githubIssueUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-800 font-medium"
+              className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-border bg-card hover:bg-muted text-foreground font-medium"
             >
               <IconGithub />
               Open Prefilled GitHub Issue

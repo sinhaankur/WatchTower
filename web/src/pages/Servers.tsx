@@ -31,8 +31,8 @@ type OrgNode = {
 
 const STATUS_META = {
   healthy:     { dot: 'bg-emerald-500', badge: 'bg-emerald-50 text-emerald-700 border-emerald-200', label: 'Healthy' },
-  unhealthy:   { dot: 'bg-red-500',     badge: 'bg-red-50 text-red-700 border-red-200',             label: 'Unhealthy' },
-  offline:     { dot: 'bg-slate-500',   badge: 'bg-slate-100 text-slate-700 border-slate-200',       label: 'Offline' },
+  unhealthy:   { dot: 'bg-red-500',     badge: 'bg-destructive/10 text-destructive border-destructive/30',             label: 'Unhealthy' },
+  offline:     { dot: 'bg-slate-500',   badge: 'bg-muted text-foreground/90 border-border',       label: 'Offline' },
   maintenance: { dot: 'bg-amber-500',   badge: 'bg-amber-50 text-amber-700 border-amber-200',       label: 'Maintenance' },
 };
 
@@ -41,7 +41,7 @@ function UsageBar({ label, value }: { label: string; value?: number }) {
   const color = pct > 80 ? 'bg-red-400' : pct > 60 ? 'bg-amber-400' : 'bg-emerald-400';
   return (
     <div>
-      <div className="flex justify-between text-xs text-slate-600 mb-1">
+      <div className="flex justify-between text-xs text-muted-foreground mb-1">
         <span>{label}</span>
         <span>{value != null ? `${pct}%` : '—'}</span>
       </div>
@@ -186,21 +186,21 @@ const Servers = () => {
   };
 
   return (
-    <div className="flex-1 overflow-auto bg-slate-50">
+    <div className="flex-1 overflow-auto bg-muted">
       <header
         className="px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between border-b sticky top-0 z-10 backdrop-blur-sm"
         style={{ borderColor: 'hsl(var(--border-soft))', background: 'hsl(var(--surface-soft) / 0.9)' }}
       >
         <div>
-          <h1 className="text-lg font-semibold text-slate-900">Servers</h1>
-          <p className="text-xs text-slate-600 mt-0.5">
+          <h1 className="text-lg font-semibold text-foreground">Servers</h1>
+          <p className="text-xs text-muted-foreground mt-0.5">
             {loading ? 'Loading…' : orgName ? `Organization: ${orgName}` : offlineMode ? 'Offline — some features unavailable' : 'Manage deployment servers'}
           </p>
         </div>
         <div className="flex items-center gap-3">
           {offlineMode && (
             <button onClick={() => void loadContext()}
-              className="px-3 py-1.5 rounded-lg border border-border text-xs text-slate-700 hover:bg-slate-100 transition-colors">
+              className="px-3 py-1.5 rounded-lg border border-border text-xs text-foreground/90 hover:bg-muted transition-colors">
               ↺ Retry
             </button>
           )}
@@ -208,7 +208,7 @@ const Servers = () => {
             <Link
               to="/login"
               title="Sign in with GitHub to add remote deployment servers"
-              className="px-4 py-1.5 rounded-lg border border-slate-300 bg-white text-slate-600 text-sm font-medium transition-colors hover:bg-slate-50 inline-flex items-center gap-1.5"
+              className="px-4 py-1.5 rounded-lg border border-border bg-card text-muted-foreground text-sm font-medium transition-colors hover:bg-muted inline-flex items-center gap-1.5"
             >
               <svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor" aria-hidden="true">
                 <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z" />
@@ -257,14 +257,14 @@ const Servers = () => {
 
         {/* Guest-mode notice */}
         {isGuest && (
-          <div className="flex items-start gap-3 rounded-xl border border-slate-300 bg-slate-50 px-4 py-3">
-            <svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor" aria-hidden="true" className="text-slate-500 mt-0.5 shrink-0">
+          <div className="flex items-start gap-3 rounded-xl border border-border bg-muted px-4 py-3">
+            <svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor" aria-hidden="true" className="text-muted-foreground mt-0.5 shrink-0">
               <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z" />
             </svg>
             <div className="text-sm">
-              <p className="text-slate-800 font-medium">Guest mode — local deployments only.</p>
-              <p className="text-xs text-slate-600 mt-0.5">
-                Guest mode can't register remote SSH servers. <Link to="/login" className="text-red-700 hover:text-red-800 font-medium">Sign in with GitHub</Link> or sign in with your server's API token to continue.
+              <p className="text-foreground font-medium">Guest mode — local deployments only.</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Guest mode can't register remote SSH servers. <Link to="/login" className="text-destructive hover:text-destructive font-medium">Sign in with GitHub</Link> or sign in with your server's API token to continue.
               </p>
             </div>
           </div>
@@ -281,7 +281,7 @@ const Servers = () => {
           <div className={`rounded-xl border px-4 py-3 text-sm ${
             actionMsg.kind === 'success'
               ? 'border-emerald-300 bg-emerald-50 text-emerald-700'
-              : 'border-red-300 bg-red-50 text-red-700'
+              : 'border-destructive/40 bg-destructive/10 text-destructive'
           }`}>
             {actionMsg.text}
           </div>
@@ -305,8 +305,8 @@ const Servers = () => {
         {showForm && (
           <div className="rounded-xl border border-border bg-card p-6 space-y-6">
             <div>
-              <h2 className="text-sm font-semibold text-slate-900">Add a Server</h2>
-              <p className="text-xs text-slate-600 mt-1">Connect a new server via SSH to use as a deployment target.</p>
+              <h2 className="text-sm font-semibold text-foreground">Add a Server</h2>
+              <p className="text-xs text-muted-foreground mt-1">Connect a new server via SSH to use as a deployment target.</p>
             </div>
 
             {/* Step indicator */}
@@ -317,13 +317,13 @@ const Servers = () => {
                     type="button"
                     onClick={() => i < step && setStep(i)}
                     className={`flex items-center gap-2 text-sm font-medium transition-colors ${
-                      i === step ? 'text-slate-900' : i < step ? 'text-slate-600 cursor-pointer hover:text-red-800' : 'text-slate-400 cursor-default'
+                      i === step ? 'text-foreground' : i < step ? 'text-muted-foreground cursor-pointer hover:text-destructive' : 'text-muted-foreground cursor-default'
                     }`}
                   >
                     <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs border ${
                       i < step ? 'bg-primary border-primary text-white' :
                       i === step ? 'border-primary text-primary bg-primary/5' :
-                      'border-border text-slate-500'
+                      'border-border text-muted-foreground'
                     }`}>
                       {i < step ? '✓' : i + 1}
                     </span>
@@ -341,23 +341,23 @@ const Servers = () => {
               <div className="space-y-4">
                 <div className="grid sm:grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="s-name" className="text-slate-700 text-xs">Server Name <span className="text-red-500">*</span></Label>
+                    <Label htmlFor="s-name" className="text-foreground/90 text-xs">Server Name <span className="text-red-500">*</span></Label>
                     <Input id="s-name" placeholder="e.g. web-server-1" value={form.name}
                       onChange={(e) => setField('name', e.target.value)}
-                      className="mt-1.5 bg-white border-border text-slate-900 placeholder:text-slate-500" />
+                      className="mt-1.5 bg-card border-border text-foreground placeholder:text-muted-foreground" />
                   </div>
                   <div>
-                    <Label htmlFor="s-host" className="text-slate-700 text-xs">Host / IP <span className="text-red-500">*</span></Label>
+                    <Label htmlFor="s-host" className="text-foreground/90 text-xs">Host / IP <span className="text-red-500">*</span></Label>
                     <Input id="s-host" placeholder="192.168.1.101" value={form.host}
                       onChange={(e) => setField('host', e.target.value)}
-                      className="mt-1.5 bg-white border-border text-slate-900 placeholder:text-slate-500" />
+                      className="mt-1.5 bg-card border-border text-foreground placeholder:text-muted-foreground" />
                   </div>
                 </div>
-                <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+                <label className="flex items-center gap-2 text-sm text-foreground/90 cursor-pointer">
                   <input type="checkbox" checked={form.is_primary}
                     onChange={(e) => setField('is_primary', e.target.checked)}
                     className="accent-red-700 cursor-pointer" />
-                  Mark as <strong className="text-slate-900">primary</strong> deployment server
+                  Mark as <strong className="text-foreground">primary</strong> deployment server
                 </label>
               </div>
             )}
@@ -368,19 +368,19 @@ const Servers = () => {
                 <GuidedSshSetup onUseKey={(path) => setField('ssh_key_path', path)} />
                 <div className="grid sm:grid-cols-3 gap-4">
                   <div>
-                    <Label htmlFor="s-user" className="text-slate-700 text-xs">SSH User</Label>
+                    <Label htmlFor="s-user" className="text-foreground/90 text-xs">SSH User</Label>
                     <Input id="s-user" value={form.user} onChange={(e) => setField('user', e.target.value)}
-                      className="mt-1.5 bg-white border-border text-slate-900" />
+                      className="mt-1.5 bg-card border-border text-foreground" />
                   </div>
                   <div>
-                    <Label htmlFor="s-port" className="text-slate-700 text-xs">Port</Label>
+                    <Label htmlFor="s-port" className="text-foreground/90 text-xs">Port</Label>
                     <Input id="s-port" type="number" value={form.port} onChange={(e) => setField('port', Number(e.target.value))}
-                      className="mt-1.5 bg-white border-border text-slate-900" />
+                      className="mt-1.5 bg-card border-border text-foreground" />
                   </div>
                   <div>
-                    <Label htmlFor="s-key" className="text-slate-700 text-xs">SSH Key Path</Label>
+                    <Label htmlFor="s-key" className="text-foreground/90 text-xs">SSH Key Path</Label>
                     <Input id="s-key" value={form.ssh_key_path} onChange={(e) => setField('ssh_key_path', e.target.value)}
-                      className="mt-1.5 bg-white border-border text-slate-900" />
+                      className="mt-1.5 bg-card border-border text-foreground" />
                   </div>
                 </div>
               </div>
@@ -390,14 +390,14 @@ const Servers = () => {
             {step === 2 && (
               <div className="space-y-4">
                 <div>
-                  <Label htmlFor="s-path" className="text-slate-700 text-xs">Remote Deploy Path</Label>
+                  <Label htmlFor="s-path" className="text-foreground/90 text-xs">Remote Deploy Path</Label>
                   <Input id="s-path" value={form.remote_path} onChange={(e) => setField('remote_path', e.target.value)}
-                    className="mt-1.5 bg-white border-border text-slate-900" />
+                    className="mt-1.5 bg-card border-border text-foreground" />
                 </div>
                 <div>
-                  <Label htmlFor="s-reload" className="text-slate-700 text-xs">Reload Command</Label>
+                  <Label htmlFor="s-reload" className="text-foreground/90 text-xs">Reload Command</Label>
                   <Input id="s-reload" value={form.reload_command} onChange={(e) => setField('reload_command', e.target.value)}
-                    className="mt-1.5 bg-white border-border text-slate-900" />
+                    className="mt-1.5 bg-card border-border text-foreground" />
                 </div>
               </div>
             )}
@@ -407,7 +407,7 @@ const Servers = () => {
               <button
                 onClick={() => step > 0 && setStep((s) => s - 1)}
                 disabled={step === 0}
-                className="px-4 py-2 text-sm font-semibold text-slate-800 border border-border bg-white rounded-lg shadow-retro hover:bg-amber-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                className="px-4 py-2 text-sm font-semibold text-foreground border border-border bg-card rounded-lg shadow-retro hover:bg-amber-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
               >
                 ← Back
               </button>
@@ -436,7 +436,7 @@ const Servers = () => {
         <div className="rounded-xl border border-border bg-card p-5">
           {/* Header row: count + health summary + search/filter */}
           <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-4">
-            <h2 className="text-sm font-semibold text-slate-900 shrink-0">
+            <h2 className="text-sm font-semibold text-foreground shrink-0">
               {loading ? 'Loading servers…' : `${nodes.length} Server${nodes.length !== 1 ? 's' : ''}`}
             </h2>
 
@@ -460,7 +460,7 @@ const Servers = () => {
                 {filterStatus !== 'all' && (
                   <button
                     onClick={() => setFilter('all')}
-                    className="text-[11px] text-slate-500 hover:text-slate-700 transition-colors"
+                    className="text-[11px] text-muted-foreground hover:text-foreground/90 transition-colors"
                   >
                     ✕ clear
                   </button>
@@ -476,9 +476,9 @@ const Servers = () => {
                   placeholder="Search servers…"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  className="w-full sm:w-52 pl-7 pr-3 py-1.5 text-xs rounded-lg border border-border bg-white text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-red-400"
+                  className="w-full sm:w-52 pl-7 pr-3 py-1.5 text-xs rounded-lg border border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-red-400"
                 />
-                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs pointer-events-none">🔍</span>
+                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground text-xs pointer-events-none">🔍</span>
               </div>
             )}
           </div>
@@ -498,7 +498,7 @@ const Servers = () => {
                     {!isGuest && (
                       <button
                         onClick={() => setShowForm(true)}
-                        className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-border text-slate-700 hover:bg-slate-100 text-sm transition-colors"
+                        className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-border text-foreground/90 hover:bg-muted text-sm transition-colors"
                       >
                         + Add Remote Server
                       </button>
@@ -516,9 +516,9 @@ const Servers = () => {
           )}
 
           {nodes.length > 0 && filteredNodes.length === 0 && (
-            <div className="text-center py-10 text-xs text-slate-500">
+            <div className="text-center py-10 text-xs text-muted-foreground">
               No servers match your search.
-              <button onClick={() => { setSearch(''); setFilter('all'); }} className="ml-2 text-red-700 hover:underline">Clear filters</button>
+              <button onClick={() => { setSearch(''); setFilter('all'); }} className="ml-2 text-destructive hover:underline">Clear filters</button>
             </div>
           )}
 
@@ -527,20 +527,20 @@ const Servers = () => {
               const meta = STATUS_META[node.status] ?? STATUS_META.offline;
               return (
                 <div key={node.id}
-                  className="p-4 rounded-xl border border-border hover:border-red-300 bg-muted/20 hover:bg-red-50/40 transition-all">
+                  className="p-4 rounded-xl border border-border hover:border-destructive/40 bg-muted/20 hover:bg-destructive/10/40 transition-all">
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex items-center gap-3 min-w-0 flex-1">
                       <span className={`w-2.5 h-2.5 rounded-full shrink-0 mt-1 ${meta.dot} ${node.status === 'healthy' ? 'status-pulse' : ''}`} />
                       <div className="min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <p className="text-sm font-semibold text-slate-900 truncate" title={node.name}>{node.name}</p>
+                          <p className="text-sm font-semibold text-foreground truncate" title={node.name}>{node.name}</p>
                           {node.is_primary && (
-                            <span className="text-xs px-1.5 py-0.5 rounded border border-red-200 bg-red-50 text-red-700 shrink-0">Primary</span>
+                            <span className="text-xs px-1.5 py-0.5 rounded border border-destructive/30 bg-destructive/10 text-destructive shrink-0">Primary</span>
                           )}
                         </div>
-                        <p className="text-xs text-slate-600 mt-0.5 font-mono truncate" title={`${node.user}@${node.host}:${node.port}`}>{node.user}@{node.host}:{node.port}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5 font-mono truncate" title={`${node.user}@${node.host}:${node.port}`}>{node.user}@{node.host}:{node.port}</p>
                         {node.last_health_check && (
-                          <p className="text-xs text-slate-600 mt-0.5">
+                          <p className="text-xs text-muted-foreground mt-0.5">
                             Last check: {new Date(node.last_health_check).toLocaleString()}
                           </p>
                         )}
@@ -551,14 +551,14 @@ const Servers = () => {
                       <button
                         onClick={() => void checkHealth(node.id)}
                         disabled={healthLoading === node.id}
-                        className="px-3 py-1 text-xs rounded-lg border border-border text-slate-700 hover:bg-slate-100 hover:text-slate-900 transition-colors disabled:opacity-50"
+                        className="px-3 py-1 text-xs rounded-lg border border-border text-foreground/90 hover:bg-muted hover:text-foreground transition-colors disabled:opacity-50"
                       >
                         {healthLoading === node.id ? 'Checking…' : 'Check Health'}
                       </button>
                       <button
                         onClick={() => void deleteNode(node.id)}
                         disabled={deleteLoading === node.id}
-                        className="px-3 py-1 text-xs rounded-lg border border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 transition-colors disabled:opacity-50"
+                        className="px-3 py-1 text-xs rounded-lg border border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive transition-colors disabled:opacity-50"
                         title="Remove server"
                       >
                         {deleteLoading === node.id ? '…' : '✕'}

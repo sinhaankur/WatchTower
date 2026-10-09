@@ -18,12 +18,12 @@ function CardBoundary({ name, children }: { name: string; children: React.ReactN
   return (
     <ErrorBoundary
       fallback={(_err, reset) => (
-        <div className="rounded-xl border border-red-200 bg-red-50 p-5 text-sm">
-          <p className="font-medium text-red-800">{name} couldn’t load.</p>
-          <p className="text-red-600 mt-1 text-xs">The rest of Settings is fine.</p>
+        <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-5 text-sm">
+          <p className="font-medium text-destructive">{name} couldn’t load.</p>
+          <p className="text-destructive mt-1 text-xs">The rest of Settings is fine.</p>
           <button
             onClick={reset}
-            className="mt-3 px-3 py-1.5 rounded-md border border-red-300 bg-white text-red-700 text-xs font-medium hover:bg-red-100"
+            className="mt-3 px-3 py-1.5 rounded-md border border-destructive/40 bg-card text-destructive text-xs font-medium hover:bg-red-100"
           >
             Retry
           </button>
@@ -67,7 +67,7 @@ function CopyButton({ text }: { text: string }) {
   return (
     <button
       onClick={() => { void navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 1800); }}
-      className="text-[10px] px-2 py-0.5 rounded border border-slate-300 hover:border-slate-500 text-slate-500 hover:text-slate-800 transition-colors"
+      className="text-[10px] px-2 py-0.5 rounded border border-border hover:border-slate-500 text-muted-foreground hover:text-foreground transition-colors"
     >
       {copied ? 'Copied!' : 'Copy'}
     </button>
@@ -108,8 +108,8 @@ function VSCodeCard() {
           </svg>
         </div>
         <div>
-          <h2 className="text-sm font-semibold text-slate-900">VS Code Integration</h2>
-          <p className="text-xs text-slate-500">Connect your editor to WatchTower projects</p>
+          <h2 className="text-sm font-semibold text-foreground">VS Code Integration</h2>
+          <p className="text-xs text-muted-foreground">Connect your editor to WatchTower projects</p>
         </div>
         {!loading && (
           <span className={`ml-auto text-xs px-2 py-0.5 rounded-full border font-medium ${
@@ -127,14 +127,14 @@ function VSCodeCard() {
 
         {/* Open project on server */}
         <div className="rounded-lg border border-border bg-muted/20 p-4 space-y-3">
-          <p className="text-xs font-semibold text-slate-800 uppercase tracking-wide">Open on Server</p>
-          <p className="text-xs text-slate-600">
-            Launch VS Code on the WatchTower host machine via the <code className="font-mono bg-slate-100 px-1 rounded">code</code> CLI.
+          <p className="text-xs font-semibold text-foreground uppercase tracking-wide">Open on Server</p>
+          <p className="text-xs text-muted-foreground">
+            Launch VS Code on the WatchTower host machine via the <code className="font-mono bg-muted px-1 rounded">code</code> CLI.
             Works when VS Code is installed server-side (e.g., SSH session or local machine).
           </p>
           {status && (
-            <div className="flex items-center gap-2 p-2 rounded bg-slate-50 border border-border">
-              <code className="text-[11px] font-mono text-slate-700 flex-1 truncate">{status.root_dir}</code>
+            <div className="flex items-center gap-2 p-2 rounded bg-muted border border-border">
+              <code className="text-[11px] font-mono text-foreground/90 flex-1 truncate">{status.root_dir}</code>
               <CopyButton text={`code ${status.root_dir}`} />
             </div>
           )}
@@ -146,42 +146,42 @@ function VSCodeCard() {
             {openLoading ? 'Opening…' : 'Open WatchTower in VS Code'}
           </button>
           {openResult && (
-            <p className={`text-xs ${openResult.ok ? 'text-emerald-700' : 'text-red-600'}`}>{openResult.msg}</p>
+            <p className={`text-xs ${openResult.ok ? 'text-emerald-700' : 'text-destructive'}`}>{openResult.msg}</p>
           )}
         </div>
 
         {/* Deep link / client-side */}
         <div className="rounded-lg border border-border bg-muted/20 p-4 space-y-3">
-          <p className="text-xs font-semibold text-slate-800 uppercase tracking-wide">Open via Browser Deep Link</p>
-          <p className="text-xs text-slate-600">
+          <p className="text-xs font-semibold text-foreground uppercase tracking-wide">Open via Browser Deep Link</p>
+          <p className="text-xs text-muted-foreground">
             Open any GitHub repo or local folder directly in your <em>local</em> VS Code
-            using the <code className="font-mono bg-slate-100 px-1 rounded">vscode://</code> URL scheme.
+            using the <code className="font-mono bg-muted px-1 rounded">vscode://</code> URL scheme.
           </p>
           <div className="space-y-2">
             <div>
-              <p className="text-[10px] text-slate-500 mb-1">Repo → Clone in VS Code</p>
-              <div className="flex items-center gap-2 p-2 rounded bg-slate-50 border border-border">
-                <code className="text-[10px] font-mono text-slate-600 flex-1 truncate">vscode://vscode.git/clone?url=https://github.com/…</code>
+              <p className="text-[10px] text-muted-foreground mb-1">Repo → Clone in VS Code</p>
+              <div className="flex items-center gap-2 p-2 rounded bg-muted border border-border">
+                <code className="text-[10px] font-mono text-muted-foreground flex-1 truncate">vscode://vscode.git/clone?url=https://github.com/…</code>
                 <CopyButton text="vscode://vscode.git/clone?url=https://github.com/owner/repo" />
               </div>
             </div>
             <div>
-              <p className="text-[10px] text-slate-500 mb-1">Local folder</p>
-              <div className="flex items-center gap-2 p-2 rounded bg-slate-50 border border-border">
-                <code className="text-[10px] font-mono text-slate-600 flex-1 truncate">vscode://file/path/to/folder</code>
+              <p className="text-[10px] text-muted-foreground mb-1">Local folder</p>
+              <div className="flex items-center gap-2 p-2 rounded bg-muted border border-border">
+                <code className="text-[10px] font-mono text-muted-foreground flex-1 truncate">vscode://file/path/to/folder</code>
                 <CopyButton text="vscode://file/path/to/folder" />
               </div>
             </div>
           </div>
-          <p className="text-[10px] text-slate-500">
+          <p className="text-[10px] text-muted-foreground">
             Your project cards show an <strong>"Open in VS Code"</strong> button using these links automatically.
           </p>
         </div>
 
         {/* Remote SSH */}
         <div className="rounded-lg border border-border bg-muted/20 p-4 space-y-3">
-          <p className="text-xs font-semibold text-slate-800 uppercase tracking-wide">Remote — SSH</p>
-          <p className="text-xs text-slate-600">
+          <p className="text-xs font-semibold text-foreground uppercase tracking-wide">Remote — SSH</p>
+          <p className="text-xs text-muted-foreground">
             Edit files directly on the WatchTower host using VS Code Remote — SSH extension.
             Install it from the VS Code marketplace, then connect to your host.
           </p>
@@ -193,14 +193,14 @@ function VSCodeCard() {
               { step: '4', text: 'Open /path/to/your/project in the remote window' },
             ].map(({ step, text }) => (
               <div key={step} className="flex items-start gap-2">
-                <span className="w-4 h-4 rounded bg-amber-400 text-slate-900 text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">{step}</span>
-                <p className="text-xs text-slate-700">{text}</p>
+                <span className="w-4 h-4 rounded bg-amber-400 text-foreground text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">{step}</span>
+                <p className="text-xs text-foreground/90">{text}</p>
               </div>
             ))}
           </div>
           <a
             href="vscode:extension/ms-vscode-remote.remote-ssh"
-            className="inline-flex items-center gap-1.5 text-xs text-red-700 hover:text-red-800 font-medium"
+            className="inline-flex items-center gap-1.5 text-xs text-destructive hover:text-destructive font-medium"
           >
             Install Remote — SSH →
           </a>
@@ -211,8 +211,8 @@ function VSCodeCard() {
           <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 space-y-2">
             <p className="text-xs font-semibold text-amber-800 uppercase tracking-wide">Install VS Code on Host</p>
             <p className="text-xs text-amber-700">{status?.install_instructions[os] ?? 'Visit https://code.visualstudio.com/download'}</p>
-            <div className="flex items-center gap-2 p-2 rounded bg-white border border-amber-200 mt-1">
-              <code className="text-[11px] font-mono text-slate-700 flex-1">sudo snap install --classic code</code>
+            <div className="flex items-center gap-2 p-2 rounded bg-card border border-amber-200 mt-1">
+              <code className="text-[11px] font-mono text-foreground/90 flex-1">sudo snap install --classic code</code>
               <CopyButton text="sudo snap install --classic code" />
             </div>
           </div>
@@ -274,11 +274,11 @@ function UpdateCheckCard() {
           </svg>
         </div>
         <div className="flex-1 min-w-0">
-          <h2 className="text-sm font-semibold text-slate-900">WatchTower Updates</h2>
-          <p className="text-xs text-slate-500">
-            Current version <span className="font-mono text-slate-700">{current}</span>
+          <h2 className="text-sm font-semibold text-foreground">WatchTower Updates</h2>
+          <p className="text-xs text-muted-foreground">
+            Current version <span className="font-mono text-foreground/90">{current}</span>
             {latest && latest !== current && (
-              <> · Latest <span className="font-mono text-slate-700">{latest}</span></>
+              <> · Latest <span className="font-mono text-foreground/90">{latest}</span></>
             )}
           </p>
         </div>
@@ -310,7 +310,7 @@ function UpdateCheckCard() {
               href={data.release_url}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-xs px-3 py-1.5 rounded-lg border border-amber-700 bg-white text-amber-800 hover:bg-amber-100 font-medium shrink-0"
+              className="text-xs px-3 py-1.5 rounded-lg border border-amber-700 bg-card text-amber-800 hover:bg-amber-100 font-medium shrink-0"
             >
               Release notes →
             </a>
@@ -327,7 +327,7 @@ function UpdateCheckCard() {
       )}
 
       {error && (
-        <p className="text-xs text-red-600 mb-3">
+        <p className="text-xs text-destructive mb-3">
           Could not reach GitHub to check for updates.
         </p>
       )}
@@ -336,7 +336,7 @@ function UpdateCheckCard() {
       )}
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <label className="flex items-center gap-2 text-xs text-slate-700 cursor-pointer select-none">
+        <label className="flex items-center gap-2 text-xs text-foreground/90 cursor-pointer select-none">
           <input
             type="checkbox"
             checked={autoCheck}
@@ -347,14 +347,14 @@ function UpdateCheckCard() {
         </label>
         <div className="flex items-center gap-3">
           {checked && (
-            <span className="text-[11px] text-slate-500" title={`Last checked ${checked}`}>
+            <span className="text-[11px] text-muted-foreground" title={`Last checked ${checked}`}>
               Checked {checked}
             </span>
           )}
           <button
             onClick={() => void handleCheckNow()}
             disabled={isFetching}
-            className="text-xs px-3 py-1.5 rounded-lg border border-border bg-white hover:bg-slate-50 text-slate-800 font-medium shadow-retro disabled:opacity-50 disabled:cursor-not-allowed"
+            className="text-xs px-3 py-1.5 rounded-lg border border-border bg-card hover:bg-muted text-foreground font-medium shadow-retro disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isFetching ? 'Checking…' : 'Check for Updates'}
           </button>
@@ -411,7 +411,7 @@ function DepRow({ label, found, detail, installCmd, hint, required }: DepRowProp
   const missingBadge = (
     <span className={`text-[10px] px-2 py-0.5 rounded-full border font-medium ${
       required
-        ? 'border-red-300 bg-red-50 text-red-700'
+        ? 'border-destructive/40 bg-destructive/10 text-destructive'
         : 'border-amber-300 bg-amber-50 text-amber-700'
     }`}>
       {required ? 'Missing (required)' : 'Missing (optional)'}
@@ -421,14 +421,14 @@ function DepRow({ label, found, detail, installCmd, hint, required }: DepRowProp
   return (
     <div className="rounded-lg border border-border bg-muted/20 p-4 space-y-2">
       <div className="flex items-center gap-2">
-        <p className="text-xs font-semibold text-slate-800 uppercase tracking-wide flex-1">{label}</p>
+        <p className="text-xs font-semibold text-foreground uppercase tracking-wide flex-1">{label}</p>
         {found ? okBadge : missingBadge}
       </div>
-      {detail && <p className="text-[11px] font-mono text-slate-700 truncate" title={detail}>{detail}</p>}
-      {hint && <p className="text-[11px] text-slate-600">{hint}</p>}
+      {detail && <p className="text-[11px] font-mono text-foreground/90 truncate" title={detail}>{detail}</p>}
+      {hint && <p className="text-[11px] text-muted-foreground">{hint}</p>}
       {!found && installCmd && (
-        <div className="flex items-center gap-2 p-2 rounded bg-slate-50 border border-border">
-          <code className="text-[11px] font-mono text-slate-700 flex-1 truncate" title={installCmd}>
+        <div className="flex items-center gap-2 p-2 rounded bg-muted border border-border">
+          <code className="text-[11px] font-mono text-foreground/90 flex-1 truncate" title={installCmd}>
             {installCmd}
           </code>
           <CopyButton text={installCmd} />
@@ -514,21 +514,21 @@ function SystemCard() {
           </svg>
         </div>
         <div className="flex-1 min-w-0">
-          <h2 className="text-sm font-semibold text-slate-900">System</h2>
-          <p className="text-xs text-slate-500">
+          <h2 className="text-sm font-semibold text-foreground">System</h2>
+          <p className="text-xs text-muted-foreground">
             {dep
               ? <>WatchTower {dep.appVersion} · {dep.platform} ({dep.arch})</>
               : 'Dependencies and diagnostics'}
           </p>
         </div>
         {!electron && (
-          <span className="text-[10px] px-2 py-0.5 rounded-full border font-medium border-slate-300 bg-slate-50 text-slate-600">
+          <span className="text-[10px] px-2 py-0.5 rounded-full border font-medium border-border bg-muted text-muted-foreground">
             Browser mode
           </span>
         )}
       </div>
 
-      {loading && <p className="text-xs text-slate-500">Probing system…</p>}
+      {loading && <p className="text-xs text-muted-foreground">Probing system…</p>}
 
       {!loading && (
         <>
@@ -570,27 +570,27 @@ function SystemCard() {
 
             {dep?.backendLogPath && (
               <div className="rounded-lg border border-border bg-muted/20 p-4 space-y-2">
-                <p className="text-xs font-semibold text-slate-800 uppercase tracking-wide">Backend log</p>
-                <div className="flex items-center gap-2 p-2 rounded bg-slate-50 border border-border">
-                  <code className="text-[11px] font-mono text-slate-700 flex-1 truncate" title={dep.backendLogPath}>
+                <p className="text-xs font-semibold text-foreground uppercase tracking-wide">Backend log</p>
+                <div className="flex items-center gap-2 p-2 rounded bg-muted border border-border">
+                  <code className="text-[11px] font-mono text-foreground/90 flex-1 truncate" title={dep.backendLogPath}>
                     {dep.backendLogPath}
                   </code>
                   <CopyButton text={dep.backendLogPath} />
                 </div>
-                <p className="text-[11px] text-slate-600">
+                <p className="text-[11px] text-muted-foreground">
                   Attached automatically when you send an error report.
                 </p>
               </div>
             )}
           </div>
 
-          <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-200">
+          <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-border">
             <div className="flex flex-col">
-              <p className="text-xs text-slate-700">
+              <p className="text-xs text-foreground/90">
                 Installed something just now? Recheck restarts the app so PATH refreshes.
               </p>
               {reportResult && (
-                <p className={`text-[11px] mt-1 ${reportResult.ok ? 'text-emerald-700' : 'text-red-600'}`}>
+                <p className={`text-[11px] mt-1 ${reportResult.ok ? 'text-emerald-700' : 'text-destructive'}`}>
                   {reportResult.msg}
                 </p>
               )}
@@ -599,14 +599,14 @@ function SystemCard() {
               <button
                 onClick={() => void handleSendReport()}
                 disabled={reportSending}
-                className="text-xs px-3 py-1.5 rounded-lg border border-border bg-white hover:bg-slate-50 text-slate-800 font-medium shadow-retro disabled:opacity-50"
+                className="text-xs px-3 py-1.5 rounded-lg border border-border bg-card hover:bg-muted text-foreground font-medium shadow-retro disabled:opacity-50"
                 title="Open mail client with diagnostics pre-filled — sent to the maintainer for fixing."
               >
                 {reportSending ? 'Opening…' : 'Send Error Report'}
               </button>
               <button
                 onClick={() => void handleRecheck()}
-                className="text-xs px-3 py-1.5 rounded-lg border border-border bg-amber-400 hover:bg-amber-500 text-slate-900 font-semibold shadow-retro"
+                className="text-xs px-3 py-1.5 rounded-lg border border-border bg-amber-400 hover:bg-amber-500 text-foreground font-semibold shadow-retro"
               >
                 Recheck (restarts app)
               </button>
@@ -683,21 +683,21 @@ function BackupCard() {
           </svg>
         </div>
         <div className="flex-1 min-w-0">
-          <h2 className="text-sm font-semibold text-slate-900">Backup & Restore</h2>
-          <p className="text-xs text-slate-500">
+          <h2 className="text-sm font-semibold text-foreground">Backup & Restore</h2>
+          <p className="text-xs text-muted-foreground">
             Export the encryption key + database so you can recover from disk loss.
           </p>
         </div>
       </div>
 
-      {loading && <p className="text-xs text-slate-500">Checking backup status…</p>}
+      {loading && <p className="text-xs text-muted-foreground">Checking backup status…</p>}
 
       {!loading && status && !status.supported && (
         <div className="rounded-lg border border-amber-300 bg-amber-50 p-3">
           <p className="text-xs text-amber-800">
             This install uses a non-SQLite database. Use your database's native backup tool
-            (e.g. <code className="font-mono bg-white px-1 rounded">pg_dump</code>) and back up
-            <code className="font-mono bg-white px-1 rounded">~/.watchtower/secret.key</code> separately.
+            (e.g. <code className="font-mono bg-card px-1 rounded">pg_dump</code>) and back up
+            <code className="font-mono bg-card px-1 rounded">~/.watchtower/secret.key</code> separately.
             In-app backup is SQLite-only in v1.
           </p>
         </div>
@@ -717,41 +717,41 @@ function BackupCard() {
 
           <div className="grid sm:grid-cols-2 gap-3">
             <div className="rounded-lg border border-border bg-muted/20 p-3 space-y-2">
-              <p className="text-xs font-semibold text-slate-800 uppercase tracking-wide">Backup contents</p>
-              <ul className="text-[11px] text-slate-700 space-y-1">
+              <p className="text-xs font-semibold text-foreground uppercase tracking-wide">Backup contents</p>
+              <ul className="text-[11px] text-foreground/90 space-y-1">
                 <li>{status.has_secret_key ? '✓' : '○'} <code className="font-mono">secret.key</code> (Fernet master key)</li>
                 <li>{status.has_database_file ? '✓' : '○'} <code className="font-mono">watchtower.db</code> (SQLite database)</li>
               </ul>
               {!status.ready_for_backup && (
-                <p className="text-[11px] text-slate-500 italic">
+                <p className="text-[11px] text-muted-foreground italic">
                   Fresh install — nothing to back up yet. Create a project or sign in to populate state.
                 </p>
               )}
             </div>
 
             <div className="rounded-lg border border-border bg-muted/20 p-3 space-y-2">
-              <p className="text-xs font-semibold text-slate-800 uppercase tracking-wide">Restore (manual)</p>
-              <p className="text-[11px] text-slate-700">
+              <p className="text-xs font-semibold text-foreground uppercase tracking-wide">Restore (manual)</p>
+              <p className="text-[11px] text-foreground/90">
                 Restore is manual in v1. Stop WatchTower, extract the tarball over your{' '}
                 <code className="font-mono">~/.watchtower/</code> directory, restart.
               </p>
-              <code className="block text-[10px] font-mono bg-slate-100 rounded px-2 py-1 text-slate-700">
+              <code className="block text-[10px] font-mono bg-muted rounded px-2 py-1 text-foreground/90">
                 tar -xzf watchtower-backup-*.tar.gz -C ~/.watchtower/
               </code>
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-200 mt-3">
-            {downloadError && <p className="text-xs text-red-600 flex-1">{downloadError}</p>}
+          <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-border mt-3">
+            {downloadError && <p className="text-xs text-destructive flex-1">{downloadError}</p>}
             {!downloadError && (
-              <p className="text-xs text-slate-500 flex-1">
+              <p className="text-xs text-muted-foreground flex-1">
                 Suggested cadence: once a week, or after every major project change.
               </p>
             )}
             <button
               onClick={() => void handleDownload()}
               disabled={downloading || !status.ready_for_backup || !status.can_export}
-              className="text-xs px-3 py-1.5 rounded-lg border border-border bg-amber-400 hover:bg-amber-500 text-slate-900 font-semibold shadow-retro disabled:opacity-50 disabled:cursor-not-allowed"
+              className="text-xs px-3 py-1.5 rounded-lg border border-border bg-amber-400 hover:bg-amber-500 text-foreground font-semibold shadow-retro disabled:opacity-50 disabled:cursor-not-allowed"
               title={
                 !status.can_export
                   ? "Requires can_manage_team permission on this org"
@@ -827,43 +827,43 @@ function StorageCard() {
           </svg>
         </div>
         <div className="flex-1 min-w-0">
-          <h2 className="text-sm font-semibold text-slate-900">Storage</h2>
-          <p className="text-xs text-slate-500">Reclaim disk from old build files</p>
+          <h2 className="text-sm font-semibold text-foreground">Storage</h2>
+          <p className="text-xs text-muted-foreground">Reclaim disk from old build files</p>
         </div>
         <button
           onClick={() => void load()}
           disabled={loading}
-          className="text-xs text-slate-500 hover:text-slate-900 transition-colors disabled:opacity-50"
+          className="text-xs text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
         >
           {loading ? '…' : '↻ Refresh'}
         </button>
       </div>
 
-      {loading && <p className="text-xs text-slate-500">Measuring…</p>}
+      {loading && <p className="text-xs text-muted-foreground">Measuring…</p>}
 
       {!loading && info && (
         <>
           <div className="flex items-baseline justify-between mb-3">
-            <span className="text-2xl font-bold text-slate-900 tabular-nums">{info.reclaimable_human}</span>
-            <span className="text-xs text-slate-500">reclaimable</span>
+            <span className="text-2xl font-bold text-foreground tabular-nums">{info.reclaimable_human}</span>
+            <span className="text-xs text-muted-foreground">reclaimable</span>
           </div>
           <div className="space-y-1.5 mb-4">
             {info.breakdown.map((b) => (
               <div key={b.path} className="flex items-center justify-between text-xs">
-                <span className="text-slate-600">{b.label}</span>
-                <span className="text-slate-500 tabular-nums">{b.human}</span>
+                <span className="text-muted-foreground">{b.label}</span>
+                <span className="text-muted-foreground tabular-nums">{b.human}</span>
               </div>
             ))}
           </div>
 
-          <label className="flex items-center gap-2 text-xs text-slate-600 mb-3 cursor-pointer">
+          <label className="flex items-center gap-2 text-xs text-muted-foreground mb-3 cursor-pointer">
             <input
               type="checkbox"
               checked={includeCaches}
               onChange={(e) => setIncludeCaches(e.target.checked)}
-              className="rounded border-slate-300"
+              className="rounded border-border"
             />
-            Also clear package caches <span className="text-slate-400">(next build re-downloads)</span>
+            Also clear package caches <span className="text-muted-foreground">(next build re-downloads)</span>
           </label>
 
           <button
@@ -874,8 +874,8 @@ function StorageCard() {
             {clearing ? 'Clearing…' : nothingToClear ? 'Nothing to clear' : 'Clear build cache'}
           </button>
 
-          {note && <p className="text-xs text-slate-500 mt-2 text-center">{note}</p>}
-          <p className="text-[11px] text-slate-400 mt-3">
+          {note && <p className="text-xs text-muted-foreground mt-2 text-center">{note}</p>}
+          <p className="text-[11px] text-muted-foreground mt-3">
             Only removes repo clones under <span className="font-mono">{info.build_dir}</span>. Your projects,
             databases, and backups are never touched.
           </p>
@@ -883,7 +883,7 @@ function StorageCard() {
       )}
 
       {!loading && !info && (
-        <p className="text-xs text-slate-500">Storage info unavailable.</p>
+        <p className="text-xs text-muted-foreground">Storage info unavailable.</p>
       )}
     </div>
   );
@@ -893,18 +893,18 @@ const Settings = () => {
   const navigate = useNavigate();
 
   return (
-    <div className="flex-1 overflow-auto bg-slate-50">
+    <div className="flex-1 overflow-auto bg-muted">
       <header
         className="px-4 sm:px-6 lg:px-8 py-4 border-b flex items-center justify-between"
         style={{ borderColor: 'hsl(var(--border-soft))' }}
       >
         <div>
-          <h1 className="text-lg font-semibold text-slate-900">Settings</h1>
-          <p className="text-xs text-slate-600 mt-0.5">Configure your WatchTower instance</p>
+          <h1 className="text-lg font-semibold text-foreground">Settings</h1>
+          <p className="text-xs text-muted-foreground mt-0.5">Configure your WatchTower instance</p>
         </div>
         <button
           onClick={() => navigate('/report-bug')}
-          className="text-xs px-3 py-1.5 rounded border border-slate-300 text-slate-600 hover:text-slate-900 hover:border-slate-400 transition-colors"
+          className="text-xs px-3 py-1.5 rounded border border-border text-muted-foreground hover:text-foreground hover:border-accent/50 transition-colors"
           title="Send a bug report with diagnostics attached"
         >
           Report Bug

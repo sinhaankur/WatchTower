@@ -103,7 +103,7 @@ function StatusDot({ running }: { running: boolean }) {
 function NoticeBanner({ notice }: { notice: Notice }) {
   const styles = {
     success: 'border-emerald-200 bg-emerald-50 text-emerald-700',
-    error:   'border-red-200 bg-red-50 text-red-700',
+    error:   'border-destructive/30 bg-destructive/10 text-destructive',
     info:    'border-border bg-muted text-foreground',
   };
   return (
@@ -340,7 +340,7 @@ const Dashboard = () => {
               serverStatus === 'online'
                 ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                 : serverStatus === 'offline'
-                  ? 'bg-red-50 text-red-700 border-red-200'
+                  ? 'bg-destructive/10 text-destructive border-destructive/30'
                   : 'bg-muted text-muted-foreground border-border'
             }`}
           >
@@ -481,7 +481,7 @@ const Dashboard = () => {
               disabled={runtimeAction !== null}
               className={`w-full flex items-center gap-3 p-3 rounded-lg border transition-colors disabled:opacity-50 text-left ${
                 bgRunning
-                  ? 'border-red-300 bg-red-50 hover:bg-red-100 text-red-700'
+                  ? 'border-destructive/40 bg-destructive/10 hover:bg-red-100 text-destructive'
                   : 'border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-700'
               }`}
             >
@@ -636,13 +636,13 @@ const Dashboard = () => {
                         <div className="flex items-center gap-1">
                           <span className="text-xs text-muted-foreground">Delete?</span>
                           <button onClick={() => void deleteProject(project.id)}
-                            className="px-2 py-1 text-xs rounded border border-red-300 text-red-600 hover:bg-red-50 transition-colors">Yes</button>
+                            className="px-2 py-1 text-xs rounded border border-destructive/40 text-destructive hover:bg-destructive/10 transition-colors">Yes</button>
                           <button onClick={() => setConfirmDelete(null)}
                             className="px-2 py-1 text-xs rounded border border-border text-muted-foreground hover:bg-muted transition-colors">No</button>
                         </div>
                       ) : (
                         <button onClick={() => setConfirmDelete(project.id)}
-                          className="px-2 py-1 text-xs rounded border border-border text-muted-foreground hover:border-red-300 hover:text-red-600 transition-colors">
+                          className="px-2 py-1 text-xs rounded border border-border text-muted-foreground hover:border-destructive/40 hover:text-destructive transition-colors">
                           Delete
                         </button>
                       )}

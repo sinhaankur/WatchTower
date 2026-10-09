@@ -52,7 +52,7 @@ export default function GuidedSshSetup({ onUseKey }: { onUseKey: (path: string) 
         <div className="px-3 pb-3 space-y-3">
           {isLoading && <p className="text-[11px] text-muted-foreground">Preparing key…</p>}
           {error && (
-            <p className="text-[11px] text-red-600">
+            <p className="text-[11px] text-destructive">
               Could not prepare an SSH key (is ssh-keygen available on the host?).
             </p>
           )}

@@ -105,19 +105,19 @@ function PlatformNotApplicable({
 }) {
   const platformLabel = status.platform === 'mac' ? 'macOS' : status.platform === 'windows' ? 'Windows' : status.platform;
   return (
-    <div className="rounded-xl border border-slate-200 bg-slate-50/40 p-5">
+    <div className="rounded-xl border border-border bg-muted/40 p-5">
       <div className="flex items-start gap-3">
-        <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0 border bg-white border-slate-200 opacity-60">
+        <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0 border bg-card border-border opacity-60">
           {icon}
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 flex-wrap">
-            <h3 className="text-sm font-semibold text-slate-700">{title}</h3>
-            <span className="text-[10px] px-1.5 py-0.5 rounded-full border bg-slate-100 border-slate-300 text-slate-600">
+            <h3 className="text-sm font-semibold text-foreground/90">{title}</h3>
+            <span className="text-[10px] px-1.5 py-0.5 rounded-full border bg-muted border-border text-muted-foreground">
               Not applicable on {platformLabel}
             </span>
           </div>
-          <p className="text-xs text-slate-600 mt-1">{status.message}</p>
+          <p className="text-xs text-muted-foreground mt-1">{status.message}</p>
         </div>
       </div>
     </div>
@@ -155,7 +155,7 @@ function Badge({ ok, label }: { ok: boolean; label?: string }) {
   const text = label ?? (ok ? 'Connected' : 'Not detected');
   const cls = ok
     ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-    : 'bg-slate-100 text-slate-500 border-slate-200';
+    : 'bg-muted text-muted-foreground border-border';
   return (
     <span className={`text-[11px] px-2 py-0.5 rounded-full border font-medium ${cls}`}>
       {text}
@@ -292,7 +292,7 @@ function ServiceControls({ service, running, enabled, supportedActions, onDone }
           <button
             onClick={() => void doAction('restart')}
             disabled={busy !== null}
-            className="px-3 py-1 text-xs font-medium rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-100 disabled:opacity-50 transition-colors"
+            className="px-3 py-1 text-xs font-medium rounded-lg border border-border text-foreground/90 hover:bg-muted disabled:opacity-50 transition-colors"
           >
             {busy === 'restart' ? '…' : '↺ Restart'}
           </button>
@@ -320,13 +320,13 @@ function ServiceControls({ service, running, enabled, supportedActions, onDone }
         )}
       </div>
       {msg && (
-        <p className={`text-xs font-medium ${msg.kind === 'ok' ? 'text-emerald-700' : 'text-red-600'}`}>
+        <p className={`text-xs font-medium ${msg.kind === 'ok' ? 'text-emerald-700' : 'text-destructive'}`}>
           {msg.kind === 'ok' ? '✓' : '✗'} {msg.text}
         </p>
       )}
       {errorDetail?.command && errorDetail.needs_terminal && (
         <div className="mt-1 rounded-lg bg-slate-900 px-3 py-2 text-[11px] font-mono text-slate-200 flex items-center gap-2 overflow-hidden">
-          <span className="text-slate-500 shrink-0">$</span>
+          <span className="text-muted-foreground shrink-0">$</span>
           <span className="truncate flex-1" title={errorDetail.command}>{errorDetail.command}</span>
           <button
             onClick={() => void copyCommand()}
@@ -373,36 +373,36 @@ function IntegrationCard({
     <div className={`p-4 rounded-xl border transition-all ${
       connected
         ? 'border-emerald-200 bg-emerald-50/30 hover:border-emerald-300'
-        : 'border-border bg-card hover:border-red-300 hover:bg-red-50/20'
+        : 'border-border bg-card hover:border-destructive/40 hover:bg-destructive/10/20'
     }`}>
       <div className="flex items-start gap-3">
         <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0 border ${
-          connected ? 'bg-emerald-50 border-emerald-200' : 'bg-slate-50 border-border'
+          connected ? 'bg-emerald-50 border-emerald-200' : 'bg-muted border-border'
         }`}>
           {icon}
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <Dot ok={connected} />
-            <p className="text-sm font-semibold text-slate-900">{name}</p>
+            <p className="text-sm font-semibold text-foreground">{name}</p>
             <Badge ok={connected} label={badgeLabel} />
-            <span className="text-[10px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded border border-border">
+            <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded border border-border">
               {category}
             </span>
           </div>
-          <p className="text-xs text-slate-600 mt-1">{description}</p>
+          <p className="text-xs text-muted-foreground mt-1">{description}</p>
           {version && (
-            <p className="text-[11px] text-slate-500 mt-0.5 font-mono">{version}</p>
+            <p className="text-[11px] text-muted-foreground mt-0.5 font-mono">{version}</p>
           )}
           {detail && (
-            <p className="text-[11px] text-slate-600 mt-0.5">{detail}</p>
+            <p className="text-[11px] text-muted-foreground mt-0.5">{detail}</p>
           )}
           {extra}
           {!connected && installCmds && installCmds.length > 0 && (
             <div className="mt-2">
               <button
                 onClick={() => setShowInstall((v) => !v)}
-                className="text-xs text-red-700 hover:text-red-800 font-medium transition-colors"
+                className="text-xs text-destructive hover:text-destructive font-medium transition-colors"
               >
                 {showInstall ? '▲ Hide install steps' : '▼ Show install steps'}
               </button>
@@ -484,9 +484,9 @@ function WatchdogCard({ podmanInstalled }: { podmanInstalled: boolean }) {
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 flex-wrap">
               <Dot ok={enabled && active} />
-              <p className="text-sm font-semibold text-slate-900">Podman Auto-Restart Watchdog</p>
+              <p className="text-sm font-semibold text-foreground">Podman Auto-Restart Watchdog</p>
               {loading ? (
-                <span className="text-[11px] text-slate-400">checking…</span>
+                <span className="text-[11px] text-muted-foreground">checking…</span>
               ) : (
                 <Badge
                   ok={enabled}
@@ -494,21 +494,21 @@ function WatchdogCard({ podmanInstalled }: { podmanInstalled: boolean }) {
                 />
               )}
             </div>
-            <p className="text-xs text-slate-600 mt-1">
+            <p className="text-xs text-muted-foreground mt-1">
               Automatically restarts Podman containers on PC reboot or crash.
-              Containers must be started with <code className="font-mono bg-slate-100 px-1 rounded">--restart=always</code>.
+              Containers must be started with <code className="font-mono bg-muted px-1 rounded">--restart=always</code>.
             </p>
-            <p className="text-xs text-slate-500 mt-1">
+            <p className="text-xs text-muted-foreground mt-1">
               Service: <code className="font-mono">{watchdog?.service ?? 'podman-restart.service'}</code>
               {watchdog && (
-                <span className="ml-2 text-slate-400">— {watchdog.state}</span>
+                <span className="ml-2 text-muted-foreground">— {watchdog.state}</span>
               )}
             </p>
             {!podmanInstalled && (
               <p className="text-xs text-amber-700 mt-1">⚠ Podman not detected. Install Podman first.</p>
             )}
             {msg && (
-              <p className={`text-xs mt-2 font-medium ${msg.kind === 'ok' ? 'text-emerald-700' : 'text-red-600'}`}>
+              <p className={`text-xs mt-2 font-medium ${msg.kind === 'ok' ? 'text-emerald-700' : 'text-destructive'}`}>
                 {msg.text}
               </p>
             )}
@@ -519,13 +519,13 @@ function WatchdogCard({ podmanInstalled }: { podmanInstalled: boolean }) {
             onClick={() => void toggle()}
             disabled={toggling || loading || !podmanInstalled}
             className={`relative inline-flex items-center h-6 w-11 rounded-full border-2 transition-colors duration-200 focus:outline-none disabled:opacity-40 ${
-              enabled ? 'bg-emerald-500 border-emerald-600' : 'bg-slate-200 border-slate-300'
+              enabled ? 'bg-emerald-500 border-emerald-600' : 'bg-slate-200 border-border'
             }`}
             title={enabled ? 'Disable watchdog' : 'Enable watchdog'}
             aria-label={enabled ? 'Disable Podman watchdog' : 'Enable Podman watchdog'}
           >
             <span
-              className={`inline-block w-4 h-4 bg-white rounded-full shadow-sm transform transition-transform duration-200 ${
+              className={`inline-block w-4 h-4 bg-card rounded-full shadow-sm transform transition-transform duration-200 ${
                 enabled ? 'translate-x-5' : 'translate-x-0.5'
               }`}
             />
@@ -538,8 +538,8 @@ function WatchdogCard({ podmanInstalled }: { podmanInstalled: boolean }) {
           <p className="text-xs text-emerald-700 font-medium">
             ✓ Watchdog is active — Podman will auto-restart your containers after any reboot or crash.
           </p>
-          <p className="text-[11px] text-slate-500 mt-1">
-            To restart all containers now: <code className="font-mono bg-slate-100 px-1 rounded">sudo systemctl start podman-restart.service</code>
+          <p className="text-[11px] text-muted-foreground mt-1">
+            To restart all containers now: <code className="font-mono bg-muted px-1 rounded">sudo systemctl start podman-restart.service</code>
           </p>
         </div>
       )}
@@ -608,28 +608,28 @@ function WatchTowerServiceCard() {
 
   return (
     <div className={`rounded-xl border p-5 transition-all ${
-      enabled ? 'border-emerald-300 bg-emerald-50/40' : 'border-slate-200 bg-white'
+      enabled ? 'border-emerald-300 bg-emerald-50/40' : 'border-border bg-card'
     }`}>
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-start gap-3 min-w-0 flex-1">
           <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0 border ${
-            enabled ? 'bg-emerald-50 border-emerald-200' : 'bg-slate-50 border-slate-200'
+            enabled ? 'bg-emerald-50 border-emerald-200' : 'bg-muted border-border'
           }`}>🛡️</div>
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <h3 className="text-sm font-semibold text-slate-900">Auto-Update Daemon</h3>
+              <h3 className="text-sm font-semibold text-foreground">Auto-Update Daemon</h3>
               <span className={`text-[10px] px-1.5 py-0.5 rounded-full border ${
                 enabled
                   ? 'bg-emerald-50 border-emerald-300 text-emerald-700'
                   : installed
-                    ? 'bg-slate-50 border-slate-300 text-slate-600'
+                    ? 'bg-muted border-border text-muted-foreground'
                     : 'bg-amber-50 border-amber-300 text-amber-800'
               }`}>
                 {enabled ? 'Enabled on boot' : installed ? 'Disabled' : 'Not installed'}
               </span>
             </div>
-            <p className="text-xs text-slate-600 mt-0.5">
-              The <code className="font-mono bg-slate-100 px-1 rounded">watchtower.service</code> systemd unit polls running containers, pulls newer images, and restarts safely. Without it, container updates require manual <code className="font-mono bg-slate-100 px-1 rounded">watchtower update-now</code>.
+            <p className="text-xs text-muted-foreground mt-0.5">
+              The <code className="font-mono bg-muted px-1 rounded">watchtower.service</code> systemd unit polls running containers, pulls newer images, and restarts safely. Without it, container updates require manual <code className="font-mono bg-muted px-1 rounded">watchtower update-now</code>.
             </p>
           </div>
         </div>
@@ -639,7 +639,7 @@ function WatchTowerServiceCard() {
             disabled={toggling}
             className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors shrink-0 ${
               enabled
-                ? 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+                ? 'bg-card text-foreground/90 border-border hover:bg-muted'
                 : 'bg-emerald-700 text-white border-emerald-800 hover:bg-emerald-800'
             } disabled:opacity-50`}
           >
@@ -650,12 +650,12 @@ function WatchTowerServiceCard() {
 
       {!installed && (
         <div className="mt-3 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-900">
-          The systemd unit isn't installed. Run <code className="font-mono bg-white border border-amber-200 px-1 rounded">scripts/install-watchtower-linux-full.sh</code> once from the source tree to install <code className="font-mono">watchtower.service</code>, then come back here to enable it.
+          The systemd unit isn't installed. Run <code className="font-mono bg-card border border-amber-200 px-1 rounded">scripts/install-watchtower-linux-full.sh</code> once from the source tree to install <code className="font-mono">watchtower.service</code>, then come back here to enable it.
         </div>
       )}
 
       {msg && (
-        <p className={`mt-3 text-xs ${msg.kind === 'ok' ? 'text-emerald-700' : 'text-red-700'}`}>
+        <p className={`mt-3 text-xs ${msg.kind === 'ok' ? 'text-emerald-700' : 'text-destructive'}`}>
           {msg.text}
         </p>
       )}
@@ -723,12 +723,12 @@ function WatchtowerConfigCard() {
   };
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-5">
+    <div className="rounded-xl border border-border bg-card p-5">
       <div className="flex items-start justify-between gap-4 mb-4">
         <div className="min-w-0">
-          <h3 className="text-sm font-semibold text-slate-900">Auto-Update Settings</h3>
-          <p className="text-xs text-slate-600 mt-0.5">
-            Edit <code className="font-mono bg-slate-100 px-1 rounded text-[11px]">{cfg.path}</code>.
+          <h3 className="text-sm font-semibold text-foreground">Auto-Update Settings</h3>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Edit <code className="font-mono bg-muted px-1 rounded text-[11px]">{cfg.path}</code>.
             Changes apply immediately if the service is running.
           </p>
         </div>
@@ -737,7 +737,7 @@ function WatchtowerConfigCard() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Poll interval */}
         <div>
-          <label className="text-xs font-medium text-slate-700 block mb-1">
+          <label className="text-xs font-medium text-foreground/90 block mb-1">
             Poll interval (seconds)
           </label>
           <input
@@ -746,16 +746,16 @@ function WatchtowerConfigCard() {
             max={86400}
             value={draft.interval}
             onChange={(e) => setDraft({ ...draft, interval: Number(e.target.value) })}
-            className="w-full text-sm rounded-md border border-slate-300 bg-white px-2 py-1.5"
+            className="w-full text-sm rounded-md border border-border bg-card px-2 py-1.5"
           />
-          <p className="text-[11px] text-slate-500 mt-1">
+          <p className="text-[11px] text-muted-foreground mt-1">
             Default 300 (5 min). Lower = faster updates + more API load.
           </p>
         </div>
 
         {/* Toggles */}
         <div className="space-y-2">
-          <label className="flex items-start gap-2 text-xs text-slate-700 cursor-pointer">
+          <label className="flex items-start gap-2 text-xs text-foreground/90 cursor-pointer">
             <input
               type="checkbox"
               checked={draft.monitor_only}
@@ -764,10 +764,10 @@ function WatchtowerConfigCard() {
             />
             <span>
               <span className="font-medium">Monitor-only</span>
-              <span className="block text-[11px] text-slate-500">Check for updates but don't apply them. Useful for testing.</span>
+              <span className="block text-[11px] text-muted-foreground">Check for updates but don't apply them. Useful for testing.</span>
             </span>
           </label>
-          <label className="flex items-start gap-2 text-xs text-slate-700 cursor-pointer">
+          <label className="flex items-start gap-2 text-xs text-foreground/90 cursor-pointer">
             <input
               type="checkbox"
               checked={draft.cleanup}
@@ -776,7 +776,7 @@ function WatchtowerConfigCard() {
             />
             <span>
               <span className="font-medium">Clean up old images</span>
-              <span className="block text-[11px] text-slate-500">After a successful update, remove the previous image.</span>
+              <span className="block text-[11px] text-muted-foreground">After a successful update, remove the previous image.</span>
             </span>
           </label>
         </div>
@@ -784,30 +784,30 @@ function WatchtowerConfigCard() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
         <div>
-          <label className="text-xs font-medium text-slate-700 block mb-1">Include (one pattern per line)</label>
+          <label className="text-xs font-medium text-foreground/90 block mb-1">Include (one pattern per line)</label>
           <textarea
             rows={3}
             value={includeText}
             onChange={(e) => setIncludeText(e.target.value)}
             placeholder="(empty = all containers)&#10;web-*&#10;api-prod"
-            className="w-full text-xs font-mono rounded-md border border-slate-300 bg-white px-2 py-1.5"
+            className="w-full text-xs font-mono rounded-md border border-border bg-card px-2 py-1.5"
           />
         </div>
         <div>
-          <label className="text-xs font-medium text-slate-700 block mb-1">Exclude (one pattern per line)</label>
+          <label className="text-xs font-medium text-foreground/90 block mb-1">Exclude (one pattern per line)</label>
           <textarea
             rows={3}
             value={excludeText}
             onChange={(e) => setExcludeText(e.target.value)}
             placeholder="postgres-*&#10;redis-prod"
-            className="w-full text-xs font-mono rounded-md border border-slate-300 bg-white px-2 py-1.5"
+            className="w-full text-xs font-mono rounded-md border border-border bg-card px-2 py-1.5"
           />
         </div>
       </div>
 
       <div className="flex items-center justify-end gap-3 mt-4">
         {msg && (
-          <p className={`text-xs ${msg.kind === 'ok' ? 'text-emerald-700' : 'text-red-700'}`}>
+          <p className={`text-xs ${msg.kind === 'ok' ? 'text-emerald-700' : 'text-destructive'}`}>
             {msg.text}
           </p>
         )}
@@ -900,11 +900,11 @@ function CloudflareSection() {
   };
 
   return (
-    <section className="rounded-xl border border-slate-200 bg-white">
+    <section className="rounded-xl border border-border bg-card">
       <header className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
         <div>
-          <h2 className="text-sm font-semibold text-slate-900">Cloudflare</h2>
-          <p className="text-xs text-slate-600 mt-0.5">
+          <h2 className="text-sm font-semibold text-foreground">Cloudflare</h2>
+          <p className="text-xs text-muted-foreground mt-0.5">
             Connect a Cloudflare API token to manage DNS, deploy to Pages/Workers, or set up failover (HA) across nodes. Phase 1: token storage.
           </p>
         </div>
@@ -921,24 +921,24 @@ function CloudflareSection() {
 
       <div className="p-5 space-y-4">
         {error && (
-          <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+          <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
             {error}
           </div>
         )}
 
         {showForm && (
-          <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 space-y-3">
+          <div className="rounded-lg border border-border bg-muted p-4 space-y-3">
             <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">API token</label>
+              <label className="block text-xs font-medium text-foreground/90 mb-1">API token</label>
               <input
                 type="password"
                 value={token}
                 onChange={(e) => setToken(e.target.value)}
                 placeholder="cf_…"
                 autoComplete="off"
-                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:border-orange-600 focus:ring-1 focus:ring-orange-600 outline-none"
+                className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm focus:border-orange-600 focus:ring-1 focus:ring-orange-600 outline-none"
               />
-              <p className="text-[11px] text-slate-500 mt-1">
+              <p className="text-[11px] text-muted-foreground mt-1">
                 Create one at{' '}
                 <a
                   href="https://dash.cloudflare.com/profile/api-tokens"
@@ -952,21 +952,21 @@ function CloudflareSection() {
               </p>
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">Label (optional)</label>
+              <label className="block text-xs font-medium text-foreground/90 mb-1">Label (optional)</label>
               <input
                 type="text"
                 value={label}
                 onChange={(e) => setLabel(e.target.value)}
                 placeholder="Personal CF"
                 maxLength={80}
-                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:border-orange-600 focus:ring-1 focus:ring-orange-600 outline-none"
+                className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm focus:border-orange-600 focus:ring-1 focus:ring-orange-600 outline-none"
               />
             </div>
             <div className="flex gap-2 justify-end">
               <button
                 type="button"
                 onClick={() => { setShowForm(false); setToken(''); setLabel(''); setError(''); }}
-                className="px-3 py-1.5 rounded-md border border-slate-300 text-xs text-slate-700 hover:bg-slate-100"
+                className="px-3 py-1.5 rounded-md border border-border text-xs text-foreground/90 hover:bg-muted"
               >
                 Cancel
               </button>
@@ -988,14 +988,14 @@ function CloudflareSection() {
             <Skeleton.Line className="h-3.5 w-1/3" />
           </div>
         ) : creds && creds.length > 0 ? (
-          <ul className="divide-y divide-slate-100 border border-slate-200 rounded-lg overflow-hidden">
+          <ul className="divide-y divide-slate-100 border border-border rounded-lg overflow-hidden">
             {creds.map((c) => (
               <li key={c.id} className="px-4 py-3 flex items-center justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="text-sm font-medium text-slate-900 truncate">
+                  <p className="text-sm font-medium text-foreground truncate">
                     {c.label || c.account_name || 'Cloudflare'}
                   </p>
-                  <p className="text-[11px] text-slate-500 truncate">
+                  <p className="text-[11px] text-muted-foreground truncate">
                     {c.account_name && <>{c.account_name} · </>}
                     {c.account_id ? <>account <code className="font-mono">{c.account_id.slice(0, 8)}…</code></> : 'no account scope'}
                     {c.last_verified_at && <> · verified {new Date(c.last_verified_at).toLocaleString()}</>}
@@ -1005,14 +1005,14 @@ function CloudflareSection() {
                   <button
                     type="button"
                     onClick={() => void reverify(c.id)}
-                    className="text-[11px] text-slate-600 hover:text-slate-900 underline underline-offset-2"
+                    className="text-[11px] text-muted-foreground hover:text-foreground underline underline-offset-2"
                   >
                     Re-verify
                   </button>
                   <button
                     type="button"
                     onClick={() => void remove(c.id)}
-                    className="text-[11px] text-red-600 hover:text-red-800 underline underline-offset-2"
+                    className="text-[11px] text-destructive hover:text-destructive underline underline-offset-2"
                   >
                     Remove
                   </button>
@@ -1021,7 +1021,7 @@ function CloudflareSection() {
             ))}
           </ul>
         ) : !showForm && (
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-muted-foreground">
             No Cloudflare connections yet. Click <strong>Connect Cloudflare</strong> to add an API token.
           </p>
         )}
@@ -1127,11 +1127,11 @@ function CloudProviderSection() {
   const meta = PROVIDER_META[provider];
 
   return (
-    <section className="rounded-xl border border-slate-200 bg-white">
+    <section className="rounded-xl border border-border bg-card">
       <header className="px-5 py-4 border-b border-slate-100 flex items-center justify-between gap-3">
         <div>
-          <h2 className="text-sm font-semibold text-slate-900">Cloud providers</h2>
-          <p className="text-xs text-slate-600 mt-0.5">
+          <h2 className="text-sm font-semibold text-foreground">Cloud providers</h2>
+          <p className="text-xs text-muted-foreground mt-0.5">
             Connect DigitalOcean or Hetzner to auto-provision fresh deploy nodes — WatchTower creates the VM, installs Podman + nginx, and registers it as an OrgNode.
           </p>
         </div>
@@ -1142,7 +1142,7 @@ function CloudProviderSection() {
 
       <div className="p-5 space-y-4">
         {error && (
-          <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+          <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
             {error}
           </div>
         )}
@@ -1158,9 +1158,9 @@ function CloudProviderSection() {
         )}
 
         {showForm && (
-          <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 space-y-3">
+          <div className="rounded-lg border border-border bg-muted p-4 space-y-3">
             <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">Provider</label>
+              <label className="block text-xs font-medium text-foreground/90 mb-1">Provider</label>
               <div className="flex gap-2">
                 {(['digitalocean', 'hetzner'] as const).map((p) => (
                   <button
@@ -1170,7 +1170,7 @@ function CloudProviderSection() {
                     className={`px-3 py-1.5 rounded-md text-xs font-medium border ${
                       provider === p
                         ? 'bg-slate-900 text-white border-slate-900'
-                        : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
+                        : 'bg-card text-foreground/90 border-border hover:bg-muted'
                     }`}
                   >
                     {PROVIDER_META[p].name}
@@ -1179,43 +1179,43 @@ function CloudProviderSection() {
               </div>
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">API token</label>
+              <label className="block text-xs font-medium text-foreground/90 mb-1">API token</label>
               <input
                 type="password"
                 value={token}
                 onChange={(e) => setToken(e.target.value)}
                 placeholder={meta.placeholder}
                 autoComplete="off"
-                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:border-slate-600 focus:ring-1 focus:ring-slate-600 outline-none font-mono"
+                className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm focus:border-slate-600 focus:ring-1 focus:ring-slate-600 outline-none font-mono"
               />
-              <p className="text-[11px] text-slate-500 mt-1">
+              <p className="text-[11px] text-muted-foreground mt-1">
                 {meta.tokenHint}{' '}
                 <a
                   href={meta.docsUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-slate-700 hover:underline"
+                  className="text-foreground/90 hover:underline"
                 >
                   Open console ↗
                 </a>
               </p>
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">Label (optional)</label>
+              <label className="block text-xs font-medium text-foreground/90 mb-1">Label (optional)</label>
               <input
                 type="text"
                 value={label}
                 onChange={(e) => setLabel(e.target.value)}
                 placeholder={provider === 'digitalocean' ? 'Personal DO' : 'Homelab Hetzner project'}
                 maxLength={80}
-                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:border-slate-600 focus:ring-1 focus:ring-slate-600 outline-none"
+                className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm focus:border-slate-600 focus:ring-1 focus:ring-slate-600 outline-none"
               />
             </div>
             <div className="flex gap-2 justify-end">
               <button
                 type="button"
                 onClick={() => { setShowForm(false); setToken(''); setLabel(''); setError(''); }}
-                className="px-3 py-1.5 rounded-md border border-slate-300 text-xs text-slate-700 hover:bg-slate-100"
+                className="px-3 py-1.5 rounded-md border border-border text-xs text-foreground/90 hover:bg-muted"
               >
                 Cancel
               </button>
@@ -1237,15 +1237,15 @@ function CloudProviderSection() {
             <Skeleton.Line className="h-3.5 w-1/3" />
           </div>
         ) : creds && creds.length > 0 ? (
-          <ul className="divide-y divide-slate-100 border border-slate-200 rounded-lg overflow-hidden">
+          <ul className="divide-y divide-slate-100 border border-border rounded-lg overflow-hidden">
             {creds.map((c) => (
               <li key={c.id} className="px-4 py-3 flex items-center justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="text-sm font-medium text-slate-900 truncate">
+                  <p className="text-sm font-medium text-foreground truncate">
                     {c.label || PROVIDER_META[c.provider].name}
                   </p>
-                  <p className="text-[11px] text-slate-500 truncate">
-                    <span className="inline-block bg-slate-100 rounded px-1.5 py-0.5 mr-1 font-mono text-[10px]">
+                  <p className="text-[11px] text-muted-foreground truncate">
+                    <span className="inline-block bg-muted rounded px-1.5 py-0.5 mr-1 font-mono text-[10px]">
                       {PROVIDER_META[c.provider].name}
                     </span>
                     {c.account_email && <>{c.account_email} · </>}
@@ -1258,14 +1258,14 @@ function CloudProviderSection() {
                   <button
                     type="button"
                     onClick={() => void reverify(c.id)}
-                    className="text-[11px] text-slate-600 hover:text-slate-900 underline underline-offset-2"
+                    className="text-[11px] text-muted-foreground hover:text-foreground underline underline-offset-2"
                   >
                     Re-verify
                   </button>
                   <button
                     type="button"
                     onClick={() => void remove(c.id)}
-                    className="text-[11px] text-red-600 hover:text-red-700 underline underline-offset-2"
+                    className="text-[11px] text-destructive hover:text-destructive underline underline-offset-2"
                   >
                     Remove
                   </button>
@@ -1274,7 +1274,7 @@ function CloudProviderSection() {
             ))}
           </ul>
         ) : (
-          <p className="text-xs text-slate-500">No cloud providers connected yet.</p>
+          <p className="text-xs text-muted-foreground">No cloud providers connected yet.</p>
         )}
       </div>
     </section>
@@ -1339,8 +1339,8 @@ function McpSection() {
     <section className="rounded-xl border border-border bg-card overflow-hidden">
       <header className="px-5 py-4 border-b border-border bg-muted/30 flex items-center justify-between gap-4">
         <div>
-          <h2 className="text-sm font-semibold text-slate-900">Connect Claude Desktop / Cursor</h2>
-          <p className="text-xs text-slate-600 mt-0.5">
+          <h2 className="text-sm font-semibold text-foreground">Connect Claude Desktop / Cursor</h2>
+          <p className="text-xs text-muted-foreground mt-0.5">
             Drive WatchTower from your AI chat client via the Model Context Protocol — list projects, trigger deploys, manage domains, sync DNS, without opening this dashboard.
           </p>
         </div>
@@ -1350,13 +1350,13 @@ function McpSection() {
       </header>
 
       <div className="px-5 py-4 flex flex-col gap-4 text-sm">
-        <ol className="text-xs text-slate-700 space-y-1 list-decimal list-inside">
+        <ol className="text-xs text-foreground/90 space-y-1 list-decimal list-inside">
           <li>
-            Install the MCP extra: <code className="bg-slate-100 rounded px-1.5 py-0.5 font-mono text-[11px]">pip install watchtower-podman[mcp]</code>
+            Install the MCP extra: <code className="bg-muted rounded px-1.5 py-0.5 font-mono text-[11px]">pip install watchtower-podman[mcp]</code>
           </li>
           <li>
             Paste the JSON below into your client's MCP config file:
-            <ul className="list-disc list-inside ml-4 mt-1 text-slate-600">
+            <ul className="list-disc list-inside ml-4 mt-1 text-muted-foreground">
               <li><span className="font-mono text-[11px]">~/Library/Application Support/Claude/claude_desktop_config.json</span> (macOS)</li>
               <li><span className="font-mono text-[11px]">%APPDATA%\Claude\claude_desktop_config.json</span> (Windows)</li>
               <li>Cursor: Settings → MCP servers</li>
@@ -1385,7 +1385,7 @@ function McpSection() {
             />
             Inline my real token
             {!storedToken && (
-              <span className="text-slate-500">(no session token found — sign in first)</span>
+              <span className="text-muted-foreground">(no session token found — sign in first)</span>
             )}
           </label>
         </div>
@@ -1396,12 +1396,12 @@ function McpSection() {
             readOnly
             value={configJson}
             rows={Math.min(14, configJson.split('\n').length)}
-            className="w-full font-mono text-[11px] leading-snug bg-slate-50 border border-border rounded-md px-3 py-2 resize-none focus:outline-none focus:ring-1 focus:ring-blue-500"
+            className="w-full font-mono text-[11px] leading-snug bg-muted border border-border rounded-md px-3 py-2 resize-none focus:outline-none focus:ring-1 focus:ring-blue-500"
             onClick={(e) => (e.target as HTMLTextAreaElement).select()}
           />
           <button
             onClick={copy}
-            className="absolute top-2 right-2 text-xs px-2.5 py-1 rounded border border-border bg-white hover:bg-slate-50 transition-colors"
+            className="absolute top-2 right-2 text-xs px-2.5 py-1 rounded border border-border bg-card hover:bg-muted transition-colors"
           >
             {copied ? '✓ Copied' : 'Copy'}
           </button>
@@ -1465,14 +1465,14 @@ const Integrations = () => {
   ].filter(Boolean).length;
 
   return (
-    <div className="flex-1 overflow-auto bg-slate-50">
+    <div className="flex-1 overflow-auto bg-muted">
       <header
         className="px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between border-b sticky top-0 z-10 backdrop-blur-sm"
         style={{ borderColor: 'hsl(var(--border-soft))', background: 'hsl(var(--surface-soft) / 0.9)' }}
       >
         <div>
-          <h1 className="text-lg font-semibold text-slate-900">Integrations</h1>
-          <p className="text-xs text-slate-600 mt-0.5">
+          <h1 className="text-lg font-semibold text-foreground">Integrations</h1>
+          <p className="text-xs text-muted-foreground mt-0.5">
             {loading
               ? 'Checking connections…'
               : `${connectedCount} of 6 connected`}
@@ -1481,7 +1481,7 @@ const Integrations = () => {
         <button
           onClick={() => void load()}
           disabled={loading}
-          className="px-3 py-1.5 rounded-lg border border-border text-xs text-slate-700 hover:bg-slate-100 transition-colors disabled:opacity-50"
+          className="px-3 py-1.5 rounded-lg border border-border text-xs text-foreground/90 hover:bg-muted transition-colors disabled:opacity-50"
         >
           {loading ? '…' : '↻ Refresh'}
         </button>
@@ -1510,7 +1510,7 @@ const Integrations = () => {
                 className={`flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border font-medium ${
                   ok
                     ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                    : 'bg-slate-100 text-slate-500 border-slate-200'
+                    : 'bg-muted text-muted-foreground border-border'
                 }`}
               >
                 <span className={`w-1.5 h-1.5 rounded-full ${ok ? 'bg-emerald-500' : 'bg-slate-400'}`} />
@@ -1522,7 +1522,7 @@ const Integrations = () => {
 
         {/* Watchdogs + auto-update — the autonomy story */}
         <section>
-          <h2 className="text-sm font-semibold text-slate-900 mb-3">Autonomous Operation</h2>
+          <h2 className="text-sm font-semibold text-foreground mb-3">Autonomous Operation</h2>
           <div className="space-y-3">
             <WatchdogCard podmanInstalled={podman?.installed ?? false} />
             <WatchTowerServiceCard />
@@ -1532,7 +1532,7 @@ const Integrations = () => {
 
         {/* Integration cards */}
         <section>
-          <h2 className="text-sm font-semibold text-slate-900 mb-3">Container Runtimes</h2>
+          <h2 className="text-sm font-semibold text-foreground mb-3">Container Runtimes</h2>
           <div className="space-y-3">
             <IntegrationCard
               icon="🦭"
@@ -1602,7 +1602,7 @@ const Integrations = () => {
         </section>
 
         <section>
-          <h2 className="text-sm font-semibold text-slate-900 mb-3">Networking & Proxy</h2>
+          <h2 className="text-sm font-semibold text-foreground mb-3">Networking & Proxy</h2>
           <div className="space-y-3">
             <IntegrationCard
               icon="🌐"
@@ -1695,7 +1695,7 @@ const Integrations = () => {
         </section>
 
         <section>
-          <h2 className="text-sm font-semibold text-slate-900 mb-3">Platform</h2>
+          <h2 className="text-sm font-semibold text-foreground mb-3">Platform</h2>
           <div className="space-y-3">
             <IntegrationCard
               icon="❄️"
@@ -1739,7 +1739,7 @@ const Integrations = () => {
 
         {/* How they work together */}
         <section className="rounded-xl border border-blue-200 bg-blue-50 p-5">
-          <h2 className="text-sm font-semibold text-slate-900 mb-2">How these work together</h2>
+          <h2 className="text-sm font-semibold text-foreground mb-2">How these work together</h2>
           <div className="space-y-2">
             {[
               {
@@ -1763,7 +1763,7 @@ const Integrations = () => {
                 text: 'Coolify provides a PaaS-style UI on top — WatchTower handles the automation and monitoring layer.',
               },
             ].map(({ icon, text }) => (
-              <div key={icon} className="flex items-start gap-3 text-xs text-slate-700">
+              <div key={icon} className="flex items-start gap-3 text-xs text-foreground/90">
                 <span className="w-5 h-5 rounded-full bg-blue-600 text-white text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">
                   {icon}
                 </span>

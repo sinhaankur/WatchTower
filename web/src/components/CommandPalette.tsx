@@ -163,11 +163,11 @@ export function CommandPalette() {
       aria-label="Command palette"
     >
       <div
-        className="w-full max-w-xl mx-4 rounded-xl bg-white border border-slate-200 shadow-2xl overflow-hidden anim-pop-in"
+        className="w-full max-w-xl mx-4 rounded-xl bg-card border border-border shadow-2xl overflow-hidden anim-pop-in"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center px-4 py-3 border-b border-slate-100">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-slate-400 mr-3">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-muted-foreground mr-3">
             <circle cx="11" cy="11" r="8" />
             <line x1="21" y1="21" x2="16.65" y2="16.65" />
           </svg>
@@ -177,13 +177,13 @@ export function CommandPalette() {
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={onInputKey}
             placeholder="Jump to a page or project…"
-            className="flex-1 text-sm text-slate-900 placeholder:text-slate-400 outline-none bg-transparent"
+            className="flex-1 text-sm text-foreground placeholder:text-muted-foreground outline-none bg-transparent"
           />
-          <kbd className="text-[10px] font-mono text-slate-400 border border-slate-200 px-1.5 py-0.5 rounded">Esc</kbd>
+          <kbd className="text-[10px] font-mono text-muted-foreground border border-border px-1.5 py-0.5 rounded">Esc</kbd>
         </div>
         <div className="max-h-80 overflow-y-auto py-1">
           {filtered.length === 0 && (
-            <div className="px-4 py-6 text-center text-xs text-slate-500">
+            <div className="px-4 py-6 text-center text-xs text-muted-foreground">
               No matches for "{query}"
             </div>
           )}
@@ -191,7 +191,7 @@ export function CommandPalette() {
             if (groupItems.length === 0) return null;
             return (
               <div key={group} className="py-1">
-                <div className="px-4 pt-1 pb-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-400">
+                <div className="px-4 pt-1 pb-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
                   {group}
                 </div>
                 {groupItems.map((it) => {
@@ -203,12 +203,12 @@ export function CommandPalette() {
                       onClick={() => select(it)}
                       onMouseEnter={() => setActiveIdx(idx)}
                       className={`w-full flex items-center justify-between px-4 py-2 text-sm text-left transition-colors ${
-                        active ? 'bg-slate-900 text-white' : 'text-slate-700 hover:bg-slate-50'
+                        active ? 'bg-slate-900 text-white' : 'text-foreground/90 hover:bg-muted'
                       }`}
                     >
                       <span className="truncate">{it.label}</span>
                       {it.hint && (
-                        <span className={`text-[11px] ml-3 truncate ${active ? 'text-slate-300' : 'text-slate-400'}`}>
+                        <span className={`text-[11px] ml-3 truncate ${active ? 'text-slate-300' : 'text-muted-foreground'}`}>
                           {it.hint}
                         </span>
                       )}
@@ -219,11 +219,11 @@ export function CommandPalette() {
             );
           })}
         </div>
-        <div className="flex items-center justify-between px-4 py-2 border-t border-slate-100 text-[10px] text-slate-500">
+        <div className="flex items-center justify-between px-4 py-2 border-t border-slate-100 text-[10px] text-muted-foreground">
           <div className="flex items-center gap-3">
-            <span><kbd className="font-mono border border-slate-200 px-1 rounded">↑↓</kbd> navigate</span>
-            <span><kbd className="font-mono border border-slate-200 px-1 rounded">↵</kbd> jump</span>
-            <span><kbd className="font-mono border border-slate-200 px-1 rounded">Esc</kbd> close</span>
+            <span><kbd className="font-mono border border-border px-1 rounded">↑↓</kbd> navigate</span>
+            <span><kbd className="font-mono border border-border px-1 rounded">↵</kbd> jump</span>
+            <span><kbd className="font-mono border border-border px-1 rounded">Esc</kbd> close</span>
           </div>
           <span>{filtered.length} result{filtered.length === 1 ? '' : 's'}</span>
         </div>

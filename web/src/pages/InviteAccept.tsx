@@ -64,7 +64,7 @@ const InviteAccept = () => {
                                : errorMessage || 'Something went wrong. Try the link again, or ask the inviter to resend it.';
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50 p-6">
+    <div className="min-h-screen flex items-center justify-center bg-muted p-6">
       <Card className="max-w-md w-full">
         <CardHeader>
           <CardTitle>{title}</CardTitle>

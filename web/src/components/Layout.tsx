@@ -104,7 +104,7 @@ function UpdateBanner() {
           href={data.release_url}
           target="_blank"
           rel="noopener noreferrer"
-          className="px-2 py-0.5 rounded border border-amber-700 bg-white text-amber-800 hover:bg-amber-100 font-medium"
+          className="px-2 py-0.5 rounded border border-amber-700 bg-card text-amber-800 hover:bg-amber-100 font-medium"
         >
           Release notes
         </a>
@@ -635,9 +635,9 @@ export default function Layout({ children }: { children: ReactNode }) {
               <span
                 className={`px-1 py-px rounded text-[9px] font-semibold uppercase tracking-wider ${
                   envInfo.insecure_dev_auth
-                    ? 'bg-red-100 text-red-700 border border-red-300'
+                    ? 'bg-red-100 text-destructive border border-destructive/40'
                     : envInfo.env === 'production'
-                      ? 'bg-slate-100 text-slate-600 border border-slate-300'
+                      ? 'bg-muted text-muted-foreground border border-border'
                       : 'bg-amber-100 text-amber-800 border border-amber-300'
                 }`}
                 title={`mode: ${envInfo.mode} · env: ${envInfo.env}${envInfo.insecure_dev_auth ? ' · INSECURE DEV AUTH' : ''}`}

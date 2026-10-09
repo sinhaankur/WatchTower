@@ -198,37 +198,37 @@ export function ProvisionNodeWizard({ onClose, onRegistered }: Props) {
     return (
       <div className="rounded-xl border border-border bg-card p-6 space-y-4">
         <div className="flex items-center justify-between gap-3">
-          <h2 className="text-base font-semibold text-slate-900">
+          <h2 className="text-base font-semibold text-foreground">
             {succeeded ? '✓ Server provisioned' : terminal ? '✗ Provisioning failed' : 'Provisioning…'}
           </h2>
           {terminal && (
             <button
               onClick={onClose}
-              className="px-3 py-1.5 rounded-md border border-slate-300 text-xs text-slate-700 hover:bg-slate-100"
+              className="px-3 py-1.5 rounded-md border border-border text-xs text-foreground/90 hover:bg-muted"
             >
               Close
             </button>
           )}
         </div>
 
-        <div className="rounded-md bg-slate-50 border border-slate-200 px-4 py-3 text-sm space-y-1">
-          <p><span className="text-slate-500">Name:</span> <span className="font-mono">{job.name}</span></p>
-          <p><span className="text-slate-500">Provider:</span> {job.provider} · {job.region} · {job.size}</p>
-          {job.public_ipv4 && <p><span className="text-slate-500">IP:</span> <code className="font-mono">{job.public_ipv4}</code></p>}
+        <div className="rounded-md bg-muted border border-border px-4 py-3 text-sm space-y-1">
+          <p><span className="text-muted-foreground">Name:</span> <span className="font-mono">{job.name}</span></p>
+          <p><span className="text-muted-foreground">Provider:</span> {job.provider} · {job.region} · {job.size}</p>
+          {job.public_ipv4 && <p><span className="text-muted-foreground">IP:</span> <code className="font-mono">{job.public_ipv4}</code></p>}
           <p>
-            <span className="text-slate-500">Status:</span>{' '}
+            <span className="text-muted-foreground">Status:</span>{' '}
             <span className={
               succeeded ? 'text-emerald-700 font-medium'
-              : job.status === 'failed' ? 'text-red-700 font-medium'
-              : 'text-slate-700'
+              : job.status === 'failed' ? 'text-destructive font-medium'
+              : 'text-foreground/90'
             }>{STATUS_LABEL[job.status]}</span>
           </p>
         </div>
 
         {job.error && (
-          <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 whitespace-pre-wrap">
+          <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive whitespace-pre-wrap">
             {job.error}
-            <p className="mt-2 text-red-600">
+            <p className="mt-2 text-destructive">
               {job.provider_resource_id
                 ? 'WatchTower tried to delete the partial VM — check your provider console to confirm no orphan was left.'
                 : 'No VM was created; nothing to clean up on the provider side.'}
@@ -243,7 +243,7 @@ export function ProvisionNodeWizard({ onClose, onRegistered }: Props) {
         )}
 
         {!terminal && (
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-muted-foreground">
             This usually takes 2–5 minutes (VM boot ~1 min, prep script ~1–3 min). Polling every 3s.
           </p>
         )}
@@ -256,28 +256,28 @@ export function ProvisionNodeWizard({ onClose, onRegistered }: Props) {
     <div className="rounded-xl border border-border bg-card p-6 space-y-5">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h2 className="text-base font-semibold text-slate-900">Provision a new server</h2>
-          <p className="text-xs text-slate-600 mt-0.5">
+          <h2 className="text-base font-semibold text-foreground">Provision a new server</h2>
+          <p className="text-xs text-muted-foreground mt-0.5">
             WatchTower creates a fresh Ubuntu VM on DigitalOcean or Hetzner, installs Podman + nginx, and registers it as a deploy node.
           </p>
         </div>
         <button
           onClick={onClose}
-          className="px-3 py-1.5 rounded-md border border-slate-300 text-xs text-slate-700 hover:bg-slate-100"
+          className="px-3 py-1.5 rounded-md border border-border text-xs text-foreground/90 hover:bg-muted"
         >
           Cancel
         </button>
       </div>
 
       {error && (
-        <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+        <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
           {error}
         </div>
       )}
 
       {/* Credential picker */}
       <div>
-        <label className="block text-xs font-medium text-slate-700 mb-1">Cloud provider credential</label>
+        <label className="block text-xs font-medium text-foreground/90 mb-1">Cloud provider credential</label>
         {loadingCreds ? (
           <Skeleton.Line className="h-9 w-full" />
         ) : creds && creds.length === 0 ? (
@@ -288,7 +288,7 @@ export function ProvisionNodeWizard({ onClose, onRegistered }: Props) {
           <select
             value={credId}
             onChange={(e) => setCredId(e.target.value)}
-            className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm"
+            className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm"
           >
             <option value="">— pick one —</option>
             {creds?.map((c) => (
@@ -303,14 +303,14 @@ export function ProvisionNodeWizard({ onClose, onRegistered }: Props) {
       {/* Region picker */}
       {credId && (
         <div>
-          <label className="block text-xs font-medium text-slate-700 mb-1">Region</label>
+          <label className="block text-xs font-medium text-foreground/90 mb-1">Region</label>
           {loadingRegions ? (
             <Skeleton.Line className="h-9 w-full" />
           ) : (
             <select
               value={region}
               onChange={(e) => setRegion(e.target.value)}
-              className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm"
+              className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm"
             >
               <option value="">— pick one —</option>
               {regions?.map((r) => (
@@ -324,8 +324,8 @@ export function ProvisionNodeWizard({ onClose, onRegistered }: Props) {
       {/* Size picker */}
       {credId && region && (
         <div>
-          <label className="block text-xs font-medium text-slate-700 mb-1">
-            Size <span className="text-slate-500">— sorted cheapest first</span>
+          <label className="block text-xs font-medium text-foreground/90 mb-1">
+            Size <span className="text-muted-foreground">— sorted cheapest first</span>
           </label>
           {loadingSizes ? (
             <Skeleton.Line className="h-9 w-full" />
@@ -333,7 +333,7 @@ export function ProvisionNodeWizard({ onClose, onRegistered }: Props) {
             <select
               value={size}
               onChange={(e) => setSize(e.target.value)}
-              className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-mono"
+              className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm font-mono"
             >
               <option value="">— pick one —</option>
               {sizes?.map((s) => (
@@ -350,16 +350,16 @@ export function ProvisionNodeWizard({ onClose, onRegistered }: Props) {
       {/* Name */}
       {credId && region && size && (
         <div>
-          <label className="block text-xs font-medium text-slate-700 mb-1">Server name</label>
+          <label className="block text-xs font-medium text-foreground/90 mb-1">Server name</label>
           <input
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="my-app-prod-1"
             maxLength={63}
-            className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-mono"
+            className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm font-mono"
           />
-          <p className="text-[11px] text-slate-500 mt-1">
+          <p className="text-[11px] text-muted-foreground mt-1">
             Alphanumeric + hyphen/underscore. Becomes the VM hostname and the WatchTower node name.
           </p>
         </div>

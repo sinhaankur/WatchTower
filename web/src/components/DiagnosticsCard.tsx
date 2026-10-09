@@ -34,7 +34,7 @@ const STATUS_LABEL: Record<CheckStatus, string> = {
 const STATUS_BADGE: Record<CheckStatus, string> = {
   ok:   'border-emerald-200 bg-emerald-50 text-emerald-700',
   warn: 'border-amber-200 bg-amber-50 text-amber-700',
-  fail: 'border-red-200 bg-red-50 text-red-700',
+  fail: 'border-destructive/30 bg-destructive/10 text-destructive',
 };
 
 /**
@@ -113,13 +113,13 @@ export function DiagnosticsCard() {
 
   return (
     <section
-      className="rounded-lg border bg-white p-4 sm:p-5"
+      className="rounded-lg border bg-card p-4 sm:p-5"
       style={{ borderColor: 'hsl(var(--border-soft))' }}
     >
       <header className="flex items-start justify-between gap-3 mb-3">
         <div>
-          <h2 className="text-sm font-semibold text-slate-900">Diagnostics</h2>
-          <p className="text-xs text-slate-600 mt-0.5">
+          <h2 className="text-sm font-semibold text-foreground">Diagnostics</h2>
+          <p className="text-xs text-muted-foreground mt-0.5">
             Live state of every subsystem. If something doesn't work,
             check here first — the fix is usually setting an env var.
           </p>
@@ -146,7 +146,7 @@ export function DiagnosticsCard() {
       </header>
 
       {error && (
-        <div className="text-xs text-red-700 bg-red-50 border border-red-200 rounded-md p-2 mb-3">
+        <div className="text-xs text-destructive bg-destructive/10 border border-destructive/30 rounded-md p-2 mb-3">
           {error}
         </div>
       )}
@@ -173,16 +173,16 @@ export function DiagnosticsCard() {
               />
               <div className="flex-1 min-w-0">
                 <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                  <span className="text-xs font-medium text-slate-900">{c.name}</span>
+                  <span className="text-xs font-medium text-foreground">{c.name}</span>
                   {c.detail && (
-                    <span className="text-[11px] text-slate-500 font-mono break-all">
+                    <span className="text-[11px] text-muted-foreground font-mono break-all">
                       {c.detail}
                     </span>
                   )}
                 </div>
                 {c.hint && (
-                  <p className="text-[11px] text-slate-600 mt-0.5">
-                    <span className="text-slate-400">↳ </span>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">
+                    <span className="text-muted-foreground">↳ </span>
                     {c.hint}
                   </p>
                 )}
@@ -197,7 +197,7 @@ export function DiagnosticsCard() {
           type="button"
           onClick={() => void load()}
           disabled={loading}
-          className="text-[11px] px-2.5 py-1 rounded border border-slate-300 text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+          className="text-[11px] px-2.5 py-1 rounded border border-border text-foreground/90 hover:bg-muted disabled:opacity-50"
         >
           {loading ? 'Re-running…' : 'Re-run'}
         </button>
@@ -205,12 +205,12 @@ export function DiagnosticsCard() {
           type="button"
           onClick={() => void copyReport()}
           disabled={!report}
-          className="text-[11px] px-2.5 py-1 rounded border border-slate-300 text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+          className="text-[11px] px-2.5 py-1 rounded border border-border text-foreground/90 hover:bg-muted disabled:opacity-50"
         >
           {copied ? 'Copied' : 'Copy report'}
         </button>
         {report && (
-          <span className="ml-auto text-[10px] text-slate-400 font-mono">
+          <span className="ml-auto text-[10px] text-muted-foreground font-mono">
             v{report.version}
           </span>
         )}

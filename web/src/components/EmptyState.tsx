@@ -45,14 +45,14 @@ export function EmptyState({
       <h2
         className={
           compact
-            ? 'text-sm font-semibold text-slate-800'
-            : 'text-base font-semibold text-slate-900'
+            ? 'text-sm font-semibold text-foreground'
+            : 'text-base font-semibold text-foreground'
         }
       >
         {title}
       </h2>
       {description && (
-        <p className="text-xs text-slate-600 max-w-md">{description}</p>
+        <p className="text-xs text-muted-foreground max-w-md">{description}</p>
       )}
       {action && <div className="flex items-center gap-2 mt-1">{action}</div>}
     </div>

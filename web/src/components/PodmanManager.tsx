@@ -34,8 +34,8 @@ const stateBadge = (state: string) => {
   const s = (state || '').toLowerCase();
   if (s.includes('running') || s === 'up') return 'text-emerald-700 bg-emerald-50 border-emerald-200';
   if (s.includes('paused')) return 'text-amber-700 bg-amber-50 border-amber-200';
-  if (s.includes('exited') || s.includes('stopped') || s.includes('created')) return 'text-slate-600 bg-slate-100 border-slate-200';
-  return 'text-slate-600 bg-slate-100 border-slate-200';
+  if (s.includes('exited') || s.includes('stopped') || s.includes('created')) return 'text-muted-foreground bg-muted border-border';
+  return 'text-muted-foreground bg-muted border-border';
 };
 
 /**
@@ -110,17 +110,17 @@ function ConnectionCard() {
   const startMachine = useStartPodmanMachine();
 
   if (isLoading) {
-    return <div className="rounded-xl border border-slate-200 bg-white p-4 text-xs text-slate-500">Checking Podman…</div>;
+    return <div className="rounded-xl border border-border bg-card p-4 text-xs text-muted-foreground">Checking Podman…</div>;
   }
   if (!status) return null;
 
   const dot = status.connected ? 'bg-emerald-500' : status.available ? 'bg-amber-500' : 'bg-red-500';
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4 flex items-center gap-4 flex-wrap">
+    <div className="rounded-xl border border-border bg-card p-4 flex items-center gap-4 flex-wrap">
       <span className={`w-2.5 h-2.5 rounded-full ${dot} shrink-0`} />
       <div className="flex-1 min-w-[220px]">
-        <p className="text-sm font-medium text-slate-900">
+        <p className="text-sm font-medium text-foreground">
           {status.connected
             ? `Podman connected — ${status.version ?? ''}`
             : status.available
@@ -128,7 +128,7 @@ function ConnectionCard() {
               : 'Podman not installed'}
         </p>
         {status.machine && (
-          <p className="text-[11px] text-slate-500 mt-0.5">
+          <p className="text-[11px] text-muted-foreground mt-0.5">
             Machine <code className="font-mono">{status.machine.name}</code>{' '}
             {status.machine.running ? 'running' : 'stopped'}
             {status.machine.cpus ? ` · ${status.machine.cpus} CPUs` : ''}
@@ -149,7 +149,7 @@ function ConnectionCard() {
             });
           }}
           disabled={startMachine.isPending}
-          className="text-xs px-4 py-2 rounded-lg border border-border bg-amber-400 hover:bg-amber-500 text-slate-900 font-semibold shadow-retro disabled:opacity-50"
+          className="text-xs px-4 py-2 rounded-lg border border-border bg-amber-400 hover:bg-amber-500 text-foreground font-semibold shadow-retro disabled:opacity-50"
         >
           {startMachine.isPending ? 'Starting… (can take a minute)' : 'Start Podman'}
         </button>
@@ -158,7 +158,7 @@ function ConnectionCard() {
         <a
           href="https://podman.io/docs/installation"
           target="_blank" rel="noopener noreferrer"
-          className="text-xs px-3 py-2 rounded-lg border border-slate-300 text-slate-700 hover:border-slate-500"
+          className="text-xs px-3 py-2 rounded-lg border border-border text-foreground/90 hover:border-slate-500"
         >
           Install Podman ↗
         </a>
@@ -177,15 +177,15 @@ function PortsEditor({ ports, onChange }: { ports: PodmanPort[]; onChange: (p: P
           <input
             type="number" placeholder="host" value={p.host || ''}
             onChange={(e) => onChange(ports.map((x, j) => j === i ? { ...x, host: Number(e.target.value) } : x))}
-            className="w-24 text-xs font-mono rounded border border-slate-300 px-2 py-1.5"
+            className="w-24 text-xs font-mono rounded border border-border px-2 py-1.5"
           />
-          <span className="text-slate-400 text-xs">→</span>
+          <span className="text-muted-foreground text-xs">→</span>
           <input
             type="number" placeholder="container" value={p.container || ''}
             onChange={(e) => onChange(ports.map((x, j) => j === i ? { ...x, container: Number(e.target.value) } : x))}
-            className="w-24 text-xs font-mono rounded border border-slate-300 px-2 py-1.5"
+            className="w-24 text-xs font-mono rounded border border-border px-2 py-1.5"
           />
-          <button onClick={() => onChange(ports.filter((_, j) => j !== i))} className="text-slate-400 hover:text-red-600 text-sm px-1">×</button>
+          <button onClick={() => onChange(ports.filter((_, j) => j !== i))} className="text-muted-foreground hover:text-destructive text-sm px-1">×</button>
         </div>
       ))}
       <button onClick={() => onChange([...ports, { host: 0, container: 0 }])} className="text-[11px] text-blue-700 hover:underline">
@@ -201,7 +201,7 @@ function ProjectPicker({ value, onChange }: { value: string; onChange: (v: strin
     <select
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="w-full text-xs rounded border border-slate-300 px-2 py-1.5 bg-white"
+      className="w-full text-xs rounded border border-border px-2 py-1.5 bg-card"
     >
       <option value="">No project link</option>
       {(projects ?? []).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
@@ -246,51 +246,51 @@ function CreateContainerForm({ pods, onDone }: { pods: PodmanPod[]; onDone: () =
   };
 
   return (
-    <div className="rounded-xl border border-slate-300 bg-slate-50 p-4 space-y-3">
+    <div className="rounded-xl border border-border bg-muted p-4 space-y-3">
       <div className="grid sm:grid-cols-2 gap-3">
         <label className="block">
-          <span className="text-[11px] text-slate-600">Name</span>
+          <span className="text-[11px] text-muted-foreground">Name</span>
           <input value={name} onChange={(e) => setName(e.target.value)} placeholder="my-redis"
-            className="mt-1 w-full text-xs font-mono rounded border border-slate-300 px-2 py-1.5" />
+            className="mt-1 w-full text-xs font-mono rounded border border-border px-2 py-1.5" />
         </label>
         <label className="block">
-          <span className="text-[11px] text-slate-600">Image</span>
+          <span className="text-[11px] text-muted-foreground">Image</span>
           <input value={image} onChange={(e) => setImage(e.target.value)} placeholder="docker.io/library/redis:7"
-            className="mt-1 w-full text-xs font-mono rounded border border-slate-300 px-2 py-1.5" />
+            className="mt-1 w-full text-xs font-mono rounded border border-border px-2 py-1.5" />
         </label>
       </div>
       <div className="grid sm:grid-cols-2 gap-3">
         <div>
-          <span className="text-[11px] text-slate-600">Run inside pod (optional)</span>
+          <span className="text-[11px] text-muted-foreground">Run inside pod (optional)</span>
           <select value={pod} onChange={(e) => setPod(e.target.value)}
-            className="mt-1 w-full text-xs rounded border border-slate-300 px-2 py-1.5 bg-white">
+            className="mt-1 w-full text-xs rounded border border-border px-2 py-1.5 bg-card">
             <option value="">Standalone container</option>
             {pods.map((p) => <option key={p.name} value={p.name}>{p.name}</option>)}
           </select>
-          {pod && <p className="text-[10px] text-slate-400 mt-1">Ports are managed by the pod.</p>}
+          {pod && <p className="text-[10px] text-muted-foreground mt-1">Ports are managed by the pod.</p>}
         </div>
         <div>
-          <span className="text-[11px] text-slate-600">Link to project (optional)</span>
+          <span className="text-[11px] text-muted-foreground">Link to project (optional)</span>
           <div className="mt-1"><ProjectPicker value={projectId} onChange={setProjectId} /></div>
         </div>
       </div>
       {!pod && (
         <div>
-          <span className="text-[11px] text-slate-600">Ports (host → container)</span>
+          <span className="text-[11px] text-muted-foreground">Ports (host → container)</span>
           <div className="mt-1"><PortsEditor ports={ports} onChange={setPorts} /></div>
         </div>
       )}
       <label className="block">
-        <span className="text-[11px] text-slate-600">Environment variables (one KEY=value per line)</span>
+        <span className="text-[11px] text-muted-foreground">Environment variables (one KEY=value per line)</span>
         <textarea value={envText} onChange={(e) => setEnvText(e.target.value)} rows={2} placeholder={'REDIS_PASSWORD=secret'}
-          className="mt-1 w-full text-xs font-mono rounded border border-slate-300 px-2 py-1.5" />
+          className="mt-1 w-full text-xs font-mono rounded border border-border px-2 py-1.5" />
       </label>
       <div className="flex gap-2 justify-end">
-        <button onClick={onDone} className="text-xs px-3 py-1.5 rounded-lg border border-slate-300 text-slate-600 hover:border-slate-400">Cancel</button>
+        <button onClick={onDone} className="text-xs px-3 py-1.5 rounded-lg border border-border text-muted-foreground hover:border-accent/50">Cancel</button>
         <button
           onClick={submit}
           disabled={create.isPending || !name.trim() || !image.trim()}
-          className="text-xs px-4 py-1.5 rounded-lg border border-border bg-amber-400 hover:bg-amber-500 text-slate-900 font-semibold shadow-retro disabled:opacity-50"
+          className="text-xs px-4 py-1.5 rounded-lg border border-border bg-amber-400 hover:bg-amber-500 text-foreground font-semibold shadow-retro disabled:opacity-50"
         >
           {create.isPending ? 'Creating… (first pull can take a while)' : 'Create & start'}
         </button>
@@ -308,24 +308,24 @@ function CreatePodForm({ onDone }: { onDone: () => void }) {
   const [projectId, setProjectId] = useState('');
 
   return (
-    <div className="rounded-xl border border-slate-300 bg-slate-50 p-4 space-y-3">
+    <div className="rounded-xl border border-border bg-muted p-4 space-y-3">
       <div className="grid sm:grid-cols-2 gap-3">
         <label className="block">
-          <span className="text-[11px] text-slate-600">Pod name</span>
+          <span className="text-[11px] text-muted-foreground">Pod name</span>
           <input value={name} onChange={(e) => setName(e.target.value)} placeholder="my-app"
-            className="mt-1 w-full text-xs font-mono rounded border border-slate-300 px-2 py-1.5" />
+            className="mt-1 w-full text-xs font-mono rounded border border-border px-2 py-1.5" />
         </label>
         <div>
-          <span className="text-[11px] text-slate-600">Link to project (optional)</span>
+          <span className="text-[11px] text-muted-foreground">Link to project (optional)</span>
           <div className="mt-1"><ProjectPicker value={projectId} onChange={setProjectId} /></div>
         </div>
       </div>
       <div>
-        <span className="text-[11px] text-slate-600">Published ports (host → container) — shared by every container in the pod</span>
+        <span className="text-[11px] text-muted-foreground">Published ports (host → container) — shared by every container in the pod</span>
         <div className="mt-1"><PortsEditor ports={ports} onChange={setPorts} /></div>
       </div>
       <div className="flex gap-2 justify-end">
-        <button onClick={onDone} className="text-xs px-3 py-1.5 rounded-lg border border-slate-300 text-slate-600 hover:border-slate-400">Cancel</button>
+        <button onClick={onDone} className="text-xs px-3 py-1.5 rounded-lg border border-border text-muted-foreground hover:border-accent/50">Cancel</button>
         <button
           onClick={() => create.mutate(
             { name: name.trim(), ports: ports.filter((p) => p.host && p.container), project_id: projectId || undefined },
@@ -335,7 +335,7 @@ function CreatePodForm({ onDone }: { onDone: () => void }) {
             },
           )}
           disabled={create.isPending || !name.trim()}
-          className="text-xs px-4 py-1.5 rounded-lg border border-border bg-amber-400 hover:bg-amber-500 text-slate-900 font-semibold shadow-retro disabled:opacity-50"
+          className="text-xs px-4 py-1.5 rounded-lg border border-border bg-amber-400 hover:bg-amber-500 text-foreground font-semibold shadow-retro disabled:opacity-50"
         >
           {create.isPending ? 'Creating…' : 'Create pod'}
         </button>
@@ -362,9 +362,9 @@ function ContainerRow({ c }: { c: PodmanContainer }) {
 
   return (
     <>
-      <tr className="hover:bg-slate-50/50">
+      <tr className="hover:bg-muted/50">
         <td className="px-4 py-2.5">
-          <p className="font-mono text-xs text-slate-900">{c.name}</p>
+          <p className="font-mono text-xs text-foreground">{c.name}</p>
           <div className="flex items-center gap-1.5 mt-0.5">
             {c.pod && <span className="text-[10px] text-purple-700 bg-purple-50 border border-purple-200 rounded px-1">pod: {c.pod}</span>}
             {c.project_id && (
@@ -374,23 +374,23 @@ function ContainerRow({ c }: { c: PodmanContainer }) {
             )}
           </div>
         </td>
-        <td className="px-4 py-2.5"><code className="text-[11px] text-slate-600 font-mono truncate inline-block max-w-[220px]" title={c.image}>{c.image}</code></td>
+        <td className="px-4 py-2.5"><code className="text-[11px] text-muted-foreground font-mono truncate inline-block max-w-[220px]" title={c.image}>{c.image}</code></td>
         <td className="px-4 py-2.5">
           <span className={`text-[10px] border rounded px-1.5 py-0.5 ${stateBadge(c.state)}`}>{c.status || c.state}</span>
         </td>
-        <td className="px-4 py-2.5 text-[11px] font-mono text-slate-600">
+        <td className="px-4 py-2.5 text-[11px] font-mono text-muted-foreground">
           {c.ports.map((p) => `${p.host}→${p.container}`).join(', ') || '—'}
         </td>
         <td className="px-4 py-2.5 text-right whitespace-nowrap">
           <div className="inline-flex items-center gap-1">
             {running
               ? <>
-                  <button onClick={() => run('restart')} disabled={act.isPending} className="text-[11px] px-2 py-1 rounded border border-slate-300 hover:bg-slate-100 disabled:opacity-50">Restart</button>
-                  <button onClick={() => run('stop')} disabled={act.isPending} className="text-[11px] px-2 py-1 rounded border border-slate-300 hover:bg-slate-100 disabled:opacity-50">Stop</button>
+                  <button onClick={() => run('restart')} disabled={act.isPending} className="text-[11px] px-2 py-1 rounded border border-border hover:bg-muted disabled:opacity-50">Restart</button>
+                  <button onClick={() => run('stop')} disabled={act.isPending} className="text-[11px] px-2 py-1 rounded border border-border hover:bg-muted disabled:opacity-50">Stop</button>
                 </>
               : <button onClick={() => run('start')} disabled={act.isPending} className="text-[11px] px-2 py-1 rounded border border-emerald-300 text-emerald-700 hover:bg-emerald-50 disabled:opacity-50">Start</button>}
-            <button onClick={() => setShowLogPanel((v) => !v)} className={`text-[11px] px-2 py-1 rounded border ${showLogPanel ? 'border-slate-400 bg-slate-100' : 'border-slate-300 hover:bg-slate-100'}`}>Logs</button>
-            <button onClick={() => run('remove')} disabled={act.isPending} className="text-[11px] px-2 py-1 rounded border border-red-300 text-red-700 hover:bg-red-50 disabled:opacity-50">Remove</button>
+            <button onClick={() => setShowLogPanel((v) => !v)} className={`text-[11px] px-2 py-1 rounded border ${showLogPanel ? 'border-slate-400 bg-muted' : 'border-border hover:bg-muted'}`}>Logs</button>
+            <button onClick={() => run('remove')} disabled={act.isPending} className="text-[11px] px-2 py-1 rounded border border-destructive/40 text-destructive hover:bg-destructive/10 disabled:opacity-50">Remove</button>
           </div>
         </td>
       </tr>
@@ -461,9 +461,9 @@ function PodCard({ p }: { p: PodmanPod }) {
   };
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4">
+    <div className="rounded-xl border border-border bg-card p-4">
       <div className="flex items-center gap-2 flex-wrap">
-        <p className="font-mono text-xs font-semibold text-slate-900">{p.name}</p>
+        <p className="font-mono text-xs font-semibold text-foreground">{p.name}</p>
         <span className={`text-[10px] border rounded px-1.5 py-0.5 ${stateBadge(p.status)}`}>{p.status}</span>
         {p.project_id && (
           <Link to={`/projects/${p.project_id}`} className="text-[10px] text-blue-700 bg-blue-50 border border-blue-200 rounded px-1 hover:underline">
@@ -472,12 +472,12 @@ function PodCard({ p }: { p: PodmanPod }) {
         )}
         <div className="ml-auto inline-flex items-center gap-1">
           {running
-            ? <button onClick={() => run('stop')} disabled={act.isPending} className="text-[11px] px-2 py-1 rounded border border-slate-300 hover:bg-slate-100 disabled:opacity-50">Stop</button>
+            ? <button onClick={() => run('stop')} disabled={act.isPending} className="text-[11px] px-2 py-1 rounded border border-border hover:bg-muted disabled:opacity-50">Stop</button>
             : <button onClick={() => run('start')} disabled={act.isPending} className="text-[11px] px-2 py-1 rounded border border-emerald-300 text-emerald-700 hover:bg-emerald-50 disabled:opacity-50">Start</button>}
-          <button onClick={() => run('remove')} disabled={act.isPending} className="text-[11px] px-2 py-1 rounded border border-red-300 text-red-700 hover:bg-red-50 disabled:opacity-50">Remove</button>
+          <button onClick={() => run('remove')} disabled={act.isPending} className="text-[11px] px-2 py-1 rounded border border-destructive/40 text-destructive hover:bg-destructive/10 disabled:opacity-50">Remove</button>
         </div>
       </div>
-      <p className="text-[11px] text-slate-500 mt-2">
+      <p className="text-[11px] text-muted-foreground mt-2">
         {p.containers.length === 0
           ? 'Empty pod — use "New container" above and pick this pod.'
           : p.containers.map((c) => c.names).join(', ')}
@@ -502,16 +502,16 @@ export default function PodmanManager() {
       {connected && (
         <>
           <div className="flex items-center gap-2">
-            <h2 className="text-sm font-semibold text-slate-900 flex-1">All containers & pods on this machine</h2>
+            <h2 className="text-sm font-semibold text-foreground flex-1">All containers & pods on this machine</h2>
             <button
               onClick={() => setCreating(creating === 'pod' ? null : 'pod')}
-              className="text-xs px-3 py-1.5 rounded-lg border border-slate-300 text-slate-700 hover:border-slate-500"
+              className="text-xs px-3 py-1.5 rounded-lg border border-border text-foreground/90 hover:border-slate-500"
             >
               New pod
             </button>
             <button
               onClick={() => setCreating(creating === 'container' ? null : 'container')}
-              className="text-xs px-3 py-1.5 rounded-lg border border-border bg-amber-400 hover:bg-amber-500 text-slate-900 font-semibold shadow-retro"
+              className="text-xs px-3 py-1.5 rounded-lg border border-border bg-amber-400 hover:bg-amber-500 text-foreground font-semibold shadow-retro"
             >
               New container
             </button>
@@ -526,20 +526,20 @@ export default function PodmanManager() {
             </div>
           )}
 
-          <div className="rounded-xl border border-slate-200 bg-white overflow-hidden shadow-retro">
+          <div className="rounded-xl border border-border bg-card overflow-hidden shadow-retro">
             <table className="w-full text-sm">
-              <thead className="bg-slate-50 border-b border-slate-200">
+              <thead className="bg-muted border-b border-border">
                 <tr className="text-left">
-                  <th className="px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500">Container</th>
-                  <th className="px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500">Image</th>
-                  <th className="px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500">State</th>
-                  <th className="px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500">Ports</th>
-                  <th className="px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wider text-slate-500">Actions</th>
+                  <th className="px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Container</th>
+                  <th className="px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Image</th>
+                  <th className="px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">State</th>
+                  <th className="px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Ports</th>
+                  <th className="px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {(containers ?? []).length === 0 ? (
-                  <tr><td colSpan={5} className="px-4 py-6 text-center text-xs text-slate-500">
+                  <tr><td colSpan={5} className="px-4 py-6 text-center text-xs text-muted-foreground">
                     No containers yet — click <strong>New container</strong> to run your first one.
                   </td></tr>
                 ) : (

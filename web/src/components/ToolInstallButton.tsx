@@ -105,7 +105,7 @@ export default function ToolInstallButton({
       >
         {state === 'running' ? 'Installing…' : state === 'failed' ? 'Retry install' : 'Install'}
       </button>
-      {error && <span className="text-[10px] text-red-600 max-w-[180px] text-right">{error}</span>}
+      {error && <span className="text-[10px] text-destructive max-w-[180px] text-right">{error}</span>}
     </div>
   );
 }

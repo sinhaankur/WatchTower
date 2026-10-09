@@ -33,8 +33,8 @@ const STEP_LABELS = ['Basic Info', 'SSH Access', 'Deployment Config'];
 
 const STATUS_STYLES: Record<string, { dot: string; badge: string; label: string }> = {
   healthy: { dot: 'bg-green-500', badge: 'bg-green-50 text-green-700 border-green-200', label: 'Healthy' },
-  unhealthy: { dot: 'bg-red-400', badge: 'bg-red-50 text-red-700 border-red-200', label: 'Unhealthy' },
-  offline: { dot: 'bg-gray-400', badge: 'bg-gray-50 text-gray-600 border-gray-200', label: 'Offline' },
+  unhealthy: { dot: 'bg-red-400', badge: 'bg-destructive/10 text-destructive border-destructive/30', label: 'Unhealthy' },
+  offline: { dot: 'bg-gray-400', badge: 'bg-muted text-muted-foreground border-border', label: 'Offline' },
   maintenance: { dot: 'bg-yellow-400', badge: 'bg-yellow-50 text-yellow-700 border-yellow-200', label: 'Maintenance' },
 };
 
@@ -42,11 +42,11 @@ function UsageBar({ value, label, color }: { value?: number; label: string; colo
   const pct = value ?? 0;
   return (
     <div className="flex-1 min-w-0">
-      <div className="flex justify-between text-xs text-gray-500 mb-1">
+      <div className="flex justify-between text-xs text-muted-foreground mb-1">
         <span>{label}</span>
         <span>{value != null ? `${pct}%` : '—'}</span>
       </div>
-      <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+      <div className="h-1.5 bg-muted rounded-full overflow-hidden">
         <div
           className={`h-full rounded-full transition-all ${color}`}
           style={{ width: value != null ? `${Math.min(pct, 100)}%` : '0%' }}
@@ -182,8 +182,8 @@ const NodeManagement = () => {
       <header className="electron-card-solid electron-divider border-b">
         <div className="px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
           <div>
-            <h1 className="text-base font-semibold text-slate-900">Nodes</h1>
-            <p className="text-xs text-slate-600 mt-0.5">
+            <h1 className="text-base font-semibold text-foreground">Nodes</h1>
+            <p className="text-xs text-muted-foreground mt-0.5">
               {loading ? 'Loading…' : orgName ? `Organization: ${orgName}` : offlineMode ? 'Server offline — some features unavailable' : 'Manage deployment nodes'}
             </p>
           </div>
@@ -220,9 +220,9 @@ const NodeManagement = () => {
           </div>
         )}
         {actionError && (
-          <div className="flex items-start gap-2 rounded-md border border-red-200 bg-red-50 px-4 py-3">
+          <div className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3">
             <span className="text-red-500 mt-0.5">✗</span>
-            <p className="text-sm text-red-700">{actionError}</p>
+            <p className="text-sm text-destructive">{actionError}</p>
           </div>
         )}
 
@@ -241,13 +241,13 @@ const NodeManagement = () => {
                     type="button"
                     onClick={() => i < step && setStep(i)}
                     className={`flex items-center gap-2 text-sm font-medium transition-colors ${
-                      i === step ? 'text-slate-900' : i < step ? 'text-slate-600 cursor-pointer hover:text-red-800' : 'text-slate-400 cursor-default'
+                      i === step ? 'text-foreground' : i < step ? 'text-muted-foreground cursor-pointer hover:text-destructive' : 'text-muted-foreground cursor-default'
                     }`}
                   >
                     <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs border ${
                       i < step ? 'bg-primary border-primary text-white' :
                       i === step ? 'border-primary text-primary bg-primary/5' :
-                      'border-slate-300 text-slate-400'
+                      'border-border text-muted-foreground'
                     }`}>
                       {i < step ? '✓' : i + 1}
                     </span>
@@ -263,7 +263,7 @@ const NodeManagement = () => {
             {/* Step 0: Basic Info */}
             {step === 0 && (
               <div className="space-y-4">
-                <p className="text-xs text-slate-600 mb-2">Give this node a recognizable name and enter its hostname or IP address.</p>
+                <p className="text-xs text-muted-foreground mb-2">Give this node a recognizable name and enter its hostname or IP address.</p>
                 <div className="grid sm:grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="name">Node Name <span className="text-red-400">*</span></Label>
@@ -286,7 +286,7 @@ const NodeManagement = () => {
                     />
                   </div>
                 </div>
-                <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer mt-2">
+                <label className="flex items-center gap-2 text-sm text-foreground/90 cursor-pointer mt-2">
                   <input
                     type="checkbox"
                     checked={form.is_primary}
@@ -301,7 +301,7 @@ const NodeManagement = () => {
             {/* Step 1: SSH Access */}
             {step === 1 && (
               <div className="space-y-4">
-                <p className="text-xs text-slate-600 mb-2">How should WatchTower connect to this node via SSH?</p>
+                <p className="text-xs text-muted-foreground mb-2">How should WatchTower connect to this node via SSH?</p>
                 <div className="grid sm:grid-cols-3 gap-4">
                   <div>
                     <Label htmlFor="user">SSH User</Label>
@@ -333,14 +333,14 @@ const NodeManagement = () => {
                     />
                   </div>
                 </div>
-                <p className="text-xs text-slate-600">The SSH key must be accessible on the WatchTower server, not your local machine.</p>
+                <p className="text-xs text-muted-foreground">The SSH key must be accessible on the WatchTower server, not your local machine.</p>
               </div>
             )}
 
             {/* Step 2: Deployment Config */}
             {step === 2 && (
               <div className="space-y-4">
-                <p className="text-xs text-slate-600 mb-2">Configure deployment paths and the command that reloads your service.</p>
+                <p className="text-xs text-muted-foreground mb-2">Configure deployment paths and the command that reloads your service.</p>
                 <div className="grid sm:grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="remote_path">Remote Deploy Path</Label>
@@ -371,14 +371,14 @@ const NodeManagement = () => {
                       onChange={(e) => setField('reload_command', e.target.value)}
                       className="mt-1.5 rounded-md"
                     />
-                    <p className="text-xs text-slate-600 mt-1">Run after each deployment to apply the new build.</p>
+                    <p className="text-xs text-muted-foreground mt-1">Run after each deployment to apply the new build.</p>
                   </div>
                 </div>
               </div>
             )}
 
             {/* Navigation */}
-            <div className="flex items-center justify-between mt-6 pt-4 border-t border-slate-200">
+            <div className="flex items-center justify-between mt-6 pt-4 border-t border-border">
               <Button
                 variant="outline"
                 disabled={step === 0}
@@ -418,16 +418,16 @@ const NodeManagement = () => {
           </CardHeader>
           <CardContent>
             {loading && (
-              <div className="flex items-center gap-2 py-6 text-sm text-slate-600">
+              <div className="flex items-center gap-2 py-6 text-sm text-muted-foreground">
                 <span className="animate-spin">⌛</span> Loading nodes…
               </div>
             )}
 
             {!loading && nodes.length === 0 && (
-              <div className="py-10 text-center border border-dashed border-slate-300 text-slate-600">
+              <div className="py-10 text-center border border-dashed border-border text-muted-foreground">
                 <p className="text-3xl mb-2">🖥</p>
-                <p className="text-sm font-medium text-slate-700">No nodes registered yet</p>
-                <p className="text-xs text-slate-600 mt-1">Use the form above to add your first deployment node.</p>
+                <p className="text-sm font-medium text-foreground/90">No nodes registered yet</p>
+                <p className="text-xs text-muted-foreground mt-1">Use the form above to add your first deployment node.</p>
               </div>
             )}
 
@@ -440,7 +440,7 @@ const NodeManagement = () => {
                       <div className="flex-1 min-w-0">
                         {/* Title row */}
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-semibold text-sm text-slate-900">{node.name}</span>
+                          <span className="font-semibold text-sm text-foreground">{node.name}</span>
                           <span className={`inline-flex items-center gap-1.5 text-xs px-2 py-0.5 border rounded-full ${s.badge}`}>
                             <span className={`w-1.5 h-1.5 rounded-full ${s.dot}`} />
                             {s.label}
@@ -451,7 +451,7 @@ const NodeManagement = () => {
                         </div>
 
                         {/* Connection info */}
-                        <p className="text-xs text-slate-600 mt-1 font-mono">
+                        <p className="text-xs text-muted-foreground mt-1 font-mono">
                           {node.user}@{node.host}:{node.port} · {node.remote_path}
                         </p>
 
@@ -463,7 +463,7 @@ const NodeManagement = () => {
                         </div>
 
                         {node.last_health_check && (
-                          <p className="text-xs text-slate-600 mt-2">Last checked: {node.last_health_check}</p>
+                          <p className="text-xs text-muted-foreground mt-2">Last checked: {node.last_health_check}</p>
                         )}
                       </div>
 
@@ -486,10 +486,10 @@ const NodeManagement = () => {
         {/* Help section */}
         <Card className="electron-card rounded-xl shadow-none">
           <CardContent className="py-4">
-            <p className="text-xs text-slate-700 font-medium mb-2">Quick tips</p>
-            <ul className="text-xs text-slate-600 space-y-1 list-disc list-inside">
+            <p className="text-xs text-foreground/90 font-medium mb-2">Quick tips</p>
+            <ul className="text-xs text-muted-foreground space-y-1 list-disc list-inside">
               <li>The WatchTower server must have SSH access to each node using the key path you provide.</li>
-              <li>Use <code className="bg-gray-100 px-1">sudo systemctl reload &lt;service&gt;</code> as the reload command for zero-downtime reloads.</li>
+              <li>Use <code className="bg-muted px-1">sudo systemctl reload &lt;service&gt;</code> as the reload command for zero-downtime reloads.</li>
               <li>Run a <strong>Health Check</strong> after adding a node to verify SSH connectivity.</li>
               <li>Only one node can be primary — it is used as the default deployment target.</li>
             </ul>

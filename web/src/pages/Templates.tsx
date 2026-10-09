@@ -30,9 +30,9 @@ const CATEGORY_BADGE: Record<string, string> = {
   analytics: 'border-blue-300 bg-blue-50 text-blue-700',
   content: 'border-emerald-300 bg-emerald-50 text-emerald-700',
   monitoring: 'border-amber-300 bg-amber-50 text-amber-700',
-  database: 'border-slate-300 bg-slate-50 text-slate-700',
-  static: 'border-slate-300 bg-slate-50 text-slate-700',
-  other: 'border-slate-300 bg-slate-50 text-slate-700',
+  database: 'border-border bg-muted text-foreground/90',
+  static: 'border-border bg-muted text-foreground/90',
+  other: 'border-border bg-muted text-foreground/90',
 };
 
 // Slug-safe project name: lowercase, hyphenated, no leading digit issues.
@@ -60,11 +60,11 @@ function TemplateCard({
       className="anim-fade-in-up rounded-xl border border-border bg-card p-4 shadow-retro flex flex-col gap-3 transition-shadow hover:shadow-retro"
     >
       <div className="flex items-start gap-3">
-        <div className="w-9 h-9 rounded-lg border border-border bg-amber-100 flex items-center justify-center text-[11px] font-mono font-bold text-slate-900 shadow-retro uppercase">
+        <div className="w-9 h-9 rounded-lg border border-border bg-amber-100 flex items-center justify-center text-[11px] font-mono font-bold text-foreground shadow-retro uppercase">
           {template.slug.slice(0, 2)}
         </div>
         <div className="flex-1 min-w-0">
-          <h2 className="text-sm font-semibold text-slate-900 truncate">{template.name}</h2>
+          <h2 className="text-sm font-semibold text-foreground truncate">{template.name}</h2>
           <span
             className={`inline-flex text-[10px] px-2 py-0.5 rounded-full border font-medium mt-1 ${
               CATEGORY_BADGE[template.category] ?? CATEGORY_BADGE.other
@@ -75,11 +75,11 @@ function TemplateCard({
         </div>
       </div>
 
-      <p className="text-xs text-slate-700 leading-relaxed">{template.description}</p>
+      <p className="text-xs text-foreground/90 leading-relaxed">{template.description}</p>
 
-      <div className="text-[11px] text-slate-500 space-y-0.5">
+      <div className="text-[11px] text-muted-foreground space-y-0.5">
         <p>
-          Repo: <a href={template.repo_url} target="_blank" rel="noopener noreferrer" className="font-mono text-slate-700 hover:text-slate-900 underline-offset-2 hover:underline">{template.repo_url.replace('https://github.com/', '')}</a>
+          Repo: <a href={template.repo_url} target="_blank" rel="noopener noreferrer" className="font-mono text-foreground/90 hover:text-foreground underline-offset-2 hover:underline">{template.repo_url.replace('https://github.com/', '')}</a>
         </p>
         {template.memory_hint_mb && <p>Memory hint: {template.memory_hint_mb} MB</p>}
         {envVars.length > 0 && (
@@ -97,29 +97,29 @@ function TemplateCard({
           so the user sees exactly what they're creating and what they'll
           need to fill in, before committing. */}
       {open ? (
-        <div className="rounded-lg border border-slate-300 bg-slate-50 p-3 space-y-2.5">
+        <div className="rounded-lg border border-border bg-muted p-3 space-y-2.5">
           <label className="block">
-            <span className="text-[11px] font-medium text-slate-600">Project name</span>
+            <span className="text-[11px] font-medium text-muted-foreground">Project name</span>
             <input
               autoFocus
               value={name}
               onChange={(e) => setName(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter' && validName && !creating) onCreate(slugifyName(name)); }}
-              className="mt-1 w-full text-xs font-mono rounded border border-slate-300 px-2 py-1.5 focus:border-border focus:outline-none"
+              className="mt-1 w-full text-xs font-mono rounded border border-border px-2 py-1.5 focus:border-border focus:outline-none"
             />
             {name && !validName && (
-              <span className="text-[10px] text-red-600">Name needs at least 2 letters/digits.</span>
+              <span className="text-[10px] text-destructive">Name needs at least 2 letters/digits.</span>
             )}
           </label>
 
           {placeholders.length > 0 && (
             <div>
-              <p className="text-[11px] font-medium text-slate-600 mb-1">You'll set these after creating:</p>
+              <p className="text-[11px] font-medium text-muted-foreground mb-1">You'll set these after creating:</p>
               <ul className="space-y-1">
                 {placeholders.map((v) => (
-                  <li key={v.key} className="text-[10.5px] text-slate-600 flex items-start gap-1.5">
+                  <li key={v.key} className="text-[10.5px] text-muted-foreground flex items-start gap-1.5">
                     <code className="font-mono text-amber-800 bg-amber-50 border border-amber-200 rounded px-1 shrink-0">{v.key}</code>
-                    {v.description && <span className="text-slate-500">{v.description}</span>}
+                    {v.description && <span className="text-muted-foreground">{v.description}</span>}
                   </li>
                 ))}
               </ul>
@@ -130,14 +130,14 @@ function TemplateCard({
             <button
               onClick={() => onCreate(slugifyName(name))}
               disabled={creating || !validName}
-              className="flex-1 text-xs px-3 py-1.5 rounded-lg border border-border bg-amber-400 hover:bg-amber-500 text-slate-900 font-semibold shadow-retro disabled:opacity-50 disabled:cursor-wait"
+              className="flex-1 text-xs px-3 py-1.5 rounded-lg border border-border bg-amber-400 hover:bg-amber-500 text-foreground font-semibold shadow-retro disabled:opacity-50 disabled:cursor-wait"
             >
               {creating ? 'Creating…' : 'Create project →'}
             </button>
             <button
               onClick={() => setOpen(false)}
               disabled={creating}
-              className="text-[11px] px-2.5 py-1.5 rounded-lg border border-slate-300 text-slate-600 hover:border-slate-400 disabled:opacity-50"
+              className="text-[11px] px-2.5 py-1.5 rounded-lg border border-border text-muted-foreground hover:border-accent/50 disabled:opacity-50"
             >
               Cancel
             </button>
@@ -147,7 +147,7 @@ function TemplateCard({
         <div className="flex items-center gap-2 pt-1 mt-auto">
           <button
             onClick={() => setOpen(true)}
-            className="flex-1 text-xs px-3 py-1.5 rounded-lg border border-border bg-amber-400 hover:bg-amber-500 text-slate-900 font-semibold shadow-retro"
+            className="flex-1 text-xs px-3 py-1.5 rounded-lg border border-border bg-amber-400 hover:bg-amber-500 text-foreground font-semibold shadow-retro"
           >
             Use this template
           </button>
@@ -156,7 +156,7 @@ function TemplateCard({
               href={template.documentation_url}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-[11px] text-slate-600 hover:text-slate-900"
+              className="text-[11px] text-muted-foreground hover:text-foreground"
               title="Open upstream documentation"
             >
               docs ↗
@@ -246,14 +246,14 @@ export default function Templates() {
   });
 
   return (
-    <div className="flex-1 overflow-auto bg-slate-50">
+    <div className="flex-1 overflow-auto bg-muted">
       <header
         className="px-4 sm:px-6 lg:px-8 py-4 border-b flex items-center justify-between"
         style={{ borderColor: 'hsl(var(--border-soft))' }}
       >
         <div>
-          <h1 className="text-lg font-semibold text-slate-900">Templates</h1>
-          <p className="text-xs text-slate-600 mt-0.5">
+          <h1 className="text-lg font-semibold text-foreground">Templates</h1>
+          <p className="text-xs text-muted-foreground mt-0.5">
             Pre-baked recipes for common self-hosted apps. One click → new project pre-filled with the right repo, env vars, and config hints.
           </p>
         </div>
@@ -262,7 +262,7 @@ export default function Templates() {
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
           placeholder="Filter…"
-          className="text-xs px-3 py-1.5 rounded border border-slate-300 focus:border-border focus:outline-none w-48"
+          className="text-xs px-3 py-1.5 rounded border border-border focus:border-border focus:outline-none w-48"
         />
       </header>
 
@@ -270,27 +270,27 @@ export default function Templates() {
         {/* How a template connects — users saw cards but not the chain
             (template → project → deploy → Applications), so "Use" felt
             like a mystery button. Three steps, always visible, cheap. */}
-        <div className="rounded-xl border border-border bg-card px-4 py-3 mb-6 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-0 text-xs text-slate-600">
+        <div className="rounded-xl border border-border bg-card px-4 py-3 mb-6 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-0 text-xs text-muted-foreground">
           <div className="flex items-center gap-2 sm:flex-1">
             <span className="w-5 h-5 rounded-full bg-secondary text-secondary-foreground font-bold flex items-center justify-center shrink-0">1</span>
-            <span><strong className="text-slate-900">Pick a template.</strong> Each is a known-good recipe: repo, env vars, config.</span>
+            <span><strong className="text-foreground">Pick a template.</strong> Each is a known-good recipe: repo, env vars, config.</span>
           </div>
           <span className="hidden sm:block text-slate-300 px-3" aria-hidden>→</span>
           <div className="flex items-center gap-2 sm:flex-1">
             <span className="w-5 h-5 rounded-full bg-secondary text-secondary-foreground font-bold flex items-center justify-center shrink-0">2</span>
-            <span><strong className="text-slate-900">We create your project</strong> with everything pre-wired — you land on its page to review.</span>
+            <span><strong className="text-foreground">We create your project</strong> with everything pre-wired — you land on its page to review.</span>
           </div>
           <span className="hidden sm:block text-slate-300 px-3" aria-hidden>→</span>
           <div className="flex items-center gap-2 sm:flex-1">
             <span className="w-5 h-5 rounded-full bg-secondary text-secondary-foreground font-bold flex items-center justify-center shrink-0">3</span>
-            <span><strong className="text-slate-900">Hit Deploy.</strong> It runs on your machine and shows up under <Link to="/applications" className="underline font-medium text-primary">Applications</Link>.</span>
+            <span><strong className="text-foreground">Hit Deploy.</strong> It runs on your machine and shows up under <Link to="/applications" className="underline font-medium text-primary">Applications</Link>.</span>
           </div>
         </div>
         {error && (
           <div className={`rounded-lg p-3 mb-4 text-xs flex items-center justify-between gap-3 ${
             error.status === 401
               ? 'border border-blue-300 bg-blue-50 text-blue-800'
-              : 'border border-red-300 bg-red-50 text-red-800'
+              : 'border border-destructive/40 bg-destructive/10 text-destructive'
           }`}>
             <span>{error.message}</span>
             {error.status === 401 && (
@@ -305,7 +305,7 @@ export default function Templates() {
               <button
                 type="button"
                 onClick={() => window.location.reload()}
-                className="shrink-0 px-2.5 py-1 rounded-md border border-red-300 text-red-800 text-[11px] font-medium hover:bg-red-100"
+                className="shrink-0 px-2.5 py-1 rounded-md border border-destructive/40 text-destructive text-[11px] font-medium hover:bg-red-100"
               >
                 Retry
               </button>
@@ -313,7 +313,7 @@ export default function Templates() {
           </div>
         )}
         {creatingError && (
-          <div className="rounded-lg border border-red-300 bg-red-50 p-3 mb-4 text-xs text-red-800">
+          <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-3 mb-4 text-xs text-destructive">
             {creatingError}
           </div>
         )}
@@ -322,7 +322,7 @@ export default function Templates() {
             {Array.from({ length: 6 }).map((_, i) => (
               <article
                 key={i}
-                className="rounded-xl border border-slate-200 bg-white p-4 flex flex-col gap-3"
+                className="rounded-xl border border-border bg-card p-4 flex flex-col gap-3"
               >
                 <div className="flex items-start gap-3">
                   <Skeleton className="w-9 h-9 rounded-lg" />
@@ -351,7 +351,7 @@ export default function Templates() {
                 <button
                   type="button"
                   onClick={() => setFilter('')}
-                  className="text-xs px-3 py-1.5 rounded-lg border border-slate-300 hover:bg-slate-50 font-medium"
+                  className="text-xs px-3 py-1.5 rounded-lg border border-border hover:bg-muted font-medium"
                 >
                   Clear filter
                 </button>

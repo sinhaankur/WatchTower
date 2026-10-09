@@ -103,7 +103,7 @@ export default function DiscoverNodesCard({
             <div className="mt-2 flex items-center gap-2 pt-2 border-t border-border-soft">
               <span className="text-muted-foreground">
                 State snapshot: {cp.snapshot_present ? `synced ${fmtAge(cp.last_synced_at)}` : 'none yet'}
-                {cp.last_sync_error && <span className="text-red-600"> · last error: {cp.last_sync_error}</span>}
+                {cp.last_sync_error && <span className="text-destructive"> · last error: {cp.last_sync_error}</span>}
               </span>
               <button
                 type="button"
@@ -141,7 +141,7 @@ export default function DiscoverNodesCard({
                 }`}
               >
                 <span
-                  className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white border border-border transition-transform ${
+                  className={`inline-block h-3.5 w-3.5 transform rounded-full bg-card border border-border transition-transform ${
                     cp.auto_failover_enabled ? 'translate-x-4' : 'translate-x-0.5'
                   }`}
                 />
@@ -170,7 +170,7 @@ export default function DiscoverNodesCard({
           </div>
         </div>
       )}
-      {pairError && <p className="mb-2 text-[11px] text-red-600">{pairError}</p>}
+      {pairError && <p className="mb-2 text-[11px] text-destructive">{pairError}</p>}
 
       <div className="space-y-1.5">
         {peers.map((p) => {

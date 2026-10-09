@@ -224,7 +224,7 @@ function DiagramFrame({
     ? 'w-full h-auto max-w-[780px] mx-auto block'
     : 'w-full h-auto max-h-[140px]';
   return (
-    <div className="rounded-xl border border-border bg-slate-50/50 px-4 py-3">
+    <div className="rounded-xl border border-border bg-muted/50 px-4 py-3">
       <svg
         viewBox={viewBox}
         role="img"
@@ -235,7 +235,7 @@ function DiagramFrame({
         {children}
       </svg>
       {caption && (
-        <p className="text-[11px] text-slate-500 mt-1.5 text-center">{caption}</p>
+        <p className="text-[11px] text-muted-foreground mt-1.5 text-center">{caption}</p>
       )}
     </div>
   );

@@ -650,12 +650,12 @@ const SetupWizard = () => {
                             ? 'electron-accent-bg border-transparent'
                             : active
                               ? 'border-sky-300 text-sky-200'
-                              : 'border-slate-600 text-slate-400'
+                              : 'border-slate-600 text-muted-foreground'
                         }`}
                       >
                         {done ? 'OK' : idx}
                       </span>
-                      <span className={`text-xs hidden sm:block ${active ? 'text-sky-100' : 'text-slate-400'}`}>{label}</span>
+                      <span className={`text-xs hidden sm:block ${active ? 'text-sky-100' : 'text-muted-foreground'}`}>{label}</span>
                     </div>
                     {i < STEP_LABELS.length - 1 && <div className={`flex-1 h-px mx-2 ${done ? 'bg-sky-300/60' : 'bg-slate-700'}`} />}
                   </div>
@@ -666,8 +666,8 @@ const SetupWizard = () => {
 
           {step === 1 && !quickMode && (
             <div className="electron-card rounded-xl p-6">
-              <h2 className="text-lg font-semibold text-slate-900">Where will your app run?</h2>
-              <p className="text-sm text-slate-600 mb-4">
+              <h2 className="text-lg font-semibold text-foreground">Where will your app run?</h2>
+              <p className="text-sm text-muted-foreground mb-4">
                 Pick the deployment target that fits. You can change this later, and you
                 can mix targets across projects.
               </p>
@@ -677,7 +677,7 @@ const SetupWizard = () => {
                 <label className={`block border rounded-lg p-4 cursor-pointer transition ${
                   data.deployment_target === 'this_machine'
                     ? 'border-emerald-400 bg-emerald-50'
-                    : 'border-slate-200 bg-white hover:border-emerald-300'
+                    : 'border-border bg-card hover:border-emerald-300'
                 }`}>
                   <div className="flex gap-3 items-start">
                     <input
@@ -689,16 +689,16 @@ const SetupWizard = () => {
                     />
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
-                        <p className="font-semibold text-sm text-slate-900">This machine (Podman)</p>
+                        <p className="font-semibold text-sm text-foreground">This machine (Podman)</p>
                         <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-200 text-emerald-900 font-bold">
                           Recommended for trying it out
                         </span>
                       </div>
-                      <p className="text-xs text-slate-700 mt-1">
+                      <p className="text-xs text-foreground/90 mt-1">
                         WatchTower builds your project with Nixpacks and runs it in a container on this Linux machine.
-                        URL is <code className="font-mono bg-white border border-slate-200 px-1 rounded">http://127.0.0.1:&lt;port&gt;</code> — only you can access it.
+                        URL is <code className="font-mono bg-card border border-border px-1 rounded">http://127.0.0.1:&lt;port&gt;</code> — only you can access it.
                       </p>
-                      <ul className="text-[11px] text-slate-600 mt-2 space-y-0.5">
+                      <ul className="text-[11px] text-muted-foreground mt-2 space-y-0.5">
                         <li>✅ No external infrastructure, no signup</li>
                         <li>✅ Closes the autonomous-ops loop locally (build → diagnose → auto-fix)</li>
                         <li>⚠ Only running while your machine is on (laptop sleep / reboot pauses the deploy)</li>
@@ -711,7 +711,7 @@ const SetupWizard = () => {
                 <label className={`block border rounded-lg p-4 cursor-pointer transition ${
                   data.deployment_target === 'remote_ssh'
                     ? 'border-blue-400 bg-blue-50'
-                    : 'border-slate-200 bg-white hover:border-blue-300'
+                    : 'border-border bg-card hover:border-blue-300'
                 }`}>
                   <div className="flex gap-3 items-start">
                     <input
@@ -722,12 +722,12 @@ const SetupWizard = () => {
                       onChange={() => setField('deployment_target', 'remote_ssh')}
                     />
                     <div className="flex-1">
-                      <p className="font-semibold text-sm text-slate-900">A remote SSH server I already have</p>
-                      <p className="text-xs text-slate-700 mt-1">
+                      <p className="font-semibold text-sm text-foreground">A remote SSH server I already have</p>
+                      <p className="text-xs text-foreground/90 mt-1">
                         WatchTower deploys via rsync + a remote reload command. Works for any Linux box you can
                         SSH into — VPS, home Pi over Tailscale, friend's box.
                       </p>
-                      <ul className="text-[11px] text-slate-600 mt-2 space-y-0.5">
+                      <ul className="text-[11px] text-muted-foreground mt-2 space-y-0.5">
                         <li>✅ 24/7 deploy if the box is up 24/7</li>
                         <li>✅ Public URL if the box is publicly addressable</li>
                         <li>⚙ Needs SSH key + reload command (we'll guide you)</li>
@@ -748,7 +748,7 @@ const SetupWizard = () => {
                 <label className={`block border rounded-lg p-4 cursor-pointer transition ${
                   data.deployment_target === 'cloud_setup'
                     ? 'border-violet-400 bg-violet-50'
-                    : 'border-slate-200 bg-white hover:border-violet-300'
+                    : 'border-border bg-card hover:border-violet-300'
                 }`}>
                   <div className="flex gap-3 items-start">
                     <input
@@ -759,53 +759,53 @@ const SetupWizard = () => {
                       onChange={() => setField('deployment_target', 'cloud_setup')}
                     />
                     <div className="flex-1">
-                      <p className="font-semibold text-sm text-slate-900">I need a server (help me pick one)</p>
-                      <p className="text-xs text-slate-700 mt-1">
+                      <p className="font-semibold text-sm text-foreground">I need a server (help me pick one)</p>
+                      <p className="text-xs text-foreground/90 mt-1">
                         WatchTower itself doesn't host servers. Pick a cheap or free cloud Linux box, then come back
                         and choose <em>"A remote SSH server I already have"</em> with its IP.
                       </p>
                       {data.deployment_target === 'cloud_setup' && (
                         <div className="mt-3 space-y-2">
-                          <p className="text-[11px] font-semibold text-slate-800 uppercase tracking-wide">Cheapest viable options</p>
+                          <p className="text-[11px] font-semibold text-foreground uppercase tracking-wide">Cheapest viable options</p>
                           <div className="grid sm:grid-cols-2 gap-2">
                             <a
                               href="https://www.oracle.com/cloud/free/"
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="block rounded border border-slate-300 bg-white hover:border-slate-500 p-2.5 text-xs"
+                              className="block rounded border border-border bg-card hover:border-slate-500 p-2.5 text-xs"
                             >
-                              <p className="font-semibold text-slate-900">Oracle Cloud Always Free</p>
-                              <p className="text-slate-600 mt-0.5">$0 forever · 4 ARM cores · 24 GB RAM · public IP</p>
+                              <p className="font-semibold text-foreground">Oracle Cloud Always Free</p>
+                              <p className="text-muted-foreground mt-0.5">$0 forever · 4 ARM cores · 24 GB RAM · public IP</p>
                             </a>
                             <a
                               href="https://www.hetzner.com/cloud/"
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="block rounded border border-slate-300 bg-white hover:border-slate-500 p-2.5 text-xs"
+                              className="block rounded border border-border bg-card hover:border-slate-500 p-2.5 text-xs"
                             >
-                              <p className="font-semibold text-slate-900">Hetzner CAX11</p>
-                              <p className="text-slate-600 mt-0.5">~$4.59/mo · 2 ARM · 4 GB RAM · billed hourly</p>
+                              <p className="font-semibold text-foreground">Hetzner CAX11</p>
+                              <p className="text-muted-foreground mt-0.5">~$4.59/mo · 2 ARM · 4 GB RAM · billed hourly</p>
                             </a>
                             <a
                               href="https://www.digitalocean.com/pricing/droplets"
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="block rounded border border-slate-300 bg-white hover:border-slate-500 p-2.5 text-xs"
+                              className="block rounded border border-border bg-card hover:border-slate-500 p-2.5 text-xs"
                             >
-                              <p className="font-semibold text-slate-900">DigitalOcean</p>
-                              <p className="text-slate-600 mt-0.5">$4–6/mo · 1 vCPU · 1 GB RAM · public IP</p>
+                              <p className="font-semibold text-foreground">DigitalOcean</p>
+                              <p className="text-muted-foreground mt-0.5">$4–6/mo · 1 vCPU · 1 GB RAM · public IP</p>
                             </a>
                             <a
                               href="https://tailscale.com/"
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="block rounded border border-slate-300 bg-white hover:border-slate-500 p-2.5 text-xs"
+                              className="block rounded border border-border bg-card hover:border-slate-500 p-2.5 text-xs"
                             >
-                              <p className="font-semibold text-slate-900">Tailscale + this machine</p>
-                              <p className="text-slate-600 mt-0.5">Free · this machine, accessible privately from anywhere</p>
+                              <p className="font-semibold text-foreground">Tailscale + this machine</p>
+                              <p className="text-muted-foreground mt-0.5">Free · this machine, accessible privately from anywhere</p>
                             </a>
                           </div>
-                          <p className="text-[11px] text-slate-600 mt-1">
+                          <p className="text-[11px] text-muted-foreground mt-1">
                             After you have a Linux box: install Podman, ensure SSH access works,
                             then come back here and switch to <em>"A remote SSH server I already have."</em>
                           </p>
@@ -832,19 +832,19 @@ const SetupWizard = () => {
 
           {step === 2 && !quickMode && (
             <div className="electron-card rounded-xl p-6">
-              <h2 className="text-lg font-semibold text-slate-900">Choose application type</h2>
-              <p className="text-sm text-slate-600 mb-6">Pick workflow template.</p>
+              <h2 className="text-lg font-semibold text-foreground">Choose application type</h2>
+              <p className="text-sm text-muted-foreground mb-6">Pick workflow template.</p>
               <div className="space-y-3">
                 {([
                   { value: 'netlify_like', title: 'Static + Functions', desc: 'Static frontend with optional API functions.' },
                   { value: 'vercel_like', title: 'SSR / Full-Stack', desc: 'Branch previews and server rendering.' },
                   { value: 'docker_platform', title: 'Docker Platform', desc: 'Containerized app runtime.' },
                 ] as const).map((opt) => (
-                  <label key={opt.value} className={`flex gap-4 items-start border rounded-md p-4 cursor-pointer ${data.use_case === opt.value ? 'border-red-300 bg-red-50' : 'border-border bg-white hover:border-red-300'}`}>
+                  <label key={opt.value} className={`flex gap-4 items-start border rounded-md p-4 cursor-pointer ${data.use_case === opt.value ? 'border-destructive/40 bg-destructive/10' : 'border-border bg-card hover:border-destructive/40'}`}>
                     <input type="radio" name="use_case" className="mt-1" checked={data.use_case === opt.value} onChange={() => setField('use_case', opt.value)} />
                     <div>
                       <p className="font-medium text-sm">{opt.title}</p>
-                      <p className="text-xs text-slate-600 mt-0.5">{opt.desc}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">{opt.desc}</p>
                     </div>
                   </label>
                 ))}
@@ -860,8 +860,8 @@ const SetupWizard = () => {
             <div className="electron-card rounded-xl p-6">
               <div className="flex items-center justify-between mb-4">
                 <div>
-                  <h2 className="text-lg font-semibold text-slate-900">Connect source</h2>
-                  <p className="text-sm text-slate-600 mt-1">GitHub repo or local folder. Deploy like a web app.</p>
+                  <h2 className="text-lg font-semibold text-foreground">Connect source</h2>
+                  <p className="text-sm text-muted-foreground mt-1">GitHub repo or local folder. Deploy like a web app.</p>
                 </div>
                 {quickMode && (
                   <span className="px-2 py-1 bg-sky-100 text-sky-700 text-xs font-medium rounded-md">⚡ Quick Mode</span>
@@ -891,14 +891,14 @@ const SetupWizard = () => {
                   <button
                     type="button"
                     onClick={() => setField('source_type', 'github')}
-                    className={`text-left px-3 py-2 border rounded-md text-sm ${data.source_type === 'github' ? 'bg-red-50 border-red-300 text-red-800 font-semibold' : 'bg-white border-border text-slate-700'}`}
+                    className={`text-left px-3 py-2 border rounded-md text-sm ${data.source_type === 'github' ? 'bg-destructive/10 border-destructive/40 text-destructive font-semibold' : 'bg-card border-border text-foreground/90'}`}
                   >
                     GitHub Repository
                   </button>
                   <button
                     type="button"
                     onClick={() => setField('source_type', 'local_folder')}
-                    className={`text-left px-3 py-2 border rounded-md text-sm ${data.source_type === 'local_folder' ? 'bg-red-50 border-red-300 text-red-800 font-semibold' : 'bg-white border-border text-slate-700'}`}
+                    className={`text-left px-3 py-2 border rounded-md text-sm ${data.source_type === 'local_folder' ? 'bg-destructive/10 border-destructive/40 text-destructive font-semibold' : 'bg-card border-border text-foreground/90'}`}
                   >
                     Local Folder
                   </button>
@@ -921,8 +921,8 @@ const SetupWizard = () => {
                             : 'Connect GitHub for Repo Access'}
                       </button>
                     </div>
-                    <Input id="repo_url" value={data.repo_url} onChange={(e) => setField('repo_url', e.target.value)} className="mt-1.5 rounded-md border-border bg-white" placeholder="https://github.com/owner/repo" />
-                    <p className="text-[11px] text-slate-600">
+                    <Input id="repo_url" value={data.repo_url} onChange={(e) => setField('repo_url', e.target.value)} className="mt-1.5 rounded-md border-border bg-card" placeholder="https://github.com/owner/repo" />
+                    <p className="text-[11px] text-muted-foreground">
                       Choosing a repo here fills URL and branch. WatchTower clones/downloads the repository when the first deployment is queued.
                     </p>
 
@@ -933,7 +933,7 @@ const SetupWizard = () => {
                           Open GitHub, enter this code, then return here. We will continue automatically once authorized.
                         </p>
                         <div className="flex items-center gap-2">
-                          <code className="px-2 py-1 rounded bg-white border border-indigo-200 text-indigo-900 font-semibold tracking-wider">
+                          <code className="px-2 py-1 rounded bg-card border border-indigo-200 text-indigo-900 font-semibold tracking-wider">
                             {deviceConnect.userCode || '---'}
                           </code>
                           <a
@@ -949,7 +949,7 @@ const SetupWizard = () => {
                           <p className="text-xs text-indigo-700 animate-pulse">Waiting for GitHub authorization…</p>
                         )}
                         {deviceConnect.error && (
-                          <p className="text-xs text-red-700 bg-red-50 border border-red-200 rounded px-2 py-1">{deviceConnect.error}</p>
+                          <p className="text-xs text-destructive bg-destructive/10 border border-destructive/30 rounded px-2 py-1">{deviceConnect.error}</p>
                         )}
                       </div>
                     )}
@@ -963,7 +963,7 @@ const SetupWizard = () => {
                         </div>
 
                         {ghPickerError && (
-                          <p className="text-xs text-red-700 bg-red-50 border border-red-200 rounded px-2 py-1">{ghPickerError}</p>
+                          <p className="text-xs text-destructive bg-destructive/10 border border-destructive/30 rounded px-2 py-1">{ghPickerError}</p>
                         )}
 
                         {ghOrgs.length > 0 && (
@@ -972,7 +972,7 @@ const SetupWizard = () => {
                             <select
                               value={selectedGHOrg}
                               onChange={(e) => setSelectedGHOrg(e.target.value)}
-                              className="w-full rounded-md border border-sky-200 bg-white text-sm px-2 py-1.5"
+                              className="w-full rounded-md border border-sky-200 bg-card text-sm px-2 py-1.5"
                             >
                               {ghOrgs.map((o) => (
                                 <option key={o.login} value={o.login}>
@@ -989,18 +989,18 @@ const SetupWizard = () => {
                             value={repoSearch}
                             onChange={(e) => setRepoSearch(e.target.value)}
                             placeholder="Filter by name..."
-                            className="rounded-md border-sky-200 bg-white text-sm"
+                            className="rounded-md border-sky-200 bg-card text-sm"
                           />
                         </div>
 
                         {ghPickerLoading && <p className="text-xs text-sky-600 animate-pulse">Loading repositories…</p>}
 
                         {!ghPickerLoading && ghRepos.length === 0 && !ghPickerError && (
-                          <p className="text-xs text-slate-500">No repositories found for this account.</p>
+                          <p className="text-xs text-muted-foreground">No repositories found for this account.</p>
                         )}
 
                         {!ghPickerLoading && ghRepos.length > 0 && (
-                          <div className="max-h-48 overflow-y-auto rounded-md border border-sky-200 bg-white divide-y divide-sky-100">
+                          <div className="max-h-48 overflow-y-auto rounded-md border border-sky-200 bg-card divide-y divide-sky-100">
                             {ghRepos
                               .filter((r) => !repoSearch || r.name.toLowerCase().includes(repoSearch.toLowerCase()))
                               .map((repo) => (
@@ -1011,11 +1011,11 @@ const SetupWizard = () => {
                                   className="w-full text-left px-3 py-2 hover:bg-sky-50 transition-colors"
                                 >
                                   <div className="flex items-center gap-2">
-                                    <span className="text-xs font-medium text-slate-800">{repo.name}</span>
+                                    <span className="text-xs font-medium text-foreground">{repo.name}</span>
                                     {repo.private && <span className="text-[10px] bg-amber-100 text-amber-700 px-1 rounded">private</span>}
                                   </div>
                                   {repo.description && (
-                                    <p className="text-[11px] text-slate-500 truncate mt-0.5">{repo.description}</p>
+                                    <p className="text-[11px] text-muted-foreground truncate mt-0.5">{repo.description}</p>
                                   )}
                                 </button>
                               ))}
@@ -1032,7 +1032,7 @@ const SetupWizard = () => {
                         id="local_folder_path"
                         value={data.local_folder_path}
                         onChange={(e) => setField('local_folder_path', e.target.value)}
-                        className="flex-1 rounded-md border-border bg-white"
+                        className="flex-1 rounded-md border-border bg-card"
                         placeholder="/home/you/my-app"
                       />
                       {/* Hidden file input for browser-based folder selection */}
@@ -1076,7 +1076,7 @@ const SetupWizard = () => {
                             folderInputRef.current?.click();
                           }
                         }}
-                        className="px-3 py-2 text-sm rounded-md border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 font-medium whitespace-nowrap"
+                        className="px-3 py-2 text-sm rounded-md border border-border bg-card hover:bg-muted text-foreground/90 font-medium whitespace-nowrap"
                       >
                         Browse…
                       </button>
@@ -1086,7 +1086,7 @@ const SetupWizard = () => {
                         Browser security only shared the folder name ({browserPickedFolderName}). Please replace it with the full absolute path before continuing.
                       </p>
                     )}
-                    <p className="text-xs text-slate-600 mt-1">Use an absolute path to your app folder on this machine.</p>
+                    <p className="text-xs text-muted-foreground mt-1">Use an absolute path to your app folder on this machine.</p>
                   </div>
                 )}
 
@@ -1094,8 +1094,8 @@ const SetupWizard = () => {
                 {quickMode && (
                   <div>
                     <Label htmlFor="project_name">Project Name *</Label>
-                    <Input id="project_name" value={data.project_name} onChange={(e) => setField('project_name', e.target.value)} className="mt-1.5 rounded-md border-border bg-white" placeholder="my-web-app" />
-                    <p className="text-xs text-slate-600 mt-1">A unique name for your deployment.</p>
+                    <Input id="project_name" value={data.project_name} onChange={(e) => setField('project_name', e.target.value)} className="mt-1.5 rounded-md border-border bg-card" placeholder="my-web-app" />
+                    <p className="text-xs text-muted-foreground mt-1">A unique name for your deployment.</p>
                   </div>
                 )}
 
@@ -1104,18 +1104,18 @@ const SetupWizard = () => {
                 <>
                 <div>
                   <Label htmlFor="launch_url">Launch URL (optional)</Label>
-                  <Input id="launch_url" value={data.launch_url} onChange={(e) => setField('launch_url', e.target.value)} className="mt-1.5 rounded-md border-border bg-white" placeholder="https://my-app.example.com or http://127.0.0.1:3000" />
-                  <p className="text-xs text-slate-600 mt-1">This enables one-click Open Web from your dashboard.</p>
+                  <Input id="launch_url" value={data.launch_url} onChange={(e) => setField('launch_url', e.target.value)} className="mt-1.5 rounded-md border-border bg-card" placeholder="https://my-app.example.com or http://127.0.0.1:3000" />
+                  <p className="text-xs text-muted-foreground mt-1">This enables one-click Open Web from your dashboard.</p>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="repo_branch">{data.source_type === 'github' ? 'Branch' : 'Branch (optional)'}</Label>
-                    <Input id="repo_branch" value={data.repo_branch} onChange={(e) => setField('repo_branch', e.target.value)} className="mt-1.5 rounded-md border-border bg-white" placeholder={data.source_type === 'github' ? 'main' : 'local'} />
+                    <Input id="repo_branch" value={data.repo_branch} onChange={(e) => setField('repo_branch', e.target.value)} className="mt-1.5 rounded-md border-border bg-card" placeholder={data.source_type === 'github' ? 'main' : 'local'} />
                   </div>
                   <div>
                     <Label htmlFor="build_command">Build/Run Command {data.source_type === 'github' ? '*' : '(optional)'}</Label>
-                    <Input id="build_command" value={data.build_command} onChange={(e) => setField('build_command', e.target.value)} className="mt-1.5 rounded-md border-border bg-white" placeholder={data.source_type === 'github' ? 'npm install && npm run build' : 'npm run dev'} />
+                    <Input id="build_command" value={data.build_command} onChange={(e) => setField('build_command', e.target.value)} className="mt-1.5 rounded-md border-border bg-card" placeholder={data.source_type === 'github' ? 'npm install && npm run build' : 'npm run dev'} />
                   </div>
                 </div>
                 </>
@@ -1140,12 +1140,12 @@ const SetupWizard = () => {
           {/* Only show step 4 if not in quick mode */}
           {step === 4 && !quickMode && (
             <div className="electron-card rounded-xl p-6">
-              <h2 className="text-lg font-semibold text-slate-900">Finalize configuration</h2>
-              <p className="text-sm text-slate-600 mb-6">Set project identity and runtime options.</p>
+              <h2 className="text-lg font-semibold text-foreground">Finalize configuration</h2>
+              <p className="text-sm text-muted-foreground mb-6">Set project identity and runtime options.</p>
               <div className="space-y-4">
                 <div>
                   <Label htmlFor="project_name">Project Name *</Label>
-                  <Input id="project_name" value={data.project_name} onChange={(e) => setField('project_name', e.target.value)} className="mt-1.5 rounded-md border-border bg-white" placeholder="my-web-app" />
+                  <Input id="project_name" value={data.project_name} onChange={(e) => setField('project_name', e.target.value)} className="mt-1.5 rounded-md border-border bg-card" placeholder="my-web-app" />
                 </div>
 
                 {data.use_case === 'netlify_like' && (
@@ -1155,11 +1155,11 @@ const SetupWizard = () => {
                       <div className="grid grid-cols-2 gap-3">
                         <div>
                           <Label htmlFor="output_dir">Output Directory</Label>
-                          <Input id="output_dir" value={data.output_dir} onChange={(e) => setField('output_dir', e.target.value)} className="mt-1.5 rounded-md border-border bg-white" />
+                          <Input id="output_dir" value={data.output_dir} onChange={(e) => setField('output_dir', e.target.value)} className="mt-1.5 rounded-md border-border bg-card" />
                         </div>
                         <div>
                           <Label htmlFor="functions_dir">Functions Directory</Label>
-                          <Input id="functions_dir" value={data.functions_dir} onChange={(e) => setField('functions_dir', e.target.value)} className="mt-1.5 rounded-md border-border bg-white" />
+                          <Input id="functions_dir" value={data.functions_dir} onChange={(e) => setField('functions_dir', e.target.value)} className="mt-1.5 rounded-md border-border bg-card" />
                         </div>
                       </div>
                     </CardContent>
@@ -1172,7 +1172,7 @@ const SetupWizard = () => {
                       <p className="text-xs font-medium uppercase tracking-wide electron-accent">SSR Runtime</p>
                       <div>
                         <Label htmlFor="framework">Framework</Label>
-                        <Input id="framework" value={data.framework} onChange={(e) => setField('framework', e.target.value)} className="mt-1.5 rounded-md border-border bg-white" />
+                        <Input id="framework" value={data.framework} onChange={(e) => setField('framework', e.target.value)} className="mt-1.5 rounded-md border-border bg-card" />
                       </div>
                     </CardContent>
                   </Card>
@@ -1188,7 +1188,7 @@ const SetupWizard = () => {
                   <CardContent className="py-4 space-y-3">
                     <p className="text-xs font-medium uppercase tracking-wide electron-accent">Port</p>
                     {recommendedPort === null ? (
-                      <p className="text-sm text-slate-600">Picking a free port…</p>
+                      <p className="text-sm text-muted-foreground">Picking a free port…</p>
                     ) : recommendedPort === 'error' ? (
                       <div className="flex items-center gap-3">
                         <p className="text-sm text-amber-800">
@@ -1199,7 +1199,7 @@ const SetupWizard = () => {
                           type="number"
                           value={data.exposed_port}
                           onChange={(e) => setField('exposed_port', Number(e.target.value || 3000))}
-                          className="w-24 rounded-md border-border bg-white"
+                          className="w-24 rounded-md border-border bg-card"
                         />
                       </div>
                     ) : portEditOpen ? (
@@ -1210,26 +1210,26 @@ const SetupWizard = () => {
                           type="number"
                           value={data.exposed_port}
                           onChange={(e) => setField('exposed_port', Number(e.target.value || 3000))}
-                          className="w-24 rounded-md border-border bg-white"
+                          className="w-24 rounded-md border-border bg-card"
                         />
                         <button
                           type="button"
                           onClick={() => setPortEditOpen(false)}
-                          className="text-xs text-slate-600 hover:text-slate-900 underline"
+                          className="text-xs text-muted-foreground hover:text-foreground underline"
                         >
                           Done
                         </button>
                       </div>
                     ) : (
                       <div className="flex items-center gap-3">
-                        <p className="text-sm text-slate-700">
-                          We'll deploy on <span className="font-mono font-semibold text-slate-900">port {data.exposed_port}</span>{' '}
-                          <span className="text-slate-500">(free, picked from 3000-3999)</span>
+                        <p className="text-sm text-foreground/90">
+                          We'll deploy on <span className="font-mono font-semibold text-foreground">port {data.exposed_port}</span>{' '}
+                          <span className="text-muted-foreground">(free, picked from 3000-3999)</span>
                         </p>
                         <button
                           type="button"
                           onClick={() => setPortEditOpen(true)}
-                          className="text-xs text-slate-600 hover:text-slate-900 underline"
+                          className="text-xs text-muted-foreground hover:text-foreground underline"
                         >
                           Edit
                         </button>
@@ -1244,7 +1244,7 @@ const SetupWizard = () => {
                       <p className="text-xs font-medium uppercase tracking-wide electron-accent">Container Runtime</p>
                       <div>
                         <Label htmlFor="dockerfile_path">Dockerfile Path</Label>
-                        <Input id="dockerfile_path" value={data.dockerfile_path} onChange={(e) => setField('dockerfile_path', e.target.value)} className="mt-1.5 rounded-md border-border bg-white" />
+                        <Input id="dockerfile_path" value={data.dockerfile_path} onChange={(e) => setField('dockerfile_path', e.target.value)} className="mt-1.5 rounded-md border-border bg-card" />
                       </div>
                     </CardContent>
                   </Card>
@@ -1252,7 +1252,7 @@ const SetupWizard = () => {
 
                 <div>
                   <Label htmlFor="custom_domain">Custom Domain (optional)</Label>
-                  <Input id="custom_domain" value={data.custom_domain} onChange={(e) => setField('custom_domain', e.target.value)} className="mt-1.5 rounded-md border-border bg-white" placeholder="app.example.com" />
+                  <Input id="custom_domain" value={data.custom_domain} onChange={(e) => setField('custom_domain', e.target.value)} className="mt-1.5 rounded-md border-border bg-card" placeholder="app.example.com" />
                 </div>
               </div>
 
@@ -1289,7 +1289,7 @@ const SetupWizard = () => {
               <p className="text-xs font-semibold uppercase tracking-[0.16em] electron-accent">Next Steps</p>
               <ol className="mt-3 space-y-2">
                 {nextSteps.map((item, idx) => (
-                  <li key={item} className="flex gap-2 text-xs text-slate-700">
+                  <li key={item} className="flex gap-2 text-xs text-foreground/90">
                     <span className="w-5 h-5 rounded-full electron-accent-bg flex items-center justify-center text-[10px] shrink-0">{idx + 1}</span>
                     <span>{item}</span>
                   </li>
@@ -1301,10 +1301,10 @@ const SetupWizard = () => {
           <Card className="electron-card rounded-xl shadow-none">
             <CardContent className="py-4">
               <p className="text-xs font-semibold uppercase tracking-[0.16em] electron-accent">Current Selection</p>
-              <div className="mt-2 text-xs text-slate-700 space-y-1">
-                <p>Mode: <span className="text-red-700">{data.deployment_model === 'self_hosted' ? 'Self-Hosted' : 'SaaS'}</span></p>
-                <p>App Type: <span className="text-red-700">{data.use_case}</span></p>
-                <p>Branch: <span className="text-red-700">{data.repo_branch || 'main'}</span></p>
+              <div className="mt-2 text-xs text-foreground/90 space-y-1">
+                <p>Mode: <span className="text-destructive">{data.deployment_model === 'self_hosted' ? 'Self-Hosted' : 'SaaS'}</span></p>
+                <p>App Type: <span className="text-destructive">{data.use_case}</span></p>
+                <p>Branch: <span className="text-destructive">{data.repo_branch || 'main'}</span></p>
               </div>
             </CardContent>
           </Card>

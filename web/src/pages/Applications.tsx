@@ -34,7 +34,7 @@ function RowMenu({
     <div ref={ref} className="relative">
       <button
         onClick={() => setOpen((v) => !v)}
-        className="px-2 py-1.5 rounded-lg border border-border text-sm text-slate-500 hover:bg-slate-100 transition-colors leading-none"
+        className="px-2 py-1.5 rounded-lg border border-border text-sm text-muted-foreground hover:bg-muted transition-colors leading-none"
         title="More actions"
         aria-haspopup="menu"
         aria-expanded={open}
@@ -52,7 +52,7 @@ function RowMenu({
           </button>
           <button
             onClick={() => { setOpen(false); onDelete(); }}
-            className="w-full text-left px-3 py-2 text-red-600 hover:bg-red-50 transition-colors"
+            className="w-full text-left px-3 py-2 text-destructive hover:bg-destructive/10 transition-colors"
           >
             ✕ Delete project
           </button>
@@ -96,8 +96,8 @@ const STATUS_COLOR: Record<string, string> = {
   building:    'bg-blue-100 text-blue-700 border-blue-200',
   deploying:   'bg-indigo-100 text-indigo-700 border-indigo-200',
   pending:     'bg-amber-100 text-amber-700 border-amber-200',
-  failed:      'bg-red-100 text-red-700 border-red-200',
-  rolled_back: 'bg-slate-100 text-slate-500 border-slate-200',
+  failed:      'bg-red-100 text-destructive border-destructive/30',
+  rolled_back: 'bg-muted text-muted-foreground border-border',
 };
 
 /**
@@ -122,7 +122,7 @@ function deduplicateProjects<T extends Project>(projects: T[]): T[] {
 }
 
 function Badge({ status }: { status: string }) {
-  const cls = STATUS_COLOR[status.toLowerCase()] ?? 'bg-slate-100 text-slate-600 border-slate-200';
+  const cls = STATUS_COLOR[status.toLowerCase()] ?? 'bg-muted text-muted-foreground border-border';
   return (
     <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${cls}`}>
       {status.replace(/_/g, ' ')}
@@ -331,8 +331,8 @@ const Applications = () => {
         style={{ borderColor: 'hsl(var(--border-soft))', background: 'hsl(var(--surface-soft) / 0.9)' }}
       >
         <div>
-          <h1 className="text-lg font-semibold text-slate-900">Applications</h1>
-          <p className="text-xs text-slate-600 mt-0.5 hidden sm:block">
+          <h1 className="text-lg font-semibold text-foreground">Applications</h1>
+          <p className="text-xs text-muted-foreground mt-0.5 hidden sm:block">
             {loading ? 'Loading…' : `${projects.length} project${projects.length !== 1 ? 's' : ''}`}
           </p>
         </div>
@@ -340,7 +340,7 @@ const Applications = () => {
           <button
             onClick={() => void loadProjects()}
             disabled={loading}
-            className="px-3 py-1.5 rounded-lg border border-border text-xs text-slate-700 hover:bg-slate-100 transition-colors disabled:opacity-50"
+            className="px-3 py-1.5 rounded-lg border border-border text-xs text-foreground/90 hover:bg-muted transition-colors disabled:opacity-50"
           >
             {loading ? '…' : '↻ Refresh'}
           </button>
@@ -359,7 +359,7 @@ const Applications = () => {
           <div className={`rounded-lg border px-4 py-3 text-sm ${
             msg.kind === 'success'
               ? 'border-emerald-300 bg-emerald-50 text-emerald-700'
-              : 'border-red-300 bg-red-50 text-red-700'
+              : 'border-destructive/40 bg-destructive/10 text-destructive'
           }`}>
             {msg.text}
           </div>
@@ -367,7 +367,7 @@ const Applications = () => {
 
         {/* Error state */}
         {error && !loading && (
-          <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
             {error}
           </div>
         )}
@@ -393,7 +393,7 @@ const Applications = () => {
               return (
                 <div
                   key={p.id}
-                  className="rounded-xl border border-border bg-card hover:border-red-200 transition-colors shadow-sm overflow-hidden"
+                  className="rounded-xl border border-border bg-card hover:border-destructive/30 transition-colors shadow-sm overflow-hidden"
                 >
                   <div className="px-5 py-4 flex items-start justify-between gap-4">
                     {/* Left: name + meta */}
@@ -402,7 +402,7 @@ const Applications = () => {
                         <span className="text-base">{meta.icon}</span>
                         <Link
                           to={`/projects/${p.id}`}
-                          className="font-semibold text-slate-900 hover:text-red-700 transition-colors truncate"
+                          className="font-semibold text-foreground hover:text-destructive transition-colors truncate"
                         >
                           {p.name}
                         </Link>
@@ -419,7 +419,7 @@ const Applications = () => {
                           </Link>
                         )}
                         {!p.lastDeployment && (
-                          <span className="text-[11px] px-2 py-0.5 rounded-full border border-slate-200 bg-slate-50 text-slate-500 font-medium">
+                          <span className="text-[11px] px-2 py-0.5 rounded-full border border-border bg-muted text-muted-foreground font-medium">
                             never deployed
                           </span>
                         )}
@@ -427,26 +427,26 @@ const Applications = () => {
                       {/* Inline failure diagnosis — the answer to "it failed,
                           now what?" belongs on the card, not two clicks away. */}
                       {p.lastDeployment?.status.toLowerCase() === 'failed' && diagnoses[p.id] && (
-                        <div className="mt-2 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-900">
+                        <div className="mt-2 flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-red-900">
                           <span className="shrink-0" aria-hidden>⚠</span>
                           <span className="min-w-0">
                             {diagnoses[p.id].cause}{' '}
                             <Link
                               to={`/deployments/${p.lastDeployment.id}`}
-                              className="font-semibold underline whitespace-nowrap hover:text-red-700"
+                              className="font-semibold underline whitespace-nowrap hover:text-destructive"
                             >
                               View log →
                             </Link>
                           </span>
                         </div>
                       )}
-                      <div className="mt-1.5 flex items-center gap-3 text-xs text-slate-500 flex-wrap">
+                      <div className="mt-1.5 flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
                         {p.repo_url && /^https?:\/\//i.test(p.repo_url) ? (
                           <a
                             href={p.repo_url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="truncate max-w-xs font-mono text-slate-600 hover:text-slate-900 hover:underline"
+                            className="truncate max-w-xs font-mono text-muted-foreground hover:text-foreground hover:underline"
                             title={`Open repository: ${p.repo_url}`}
                           >
                             {p.repo_url.replace('https://github.com/', '')} ↗
@@ -454,7 +454,7 @@ const Applications = () => {
                         ) : (
                           <span className="font-mono">{p.source_type === 'local_folder' ? 'local folder' : p.repo_url}</span>
                         )}
-                        <span className="font-mono bg-slate-100 px-1.5 py-0.5 rounded">{p.repo_branch}</span>
+                        <span className="font-mono bg-muted px-1.5 py-0.5 rounded">{p.repo_branch}</span>
                         {p.lastDeployment && (
                           <span>Last deploy {fmtDate(p.lastDeployment.created_at)}</span>
                         )}
@@ -481,14 +481,14 @@ const Applications = () => {
                           href={p.launch_url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="px-3 py-1.5 rounded-lg border border-border text-xs text-slate-700 hover:bg-slate-100 transition-colors"
+                          className="px-3 py-1.5 rounded-lg border border-border text-xs text-foreground/90 hover:bg-muted transition-colors"
                           title={`Open app: ${p.launch_url}`}
                         >
                           Open ↗
                         </a>
                       ) : (
                         <span
-                          className="px-3 py-1.5 rounded-lg border border-border text-xs text-slate-400 cursor-not-allowed"
+                          className="px-3 py-1.5 rounded-lg border border-border text-xs text-muted-foreground cursor-not-allowed"
                           title="No launch URL set. Edit the project to add one, or deploy to populate it."
                         >
                           Open ↗
@@ -508,7 +508,7 @@ const Applications = () => {
                       </button>
                       <Link
                         to={`/projects/${p.id}`}
-                        className="px-3 py-1.5 rounded-lg border border-border text-xs text-slate-700 hover:bg-slate-100 transition-colors"
+                        className="px-3 py-1.5 rounded-lg border border-border text-xs text-foreground/90 hover:bg-muted transition-colors"
                       >
                         Details
                       </Link>
@@ -522,7 +522,7 @@ const Applications = () => {
 
                   {/* Deployment progress bar */}
                   {inProgress && (
-                    <div className="h-0.5 w-full bg-slate-100">
+                    <div className="h-0.5 w-full bg-muted">
                       <div className="h-full bg-blue-400 animate-pulse w-full" />
                     </div>
                   )}
@@ -542,7 +542,7 @@ const Applications = () => {
                 action={
                   <>
                     <Link to="/servers"
-                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg border border-border text-slate-700 hover:bg-slate-100 text-sm transition-colors">
+                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg border border-border text-foreground/90 hover:bg-muted text-sm transition-colors">
                       → Add Server First
                     </Link>
                     <Link to="/setup"
@@ -554,7 +554,7 @@ const Applications = () => {
               />
             </div>
 
-            <h2 className="text-sm font-semibold text-slate-900 mb-3">What can I deploy?</h2>
+            <h2 className="text-sm font-semibold text-foreground mb-3">What can I deploy?</h2>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               {[
                 { icon: '🌐', title: 'Static Site',   desc: 'React, Vue, Angular — any static build. Fast to serve, ideal for frontends.' },
@@ -562,11 +562,11 @@ const Applications = () => {
                 { icon: '🐳', title: 'Docker App',    desc: 'Any containerised service. Bring your own Dockerfile.' },
               ].map(({ icon, title, desc }) => (
                 <Link key={title} to="/setup"
-                  className="p-4 rounded-lg border border-border bg-muted/20 hover:border-red-300 hover:bg-red-50/40 transition-all group">
+                  className="p-4 rounded-lg border border-border bg-muted/20 hover:border-destructive/40 hover:bg-destructive/10/40 transition-all group">
                   <span className="text-2xl">{icon}</span>
-                  <p className="text-sm font-semibold text-slate-900 mt-2">{title}</p>
-                  <p className="text-xs text-slate-600 mt-1">{desc}</p>
-                  <p className="text-xs text-red-700 mt-3 opacity-0 group-hover:opacity-100 transition-opacity">Deploy this →</p>
+                  <p className="text-sm font-semibold text-foreground mt-2">{title}</p>
+                  <p className="text-xs text-muted-foreground mt-1">{desc}</p>
+                  <p className="text-xs text-destructive mt-3 opacity-0 group-hover:opacity-100 transition-opacity">Deploy this →</p>
                 </Link>
               ))}
             </div>
@@ -577,20 +577,20 @@ const Applications = () => {
       {/* Cache clear confirmation dialog */}
       {confirmCacheClear && (
         <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4 anim-fade-in">
-          <div className="bg-white rounded-xl border border-border shadow-xl p-6 max-w-sm w-full anim-pop-in">
-            <h2 className="text-base font-semibold text-slate-900">Clear build cache?</h2>
-            <p className="text-sm text-slate-600 mt-1">
+          <div className="bg-card rounded-xl border border-border shadow-xl p-6 max-w-sm w-full anim-pop-in">
+            <h2 className="text-base font-semibold text-foreground">Clear build cache?</h2>
+            <p className="text-sm text-muted-foreground mt-1">
               Removes <span className="font-medium">{confirmCacheClear.name}</span>'s cloned workspace
               and package-manager caches (npm / pnpm / yarn / bun) on this device. The next deploy will
               re-clone and re-install from scratch — slower, but recovers from corrupted caches.
             </p>
-            <p className="text-xs text-slate-500 mt-2">
+            <p className="text-xs text-muted-foreground mt-2">
               The active local-run container and deployment history are not affected.
             </p>
             <div className="flex gap-2 mt-4 justify-end">
               <button
                 onClick={() => setConfirmCacheClear(null)}
-                className="px-4 py-2 rounded-lg border border-border text-sm text-slate-700 hover:bg-slate-100 transition-colors"
+                className="px-4 py-2 rounded-lg border border-border text-sm text-foreground/90 hover:bg-muted transition-colors"
               >
                 Cancel
               </button>
@@ -609,15 +609,15 @@ const Applications = () => {
       {/* Delete confirmation dialog */}
       {confirmDelete && (
         <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4 anim-fade-in">
-          <div className="bg-white rounded-xl border border-border shadow-xl p-6 max-w-sm w-full anim-pop-in">
-            <h2 className="text-base font-semibold text-slate-900">Delete project?</h2>
-            <p className="text-sm text-slate-600 mt-1">
+          <div className="bg-card rounded-xl border border-border shadow-xl p-6 max-w-sm w-full anim-pop-in">
+            <h2 className="text-base font-semibold text-foreground">Delete project?</h2>
+            <p className="text-sm text-muted-foreground mt-1">
               This removes the project and all deployment history. This cannot be undone.
             </p>
             <div className="flex gap-2 mt-4 justify-end">
               <button
                 onClick={() => setConfirmDelete(null)}
-                className="px-4 py-2 rounded-lg border border-border text-sm text-slate-700 hover:bg-slate-100 transition-colors"
+                className="px-4 py-2 rounded-lg border border-border text-sm text-foreground/90 hover:bg-muted transition-colors"
               >
                 Cancel
               </button>
