@@ -38,7 +38,11 @@ python-dotenv==1.2.4
 
 # Database
 sqlalchemy==2.0.54
-psycopg2-binary==2.9.13
+# Range, not an exact pin: 2.9.13's aarch64 wheels need manylinux_2_27+, but
+# the linux-arm64 cross-build targets an older glibc (manylinux2014) whose
+# newest wheel is 2.9.11 — ==2.9.13 broke the arm64 bundle. (See requirements.txt;
+# THIS is the file build-python-bundle.sh actually installs from.)
+psycopg2-binary>=2.9.9,<2.10
 alembic==1.20.0
 
 # Utilities
