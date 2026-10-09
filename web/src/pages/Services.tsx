@@ -40,7 +40,7 @@ const SERVICES: ServiceDef[] = [
     ports: [{ host: 7700, container: 7700 }], openPort: 7700,
   },
   {
-    slug: 'mailpit', name: 'Mailpit', category: 'Dev Tools', tone: 'bg-sky-100 text-sky-700',
+    slug: 'mailpit', name: 'Mailpit', category: 'Dev Tools', tone: 'bg-sky-500/15 text-sky-600 dark:text-sky-400',
     desc: 'Email testing and capture for local development.',
     image: 'docker.io/axllent/mailpit:latest',
     ports: [{ host: 8025, container: 8025 }, { host: 1025, container: 1025 }], openPort: 8025,

@@ -97,7 +97,7 @@ export default function NetworkMap({ nodes }: { nodes: MapNode[] }) {
           const y = startY + i * ROW_H;
           return (
             <g key={n.id}>
-              <rect x="438" y={y - 27} width="246" height="54" rx="11" fill="#ffffff" stroke="#e5e0d3" strokeWidth="1.5" />
+              <rect x="438" y={y - 27} width="246" height="54" rx="11" fill="hsl(var(--card))" stroke="hsl(var(--border))" strokeWidth="1.5" />
               <circle cx="458" cy={y} r="5" fill={STATUS_FILL[n.status]} />
               <text x="472" y={y - 3} fontSize="12.5" fontWeight="700" fill="#0f172a">
                 {n.name.length > 22 ? n.name.slice(0, 21) + '…' : n.name}

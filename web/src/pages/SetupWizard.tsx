@@ -628,7 +628,7 @@ const SetupWizard = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="font-semibold text-sky-900 text-sm">✨ Quick Start Available</p>
-                  <p className="text-xs text-sky-700 mt-1">Skip form decisions — we'll use smart defaults and you just confirm the repo.</p>
+                  <p className="text-xs text-sky-600 dark:text-sky-400 mt-1">Skip form decisions — we'll use smart defaults and you just confirm the repo.</p>
                 </div>
                 <Button onClick={activateQuickMode} className="bg-sky-600 hover:bg-sky-700 text-white rounded-md text-sm whitespace-nowrap">Start Quick Mode →</Button>
               </div>
@@ -864,7 +864,7 @@ const SetupWizard = () => {
                   <p className="text-sm text-muted-foreground mt-1">GitHub repo or local folder. Deploy like a web app.</p>
                 </div>
                 {quickMode && (
-                  <span className="px-2 py-1 bg-sky-100 text-sky-700 text-xs font-medium rounded-md">⚡ Quick Mode</span>
+                  <span className="px-2 py-1 bg-sky-500/15 text-sky-600 dark:text-sky-400 text-xs font-medium rounded-md">⚡ Quick Mode</span>
                 )}
               </div>
 
@@ -873,7 +873,7 @@ const SetupWizard = () => {
                 <div className="space-y-4 bg-sky-50 rounded-lg p-4 border border-sky-200 mb-6">
                   <div>
                     <p className="text-xs font-semibold text-sky-900 mb-2">📋 Using these presets:</p>
-                    <ul className="text-xs text-sky-700 space-y-0.5 list-disc list-inside">
+                    <ul className="text-xs text-sky-600 dark:text-sky-400 space-y-0.5 list-disc list-inside">
                       <li><strong>App type:</strong> SSR / Full-Stack (Next.js, Svelte, etc.)</li>
                       <li><strong>Deployment:</strong> Self-Hosted</li>
                       <li><strong>Branch previews:</strong> Enabled</li>

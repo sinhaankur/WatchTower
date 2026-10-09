@@ -137,7 +137,7 @@ export default function BackupDestinationsCard() {
                 <span className="text-muted-foreground font-mono truncate flex-1">
                   {d.kind === 'folder' ? d.folder_path : (nodes.find((n) => n.id === d.node_id)?.host ?? d.node_id)}
                 </span>
-                {!d.is_enabled && <span className="text-amber-600 shrink-0">paused</span>}
+                {!d.is_enabled && <span className="text-accent shrink-0">paused</span>}
                 <button type="button" onClick={() => void test(d.id)} className="text-muted-foreground hover:text-foreground transition-colors shrink-0">Test</button>
                 <button type="button" onClick={() => void toggle(d)} className="text-muted-foreground hover:text-foreground transition-colors shrink-0">{d.is_enabled ? 'Pause' : 'Enable'}</button>
                 <button type="button" onClick={() => void remove(d.id)} className="text-muted-foreground hover:text-destructive transition-colors shrink-0">Remove</button>

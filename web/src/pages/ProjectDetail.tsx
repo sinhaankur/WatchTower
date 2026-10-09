@@ -489,7 +489,7 @@ const STEP_ICON: Record<GoLiveStep['status'], string> = {
   ok: '✓', skipped: '–', failed: '✗', manual: '➜',
 };
 const STEP_COLOR: Record<GoLiveStep['status'], string> = {
-  ok: 'text-emerald-600', skipped: 'text-muted-foreground', failed: 'text-destructive', manual: 'text-amber-600',
+  ok: 'text-emerald-600', skipped: 'text-muted-foreground', failed: 'text-destructive', manual: 'text-accent',
 };
 
 function GoLiveCard({ project }: { project: Project }) {

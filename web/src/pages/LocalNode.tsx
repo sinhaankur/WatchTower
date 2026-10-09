@@ -419,7 +419,7 @@ export default function LocalNode() {
         {step === 3 && (
           <div className="rounded-xl border border-border bg-card p-6 space-y-5">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-emerald-100 border border-emerald-300 flex items-center justify-center text-lg">✓</div>
+              <div className="w-10 h-10 rounded-full bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-lg">✓</div>
               <div>
                 <h2 className="text-base font-semibold text-foreground">Node registered!</h2>
                 <p className="text-xs text-muted-foreground">Now start the background agent on this machine.</p>

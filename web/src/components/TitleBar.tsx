@@ -68,10 +68,9 @@ export default function TitleBar() {
 
   return (
     <div
-      className="flex items-center shrink-0 select-none border-b border-border"
+      className="flex items-center shrink-0 select-none border-b border-border bg-card text-foreground"
       style={{
         height: 36,
-        background: '#fbf6ea',
         WebkitAppRegion: 'drag',
       } as React.CSSProperties}
     >
@@ -81,7 +80,7 @@ export default function TitleBar() {
       {/* Logo + title — always center-ish */}
       <div className="flex items-center gap-2 px-3" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
         <BrandLogo size="sm" />
-        <span className="text-xs font-semibold text-foreground/90" style={{ fontFamily: 'Space Mono, monospace', letterSpacing: '0.03em' }}>
+        <span className="text-sm font-semibold text-foreground" style={{ fontFamily: 'Space Mono, monospace', letterSpacing: '0.03em' }}>
           WatchTower
         </span>
       </div>

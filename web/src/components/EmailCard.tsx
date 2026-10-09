@@ -150,7 +150,7 @@ export default function EmailCard() {
           </p>
         </div>
         {config?.configured && (
-          <span className="text-xs font-semibold text-emerald-800 bg-emerald-100 border border-emerald-300 rounded-full px-2 py-0.5">
+          <span className="text-xs font-semibold text-emerald-800 bg-emerald-500/15 border border-emerald-500/30 rounded-full px-2 py-0.5">
             Auto-send on
           </span>
         )}

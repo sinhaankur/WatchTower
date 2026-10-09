@@ -261,7 +261,7 @@ const Servers = () => {
         {/* Notices */}
         {pageError && (
           <div className="flex items-start gap-3 rounded-xl border border-amber-300 bg-accent/10 px-4 py-3">
-            <span className="text-amber-600 mt-0.5">⚠</span>
+            <span className="text-accent mt-0.5">⚠</span>
             <p className="text-sm text-accent">{pageError}</p>
           </div>
         )}

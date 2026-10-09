@@ -52,7 +52,7 @@ function barBg(pct: number): string {
 
 function statusLabel(pct: number): { text: string; color: string } {
   if (pct < 60) return { text: 'Healthy', color: 'text-emerald-600' };
-  if (pct < 80) return { text: 'Moderate', color: 'text-amber-600' };
+  if (pct < 80) return { text: 'Moderate', color: 'text-accent' };
   return { text: 'High', color: 'text-destructive' };
 }
 
@@ -208,7 +208,7 @@ export default function SystemResourceMonitor() {
           <div className="grid grid-cols-3 gap-3">
             {[
               { label: 'Total RAM',  value: fmtMb(ram.total_mb),     sub: 'installed',         color: 'text-foreground/90' },
-              { label: 'In Use',     value: fmtMb(ram.used_mb),      sub: `${ram.percent_used}% used`, color: ram.percent_used > 80 ? 'text-destructive' : ram.percent_used > 60 ? 'text-amber-600' : 'text-emerald-600' },
+              { label: 'In Use',     value: fmtMb(ram.used_mb),      sub: `${ram.percent_used}% used`, color: ram.percent_used > 80 ? 'text-destructive' : ram.percent_used > 60 ? 'text-accent' : 'text-emerald-600' },
               { label: 'Available',  value: fmtMb(ram.available_mb), sub: 'for new apps',      color: 'text-foreground/90' },
             ].map(({ label, value, sub, color }) => (
               <div key={label} className="rounded-lg bg-muted/40 p-3 text-center">
