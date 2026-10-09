@@ -46,6 +46,35 @@ def test_api_health_alias_returns_200(anon_client: TestClient):
     assert r.status_code == 200
 
 
+def test_ready_returns_200_when_db_reachable(anon_client: TestClient):
+    """Readiness probe verifies the DB with a SELECT 1 and returns ok."""
+    r = anon_client.get("/ready")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["status"] == "ready"
+    assert body["database"] == "ok"
+
+
+def test_ready_returns_503_when_db_unreachable(anon_client: TestClient):
+    """When the DB can't be reached, /ready reports 503 not_ready — the
+    correct signal for a load-balancer readiness gate to pull the pod
+    from rotation instead of routing traffic into 500s. Liveness (/health)
+    must stay 200 in the same situation so the process isn't restart-looped."""
+    class _DeadSession:
+        def execute(self, *a, **k):
+            raise RuntimeError("simulated DB outage")
+
+        def close(self):
+            pass
+
+    with patch("watchtower.database.SessionLocal", lambda: _DeadSession()):
+        r = anon_client.get("/ready")
+    assert r.status_code == 503
+    assert r.json()["status"] == "not_ready"
+    # Liveness must remain green even while the DB is down.
+    assert anon_client.get("/health").status_code == 200
+
+
 # ── Auth gate ────────────────────────────────────────────────────────────────
 
 def test_unauthenticated_request_returns_401(anon_client: TestClient):
@@ -151,6 +180,30 @@ def test_custom_domain_crud(client: TestClient):
     listing_after = client.get(f"/api/projects/{p['id']}/domains")
     assert listing_after.status_code == 200
     assert listing_after.json() == []
+
+
+def test_cdn_analytics_zero_state_for_unproxied_domain(client: TestClient):
+    """A domain that isn't proxied through Cloudflare has no edge cache, so
+    the analytics endpoint returns a friendly all-zero state with a note —
+    not an error and not a misleading 0% cache-hit. No Cloudflare call is
+    made in this branch, so the test needs no network mock."""
+    p = _create_project(client, "cdn-proj", "https://example.com/cdn.git")
+    create = client.post(
+        f"/api/projects/{p['id']}/domains",
+        json={"domain": "nocdn.example.com", "is_primary": True, "tls_enabled": True},
+    )
+    assert create.status_code == 201, create.text
+    domain = create.json()
+
+    r = client.get(
+        f"/api/integrations/cloudflare/projects/{p['id']}/domains/{domain['id']}/analytics"
+    )
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["proxied"] is False
+    assert body["cache_hit_ratio"] == 0.0
+    assert body["bytes_saved"] == 0
+    assert body["note"]  # explains why the numbers are zero
 
 
 def test_github_device_connect_flow_persists_connection(client: TestClient, monkeypatch):

@@ -27,7 +27,10 @@ services:
     volumes:
       - watchtower_data:/data
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      # /ready verifies the DB is reachable (SELECT 1), not just that the
+      # process is up (/health) — so a container with a broken DB is marked
+      # unhealthy and restart/rotation logic can act on it.
+      test: ["CMD", "curl", "-f", "http://localhost:8000/ready"]
       interval: 15s
       timeout: 5s
       retries: 5

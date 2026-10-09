@@ -78,6 +78,22 @@ watchtower start | status | update-now | list-containers | validate-config
 watchtower -c /path/to/watchtower.yml start
 ```
 
+### Interactive console (`watchtower-console`)
+
+A dependency-free REPL over the running API (`watchtower/console.py`) — a
+stay-open shell for ops (`status`, `projects`, `deployments <proj>`,
+`deploy <proj> [branch]`, `rollback <id>`, `whoami`, `health`). Thin HTTP
+client over `/api` (like the MCP server + VS Code extension), so it inherits
+the token's auth/RBAC — no direct DB access. Uses `requests` (core dep), no
+`rich`/`textual`, so it works over bare SSH. Config: `WATCHTOWER_API_BASE_URL`
+(default `http://127.0.0.1:8000`) + `WATCHTOWER_API_TOKEN`.
+
+```bash
+watchtower-console                       # interactive REPL
+watchtower-console health                # one-shot: run a command and exit
+watchtower-console --base-url http://host:8000 --token <tok>
+```
+
 ### Docker / Compose
 
 ```bash

@@ -130,11 +130,12 @@ async def create_from_template(
     # surfaces the placeholder=True flag in the response so the UI
     # can prompt the user to fill them in.
     created_env_var_ids: list[str] = []
+    from watchtower.api.envvars import enc_value
     for tpl_env in tpl.default_env_vars:
         env_var = EnvironmentVariable(
             project_id=project.id,
             key=tpl_env.key,
-            value=tpl_env.value,
+            value=enc_value(tpl_env.value),  # encrypted at rest like all env-var values
             environment="production",
         )
         db.add(env_var)

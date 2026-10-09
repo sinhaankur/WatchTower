@@ -28,6 +28,7 @@ podman during CI.
 from __future__ import annotations
 
 import logging
+import os
 import socket
 import subprocess
 from dataclasses import dataclass, field as dc_field
@@ -43,22 +44,64 @@ class ManagedDbRuntimeError(Exception):
 # ── Binary resolution ────────────────────────────────────────────────────────
 
 
-def _podman_path() -> Optional[str]:
-    """Resolve podman, falling back to docker for Linux dev hosts.
+def _runtime_preference_order() -> tuple[str, ...]:
+    """Which runtimes to try, in order.
 
-    Returns None if neither is installed — callers turn that into a
-    user-facing 400 with an install hint, not a 500. Both lookups go
-    through the shared tool_resolver, so the GUI-bundle / Homebrew
-    fallback paths stay consistent with the rest of the app (no more
-    one-off "/opt/homebrew/bin/podman" check that drifts from the table).
+    Default is Podman-first (rootless/daemonless — the safest default for
+    "turn your own PC into a server"), falling back to Docker so a host that
+    already runs Docker well just works — no reason to make someone install
+    a second runtime. An operator can flip the preference explicitly with
+    ``WATCHTOWER_CONTAINER_RUNTIME=docker`` (or ``podman``); anything else
+    falls back to the default order.
+    """
+    pref = os.getenv("WATCHTOWER_CONTAINER_RUNTIME", "").strip().lower()
+    if pref == "docker":
+        return ("docker", "podman")
+    if pref == "podman":
+        return ("podman",)  # explicit podman-only: don't silently use docker
+    return ("podman", "docker")
+
+
+def detect_runtime() -> Optional[str]:
+    """Return the NAME of the active runtime ("podman" | "docker"), or None.
+
+    Callers that need to branch on capability (e.g. Docker has no ``pod``
+    concept) use this instead of parsing the binary path. Honors the same
+    preference order as ``_podman_path``.
     """
     from watchtower.tool_resolver import resolve_tool
 
-    for candidate in ("podman", "docker"):
+    for candidate in _runtime_preference_order():
+        if resolve_tool(candidate):
+            return candidate
+    return None
+
+
+def _podman_path() -> Optional[str]:
+    """Resolve the container-runtime binary (podman or docker).
+
+    Kept named ``_podman_path`` because the whole local-runtime family
+    imports it; despite the name it is runtime-agnostic — it returns
+    whichever runtime wins :func:`_runtime_preference_order`. Returns None
+    if neither is installed — callers turn that into a user-facing 400 with
+    an install hint, not a 500. Lookups go through the shared tool_resolver
+    so the GUI-bundle / Homebrew fallback paths stay consistent.
+    """
+    from watchtower.tool_resolver import resolve_tool
+
+    for candidate in _runtime_preference_order():
         found = resolve_tool(candidate)
         if found:
             return found
     return None
+
+
+def runtime_supports_pods() -> bool:
+    """True only for Podman. Docker has no first-class ``pod`` primitive, so
+    managed-DB code that groups containers into a pod must degrade to a plain
+    container + explicit network on Docker. Lets call sites branch without
+    re-detecting the binary each time."""
+    return detect_runtime() == "podman"
 
 
 def have_runtime() -> bool:
@@ -170,6 +213,23 @@ def create_pod(spec: CreateSpec) -> None:
     if not bin_:
         raise ManagedDbRuntimeError(
             "No container runtime found. Install Podman (or Docker) and retry."
+        )
+
+    # Managed databases group their container inside a Podman *pod* (the
+    # addressable unit for replication/backup). Docker has no pod primitive,
+    # so on a Docker-only host we fail fast with a clear, actionable message
+    # instead of a cryptic `docker: 'pod' is not a docker command`. The rest
+    # of WatchTower (Run Locally, local containers, deploys) is fully
+    # Docker-capable via the shared runtime seam — only managed-DB pods need
+    # Podman today. (A Docker container+network fallback is a tracked
+    # follow-up; see docs/CONTAINER_RUNTIME.md.)
+    if not runtime_supports_pods():
+        raise ManagedDbRuntimeError(
+            "Managed databases currently require Podman (they run inside a "
+            "Podman pod, which Docker doesn't have). Install Podman "
+            "(https://podman.io) to use managed databases — everything else "
+            "in WatchTower works with Docker. Or set "
+            "WATCHTOWER_CONTAINER_RUNTIME=podman if you have both installed."
         )
 
     pod = pod_name(spec.db_id)

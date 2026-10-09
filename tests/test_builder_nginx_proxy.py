@@ -116,6 +116,70 @@ def test_config_collapses_multiple_domains_into_one_server_name(project):
 
 
 # ---------------------------------------------------------------------------
+# Origin cache rules (CDN correctness — docs/CDN_STRATEGY.md §3.2.3)
+# ---------------------------------------------------------------------------
+
+
+def test_config_sets_immutable_cache_on_hashed_assets(project):
+    """Content-hashed assets must be served immutable/1yr so a CDN caches
+    them at the edge even when the user's app sets no Cache-Control."""
+    cfg = _build_nginx_proxy_config(project, ["site.example.com"], 8082)
+    assert 'add_header Cache-Control "public, max-age=31536000, immutable" always;' in cfg
+    # The upstream's own header is dropped first so ours is authoritative.
+    assert "proxy_hide_header Cache-Control;" in cfg
+    # Matches hashed JS/CSS by the .<hash>.ext shape.
+    assert "js|css" in cfg
+
+
+def test_config_sets_no_cache_on_html(project):
+    """HTML must never be cached — a deploy has to be seen immediately."""
+    cfg = _build_nginx_proxy_config(project, ["site.example.com"], 8082)
+    assert 'add_header Cache-Control "no-cache, no-store, must-revalidate" always;' in cfg
+    assert "location ~* '\\.html?$'" in cfg
+
+
+def test_config_still_proxies_everything_via_catch_all(project):
+    """The cache location blocks must not shadow the catch-all proxy — a
+    request that isn't a hashed asset or HTML still reaches the upstream."""
+    cfg = _build_nginx_proxy_config(project, ["site.example.com"], 8082)
+    # Three proxy_pass blocks: hashed-asset, html, catch-all.
+    assert cfg.count("proxy_pass http://127.0.0.1:8082;") == 3
+    assert "location / {" in cfg
+
+
+def test_config_is_valid_nginx_syntax(project):
+    """The strongest guard: feed the generated config to a real `nginx -t`.
+    Skips cleanly when nginx isn't installed (most CI/dev boxes) so it
+    never flakes — but on any machine with nginx it catches parser-level
+    breakage like the `{8,}` quantifier that must be quoted in a location
+    regex. This test caught exactly that bug during development."""
+    import shutil
+    import subprocess
+    import tempfile
+    import os
+
+    nginx = shutil.which("nginx") or (
+        "/opt/homebrew/opt/nginx/bin/nginx"
+        if os.path.exists("/opt/homebrew/opt/nginx/bin/nginx") else None
+    )
+    if not nginx:
+        pytest.skip("nginx not installed — skipping real syntax validation")
+
+    cfg = _build_nginx_proxy_config(project, ["site.example.com", "www.example.com"], 8082)
+    with tempfile.NamedTemporaryFile("w", suffix=".conf", delete=False) as fh:
+        fh.write("events {}\nhttp {\n" + cfg + "\n}\n")
+        conf_path = fh.name
+    try:
+        result = subprocess.run(
+            [nginx, "-t", "-c", conf_path],
+            capture_output=True, text=True, timeout=15,
+        )
+        assert result.returncode == 0, f"nginx -t rejected the config:\n{result.stderr}"
+    finally:
+        os.unlink(conf_path)
+
+
+# ---------------------------------------------------------------------------
 # _apply_nginx_proxy_on_node — hostname validation
 # ---------------------------------------------------------------------------
 

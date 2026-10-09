@@ -262,6 +262,30 @@ class CloudflareDnsStatus(BaseModel):
     cloudflare_record_id: Optional[str] = None
     cloudflare_target_ip: Optional[str] = None
     cloudflare_synced_at: Optional[datetime] = None
+    cloudflare_proxied: bool = False
+
+
+class CloudflarePurgeResult(BaseModel):
+    domain: str
+    purged: bool
+    detail: str
+
+
+class CloudflareCacheAnalytics(BaseModel):
+    domain: str
+    proxied: bool
+    since: Optional[str] = None
+    until: Optional[str] = None
+    total_requests: int = 0
+    cached_requests: int = 0
+    total_bytes: int = 0
+    cached_bytes: int = 0
+    cache_hit_ratio: float = 0.0
+    bytes_saved: int = 0
+    # When the domain isn't proxied (no edge cache) or there's no traffic yet,
+    # the numbers are all-zero and this explains why — the SPA shows a friendly
+    # state instead of a misleading "0% cache hit".
+    note: Optional[str] = None
 
 
 def _load_owned_domain(db: Session, project_id: UUID, domain_id: UUID, current_user: dict) -> CustomDomain:
@@ -336,6 +360,9 @@ async def sync_domain_to_cloudflare(
     domain.cloudflare_record_id = result.record_id
     domain.cloudflare_target_ip = result.target_ip
     domain.cloudflare_synced_at = datetime.now(timezone.utc).replace(tzinfo=None)
+    # Persist the proxy state — auto-purge-on-deploy only fires for proxied
+    # domains (a grey-cloud/DNS-only domain has no edge cache to invalidate).
+    domain.cloudflare_proxied = bool(payload.proxied)
 
     audit_log.record_for_user(
         db, current_user,
@@ -349,6 +376,7 @@ async def sync_domain_to_cloudflare(
             "target_ip": payload.target_ip,
             "zone_id": result.zone_id,
             "credential_id": str(cred.id),
+            "proxied": bool(payload.proxied),
         },
     )
     db.commit()
@@ -360,6 +388,7 @@ async def sync_domain_to_cloudflare(
         cloudflare_record_id=domain.cloudflare_record_id,
         cloudflare_target_ip=domain.cloudflare_target_ip,
         cloudflare_synced_at=domain.cloudflare_synced_at,
+        cloudflare_proxied=bool(domain.cloudflare_proxied),
     )
 
 
@@ -412,9 +441,120 @@ async def unsync_domain_from_cloudflare(
     domain.cloudflare_record_id = None
     domain.cloudflare_target_ip = None
     domain.cloudflare_synced_at = None
+    domain.cloudflare_proxied = False
     db.commit()
     db.refresh(domain)
     return CloudflareDnsStatus(domain=domain.domain)
+
+
+@router.post("/projects/{project_id}/domains/{domain_id}/purge-cache", response_model=CloudflarePurgeResult)
+async def purge_domain_cache(
+    project_id: UUID,
+    domain_id: UUID,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(util.get_current_user),
+):
+    """Purge Cloudflare's edge cache for this domain's zone.
+
+    Manual counterpart to the automatic purge-on-deploy. A no-op (not an
+    error) for a DNS-only domain — there's no edge cache to clear when the
+    domain isn't proxied — so the UI can offer the button unconditionally.
+    """
+    domain = _load_owned_domain(db, project_id, domain_id, current_user)
+
+    if not domain.cloudflare_proxied or not domain.cloudflare_zone_id or not domain.cloudflare_credential_id:
+        return CloudflarePurgeResult(
+            domain=domain.domain,
+            purged=False,
+            detail="Domain is not proxied through Cloudflare — nothing to purge.",
+        )
+
+    cred = db.query(CloudflareCredential).filter(CloudflareCredential.id == domain.cloudflare_credential_id).first()
+    if not cred:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Linked Cloudflare credential is gone.")
+    plaintext = util.decrypt_secret(cred.api_token_encrypted)
+    if not plaintext:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Could not decrypt stored Cloudflare token — WATCHTOWER_SECRET_KEY may have changed.",
+        )
+
+    try:
+        cloudflare_dns.purge_cache(plaintext, domain.cloudflare_zone_id)
+    except cloudflare_dns.CloudflareDnsError as exc:
+        raise HTTPException(status_code=exc.status, detail=exc.detail) from exc
+
+    audit_log.record_for_user(
+        db, current_user,
+        action="cloudflare.cache.purge",
+        entity_type="custom_domain",
+        entity_id=domain.id,
+        org_id=domain.project.org_id,
+        request=request,
+        extra={"domain": domain.domain, "zone_id": domain.cloudflare_zone_id, "trigger": "manual"},
+    )
+    db.commit()
+    return CloudflarePurgeResult(domain=domain.domain, purged=True, detail="Edge cache purged.")
+
+
+@router.get("/projects/{project_id}/domains/{domain_id}/analytics", response_model=CloudflareCacheAnalytics)
+async def domain_cache_analytics(
+    project_id: UUID,
+    domain_id: UUID,
+    days: int = 30,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(util.get_current_user),
+):
+    """CDN payoff metrics for this domain — cache-hit ratio + bytes the edge
+    served so this machine's uplink didn't have to.
+
+    Returns a friendly all-zero state (with ``note``) for DNS-only domains or
+    zones with no traffic yet, rather than an error — the SPA renders "no CDN
+    data yet" instead of a misleading 0%. ``days`` is clamped to 1–365.
+    """
+    domain = _load_owned_domain(db, project_id, domain_id, current_user)
+    days = max(1, min(int(days), 365))
+
+    if not domain.cloudflare_proxied or not domain.cloudflare_zone_id or not domain.cloudflare_credential_id:
+        return CloudflareCacheAnalytics(
+            domain=domain.domain,
+            proxied=False,
+            note="This domain isn't proxied through Cloudflare, so there's no edge cache to measure.",
+        )
+
+    cred = db.query(CloudflareCredential).filter(CloudflareCredential.id == domain.cloudflare_credential_id).first()
+    if not cred:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Linked Cloudflare credential is gone.")
+    plaintext = util.decrypt_secret(cred.api_token_encrypted)
+    if not plaintext:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Could not decrypt stored Cloudflare token — WATCHTOWER_SECRET_KEY may have changed.",
+        )
+
+    try:
+        stats = cloudflare_dns.zone_analytics(plaintext, domain.cloudflare_zone_id, days=days)
+    except cloudflare_dns.CloudflareDnsError as exc:
+        raise HTTPException(status_code=exc.status, detail=exc.detail) from exc
+
+    note = None
+    if stats.total_requests == 0:
+        note = "No traffic recorded in this window yet — check back once your site has visitors."
+
+    return CloudflareCacheAnalytics(
+        domain=domain.domain,
+        proxied=True,
+        since=stats.since,
+        until=stats.until,
+        total_requests=stats.total_requests,
+        cached_requests=stats.cached_requests,
+        total_bytes=stats.total_bytes,
+        cached_bytes=stats.cached_bytes,
+        cache_hit_ratio=round(stats.cache_hit_ratio, 4),
+        bytes_saved=stats.bytes_saved,
+        note=note,
+    )
 
 
 @router.delete("/{cred_id}", status_code=status.HTTP_204_NO_CONTENT)

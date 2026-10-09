@@ -309,3 +309,78 @@ def test_sync_dns_per_domain_failures_are_independent(db, project, org, credenti
     # ok.example.com synced; boom.example.com left at its prior state.
     assert ok_dom.cloudflare_target_ip == "3.3.3.3"
     assert boom_dom.cloudflare_target_ip is None
+
+
+# ---------------------------------------------------------------------------
+# CDN: proxied state is honoured + auto-purge-on-deploy
+# ---------------------------------------------------------------------------
+
+
+def test_sync_dns_honours_proxied_flag(db, project, org, credential):
+    """A domain flagged cloudflare_proxied=True must sync with proxied=True —
+    a deploy must never silently flip a user's CDN-enabled domain back to
+    DNS-only."""
+    db.add(CustomDomain(
+        id=uuid.uuid4(),
+        project_id=project.id,
+        domain="cdn.example.com",
+        cloudflare_credential_id=credential.id,
+        cloudflare_proxied=True,
+    ))
+    db.commit()
+    node = _node(org.id, "6.6.6.6")
+    fake = cloudflare_dns.SyncResult(record_id="r", zone_id="z", zone_name="example.com", target_ip="6.6.6.6")
+
+    with patch.object(cloudflare_dns, "sync_a_record", return_value=fake) as mock_sync, \
+         patch.object(cloudflare_dns, "purge_cache") as mock_purge:
+        asyncio.run(builder._sync_dns_for_project(db, project, [node], lambda _l: None))
+
+    assert mock_sync.call_args.kwargs.get("proxied") is True
+    # A proxied domain's edge cache must be purged after the deploy.
+    mock_purge.assert_called_once()
+    assert mock_purge.call_args.args[1] == "z"  # zone_id from the sync result
+
+
+def test_sync_dns_no_purge_for_dns_only_domain(db, project, org, credential):
+    """A grey-cloud (DNS-only) domain has no edge cache — auto-purge must
+    not fire (and must not cost a Cloudflare API call)."""
+    db.add(CustomDomain(
+        id=uuid.uuid4(),
+        project_id=project.id,
+        domain="greycloud.example.com",
+        cloudflare_credential_id=credential.id,
+        cloudflare_proxied=False,
+    ))
+    db.commit()
+    node = _node(org.id, "7.7.7.7")
+    fake = cloudflare_dns.SyncResult(record_id="r", zone_id="z", zone_name="example.com", target_ip="7.7.7.7")
+
+    with patch.object(cloudflare_dns, "sync_a_record", return_value=fake), \
+         patch.object(cloudflare_dns, "purge_cache") as mock_purge:
+        asyncio.run(builder._sync_dns_for_project(db, project, [node], lambda _l: None))
+
+    mock_purge.assert_not_called()
+
+
+def test_auto_purge_failure_does_not_raise(db, project, org, credential):
+    """A purge failure must never fail an already-live deploy — it's
+    logged/warned and the deploy stays green."""
+    db.add(CustomDomain(
+        id=uuid.uuid4(),
+        project_id=project.id,
+        domain="purgefail.example.com",
+        cloudflare_credential_id=credential.id,
+        cloudflare_proxied=True,
+    ))
+    db.commit()
+    node = _node(org.id, "8.8.8.8")
+    fake = cloudflare_dns.SyncResult(record_id="r", zone_id="z", zone_name="example.com", target_ip="8.8.8.8")
+
+    captured: list[str] = []
+    with patch.object(cloudflare_dns, "sync_a_record", return_value=fake), \
+         patch.object(cloudflare_dns, "purge_cache",
+                      side_effect=cloudflare_dns.CloudflareDnsError(502, "boom")):
+        # Must not raise.
+        asyncio.run(builder._sync_dns_for_project(db, project, [node], captured.append))
+
+    assert any("purge failed" in line for line in captured)

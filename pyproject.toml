@@ -75,6 +75,7 @@ watchtower = "watchtower.cli:main"
 watchtower-deploy = "watchtower.deploy_server:main"
 watchtower-package = "watchtower.package_builder:main"
 watchtower-mcp = "watchtower.mcp_server:main"
+watchtower-console = "watchtower.console:main"
 
 # Optional dependency sets — install only what a given deployment needs.
 #

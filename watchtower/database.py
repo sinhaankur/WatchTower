@@ -86,11 +86,27 @@ def _default_database_url() -> str:
 DATABASE_URL = _default_database_url()
 
 # Create engine
-engine = create_engine(
-    DATABASE_URL,
-    connect_args={"check_same_thread": False} if "sqlite" in DATABASE_URL else {},
-    echo=os.getenv("SQL_ECHO", "False").lower() == "true"
-)
+#
+# `pool_pre_ping` is applied to non-SQLite engines only (Postgres/MySQL via
+# DATABASE_URL). Pooled connections go stale when the DB restarts, a network
+# blip drops the TCP session, or the server closes an idle connection past
+# its wait_timeout. Without pre-ping, the *next* request to grab that dead
+# connection throws OperationalError instead of transparently reconnecting —
+# a self-inflicted 500 after any DB maintenance window. Pre-ping issues a
+# cheap `SELECT 1` on checkout and silently recycles a dead connection.
+# `pool_recycle` proactively retires connections older than 30 min so we
+# don't sit on one long enough for a proxy/DB idle-timeout to guillotine it.
+# SQLite is a local file with no pool to go stale, so neither applies there.
+_is_sqlite = "sqlite" in DATABASE_URL
+_engine_kwargs = {
+    "connect_args": {"check_same_thread": False} if _is_sqlite else {},
+    "echo": os.getenv("SQL_ECHO", "False").lower() == "true",
+}
+if not _is_sqlite:
+    _engine_kwargs["pool_pre_ping"] = True
+    _engine_kwargs["pool_recycle"] = 1800
+
+engine = create_engine(DATABASE_URL, **_engine_kwargs)
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
@@ -168,6 +184,12 @@ class User(Base):
     id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
     email = Column(String, unique=True, index=True)
     github_id = Column(Integer, nullable=True, unique=True)
+    # Stable identity for a generic-OIDC login (Google, GitLab, Authentik,
+    # Okta, …), stored as "<issuer>|<sub>" — the OIDC spec's guaranteed-stable
+    # per-issuer subject. Nullable + unique so GitHub-only and token-auth
+    # users are unaffected, and two different providers can't collide on a
+    # bare `sub`. See watchtower/oidc.py + the auth/oidc/* routes.
+    oidc_subject = Column(String, nullable=True, unique=True, index=True)
     name = Column(String)
     # Optional: GitHub avatar URL captured on OAuth upsert. The sidebar
     # identity badge falls back to an initial-letter placeholder when
@@ -379,6 +401,11 @@ class CustomDomain(Base):
     cloudflare_record_id = Column(String, nullable=True)
     cloudflare_target_ip = Column(String, nullable=True)
     cloudflare_synced_at = Column(DateTime, nullable=True)
+    # True when the A record is proxied ("orange cloud") — i.e. traffic runs
+    # through Cloudflare's CDN + TLS + edge cache. This is the flag auto-purge
+    # keys off: only proxied domains have an edge cache to invalidate after a
+    # deploy. DNS-only ("grey cloud") domains skip purge entirely.
+    cloudflare_proxied = Column(Boolean, default=False, nullable=False, server_default="0")
     # Set when this domain is served via a Cloudflare Tunnel (Go Live's
     # tunnel mode) rather than a plain A record. Persisted so the tunnel
     # can be torn down on project/domain delete instead of orphaning a
@@ -398,7 +425,11 @@ class EnvironmentVariable(Base):
     id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
     project_id = Column(Uuid(as_uuid=True), ForeignKey("projects.id"), index=True)
     key = Column(String)
-    value = Column(String)  # Should be encrypted in production
+    # Fernet-encrypted at rest (api/envvars.py enc_value/dec_value). Env vars
+    # routinely hold secrets (API keys, DB passwords), so the raw value must
+    # never sit in the SQLite file. Legacy plaintext rows are read-compatible
+    # (dec_value falls back) and self-heal to ciphertext on next write.
+    value = Column(String)
     environment = Column(Enum(Environment), default=Environment.PRODUCTION)
     created_at = Column(DateTime, default=_utcnow)
 

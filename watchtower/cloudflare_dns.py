@@ -200,6 +200,138 @@ def delete_a_record(token: str, zone_id: str, record_id: str) -> None:
         raise
 
 
+# ── CDN cache purge ────────────────────────────────────────────────────────
+# When a domain is proxied (orange cloud), Cloudflare caches static assets at
+# the edge. After a deploy the origin has new bytes but the edge still serves
+# the old cached copies until their TTL expires — so a user "deploys a fix"
+# and visitors keep seeing the stale page. Purging on deploy closes that loop;
+# it is THE correctness keystone of the CDN feature (docs/CDN_STRATEGY.md §4).
+
+
+@dataclass
+class CacheAnalytics:
+    """Aggregated edge-cache stats for a zone over a window.
+
+    ``bytes_saved`` / ``cached_requests`` are the payoff metrics: bytes the
+    edge served so the origin (the user's own machine) didn't have to. That's
+    the whole promise of "host from a PC you already own" made measurable.
+    """
+    since: str
+    until: str
+    total_requests: int
+    cached_requests: int
+    total_bytes: int
+    cached_bytes: int
+
+    @property
+    def cache_hit_ratio(self) -> float:
+        """Fraction of requests served from the edge (0.0–1.0)."""
+        return (self.cached_requests / self.total_requests) if self.total_requests else 0.0
+
+    @property
+    def bytes_saved(self) -> int:
+        """Bytes served by the edge instead of the origin uplink."""
+        return self.cached_bytes
+
+
+_ANALYTICS_QUERY = """
+query ZoneCache($zoneTag: String!, $since: Date!, $until: Date!) {
+  viewer {
+    zones(filter: { zoneTag: $zoneTag }) {
+      httpRequests1dGroups(
+        filter: { date_geq: $since, date_lt: $until }
+        limit: 366
+        orderBy: [date_ASC]
+      ) {
+        sum { requests cachedRequests bytes cachedBytes }
+      }
+    }
+  }
+}
+""".strip()
+
+
+def zone_analytics(token: str, zone_id: str, *, days: int = 30) -> CacheAnalytics:
+    """Fetch cached-vs-total requests + bytes for a zone over the last N days.
+
+    Uses Cloudflare's GraphQL Analytics API (``httpRequests1dGroups``), summing
+    the daily groups into one window total. A zone with no traffic yet returns
+    all-zeros rather than raising — the "you haven't been visited yet" state is
+    normal, not an error. Raises ``CloudflareDnsError`` on auth / API failure.
+    """
+    from datetime import date, timedelta
+
+    until = date.today() + timedelta(days=1)  # date_lt is exclusive → include today
+    since = until - timedelta(days=days + 1)
+    variables = {"zoneTag": zone_id, "since": since.isoformat(), "until": until.isoformat()}
+
+    try:
+        resp = requests.post(
+            f"{CLOUDFLARE_API_BASE}/graphql",
+            headers=_headers(token),
+            json={"query": _ANALYTICS_QUERY, "variables": variables},
+            timeout=15,
+        )
+    except requests.RequestException as exc:
+        raise CloudflareDnsError(502, f"Cloudflare unreachable: {exc}") from exc
+
+    if resp.status_code in (401, 403):
+        raise CloudflareDnsError(
+            403,
+            "Cloudflare rejected the token for analytics. The token needs the "
+            "'Analytics: Read' permission (Account Analytics + Zone Analytics).",
+        )
+    body: dict = {}
+    try:
+        body = resp.json() or {}
+    except ValueError:
+        pass
+    # GraphQL returns 200 with an `errors` array on query problems.
+    if resp.status_code >= 400 or body.get("errors"):
+        errs = "; ".join(e.get("message", "") for e in (body.get("errors") or [])) or resp.text[:200]
+        raise CloudflareDnsError(resp.status_code if resp.status_code >= 400 else 502, errs or "Cloudflare analytics error")
+
+    groups = (
+        (((body.get("data") or {}).get("viewer") or {}).get("zones") or [{}])[0].get("httpRequests1dGroups")
+        or []
+    )
+    total_requests = cached_requests = total_bytes = cached_bytes = 0
+    for g in groups:
+        s = g.get("sum") or {}
+        total_requests += int(s.get("requests") or 0)
+        cached_requests += int(s.get("cachedRequests") or 0)
+        total_bytes += int(s.get("bytes") or 0)
+        cached_bytes += int(s.get("cachedBytes") or 0)
+
+    return CacheAnalytics(
+        since=since.isoformat(),
+        until=until.isoformat(),
+        total_requests=total_requests,
+        cached_requests=cached_requests,
+        total_bytes=total_bytes,
+        cached_bytes=cached_bytes,
+    )
+
+
+def purge_cache(token: str, zone_id: str, *, files: Optional[list[str]] = None) -> None:
+    """Purge Cloudflare's edge cache for a zone.
+
+    ``files`` (a list of absolute URLs) does a surgical by-URL purge; when
+    omitted we purge everything in the zone. By-URL is gentler on cache-hit
+    ratio but requires knowing every changed URL — which WatchTower can't
+    reliably enumerate for an arbitrary user framework — so a full purge on
+    deploy is the safe default. A 404 (zone gone) is treated as success:
+    the desired end state is "no stale cache", and a missing zone has none.
+    """
+    body: dict = {"files": files} if files else {"purge_everything": True}
+    try:
+        _cf_post(token, f"/zones/{zone_id}/purge_cache", body)
+    except CloudflareDnsError as exc:
+        if exc.status == 404:
+            return
+        raise
+
+
 # ── Cloudflare Tunnel (remotely-managed) ──────────────────────────────────────
 # A remotely-managed tunnel is created via the API and configured entirely
 # server-side (config_src=cloudflare). The node just runs `cloudflared` with

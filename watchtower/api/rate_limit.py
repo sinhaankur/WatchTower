@@ -38,18 +38,40 @@ from starlette.requests import Request as StarletteRequest
 from starlette.responses import JSONResponse
 
 
-def _key_remote(request: StarletteRequest) -> str:
-    """Default key — remote IP, with X-Forwarded-For trust if behind a proxy.
+def client_ip(request: StarletteRequest) -> Optional[str]:
+    """Best-effort real-client IP, honouring proxy headers only when trusted.
 
-    slowapi's ``get_remote_address`` already handles ``request.client.host``;
-    we override only when an operator opts in to trust forwarded headers.
+    Precedence when ``WATCHTOWER_TRUST_FORWARDED_FOR=true`` (i.e. the operator
+    has confirmed WatchTower sits behind a proxy/CDN that sets these):
+      1. ``CF-Connecting-IP`` — Cloudflare's single, authoritative client IP.
+         When proxied through Cloudflare, ``request.client.host`` is a
+         Cloudflare edge IP and XFF may carry multiple hops; CF-Connecting-IP
+         is the one Cloudflare guarantees is the true visitor.
+      2. ``X-Forwarded-For`` first hop — the original client through a
+         generic reverse proxy.
+    Without the trust flag, these headers are attacker-controllable (a direct
+    client can send any ``CF-Connecting-IP`` it likes), so we ignore them and
+    use only the socket peer. This mirrors the existing rate-limit gate so
+    there's one notion of "trusted proxy" across the app.
     """
     if os.getenv("WATCHTOWER_TRUST_FORWARDED_FOR", "false").lower() == "true":
+        cf = request.headers.get("cf-connecting-ip")
+        if cf and cf.strip():
+            return cf.strip()
         fwd = request.headers.get("x-forwarded-for")
-        if fwd:
-            # Take the first hop (the original client).
-            return fwd.split(",")[0].strip() or get_remote_address(request)
-    return get_remote_address(request)
+        if fwd and fwd.split(",")[0].strip():
+            return fwd.split(",")[0].strip()
+    return request.client.host if request.client else None
+
+
+def _key_remote(request: StarletteRequest) -> str:
+    """Default key — remote IP, with proxy-header trust if behind a proxy.
+
+    Delegates to :func:`client_ip` for the header precedence (CF-Connecting-IP
+    → X-Forwarded-For → socket peer), falling back to slowapi's helper if we
+    somehow can't resolve one.
+    """
+    return client_ip(request) or get_remote_address(request)
 
 
 def _key_user_then_remote(request: StarletteRequest) -> str:

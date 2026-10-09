@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>WatchTower vs Coolify, Dokploy, Umbrel &amp; CasaOS — self-hosted deploy platforms compared</title>
-  <meta name="description" content="An honest comparison of WatchTower with Coolify, Dokploy, Umbrel, and CasaOS — and with cloud platforms like Vercel. Only WatchTower diagnoses and repairs a failed deployment on its own, rootless, on a computer you already own.">
+  <title>WatchTower vs Coolify, CapRover, Dokku, Dokploy &amp; Umbrel — self-hosted deploy platforms compared</title>
+  <meta name="description" content="An honest comparison of WatchTower with Coolify, CapRover, Dokku, Dokploy, Umbrel and CasaOS — and cloud platforms like Vercel. Only WatchTower diagnoses and repairs a failed deployment on its own, runs rootless on a computer you already own, and ships as a desktop app instead of a server dashboard.">
   <meta name="robots" content="index, follow, max-image-preview:large">
   <meta name="theme-color" content="#fffdf8">
   <link rel="canonical" href="https://sinhaankur.github.io/WatchTower/compare/">
   <meta property="og:site_name" content="WatchTower">
   <meta property="og:type" content="article">
-  <meta property="og:title" content="WatchTower vs Coolify, Dokploy, Umbrel & CasaOS">
+  <meta property="og:title" content="WatchTower vs Coolify, CapRover, Dokku, Dokploy & Umbrel">
   <meta property="og:description" content="Every self-hosting tool lets you deploy apps. Only WatchTower repairs a failed deployment on its own — rootless, private, on hardware you already own.">
   <meta property="og:url" content="https://sinhaankur.github.io/WatchTower/compare/">
   <meta property="og:image" content="https://sinhaankur.github.io/WatchTower/og-image.png">
@@ -31,7 +31,7 @@
         "name": "Is WatchTower an alternative to Coolify or Dokploy?",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "Yes. Like Coolify and Dokploy, WatchTower is a self-hosted deployment platform with GitHub push-to-deploy and one-click managed databases. The differences: WatchTower diagnoses and repairs failed deployments on its own, runs rootless on Podman instead of a root Docker daemon, is designed for a computer you already own rather than a VPS, and is private by default over Tailscale."
+          "text": "Yes. Like Coolify and Dokploy, WatchTower is a self-hosted deployment platform with GitHub push-to-deploy and one-click managed databases. The differences: WatchTower diagnoses and repairs failed deployments on its own, runs on your existing Docker or rootless Podman (your choice — it auto-detects), is designed for a computer you already own rather than a VPS, and is private by default over Tailscale."
         }
       },
       {
@@ -145,57 +145,67 @@
             <th class="wt-col">WatchTower</th>
             <th>Coolify</th>
             <th>Dokploy</th>
+            <th>CapRover</th>
+            <th>Dokku</th>
             <th>Umbrel / CasaOS</th>
           </tr>
         </thead>
         <tbody>
-          <tr>
-            <td>Deploy from GitHub</td>
-            <td class="yes">✅</td><td class="yes">✅</td><td class="yes">✅</td><td class="dim">partial (app store)</td>
-          </tr>
-          <tr>
-            <td>One-click managed databases</td>
-            <td class="yes">✅</td><td class="yes">✅</td><td class="yes">✅</td><td class="yes">✅</td>
-          </tr>
           <tr class="hl">
             <td>Self-heals a failed deploy</td>
-            <td class="yes">✅</td><td class="no">❌</td><td class="no">❌</td><td class="no">❌</td>
+            <td class="yes">✅</td><td class="no">❌</td><td class="no">❌</td><td class="no">❌</td><td class="no">❌</td><td class="no">❌</td>
           </tr>
           <tr>
             <td>AI root-cause analysis (bring your own local LLM)</td>
-            <td class="yes">✅</td><td class="no">❌</td><td class="no">❌</td><td class="no">❌</td>
+            <td class="yes">✅</td><td class="no">❌</td><td class="no">❌</td><td class="no">❌</td><td class="no">❌</td><td class="no">❌</td>
           </tr>
           <tr>
-            <td>Built for your own PC (not a VPS)</td>
-            <td class="yes">✅</td><td class="dim">VPS-first</td><td class="dim">VPS-first</td><td class="yes">✅</td>
+            <td>A real desktop app — not a server dashboard</td>
+            <td class="yes">✅ Mac/Win/Linux</td><td class="no">❌</td><td class="no">❌</td><td class="no">❌</td><td class="no">❌</td><td class="no">❌</td>
           </tr>
           <tr>
-            <td>Rootless (no root Docker daemon)</td>
-            <td class="yes">✅ Podman</td><td class="no">❌</td><td class="no">❌</td><td class="no">❌</td>
+            <td>Runs on a computer you already own (not a rented VPS)</td>
+            <td class="yes">✅</td><td class="dim">VPS-first</td><td class="dim">VPS-first</td><td class="dim">VPS-first</td><td class="dim">Linux server</td><td class="yes">✅</td>
           </tr>
           <tr>
-            <td>Private by default (Tailscale)</td>
-            <td class="yes">✅ built-in</td><td class="dim">add-on</td><td class="dim">add-on</td><td class="dim">add-on</td>
+            <td>Rootless by default (no root daemon to babysit)</td>
+            <td class="yes">✅ Podman or Docker</td><td class="no">❌</td><td class="no">❌</td><td class="no">❌</td><td class="no">❌</td><td class="no">❌</td>
           </tr>
           <tr>
-            <td>Desktop app (macOS / Linux / Windows)</td>
-            <td class="yes">✅</td><td class="no">❌</td><td class="no">❌</td><td class="no">❌</td>
+            <td>Point at a repo &amp; go — no CI to wire up</td>
+            <td class="yes">✅</td><td class="yes">✅</td><td class="yes">✅</td><td class="dim">GitHub Action + token</td><td class="dim"><code>git push</code> to remote</td><td class="dim">app store only</td>
+          </tr>
+          <tr>
+            <td>Private by default (Tailscale built in)</td>
+            <td class="yes">✅</td><td class="dim">add-on</td><td class="dim">add-on</td><td class="dim">add-on</td><td class="dim">add-on</td><td class="dim">add-on</td>
           </tr>
         </tbody>
       </table>
     </div>
     <p class="foot-note">
-      Reflects public feature sets as of mid-2026. WatchTower is a younger project than
-      Coolify — its strengths are self-healing and rootless operation on your own
-      hardware, not breadth or years of hardening.
+      Reflects each project's public, open-source edition as of August 2026, verified
+      against official docs. These are all good tools — Coolify, CapRover, Dokku and
+      Dokploy are mature, browser-dashboard PaaS platforms built for a VPS or Linux
+      server, and CapRover in particular has years of hardening WatchTower doesn't.
+      WatchTower makes a different bet: a real desktop app on the computer you already
+      own, that heals its own failed deploys, runs rootless, and stays out of your way.
     </p>
     <div class="callout">
-      The highlighted row is the point. When a deployment fails — port conflict,
-      registry flake, out-of-memory, build error — WatchTower classifies the cause,
-      applies a safe fix, and retries automatically. Everything it can't fix safely
-      is queued for you with a plain-language explanation of what's missing and how
-      to fix it. Autonomy ships <strong>off</strong> and is always your switch to flip.
+      <strong>Easy to start, and it doesn't leave you stranded.</strong>
+      You install a desktop app — not a server dashboard you SSH in to set up — point it
+      at a repo, and you're live. And when a deploy fails (port conflict, registry flake,
+      out-of-memory, build error), WatchTower classifies the cause, applies a safe fix,
+      and retries by itself; anything it can't fix safely is queued with a plain-language
+      explanation of what's missing and how to fix it. No other tool here does that —
+      they surface the error and hand you the terminal. Autonomy ships
+      <strong>off</strong> and is always your switch to flip.
     </div>
+    <p class="foot-note">
+      Lighter on the machine, too: WatchTower runs rootless (no root Docker daemon) and,
+      since v1.22, ships a leaner bundle. CapRover and Dokku document a 1&nbsp;GB RAM
+      minimum on a Docker runtime; WatchTower is built to share a computer you're already
+      using, not commandeer a dedicated box.
+    </p>
   </section>
 
   <section class="panel">

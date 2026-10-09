@@ -10,6 +10,15 @@ on:
 permissions:
   contents: read
   packages: write
+  # id-token: write is required for cosign KEYLESS signing — it lets the job
+  # mint a short-lived OIDC token that Sigstore's Fulcio exchanges for an
+  # ephemeral signing cert bound to this workflow's identity. No long-lived
+  # private key to store or leak; the signature is publicly verifiable
+  # against the GitHub OIDC issuer + this repo/workflow. See the sign step.
+  id-token: write
+  # attestations: write lets the build attach a signed SBOM + provenance
+  # attestation to the pushed image via the GitHub attestation store.
+  attestations: write
 
 jobs:
   publish:
@@ -51,6 +60,7 @@ jobs:
             type=raw,value=latest,enable={{is_default_branch}}
 
       - name: Build and push image
+        id: build
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -63,3 +73,61 @@ jobs:
           # cache and the apt layer instead of rebuilding from scratch.
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          # SBOM + provenance: BuildKit generates an SPDX software bill of
+          # materials and a SLSA provenance statement and pushes them
+          # alongside the image in the registry. `mode=max` provenance
+          # records the full build environment (base image, build args,
+          # source commit) so a consumer can audit exactly how the image
+          # was produced. These make the image auditable — you can answer
+          # "what's inside this image and how was it built" without pulling
+          # and cracking it open.
+          sbom: true
+          provenance: mode=max
+
+      # ── Sign the image (cosign keyless via Sigstore) ───────────────────────
+      # Anyone can then verify the image genuinely came from this repo's
+      # workflow (not a typo-squatted or tampered copy) with:
+      #   cosign verify ghcr.io/<owner>/watchtower@<digest> \
+      #     --certificate-identity-regexp 'https://github.com/<owner>/WatchTower/.*' \
+      #     --certificate-oidc-issuer https://token.actions.githubusercontent.com
+      # Signing the DIGEST (not a mutable tag) so the signature is bound to
+      # the exact bytes, immune to a later tag-repoint.
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v4
+
+      - name: Sign the published image (keyless)
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+          IMAGE: ghcr.io/${{ github.repository_owner }}/watchtower
+          COSIGN_YES: "true"
+        run: |
+          if [ -z "$DIGEST" ]; then
+            echo "::error::build step produced no image digest — refusing to sign nothing."
+            exit 1
+          fi
+          cosign sign "${IMAGE}@${DIGEST}"
+
+      # ── Generate an SPDX SBOM from the pushed image ────────────────────────
+      # syft scans the actual pushed image (by digest, so we attest exactly
+      # what shipped) and writes an SPDX-JSON bill of materials. This is the
+      # canonical artifact the attestation below is bound to.
+      - name: Generate SBOM (syft)
+        uses: anchore/sbom-action@v0
+        with:
+          image: ghcr.io/${{ github.repository_owner }}/watchtower@${{ steps.build.outputs.digest }}
+          format: spdx-json
+          output-file: sbom.spdx.json
+          upload-artifact: false
+
+      # ── Attach a signed SBOM attestation to the pushed digest ──────────────
+      # GitHub-native, signed via the same Sigstore machinery as cosign;
+      # surfaced on the package page and verifiable with:
+      #   gh attestation verify oci://ghcr.io/<owner>/watchtower@<digest> \
+      #     --repo <owner>/WatchTower
+      - name: Attest SBOM
+        uses: actions/attest-sbom@v4
+        with:
+          subject-name: ghcr.io/${{ github.repository_owner }}/watchtower
+          subject-digest: ${{ steps.build.outputs.digest }}
+          sbom-path: sbom.spdx.json
+          push-to-registry: true

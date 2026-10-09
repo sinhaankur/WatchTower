@@ -124,17 +124,21 @@ def _validate_port(value: Any, what: str) -> int:
 def runtime_status() -> Dict[str, Any]:
     """Everything the connection card needs in one call: binary, version,
     machine state (macOS/Windows VMs), and whether the socket answers."""
+    from watchtower.managed_db_runtime import detect_runtime
+
     bin_ = _podman_path()
     if not bin_:
         return {
             "available": False,
             "binary": None,
+            "runtime": None,
             "version": None,
             "machine": None,
             "connected": False,
             "hint": "Install Podman (https://podman.io) or Docker, then refresh.",
         }
 
+    runtime = detect_runtime()  # "podman" | "docker" — what actually resolved
     _rc, out, _err = _run([bin_, "--version"], timeout=10.0)
     version = out.strip() or None
 
@@ -157,19 +161,27 @@ def runtime_status() -> Dict[str, Any]:
             except json.JSONDecodeError:
                 machine = None
 
-    rc, _out, err = _run([bin_, "info", "--format", "{{.Host.Arch}}"], timeout=15.0)
+    # `info --format {{.Host.Arch}}` is a Podman template; Docker's info tree
+    # differs. Probe with a runtime-appropriate format so a healthy Docker
+    # daemon isn't reported as "not responding". Both accept a bare `info`
+    # that exits 0 when the daemon/socket answers, so use that as the
+    # portable connectivity signal.
+    rc, _out, err = _run([bin_, "info", "--format", "{{json .}}"], timeout=15.0)
     connected = rc == 0
 
     hint = None
     if not connected:
         if machine and not machine["running"]:
             hint = "The Podman machine is stopped — click Start to bring it up."
+        elif runtime == "docker":
+            hint = (err or "Docker is installed but the daemon isn't responding — is Docker running?").strip()[:300]
         else:
             hint = (err or "Podman is installed but not responding.").strip()[:300]
 
     return {
         "available": True,
         "binary": bin_,
+        "runtime": runtime,
         "version": version,
         "machine": machine,
         "connected": connected,

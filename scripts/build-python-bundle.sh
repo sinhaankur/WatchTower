@@ -26,6 +26,16 @@ TARGET="${TARGET:-}"
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 OUT_DIR="${OUT_DIR:-$REPO_ROOT/desktop/python-bundle}"
 
+# The desktop bundle installs a LEANER set than the dev/CI/Docker
+# requirements.txt — it drops redis/rq (in-process BackgroundTasks) and
+# fabric (local/ssh+rsync deploys), ~7 MB the packaged app never reaches.
+# Falls back to requirements.txt if the lean file is somehow absent, so an
+# older checkout still builds. The fingerprint (payload-freshness check
+# further down) is computed from THIS same file so it reflects what actually
+# shipped. See requirements-bundle.txt for the full rationale.
+BUNDLE_REQUIREMENTS="$REPO_ROOT/requirements-bundle.txt"
+[ -f "$BUNDLE_REQUIREMENTS" ] || BUNDLE_REQUIREMENTS="$REPO_ROOT/requirements.txt"
+
 if [ -z "$TARGET" ]; then
   case "$(uname -s)-$(uname -m)" in
     Darwin-arm64)  TARGET="darwin-arm64" ;;
@@ -177,7 +187,7 @@ if [ "$USE_CROSS_INSTALL" = "true" ]; then
   ABI_ARGS="--python-version $PYV_SHORT --implementation cp --abi cp${PYV_NODOT}"
   python3 -m pip install --no-cache-dir --target "$SITE_PACKAGES" \
     $PLATFORM_ARGS $ABI_ARGS --only-binary=:all: --upgrade \
-    -r "$REPO_ROOT/requirements.txt"
+    -r "$BUNDLE_REQUIREMENTS"
   # Install watchtower itself (pure Python → no platform constraint needed).
   python3 -m pip install --no-cache-dir --target "$SITE_PACKAGES" \
     --no-deps --upgrade "$REPO_ROOT"
@@ -198,7 +208,7 @@ if [ "$USE_CROSS_INSTALL" = "true" ]; then
 else
   echo "==> Native install: $TARGET matches host"
   "$PYTHON_BIN" -m pip install --no-cache-dir --upgrade pip
-  "$PYTHON_BIN" -m pip install --no-cache-dir -r "$REPO_ROOT/requirements.txt"
+  "$PYTHON_BIN" -m pip install --no-cache-dir -r "$BUNDLE_REQUIREMENTS"
   "$PYTHON_BIN" -m pip install --no-cache-dir --no-deps "$REPO_ROOT"
 fi
 
@@ -268,7 +278,7 @@ fi
 # builds.
 echo "==> Writing runtime-fingerprint.json"
 SHELL_VERSION=$(grep -E '^__version__' "$REPO_ROOT/watchtower/__init__.py" | sed -E 's/.*"([^"]+)".*/\1/')
-REQ_SHA=$(python3 "$REPO_ROOT/scripts/payload_tools.py" fingerprint "$REPO_ROOT/requirements.txt")
+REQ_SHA=$(python3 "$REPO_ROOT/scripts/payload_tools.py" fingerprint "$BUNDLE_REQUIREMENTS")
 cat > "$OUT_DIR/python/runtime-fingerprint.json" <<EOF
 {
   "shellVersion": "$SHELL_VERSION",

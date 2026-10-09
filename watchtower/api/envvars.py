@@ -67,6 +67,34 @@ def _mask(value: str) -> str:
     return "*" * (len(value) - 4) + value[-4:]
 
 
+# ── Encryption at rest ────────────────────────────────────────────────────────
+# Env-var values are frequently secrets (API keys, DB passwords). They must not
+# sit in the SQLite file as plaintext. We Fernet-encrypt on write (same key as
+# GitHub tokens / SSH keys) and decrypt on read.
+#
+# Backward compatibility: rows written before this change are plaintext. The
+# decrypt helper detects a non-Fernet value and returns it unchanged, so
+# existing installs keep working and each row self-heals to ciphertext the next
+# time it's written. No data migration required, no broken deploys.
+
+def enc_value(plaintext: str) -> str:
+    return util.encrypt_secret(plaintext)
+
+
+def dec_value(stored: str) -> str:
+    """Decrypt a stored env-var value; tolerate legacy plaintext rows."""
+    if stored is None:
+        return ""
+    try:
+        return util.decrypt_secret(stored)
+    except Exception:
+        # Not valid ciphertext → a legacy plaintext row (or the key rotated).
+        # Return as-is so the deploy/injection path still gets *a* value
+        # rather than 503-ing the whole deploy. A rotated key is surfaced
+        # elsewhere; here, availability of the deploy path wins.
+        return stored
+
+
 # ── Endpoints ─────────────────────────────────────────────────────────────────
 
 @router.get("/{project_id}/env", response_model=List[EnvVarResponse])
@@ -90,7 +118,7 @@ async def list_env_vars(
             id=r.id,
             project_id=r.project_id,
             key=r.key,
-            value=_mask(r.value),
+            value=_mask(dec_value(r.value)),
             environment=r.environment.value if hasattr(r.environment, "value") else str(r.environment),
         )
         for r in rows
@@ -120,7 +148,7 @@ async def create_env_var(
     ).first()
 
     if existing:
-        existing.value = data.value
+        existing.value = enc_value(data.value)
         db.flush()
         row = existing
         action = "envvar.update"
@@ -128,7 +156,7 @@ async def create_env_var(
         row = EnvironmentVariable(
             project_id=project_id,
             key=data.key.strip(),
-            value=data.value,
+            value=enc_value(data.value),
             environment=data.environment,
         )
         db.add(row)
@@ -154,7 +182,7 @@ async def create_env_var(
         id=row.id,
         project_id=row.project_id,
         key=row.key,
-        value=row.value,    # full value on create/update
+        value=dec_value(row.value),    # full (decrypted) value on create/update
         environment=row.environment.value if hasattr(row.environment, "value") else str(row.environment),
     )
 
@@ -179,7 +207,7 @@ async def update_env_var(
     if not row:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Environment variable not found")
 
-    row.value = data.value
+    row.value = enc_value(data.value)
     audit_log.record_for_user(
         db, current_user,
         action="envvar.update",
@@ -196,7 +224,7 @@ async def update_env_var(
         id=row.id,
         project_id=row.project_id,
         key=row.key,
-        value=row.value,
+        value=dec_value(row.value),
         environment=row.environment.value if hasattr(row.environment, "value") else str(row.environment),
     )
 

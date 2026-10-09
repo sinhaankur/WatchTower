@@ -229,6 +229,24 @@ else
       FAIL "Bundled Python cannot load watchtower.api:app — the packaged backend WILL crash at startup"
       (cd /tmp && WATCHTOWER_API_TOKEN=preflight-probe "$APP_PY" -c "from watchtower.api import app" 2>&1 | tail -12)
     fi
+    # Lean-bundle contract: the desktop bundle deliberately DROPS redis/rq/
+    # fabric (requirements-bundle.txt). Verify (a) they really are absent
+    # (the trim took effect) and (b) the queue still degrades to in-process
+    # BackgroundTasks without them — i.e. the trim didn't break the default
+    # deploy path. A regression here would either re-bloat the bundle or
+    # crash a deploy on a lean install.
+    if (cd /tmp && "$APP_PY" -c "
+import importlib.util as u
+absent = [m for m in ('redis','rq','fabric') if u.find_spec(m) is None]
+import watchtower.queue as q
+assert q._get_queue() is None, 'queue did not fall back to in-process without redis'
+print('lean-ok', ','.join(absent))
+" 2>&1 | grep -q "lean-ok"); then
+      PASS "Bundled Python is lean (redis/rq/fabric dropped) and queue degrades gracefully"
+    else
+      FAIL "Lean-bundle contract broken — either the extras crept back in or the queue no longer falls back without redis"
+      (cd /tmp && "$APP_PY" -c "import importlib.util as u; print([m for m in ('redis','rq','fabric') if u.find_spec(m) is not None], 'unexpectedly present')" 2>&1 | tail -5)
+    fi
     # Verify alembic migrations are bundled (caught the 1.11.0 fresh-DB bug).
     APP_ALEMBIC_ENV=$(find "$REPO_ROOT/desktop/dist/mac-arm64/WatchTower.app/Contents/Resources/python/lib" -path '*/site-packages/watchtower/alembic/env.py' 2>/dev/null | head -1)
     if [ -n "$APP_ALEMBIC_ENV" ]; then

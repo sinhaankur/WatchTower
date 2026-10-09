@@ -85,13 +85,15 @@ async def complete_setup_wizard(
             )
             db.add(config)
         
-        # Add environment variables if provided
+        # Add environment variables if provided. Values are encrypted at rest
+        # (same Fernet path as api/envvars.py) — env vars often hold secrets.
         if setup_data.environment_variables:
+            from watchtower.api.envvars import enc_value
             for env_var in setup_data.environment_variables:
                 db_env_var = EnvironmentVariable(
                     project_id=project.id,
                     key=env_var.key,
-                    value=env_var.value,
+                    value=enc_value(env_var.value),
                     environment=env_var.environment
                 )
                 db.add(db_env_var)

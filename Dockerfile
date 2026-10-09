@@ -60,12 +60,36 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     pip install --upgrade pip \
     && pip install '.[all]'
 
-EXPOSE 8000
-
-HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
-  CMD curl -fsS http://127.0.0.1:8000/health || exit 1
+# ── Run as a non-root user ──────────────────────────────────────────────────
+# A deployment control plane that terminates a public web server, does
+# SSH-out, and shells subprocesses should not run as root — a container
+# escape or an RCE in any dependency then owns UID 0. Create an unprivileged
+# `watchtower` user and hand it the two paths the app writes to at runtime:
+#   - /data  → DB + Fernet secret key + backups (WATCHTOWER_DATA_DIR)
+#   - /builds → git clones + build artifacts (WATCHTOWER_BUILD_DIR)
+# Pinning these to owned, absolute paths (instead of the user's $HOME) keeps
+# writes working regardless of how home resolves for a numeric UID, and makes
+# them the obvious volume mount points for persistence.
+RUN groupadd --system watchtower \
+    && useradd --system --gid watchtower --home-dir /home/watchtower --create-home watchtower \
+    && mkdir -p /data /builds \
+    && chown -R watchtower:watchtower /data /builds /app
 
 ENV WATCHTOWER_HOST=0.0.0.0 \
-    WATCHTOWER_PORT=8000
+    WATCHTOWER_PORT=8000 \
+    WATCHTOWER_DATA_DIR=/data \
+    WATCHTOWER_BUILD_DIR=/builds
+
+VOLUME ["/data"]
+
+USER watchtower
+
+EXPOSE 8000
+
+# Readiness (/ready) verifies the DB is reachable, not just that the process
+# is up (/health). The container HEALTHCHECK uses /ready so an image with a
+# broken DB connection is reported unhealthy instead of falsely green.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+  CMD curl -fsS http://127.0.0.1:8000/ready || exit 1
 
 CMD ["watchtower-deploy", "serve", "--host", "0.0.0.0", "--port", "8000"]

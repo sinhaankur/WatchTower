@@ -96,8 +96,13 @@ def record(
     try:
         request_id = get_request_id() or None
         ip = None
-        if request is not None and request.client is not None:
-            ip = request.client.host
+        if request is not None:
+            # Honour CF-Connecting-IP / X-Forwarded-For when WatchTower is
+            # behind a trusted proxy/CDN (WATCHTOWER_TRUST_FORWARDED_FOR),
+            # else the socket peer. Same trust gate as rate limiting so the
+            # audit log records the real visitor, not a Cloudflare edge IP.
+            from watchtower.api.rate_limit import client_ip
+            ip = client_ip(request)
 
         event = AuditEvent(
             action=action,

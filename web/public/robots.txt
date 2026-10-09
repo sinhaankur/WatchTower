@@ -1,0 +1,8 @@
+# WatchTower control-plane SPA — this is the authenticated application UI
+# (dashboard, deployments, settings), not public content. There is nothing
+# here for a search crawler to index: every route behind /login requires a
+# session, and indexing app shells only leaks URL structure and produces
+# useless search results. The public marketing site (a separate origin) has
+# its own robots.txt that DOES allow crawling.
+User-agent: *
+Disallow: /

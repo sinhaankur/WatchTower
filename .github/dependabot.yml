@@ -1,0 +1,75 @@
+# Dependabot — automated dependency + security updates.
+#
+# Covers every dependency ecosystem in the repo plus the GitHub Actions
+# workflows themselves (a compromised or vulnerable action is a real
+# supply-chain vector). Grouped so a routine bump lands as ONE PR per
+# ecosystem instead of a dozen — less review churn, and security updates
+# still come through individually so they're never buried in a group.
+#
+# Cadence is weekly (Monday): frequent enough to keep the CVE window short,
+# infrequent enough not to bury the maintainer in PRs. open-pull-requests-limit
+# caps concurrent noise per ecosystem.
+version: 2
+
+updates:
+  # ── Python (root: pyproject.toml + requirements.txt) ──────────────────────
+  - package-ecosystem: pip
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      python-minor-patch:
+        # Batch routine minor/patch bumps; majors stay individual so a
+        # breaking change gets its own reviewable PR.
+        update-types: ["minor", "patch"]
+    labels: ["dependencies", "python"]
+
+  # ── Frontend SPA (web/) ───────────────────────────────────────────────────
+  - package-ecosystem: npm
+    directory: "/web"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      web-minor-patch:
+        update-types: ["minor", "patch"]
+    labels: ["dependencies", "frontend"]
+
+  # ── Electron desktop shell (desktop/) ─────────────────────────────────────
+  - package-ecosystem: npm
+    directory: "/desktop"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      desktop-minor-patch:
+        update-types: ["minor", "patch"]
+    labels: ["dependencies", "desktop"]
+
+  # ── VS Code extension (vscode-extension/) ─────────────────────────────────
+  - package-ecosystem: npm
+    directory: "/vscode-extension"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 3
+    groups:
+      vscode-minor-patch:
+        update-types: ["minor", "patch"]
+    labels: ["dependencies", "vscode-extension"]
+
+  # ── GitHub Actions (the workflows in .github/workflows) ───────────────────
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      actions-all:
+        patterns: ["*"]
+    labels: ["dependencies", "ci"]

@@ -505,6 +505,32 @@ _PUBLIC_ASSET_HEADERS = {
     **_SPA_SECURITY_HEADERS,
 }
 
+# One year, immutable. Every file under /assets is content-hashed by Vite
+# (e.g. vendor-react-5Zn00eSR.js) — the hash changes when the bytes change,
+# so the URL is a permanent identifier and can never go stale. `immutable`
+# tells the browser not to even send a revalidation request on reload,
+# eliminating the 304 round-trip per chunk that StaticFiles' default
+# (Last-Modified/ETag only, no max-age) incurred on every navigation.
+# This is also the header a CDN (Cloudflare, etc.) keys off to cache the
+# bundle at the edge indefinitely — see docs/CDN_STRATEGY.md.
+_IMMUTABLE_ASSET_CACHE = "public, max-age=31536000, immutable"
+
+
+class _ImmutableStaticFiles(StaticFiles):
+    """StaticFiles that stamps content-hashed bundles as immutable.
+
+    The default StaticFiles emits only Last-Modified + ETag, so browsers
+    re-validate every hashed chunk on each load (a 304 per file). Because
+    Vite hashes every filename, the response body for a given URL never
+    changes, so we can safely tell clients and CDNs to cache for a year
+    and skip revalidation entirely.
+    """
+
+    def file_response(self, *args, **kwargs):  # type: ignore[override]
+        resp = super().file_response(*args, **kwargs)
+        resp.headers["Cache-Control"] = _IMMUTABLE_ASSET_CACHE
+        return resp
+
 
 @app.get("/", tags=["Health"], include_in_schema=False)
 async def root():
@@ -522,6 +548,16 @@ async def root():
 
 @app.get("/health", tags=["Health"])
 async def health():
+    """Liveness probe — is the process up and serving.
+
+    Deliberately shallow and dependency-free: it must stay green whenever
+    the ASGI app can answer, even if the DB is briefly unreachable, so an
+    orchestrator's *liveness* check doesn't kill (and restart-loop) a
+    process that would recover on its own. Use ``/ready`` for a check that
+    gates traffic on the DB actually being reachable. The Docker
+    HEALTHCHECK and CI smoke test key off this endpoint + the
+    ``watchtower-api`` service marker below — don't change that contract.
+    """
     return {"status": "healthy", "service": "watchtower-api"}
 
 
@@ -529,6 +565,38 @@ async def health():
 async def health_alias():
     """Alias so the frontend apiClient (baseURL=/api) can reach /health."""
     return {"status": "healthy", "service": "watchtower-api"}
+
+
+@app.get("/ready", tags=["Health"])
+async def ready():
+    """Readiness probe — is the process able to serve real requests.
+
+    Unlike ``/health`` (liveness), this verifies the backing store is
+    actually reachable with a cheap ``SELECT 1``. A load balancer / k8s
+    readiness gate should route traffic here so a pod with a dead DB
+    connection is pulled from rotation instead of returning 500s to users.
+    Returns 503 (not 500) on failure so it reads as "not ready yet",
+    which is the semantically correct signal for a readiness gate.
+    """
+    from sqlalchemy import text
+    from watchtower.database import SessionLocal
+
+    db = SessionLocal()
+    try:
+        db.execute(text("SELECT 1"))
+        return {"status": "ready", "service": "watchtower-api", "database": "ok"}
+    except Exception as exc:  # noqa: BLE001 — any DB error means "not ready"
+        logger.warning("Readiness check failed: database unreachable: %s", exc)
+        return JSONResponse(
+            status_code=503,
+            content={
+                "status": "not_ready",
+                "service": "watchtower-api",
+                "database": "unreachable",
+            },
+        )
+    finally:
+        db.close()
 
 
 app.include_router(projects.router)
@@ -608,8 +676,9 @@ def _resolve_web_dist() -> Path:
 _WEB_DIST = _resolve_web_dist()
 
 if _WEB_DIST.is_dir():
-    # Static assets (JS/CSS/images) served under /assets
-    app.mount("/assets", StaticFiles(directory=str(_WEB_DIST / "assets")), name="assets")
+    # Static assets (JS/CSS/images) served under /assets — content-hashed,
+    # so served immutable + cacheable-for-a-year (and CDN-friendly).
+    app.mount("/assets", _ImmutableStaticFiles(directory=str(_WEB_DIST / "assets")), name="assets")
 
     # Public root files (favicon, etc.) — serve any file that exists
     @app.get("/{filename:path}", include_in_schema=False)

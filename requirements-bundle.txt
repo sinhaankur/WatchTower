@@ -1,0 +1,58 @@
+# Desktop-bundle dependency set — what ships INSIDE the packaged Mac/Linux/
+# Windows app (built by scripts/build-python-bundle.sh into
+# desktop/python-bundle/python).
+#
+# This is deliberately LEANER than requirements.txt. The desktop app is the
+# personal-appliance flow: it runs the API in-process, uses FastAPI
+# BackgroundTasks (NOT a Redis/RQ worker), and deploys locally / over plain
+# ssh+rsync (NOT the legacy fabric JSON-file path). So redis, rq, and fabric
+# are ~7 MB of code the packaged app can never reach — every install and
+# every two-stage-updater payload carried them for nothing. They're omitted
+# here.
+#
+# What STAYS vs requirements.txt:
+#   - everything the API needs at startup (core + DB + crypto + rate limit),
+#     because the packaged backend crashes if any startup dep is missing
+#     (this file is the bundle's ONLY dep source — the v1.20.0
+#     python-multipart gap is why every needed dep must be listed here);
+#   - openai, because the AI agent + self-heal is a headline desktop feature
+#     and only the openai SDK path is wired (self_heal.py / api/agent.py).
+#
+# What's DROPPED (present in requirements.txt for dev/CI/Docker, which DO run
+# the worker + SSH deploys):
+#   - fabric   (SSH/rsync legacy deploy path — desktop deploys locally)
+#   - redis+rq (durable queue — desktop uses in-process BackgroundTasks)
+#
+# Keep this in lockstep with requirements.txt for the shared lines; only the
+# three optional-extra lines differ. CI's preflight loads watchtower.api:app
+# from the bundle, which catches a missing STARTUP dep — but NOT a missing
+# lazy dep, so think before dropping anything a feature imports on use.
+
+# Core
+fastapi==0.115.0
+uvicorn==0.29.0
+python-multipart==0.0.30
+pydantic==2.5.0
+pydantic-settings==2.1.0
+python-dotenv==1.0.0
+
+# Database
+sqlalchemy==2.0.23
+psycopg2-binary==2.9.9
+alembic==1.13.1
+
+# Utilities
+pyyaml>=6.0
+apscheduler>=3.10.0
+requests==2.31.0
+podman==5.0.0; sys_platform == "linux"
+
+# HTTP client (health checks + OIDC/Cloudflare/agent HTTP)
+httpx==0.25.2
+
+# Rate limiting
+slowapi>=0.1.9
+
+# [agent] LLM agent + self-heal — talks to ANY OpenAI-compatible endpoint.
+# Kept in the desktop bundle because AI self-heal is a headline feature.
+openai>=1.50.0
