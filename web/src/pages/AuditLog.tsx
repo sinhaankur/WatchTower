@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Copy, Check, Download } from 'lucide-react';
 import apiClient from '@/lib/api';
-import { useProFeature } from '@/hooks/queries';
-import { ProLock } from '@/components/ProLock';
 import EmptyState from '@/components/EmptyState';
 
 type AuditEvent = {
@@ -56,6 +55,39 @@ function formatRelative(iso: string | null): string {
   return `${Math.floor(sec / 86400)}d ago`;
 }
 
+// ── Export ────────────────────────────────────────────────────────────────────
+// The log is already in the browser, so copy/download happens client-side.
+// The point (user ask): grab the events and paste them into a prompt/tool to
+// diagnose. JSON keeps the nested metadata; CSV is spreadsheet-friendly.
+
+function auditToJson(events: AuditEvent[]): string {
+  return JSON.stringify(events, null, 2);
+}
+
+function auditToCsv(events: AuditEvent[]): string {
+  const cols = ['created_at', 'action', 'actor_email', 'entity_type', 'entity_id', 'ip_address', 'request_id', 'extra'] as const;
+  const esc = (v: unknown): string => {
+    const s = v == null ? '' : typeof v === 'object' ? JSON.stringify(v) : String(v);
+    // RFC-4180: quote if the cell has a comma, quote, or newline; double inner quotes.
+    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  const header = cols.join(',');
+  const rows = events.map((e) => cols.map((c) => esc(e[c])).join(','));
+  return [header, ...rows].join('\n');
+}
+
+function downloadText(filename: string, text: string, mime: string): void {
+  const blob = new Blob([text], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
 export default function AuditLog() {
   const [events, setEvents] = useState<AuditEvent[]>([]);
   const [loading, setLoading] = useState(true);
@@ -65,15 +97,9 @@ export default function AuditLog() {
   const [days, setDays] = useState(30);
   const [search, setSearch] = useState('');
   const [expanded, setExpanded] = useState<string | null>(null);
-
-  // Pro gate. The /api/audit endpoint returns 402 on Free tier — we don't
-  // bother fetching from it at all if we know the user can't see results.
-  // Avoids a useless 402 in the network tab and lets <ProLock> render
-  // immediately instead of after a fetch round-trip.
-  const isPro = useProFeature('audit-log');
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    if (!isPro) return;
     let cancelled = false;
     setLoading(true);
     setError(null);
@@ -98,7 +124,7 @@ export default function AuditLog() {
         if (!cancelled) setLoading(false);
       });
     return () => { cancelled = true; };
-  }, [action, entityType, days, isPro]);
+  }, [action, entityType, days]);
 
   const filtered = useMemo(() => {
     if (!search.trim()) return events;
@@ -111,27 +137,18 @@ export default function AuditLog() {
     );
   }, [events, search]);
 
-  // Free tier: render the upsell card and stop. Header still shows so the
-  // page identity is consistent (user clicked "Audit Log" in the nav and
-  // sees an Audit Log page, not a generic paywall).
-  if (!isPro) {
-    return (
-      <div className="flex-1 overflow-auto bg-muted">
-        <header
-          className="px-4 sm:px-6 lg:px-8 py-4 border-b"
-          style={{ borderColor: 'hsl(var(--border-soft))' }}
-        >
-          <h1 className="text-lg font-semibold text-foreground">Audit Log</h1>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            Append-only record of who changed what, scoped to your organization.
-          </p>
-        </header>
-        <main className="px-4 sm:px-6 lg:px-8 py-8 max-w-3xl mx-auto w-full">
-          <ProLock feature="audit-log" />
-        </main>
-      </div>
-    );
-  }
+  const onCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(auditToJson(filtered));
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // Clipboard denied (rare, e.g. insecure context) — fall back to a download.
+      downloadText(`watchtower-audit-${Date.now()}.json`, auditToJson(filtered), 'application/json');
+    }
+  };
+
+  const stamp = new Date().toISOString().slice(0, 10);
 
   return (
     <div className="flex-1 overflow-auto bg-muted">
@@ -145,8 +162,42 @@ export default function AuditLog() {
             Append-only record of who changed what, scoped to your organization.
           </p>
         </div>
-        <div className="text-xs text-muted-foreground">
-          {loading ? 'Loading…' : `${filtered.length} event${filtered.length === 1 ? '' : 's'}`}
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground mr-1">
+            {loading ? 'Loading…' : `${filtered.length} event${filtered.length === 1 ? '' : 's'}`}
+          </span>
+          {/* Copy / download the (filtered) log so it can be pasted into a
+              prompt or opened in a tool to diagnose an incident. */}
+          <button
+            type="button"
+            onClick={onCopy}
+            disabled={filtered.length === 0}
+            title="Copy the shown events as JSON"
+            className="inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-2.5 py-1.5 text-xs font-medium text-foreground hover:border-accent/50 hover:bg-muted transition-colors disabled:opacity-40"
+          >
+            {copied ? <Check size={13} className="text-emerald-500" /> : <Copy size={13} />}
+            {copied ? 'Copied' : 'Copy'}
+          </button>
+          <button
+            type="button"
+            onClick={() => downloadText(`watchtower-audit-${stamp}.json`, auditToJson(filtered), 'application/json')}
+            disabled={filtered.length === 0}
+            title="Download the shown events as JSON"
+            className="inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-2.5 py-1.5 text-xs font-medium text-foreground hover:border-accent/50 hover:bg-muted transition-colors disabled:opacity-40"
+          >
+            <Download size={13} />
+            JSON
+          </button>
+          <button
+            type="button"
+            onClick={() => downloadText(`watchtower-audit-${stamp}.csv`, auditToCsv(filtered), 'text/csv')}
+            disabled={filtered.length === 0}
+            title="Download the shown events as CSV"
+            className="inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-2.5 py-1.5 text-xs font-medium text-foreground hover:border-accent/50 hover:bg-muted transition-colors disabled:opacity-40"
+          >
+            <Download size={13} />
+            CSV
+          </button>
         </div>
       </header>
 
