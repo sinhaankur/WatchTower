@@ -356,6 +356,19 @@ export function useMe() {
   });
 }
 
+/** Personalize your display name — no GitHub needed. Persists to your user
+ *  record and refreshes the identity everywhere it's shown. */
+export function useUpdateMe() {
+  const qc = useQueryClient();
+  return useMutation<Me, unknown, { name: string }>({
+    mutationFn: async (body) => (await apiClient.patch<Me>('/me', body)).data,
+    onSuccess: (me) => {
+      qc.setQueryData(queryKeys.me, me);          // instant update
+      void qc.invalidateQueries({ queryKey: queryKeys.me });
+    },
+  });
+}
+
 /**
  * Fetches current vs latest GitHub release. Honors the user's
  * auto-check preference: when disabled, the query stays idle until
