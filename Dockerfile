@@ -56,8 +56,10 @@ COPY --from=web-builder /web/dist /app/web/dist
 # SSH deploys, and powers the AI agent — so unlike a lean PyPI install it
 # wants everything. (PyPI / pipx consumers get the lean default; see
 # pyproject.toml [project.optional-dependencies].)
+# Upgrade setuptools alongside pip — the base image ships 70.3.0 which carries
+# CVE-2025-47273 (path traversal). pip's upgrade alone doesn't touch it.
 RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install --upgrade pip \
+    pip install --upgrade pip 'setuptools>=78.1.1' \
     && pip install '.[all]'
 
 # ── Run as a non-root user ──────────────────────────────────────────────────
