@@ -2241,11 +2241,14 @@ async function startBackend(payload = null) {
         // Stable identity across restarts — the email-based fallback lookup in
         // _ensure_user_org_member uses this to find the same DB user even when
         // runtimeApiToken (and thus the uuid5-derived user_id) changes.
-        // Match the browser-mode default so the email-based fallback in
-        // _ensure_user_org_member always resolves the same DB user across
-        // browser↔desktop switches and across restarts with new random tokens.
+        // Keep the EMAIL stable — it's the key _ensure_user_org_member uses to
+        // resolve the same DB user across browser↔desktop and across restarts
+        // with new random tokens. Changing it would fork your org/projects, so
+        // it stays 'developer@watchtower.local'. Only the display NAME is updated
+        // to the honest "Local admin" the backend now uses (was the generic,
+        // placeholder-looking "WatchTower Developer").
         WATCHTOWER_DEFAULT_USER_EMAIL: process.env.WATCHTOWER_DEFAULT_USER_EMAIL || 'developer@watchtower.local',
-        WATCHTOWER_DEFAULT_USER_NAME:  process.env.WATCHTOWER_DEFAULT_USER_NAME  || 'WatchTower Developer',
+        WATCHTOWER_DEFAULT_USER_NAME:  process.env.WATCHTOWER_DEFAULT_USER_NAME  || 'Local admin',
         // Desktop is single-user — disable the multi-user owner-mode claim
         // system so it never blocks access with "not invited" 403s.
         WATCHTOWER_INSTALL_OWNER_MODE: process.env.WATCHTOWER_INSTALL_OWNER_MODE || 'false',

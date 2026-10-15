@@ -29,10 +29,10 @@
 # lazy dep, so think before dropping anything a feature imports on use.
 
 # Core
-fastapi==0.142.2
+fastapi==0.143.0
 uvicorn==0.54.0
 python-multipart==0.0.32
-pydantic==2.13.5
+pydantic==2.14.0
 pydantic-settings==2.15.0
 python-dotenv==1.2.4
 
