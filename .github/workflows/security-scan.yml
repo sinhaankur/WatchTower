@@ -15,10 +15,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Run Trivy filesystem scan
-        uses: aquasecurity/trivy-action@v0.24.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: fs
           scan-ref: .
@@ -32,10 +32,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       - name: Build container image
         # Reuse the GHA layer cache populated by publish-container.yml
@@ -43,7 +43,7 @@ jobs:
         # + cache-from, every PR rebuilt the apt + pip + npm layers from
         # scratch, ~5 minutes per run on a path that's just a security
         # gate. `load: true` keeps the image addressable for trivy below.
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           load: true
@@ -51,7 +51,7 @@ jobs:
           cache-from: type=gha
 
       - name: Run Trivy image scan
-        uses: aquasecurity/trivy-action@v0.24.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: watchtower:security-scan
           severity: CRITICAL,HIGH
