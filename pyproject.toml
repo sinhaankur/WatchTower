@@ -57,6 +57,10 @@ dependencies = [
   "pyyaml>=6.0",
   "apscheduler>=3.10.0",
   "requests>=2.28.0",
+  # Pin the transitive urllib3 above the fixed versions (CVE-2026-97687,
+  # CVE-2026-97689) — the container installs '.[all]' from pyproject, not
+  # requirements.txt, so the floor must live here too (see bundle dep gap).
+  "urllib3>=2.8.0",
   "httpx>=0.25.0",
   # Rate limiting
   "slowapi>=0.1.9",
