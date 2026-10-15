@@ -61,16 +61,24 @@ httpx==0.28.1
 # that path, so the bundle shipped without it. Preflight caught the first-launch
 # crash before it reached users.
 #
-# Platform-split floor. cryptography dropped x86_64 macOS (Intel) wheels as of
-# 49.0.0 — neither 49.x nor 50.x publish one, so the CVE-2026-69249 fix (>=49, a
-# cert-chain DoS) is simply not pip-installable on Intel Mac; its newest wheel is
-# 48.0.1. Every other arch (linux x64/arm64, Apple-Silicon mac, windows) gets the
-# fully-patched >=50.0.2. Intel Mac gets the best available (48.x) and carries
-# that one availability-only advisory until upstream ships an Intel wheel again or
-# we drop the darwin-x64 desktop target. Without this split the Intel-Mac bundle
-# build fails outright ("No matching distribution for cryptography>=50.0.2").
-cryptography>=50.0.2; sys_platform != "darwin" or platform_machine != "x86_64"
-cryptography>=48.0.0,<49; sys_platform == "darwin" and platform_machine == "x86_64"
+# Floor only — NO upper cap and NO env markers, on purpose. The cross-arch
+# bundle builder (scripts/build-python-bundle.sh) installs with
+# `pip --platform <arch> --only-binary=:all:`, which picks the newest WHEEL
+# available per target platform. PEP 508 markers like
+# `platform_machine == "x86_64"` do NOT work here — pip evaluates them against
+# the HOST (e.g. an arm64 macOS runner cross-building the x64 bundle), not the
+# target, so a marker-based split picks the wrong branch and the build dies with
+# "No matching distribution for cryptography>=50.0.2". (That was the 2.1.1/2.1.2
+# darwin-x64 failure.)
+#
+# A plain floor lets wheel availability do the right thing automatically:
+#   - linux x64/arm64, Apple-Silicon mac, windows → newest wheel = 50.0.2 (fully
+#     patched, incl. CVE-2026-69249)
+#   - Intel Mac (x86_64) → upstream dropped x86_64 wheels after 48.0.1, so pip
+#     resolves to 48.0.1 there. That one arch carries the >=49 cert-chain DoS
+#     (availability-only) until upstream restores Intel wheels or we drop the
+#     darwin-x64 target.
+cryptography>=48.0.0
 
 # Rate limiting
 slowapi>=0.1.9
