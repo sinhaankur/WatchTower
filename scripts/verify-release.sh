@@ -98,9 +98,9 @@ VERSION_NUM="${TAG#v}"
 EXPECTED_INSTALLERS=(
   "WatchTower-${VERSION_NUM}-mac-arm64.dmg"
   "WatchTower-${VERSION_NUM}-mac-x64.dmg"
-  "WatchTower-${VERSION_NUM}-linux-x86_64.AppImage"
-  "WatchTower-${VERSION_NUM}-linux-arm64.AppImage"
-  "WatchTower-${VERSION_NUM}-linux-armv7l.AppImage"
+  "WatchTower-${VERSION_NUM}-x86_64.AppImage"
+  "WatchTower-${VERSION_NUM}-arm64.AppImage"
+  "WatchTower-${VERSION_NUM}-armv7l.AppImage"
   "WatchTower-${VERSION_NUM}-win-x64.exe"
   "WatchTower-${VERSION_NUM}-win-arm64.exe"
 )
@@ -272,7 +272,7 @@ verify_linux_appimage() {
   local expected_arch_pattern="$2"
   local appimage_arch="$arch"
   case "$arch" in arm64) appimage_arch=aarch64 ;; x64) appimage_arch=x86_64 ;; esac
-  local img="WatchTower-$VERSION-linux-${appimage_arch}.AppImage"
+  local img="WatchTower-$VERSION-${appimage_arch}.AppImage"
   local img_path
   img_path=$(DOWNLOAD "$img") || return 1
   # AppImage lets us extract without mounting (`--appimage-extract` works

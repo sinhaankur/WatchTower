@@ -93,6 +93,7 @@
         "AppImage",
         "deb"
       ],
+      "artifactName": "WatchTower-${version}-${arch}.${ext}",
       "category": "Development",
       "desktop": {
         "entry": {
