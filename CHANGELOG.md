@@ -9,6 +9,12 @@ Curated, human-friendly history of WatchTower releases. Auto-generated GitHub Re
 
 ---
 
+## 2.1.2 — Release-pipeline fixes (supersedes 2.1.1)
+
+- **Fixes the 2.1.1 build.** 2.1.1 tagged but its installer build failed: the Intel-Mac (x86_64) desktop bundle couldn't resolve `cryptography>=50.0.2` because upstream dropped x86_64 macOS wheels at 49.0.0. 2.1.2 uses a platform-split floor — the fully-patched `>=50.0.2` on every arch that has a wheel (Linux x64/arm64, Apple-Silicon Mac, Windows), and the newest available `48.x` on Intel Mac.
+- **Deterministic, truthful container security scan.** The Trivy container scan now builds without a stale layer cache and excludes pip's *vendored* dependency tree (`pip/_vendor`, which bundles old urllib3/msgpack copies pip imports internally and that can't be upgraded without breaking pip). The app's real dependency surface is still fully scanned and is patched.
+- Everything from 2.1.1 below (container CVE pins, AppImage catalog naming) ships here too.
+
 ## 2.1.1 — Security hardening + AppImage catalog fit
 
 - **Patched three container CVEs.** The published container image now floors `urllib3` (≥2.8.0), `msgpack` (≥1.2.1), and `setuptools` (≥78.1.1), closing CVE-2026-97687/97689, GHSA-6v7p-g79w-8964, and CVE-2025-47273. These pins live in `pyproject.toml`/Dockerfile — the surface the image actually installs from — so the Trivy container scan is clean.
