@@ -40,7 +40,7 @@ Anything that fails one or more items ships as **Beta** (opt-in channel, must be
 ### 3. CI artifact integrity (per release tag)
 - `Run tests` job passes.
 - `Create GitHub Release` job creates the release.
-- All seven desktop matrix entries reach `success` conclusion (linux-x64, linux-arm64, linux-armv7l, mac-arm64, mac-x64, windows-x64, windows-arm64).
+- All six desktop matrix entries reach `success` conclusion (linux-x64, linux-arm64, mac-arm64, mac-x64, windows-x64, windows-arm64). (linux-armv7l was dropped after v2.1.0 — Electron 44 removed 32-bit ARM Linux builds.)
 - The Linux x64 smoke test passes (boots backend, hits `/health` within 90s).
 - Each `.dmg` / `.AppImage` / `.exe` contains the **correct arch** Python bundle:
   - mac-arm64.dmg → arm64 `_pydantic_core.cpython-3*-darwin.so` (Mach-O arm64)

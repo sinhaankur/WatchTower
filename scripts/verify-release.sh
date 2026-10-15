@@ -100,7 +100,7 @@ EXPECTED_INSTALLERS=(
   "WatchTower-${VERSION_NUM}-mac-x64.dmg"
   "WatchTower-${VERSION_NUM}-x86_64.AppImage"
   "WatchTower-${VERSION_NUM}-arm64.AppImage"
-  "WatchTower-${VERSION_NUM}-armv7l.AppImage"
+  # linux-armv7l dropped after v2.1.0 (Electron 44 removed 32-bit ARM builds)
   "WatchTower-${VERSION_NUM}-win-x64.exe"
   "WatchTower-${VERSION_NUM}-win-arm64.exe"
 )
@@ -381,9 +381,10 @@ verify_linux_appimage arm64 "aarch64"
 verify_windows_zip x64
 verify_windows_authenticode x64
 verify_windows_authenticode arm64
-# Note: armv7l + Windows arm64 don't ship a python-build-standalone bundle
-# (no PBS target exists), so there's nothing to arch-verify there. They
-# fall back to system/pipx Python at runtime.
+# Note: Windows arm64 doesn't ship a python-build-standalone bundle (no PBS
+# target exists), so there's nothing to arch-verify there — it falls back to
+# system/pipx Python at runtime. linux-armv7l was dropped after v2.1.0
+# (Electron 44 removed 32-bit ARM Linux builds).
 
 # ──────────────────────────────────────────────────────────────────────────
 # Two-stage-updater payload (docs/DESKTOP_TWO_STAGE_UPDATER.md, phase 1).

@@ -248,12 +248,12 @@ jobs:
             eb_args: --linux AppImage deb --arm64
             artifact_glob: "desktop/dist/*arm64*"
             extra_apt: "gcc-aarch64-linux-gnu"
-          - os: ubuntu-latest
-            bundle_target: ""
-            bundle_source: "skip"
-            eb_args: --linux AppImage deb --armv7l
-            artifact_glob: "desktop/dist/*armv7l*"
-            extra_apt: "gcc-arm-linux-gnueabihf"
+          # NOTE: linux-armv7l (32-bit ARM) was dropped after v2.1.0. Electron
+          # 44 removed its 32-bit ARM Linux builds, so electron-builder 404s
+          # fetching electron-v44-linux-armv7l.zip and the leg fails. Electron
+          # won't re-add armv7l. 32-bit ARM users run WatchTower via PyPI
+          # (pip/pipx), the container image, or browser mode — only the Electron
+          # desktop .app can't target armv7l anymore.
           - os: macos-14
             bundle_target: "darwin-arm64"
             bundle_source: "inline"
