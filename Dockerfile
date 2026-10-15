@@ -18,8 +18,17 @@ COPY web/package*.json ./
 # BuildKit cache mount preserves npm's download cache across builds — even
 # when a dependency change invalidates this layer, the tarballs we already
 # pulled stay on disk and the next install is offline-fast.
+#
+# The explicit musl-rollup install after `npm ci` works around npm bug #4828
+# (https://github.com/npm/cli/issues/4828): with a cached /root/.npm, `npm ci`
+# can skip materialising a platform-specific OPTIONAL dependency even when it's
+# in the lockfile. On alpine (musl) that leaves rollup unable to find its native
+# binary — "Cannot find module @rollup/rollup-linux-x64-musl" — and `vite build`
+# dies. Force-installing the musl binary (no-save, so the lockfile is untouched)
+# guarantees it's present. If npm ci already placed it, this is a fast no-op.
 RUN --mount=type=cache,target=/root/.npm \
-    npm ci --prefer-offline --no-audit --no-fund
+    npm ci --prefer-offline --no-audit --no-fund \
+    && npm install --no-save --prefer-offline --no-audit --no-fund @rollup/rollup-linux-x64-musl
 COPY web/ ./
 RUN npm run build
 
