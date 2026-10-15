@@ -53,9 +53,9 @@ case "$OS" in
     esac ;;
   Linux)
     case "$ARCH" in
-      x86_64|amd64)   ASSET_RE='linux-x86_64\.AppImage$' ;;
-      aarch64|arm64)  ASSET_RE='linux-arm64\.AppImage$' ;;
-      armv7l)         ASSET_RE='linux-armv7l\.AppImage$' ;;
+      x86_64|amd64)   ASSET_RE='-x86_64\.AppImage$' ;;
+      aarch64|arm64)  ASSET_RE='-arm64\.AppImage$' ;;
+      armv7l)         ASSET_RE='-armv7l\.AppImage$' ;;
       *) die "unsupported Linux arch: $ARCH" ;;
     esac ;;
   *)
