@@ -9,6 +9,12 @@ Curated, human-friendly history of WatchTower releases. Auto-generated GitHub Re
 
 ---
 
+## 2.1.1 — Security hardening + AppImage catalog fit
+
+- **Patched three container CVEs.** The published container image now floors `urllib3` (≥2.8.0), `msgpack` (≥1.2.1), and `setuptools` (≥78.1.1), closing CVE-2026-97687/97689, GHSA-6v7p-g79w-8964, and CVE-2025-47273. These pins live in `pyproject.toml`/Dockerfile — the surface the image actually installs from — so the Trivy container scan is clean.
+- **AppImage names follow community convention.** Linux AppImages drop the redundant `linux` from their filename (`WatchTower-<ver>-<arch>.AppImage`), so the app can list cleanly in the AppImage community catalog. The install script and release verifier were updated in lockstep (and still match older releases).
+- **Dependency maintenance.** Merged a batch of safe dependency bumps (electron 44, `@types/node`, `mcp`, GitHub Actions, and more); deferred the breaking major upgrades (eslint 9, vitest 5, lucide 1.x, TypeScript 7) that each need a dedicated migration.
+
 ## 1.21.0 — Small fast updates, live node mesh, and email that just works
 
 - **Updates shrink from ~200 MB to under 1 MB.** The desktop app now updates in two stages: the heavy shell (Electron + bundled Python) changes rarely, while the part that changes every release ships as a tiny signed payload (0.7 MB, one artifact for every platform and chip). Downloads are verified twice (checksum + Ed25519 signature against a key pinned in the app) before they ever run, a payload that fails to boot is quarantined and rolled back automatically, and anything incompatible falls back to the normal installer flow. This release publishes the payloads and ships the first payload-aware app — so updates *after* this one get small.
