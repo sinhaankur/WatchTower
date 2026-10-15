@@ -127,11 +127,21 @@ else
   # Count only vulnerabilities that have a fix available — matches Trivy's
   # ignore-unfixed, so an unfixable upstream advisory doesn't block a release
   # we can do nothing about. Falls back to 0 if jq/node parsing is unavailable.
+  # A "fix" that npm only offers as a SemVer-MAJOR bump of a build-only tool
+  # (e.g. tailwindcss 3→4 to shift the micromatch/braces tree) is NOT a fix we
+  # can take without a breaking migration — and the underlying advisory has no
+  # patched release of the actual package. Trivy's fs scan (ignore-unfixed:true)
+  # skips these, so CI does not fail on them; preflight must match that posture
+  # or it's stricter than the gate it mirrors. Count a vuln as fixable ONLY when
+  # a non-major fix exists (fixAvailable === true, or an object without
+  # isSemVerMajor).
   FIXABLE="$(printf '%s' "$AUDIT_JSON" | node -e '
     let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{
       try{const a=JSON.parse(s).vulnerabilities||{};
         let n=0;for(const v of Object.values(a)){
-          if((v.severity==="high"||v.severity==="critical")&&v.fixAvailable)n++;
+          const f=v.fixAvailable;
+          const realFix = f===true || (f && typeof f==="object" && !f.isSemVerMajor);
+          if((v.severity==="high"||v.severity==="critical")&&realFix)n++;
         }process.stdout.write(String(n));
       }catch{process.stdout.write("0");}});' 2>/dev/null || echo 0)"
   if [ "${FIXABLE:-0}" -gt 0 ]; then

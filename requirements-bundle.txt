@@ -54,6 +54,14 @@ podman==5.8.0; sys_platform == "linux"
 # HTTP client (health checks + OIDC/Cloudflare/agent HTTP)
 httpx==0.28.1
 
+# Crypto / secret storage — Fernet encryption of env vars, GitHub PATs, SSH
+# keys, and the auto-generated secret.key. A STARTUP dep: the packaged backend
+# cannot boot without it. Must be listed explicitly — it was previously pulled
+# in transitively, and a dep-graph change (the python-minor-patch bump) dropped
+# that path, so the bundle shipped without it. Preflight caught the first-launch
+# crash before it reached users.
+cryptography>=50.0.2
+
 # Rate limiting
 slowapi>=0.1.9
 
