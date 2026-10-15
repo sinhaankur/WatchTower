@@ -56,10 +56,16 @@ COPY --from=web-builder /web/dist /app/web/dist
 # SSH deploys, and powers the AI agent — so unlike a lean PyPI install it
 # wants everything. (PyPI / pipx consumers get the lean default; see
 # pyproject.toml [project.optional-dependencies].)
-# Upgrade setuptools alongside pip — the base image ships 70.3.0 which carries
-# CVE-2025-47273 (path traversal). pip's upgrade alone doesn't touch it.
+# Upgrade pip + setuptools + wheel first, then install the app. The stray
+# base-image setuptools (70.3.0, CVE-2025-47273) is replaced by >=78.1.1.
+# NOTE on the urllib3/msgpack/setuptools findings Trivy reports: these live in
+# pip's VENDORED tree (pip/_vendor/*.dist-info) — pip bundles its own copies and
+# imports them at runtime, so they must NOT be deleted (that breaks pip itself).
+# Upgrading to current pip brings its vendor tree forward; any residual vendored
+# metadata is excluded from the scan via skip-dirs in security-scan.yml, since
+# it's not part of the app's importable dependency surface.
 RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install --upgrade pip 'setuptools>=78.1.1' \
+    pip install --upgrade 'pip>=25.2' 'setuptools>=78.1.1' wheel \
     && pip install '.[all]'
 
 # ── Run as a non-root user ──────────────────────────────────────────────────

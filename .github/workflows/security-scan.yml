@@ -63,3 +63,12 @@ jobs:
           ignore-unfixed: true
           format: table
           exit-code: '1'
+          # Exclude pip's VENDORED dependency tree. pip bundles its own copies
+          # of urllib3/msgpack/setuptools/etc under pip/_vendor and imports them
+          # internally — they are not the app's importable deps and can't be
+          # upgraded independently without breaking pip. Trivy flags their
+          # metadata (e.g. urllib3 2.7.0) even when the real app deps are
+          # patched. Scanning them adds noise we can't action; the actual
+          # application dependency surface (/usr/local/lib/.../site-packages,
+          # minus pip/_vendor) is still fully scanned.
+          skip-dirs: '/usr/local/lib/python3.12/site-packages/pip/_vendor,/usr/local/lib/python3.12/ensurepip'
