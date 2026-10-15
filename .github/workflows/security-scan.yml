@@ -38,17 +38,22 @@ jobs:
         uses: docker/setup-buildx-action@v4
 
       - name: Build container image
-        # Reuse the GHA layer cache populated by publish-container.yml
-        # (read-only — never write from this workflow). Without buildx
-        # + cache-from, every PR rebuilt the apt + pip + npm layers from
-        # scratch, ~5 minutes per run on a path that's just a security
-        # gate. `load: true` keeps the image addressable for trivy below.
+        # Build with NO cache. A security scan MUST reflect the dependency
+        # versions that actually ship — reusing the GHA layer cache
+        # (cache-from: type=gha) made this nondeterministic: when the cached
+        # pip layer predated a security pin, Trivy reported the OLD versions
+        # (e.g. urllib3 2.7.0 after we'd floored it to 2.8.0) and the gate
+        # failed on vulnerabilities that were already fixed in source — or
+        # worse, could pass on a stale layer that hides a real one. The ~3-5
+        # min rebuild is the right cost for a gate whose whole job is to tell
+        # the truth about what we ship. `load: true` keeps the image
+        # addressable for trivy below.
         uses: docker/build-push-action@v7
         with:
           context: .
           load: true
           tags: watchtower:security-scan
-          cache-from: type=gha
+          no-cache: true
 
       - name: Run Trivy image scan
         uses: aquasecurity/trivy-action@v0.36.0

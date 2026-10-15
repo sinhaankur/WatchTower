@@ -123,29 +123,38 @@ fi
 if [ -n "${SKIP_AUDIT:-}" ]; then
   WARN "SKIP_AUDIT set — dependency audit skipped (NOT a stable release)"
 else
-  AUDIT_JSON="$(cd "$REPO_ROOT" && npm --prefix web audit --omit=dev --audit-level=high --json 2>/dev/null || true)"
-  # Count only vulnerabilities that have a fix available — matches Trivy's
-  # ignore-unfixed, so an unfixable upstream advisory doesn't block a release
-  # we can do nothing about. Falls back to 0 if jq/node parsing is unavailable.
-  # A "fix" that npm only offers as a SemVer-MAJOR bump of a build-only tool
-  # (e.g. tailwindcss 3→4 to shift the micromatch/braces tree) is NOT a fix we
-  # can take without a breaking migration — and the underlying advisory has no
-  # patched release of the actual package. Trivy's fs scan (ignore-unfixed:true)
-  # skips these, so CI does not fail on them; preflight must match that posture
-  # or it's stricter than the gate it mirrors. Count a vuln as fixable ONLY when
-  # a non-major fix exists (fixAvailable === true, or an object without
-  # isSemVerMajor).
-  FIXABLE="$(printf '%s' "$AUDIT_JSON" | node -e '
+  # Measure fixability EMPIRICALLY, not from npm's self-contradictory
+  # `fixAvailable` flags. npm has twice lied here: (1) it reports a
+  # SemVer-MAJOR bump (tailwindcss 3→4) as a "fix" for the braces/micromatch
+  # chain, and (2) it marks a transitive node (fast-glob) `fixAvailable:true`
+  # when NO installable version escapes the unpatched root (braces has no fix
+  # at all — advisory range "*"). Both are non-fixes. CI's Trivy fs scan uses
+  # ignore-unfixed:true and skips these, so it passes; preflight must match or
+  # it's stricter than the gate it mirrors.
+  #
+  # So: count HIGH/CRITICAL now, then in a throwaway copy of the lockfile run a
+  # NON-major `npm audit fix` and count again. If the count DROPS, a real fix
+  # exists that we're not taking → block. If it's unchanged, the remaining
+  # advisories are genuinely unfixable (no patched release / major-only) — the
+  # same ones Trivy ignore-unfixed skips, so CI passes and we must too.
+  _count_hc() { node -e '
     let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{
-      try{const a=JSON.parse(s).vulnerabilities||{};
-        let n=0;for(const v of Object.values(a)){
-          const f=v.fixAvailable;
-          const realFix = f===true || (f && typeof f==="object" && !f.isSemVerMajor);
-          if((v.severity==="high"||v.severity==="critical")&&realFix)n++;
-        }process.stdout.write(String(n));
-      }catch{process.stdout.write("0");}});' 2>/dev/null || echo 0)"
+      try{const m=JSON.parse(s).metadata.vulnerabilities||{};
+        process.stdout.write(String((m.high||0)+(m.critical||0)));
+      }catch{process.stdout.write("0");}});' 2>/dev/null || echo 0; }
+  BEFORE_HC="$( (cd "$REPO_ROOT/web" && npm audit --omit=dev --json 2>/dev/null) | _count_hc )"
+  AUDIT_TMP=$(mktemp -d)
+  cp "$REPO_ROOT/web/package.json" "$REPO_ROOT/web/package-lock.json" "$AUDIT_TMP/" 2>/dev/null
+  ( cd "$AUDIT_TMP" && npm audit fix --omit=dev --package-lock-only >/dev/null 2>&1 || true )
+  AFTER_HC="$( (cd "$AUDIT_TMP" && npm audit --omit=dev --json 2>/dev/null) | _count_hc )"
+  rm -rf "$AUDIT_TMP"
+  FIXABLE=$(( ${BEFORE_HC:-0} - ${AFTER_HC:-0} ))
+  [ "$FIXABLE" -lt 0 ] && FIXABLE=0
   if [ "${FIXABLE:-0}" -gt 0 ]; then
-    FAIL "Frontend prod deps — $FIXABLE fixable HIGH/CRITICAL vuln(s) (run 'npm --prefix web audit --omit=dev --audit-level=high'); CI Security Scan will fail"
+    FAIL "Frontend prod deps — $FIXABLE HIGH/CRITICAL vuln(s) a non-major 'npm audit fix' WOULD resolve ($BEFORE_HC→$AFTER_HC) but the lockfile hasn't taken (run 'npm --prefix web audit fix --omit=dev'); CI Security Scan will fail"
+  elif [ "${AFTER_HC:-0}" -gt 0 ]; then
+    WARN "Frontend prod deps — $AFTER_HC HIGH/CRITICAL advisory(ies) with NO installable fix (e.g. braces GHSA-vfj7-8cjw-p6xm, no patched release). Trivy ignore-unfixed skips these; not a release blocker."
+    PASS "Frontend prod deps — no FIXABLE HIGH/CRITICAL vulnerabilities"
   else
     PASS "Frontend prod deps — no fixable HIGH/CRITICAL vulnerabilities"
   fi
