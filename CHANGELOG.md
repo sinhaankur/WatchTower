@@ -9,6 +9,13 @@ Curated, human-friendly history of WatchTower releases. Auto-generated GitHub Re
 
 ---
 
+## 2.1.3 — Complete the release (supersedes 2.1.1 / 2.1.2)
+
+- **Fixes the remaining release-build failures** so every supported platform ships again:
+  - **Intel Mac desktop app builds again.** The platform-split `cryptography` pin in 2.1.2 didn't actually resolve on Intel Mac (the cross-arch builder evaluates pip markers against the build host, not the target). Replaced with a plain floor so wheel availability picks the right version per platform — `50.0.2` everywhere a wheel exists, `48.0.1` on Intel Mac (the newest upstream ships).
+  - **Dropped 32-bit ARM Linux (armv7l) desktop builds.** Electron 44 removed its armv7l builds, so the desktop packager can no longer target it. 32-bit ARM users run WatchTower via `pip`/`pipx`, the container image, or browser mode.
+- Carries forward everything from 2.1.1/2.1.2 (container CVE pins, AppImage catalog naming, deterministic security scan).
+
 ## 2.1.2 — Release-pipeline fixes (supersedes 2.1.1)
 
 - **Fixes the 2.1.1 build.** 2.1.1 tagged but its installer build failed: the Intel-Mac (x86_64) desktop bundle couldn't resolve `cryptography>=50.0.2` because upstream dropped x86_64 macOS wheels at 49.0.0. 2.1.2 uses a platform-split floor — the fully-patched `>=50.0.2` on every arch that has a wheel (Linux x64/arm64, Apple-Silicon Mac, Windows), and the newest available `48.x` on Intel Mac.
