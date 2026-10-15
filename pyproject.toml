@@ -114,6 +114,9 @@ agent = [
 queue = [
   "redis>=5.0.0",
   "rq>=1.16.0",
+  # rq pulls msgpack transitively; floor it above the fix for
+  # GHSA-6v7p-g79w-8964 (out-of-bounds read / crash). (security)
+  "msgpack>=1.2.1",
 ]
 # Convenience: everything above. Matches the dev clone / Docker image, which
 # install requirements.txt (the full pinned set). Excludes `mcp` on purpose.
@@ -122,6 +125,8 @@ all = [
   "openai>=1.50.0",
   "redis>=5.0.0",
   "rq>=1.16.0",
+  # see [queue] — msgpack floor for GHSA-6v7p-g79w-8964 (security)
+  "msgpack>=1.2.1",
 ]
 mcp = [
   # Floor raised to 1.28.1 for the CVE fixes (PYSEC-2026-3481/3482/3483);

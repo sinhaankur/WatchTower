@@ -73,6 +73,7 @@ fabric==3.2.3
 # Redis still work.
 redis==8.1.0
 rq==1.16.2
+msgpack>=1.2.1  # security: GHSA-6v7p-g79w-8964 (rq transitive dep)
 
 # [agent] LLM agent — talks to ANY OpenAI-compatible chat-completions
 # endpoint (Ollama, LM Studio, vLLM, llama.cpp, OpenAI, OpenRouter,
