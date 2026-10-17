@@ -1641,10 +1641,37 @@ def _resolve_build_command(
         # which short-circuits this branch above.
         if repo_dir is not None and not (repo_dir / "package.json").exists():
             return ""
+        # A package.json with NO "build" script is the other common static-site
+        # shape: a hand-coded HTML site that carries package.json only for dev
+        # tooling (linters, puppeteer screenshotters, formatters). Running
+        # `npm run build` there dies with `npm error Missing script: "build"`.
+        # Detect that and skip the build — serve the files as-is, same as the
+        # no-package.json case. (An explicit project.build_command still wins
+        # above.)
+        if repo_dir is not None and not _package_json_has_build_script(repo_dir):
+            return ""
         install = _detect_node_install(repo_dir) if repo_dir else "npm install"
         return f"{install} && npm run build"
 
     return ""
+
+
+def _package_json_has_build_script(repo_dir: Path) -> bool:
+    """True iff repo_dir/package.json declares a non-empty ``scripts.build``.
+
+    Defensive: a malformed/unreadable package.json returns False (skip the
+    build) rather than raising — a static site with a broken package.json
+    should still deploy its files, not hard-fail the whole deployment.
+    """
+    pkg = repo_dir / "package.json"
+    if not pkg.exists():
+        return False
+    try:
+        data = _json.loads(pkg.read_text(encoding="utf-8"))
+    except (ValueError, OSError):
+        return False
+    build = (data.get("scripts") or {}).get("build")
+    return bool(build and str(build).strip())
 
 
 def _detect_node_install(repo_dir: Path) -> str:
