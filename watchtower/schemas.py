@@ -189,7 +189,12 @@ class DeploymentBase(BaseModel):
 
 
 class DeploymentTriggerRequest(BaseModel):
-    branch: str = Field(default="main")
+    # No hardcoded default: when the caller (e.g. the "Deploy" button) omits a
+    # branch, the handler falls back to the PROJECT'S configured repo_branch —
+    # NOT a blind "main". Hardcoding "main" silently broke deploys for every repo
+    # whose default branch is "master" or anything else ("Remote branch main not
+    # found in upstream origin").
+    branch: Optional[str] = None
     commit_sha: Optional[str] = None
     node_ids: Optional[List[UUID]] = None
 

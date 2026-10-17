@@ -176,11 +176,17 @@ async def trigger_deployment(
                 detail="No active deployment nodes are available for this organization",
             )
 
+        # Branch resolution: honour an explicit request, else the project's
+        # configured repo_branch, else "main" as a last resort. Without this
+        # fallback, the "Deploy" button (which sends no branch) always cloned
+        # "main" and failed on any repo defaulting to "master".
+        deploy_branch = deploy_data.branch or project.repo_branch or "main"
+
         # Create deployment record
         deployment = Deployment(
             project_id=project_id,
             commit_sha=deploy_data.commit_sha or "manual-trigger",
-            branch=deploy_data.branch,
+            branch=deploy_branch,
             status=DeploymentStatus.PENDING,
             trigger=DeploymentTrigger.MANUAL,
             triggered_by_user_id=user_id,
