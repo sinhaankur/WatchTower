@@ -626,6 +626,9 @@ PATTERNS: list[tuple[FailureKind, re.Pattern, Callable[[re.Match], FailureDiagno
         FailureKind.ARTIFACT_MISSING,
         re.compile(
             r"rsync\(?\d*\)?:?\s*error:?\s*(?P<apath>[^\s:]+)[:\s]+\(l\)stat: No such file or directory"
+            # Plain rsync form seen in real deploys: "rsync: /path/: (l)stat:
+            # No such file or directory" (no literal 'error:' keyword).
+            r"|rsync:\s*(?P<apath3>[^\s:]+):?\s*\(l\)stat: No such file or directory"
             r"|rsync: (?:\[sender\] )?change_dir .* failed: No such file or directory"
             r"|cannot stat local path (?P<apath2>[^\s:]+): No such file",
             re.IGNORECASE,
@@ -650,12 +653,30 @@ PATTERNS: list[tuple[FailureKind, re.Pattern, Callable[[re.Match], FailureDiagno
             r"|error\[E\d+\]:\s*(?P<msg6>[^\n]+)(?:\n[^\n]*-->\s*(?P<file6>[^\s:]+):(?P<line6>\d+))?"
             # esbuild / vite: "✘ [ERROR] msg"
             r"|✘ \[ERROR\]\s*(?P<msg7>[^\n]+)"
+            # npm/yarn: the configured build command has no matching script —
+            # "npm error Missing script: \"build\"". Common on static sites
+            # that carry package.json only for tooling.
+            r"|(?:npm error|error) Missing script:\s*(?P<msg8>\"?[^\n\"]+\"?)"
+            # pnpm 10+ hard-fails when it ignores dependency build scripts.
+            r"|(?P<msg9>ERR_PNPM_IGNORED_BUILDS[^\n]*)"
             # Location-less fallbacks, still clearly compile-time
             r"|Type error:\s*(?P<msg3>[^\n]+)"
             r"|SyntaxError:\s*(?P<msg4>[^\n]+)",
             re.IGNORECASE,
         ),
         lambda m: _fix_build_error(_normalize_build_error_match(m)),
+    ),
+    (
+        # Git clone pointed at a branch the repo doesn't have — the deploy's
+        # branch (often a blind "main") doesn't match the repo's default
+        # ("master" etc.). Classify it so self-heal can advise the branch fix
+        # rather than falling through to UNKNOWN.
+        FailureKind.GIT_AUTH_FAILED,
+        re.compile(
+            r"(?:fatal:\s*)?(?:Remote branch|Could not find remote branch)\s+(?P<branch>\S+)\s+not found in upstream",
+            re.IGNORECASE,
+        ),
+        _fix_git_auth_failed,
     ),
     (
         FailureKind.PERMISSION_DENIED,
@@ -714,7 +735,7 @@ def _normalize_tool_match(m: re.Match) -> re.Match:
 
 def _normalize_artifact_match(m: re.Match) -> re.Match:
     g = m.groupdict()
-    chosen = g.get("apath") or g.get("apath2")
+    chosen = g.get("apath") or g.get("apath2") or g.get("apath3")
     if chosen and not g.get("apath"):
         return _RewrittenMatch(m, {"apath": chosen})
     return m
@@ -728,6 +749,7 @@ def _normalize_build_error_match(m: re.Match) -> re.Match:
     msg = (
         g.get("msg") or g.get("msg2") or g.get("msg3") or g.get("msg4")
         or g.get("msg5") or g.get("msg6") or g.get("msg7")
+        or g.get("msg8") or g.get("msg9")
     )
     if file and not g.get("file"):
         overlay["file"] = file
