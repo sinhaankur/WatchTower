@@ -3336,6 +3336,124 @@ async function clearCacheOnVersionChange(win) {
   }
 }
 
+// Fetch JSON from the local backend with the runtime token, short timeout.
+// Resolves null on any error — the tray must never hang or throw.
+function fetchBackendJson(pathname) {
+  return new Promise((resolve) => {
+    let settled = false;
+    const done = (v) => { if (!settled) { settled = true; resolve(v); } };
+    try {
+      const req = http.request(
+        {
+          host: HOST,
+          port: BACKEND_PORT,
+          path: pathname,
+          method: 'GET',
+          headers: { Authorization: `Bearer ${runtimeApiToken}`, Accept: 'application/json' },
+          timeout: 1500,
+        },
+        (res) => {
+          let body = '';
+          res.on('data', (c) => { body += c; });
+          res.on('end', () => {
+            if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
+              try { done(JSON.parse(body)); } catch { done(null); }
+            } else {
+              done(null);
+            }
+          });
+        },
+      );
+      req.on('error', () => done(null));
+      req.on('timeout', () => { try { req.destroy(); } catch { /* noop */ } done(null); });
+      req.end();
+    } catch { done(null); }
+  });
+}
+
+// Build the tray menu from live backend state, in the shape of the Tailscale
+// menu-bar dropdown: running status + identity at the top, this machine's
+// node, the few actions that matter, then Settings / Open / Quit. Re-run on
+// every open so the status and counts are current.
+async function buildTrayMenu() {
+  const [health, me, pc] = await Promise.all([
+    fetchBackendJson('/health'),
+    fetchBackendJson('/api/me'),
+    fetchBackendJson('/api/this-pc/status'),
+  ]);
+
+  const running = !!health && health.status === 'healthy';
+  const identity = (me && (me.email || me.name)) || null;
+  const version = (health && health.version) ? `v${health.version}` : (app.getVersion ? `v${app.getVersion()}` : '');
+
+  // "This PC" line: registered + serving, registered, or not yet a server.
+  let thisPc;
+  if (pc && pc.registered) {
+    const node = (pc.node_status === 'healthy') ? 'Serving' : (pc.node_status || 'Registered');
+    thisPc = `${pc.hostname || 'This PC'} · ${node}`;
+  } else if (pc && pc.hostname) {
+    thisPc = `${pc.hostname} · Not a server yet`;
+  } else {
+    thisPc = 'This PC';
+  }
+
+  const openTo = (hash) => () => {
+    bringWindowToFront(mainWindow);
+    try {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('wt:navigate', hash);
+      }
+    } catch { /* navigation is best-effort */ }
+  };
+
+  const template = [
+    { label: running ? 'WatchTower · Running' : 'WatchTower · Starting…', enabled: false },
+  ];
+  if (identity) template.push({ label: identity, enabled: false });
+  template.push({ type: 'separator' });
+  template.push({ label: thisPc, enabled: false });
+  if (pc && !pc.registered && pc.ready) {
+    template.push({ label: 'Use this PC as a server', click: openTo('/start') });
+  }
+  template.push({ type: 'separator' });
+  // Real SPA routes: the Sites page lists projects; the Dashboard surfaces
+  // recent deployments. (There is no standalone /deployments list route.)
+  template.push({ label: 'Sites', click: openTo('/applications') });
+  template.push({ label: 'Dashboard', click: openTo('/') });
+  template.push({ type: 'separator' });
+  template.push({ label: 'Open WatchTower', click: () => bringWindowToFront(mainWindow) });
+  template.push({
+    label: 'Check for Updates…',
+    click: () => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        if (autoUpdater && app.isPackaged) {
+          autoUpdater.checkForUpdates().catch(() => checkForUpdatesViaGitHubAPI(mainWindow, true));
+        } else {
+          checkForUpdatesViaGitHubAPI(mainWindow, true);
+        }
+      }
+    },
+  });
+  template.push({ label: 'Settings', click: openTo('/settings') });
+  template.push({ type: 'separator' });
+  if (version) template.push({ label: version, enabled: false });
+  template.push({
+    label: 'Quit WatchTower',
+    click: () => { isQuitting = true; stopProcesses(); app.quit(); },
+  });
+
+  return Menu.buildFromTemplate(template);
+}
+
+// Refresh the tray menu from live state, guarding against a destroyed tray.
+async function refreshTrayMenu() {
+  if (!tray || tray.isDestroyed?.()) return;
+  try {
+    const menu = await buildTrayMenu();
+    if (tray && !tray.isDestroyed?.()) tray.setContextMenu(menu);
+  } catch { /* keep the previous menu on any failure */ }
+}
+
 function createTray() {
   // macOS: use the monochrome template PNG so the system auto-inverts for
   // light/dark mode and renders at native menu-bar size (~22px). Feeding
@@ -3372,43 +3490,25 @@ function createTray() {
 
   tray.setToolTip('WatchTower');
 
-  const contextMenu = Menu.buildFromTemplate([
-    {
-      label: 'Open WatchTower',
-      // Same Windows focus-stealing fix as second-instance + tray.click.
-      // The right-click "Open" menu item used `show + focus` and was
-      // silently broken on Windows for the same reason — users would
-      // pick it from the menu and the window would stay hidden behind
-      // their foreground app.
-      click: () => bringWindowToFront(mainWindow),
-    },
-    { type: 'separator' },
-    {
-      label: 'Check for Updates…',
-      enabled: true,
-      click: () => {
-        if (mainWindow && !mainWindow.isDestroyed()) {
-          if (autoUpdater && app.isPackaged) {
-            autoUpdater.checkForUpdates().catch(() => {
-              checkForUpdatesViaGitHubAPI(mainWindow, true);
-            });
-          } else {
-            checkForUpdatesViaGitHubAPI(mainWindow, true);
-          }
-        }
-      },
-    },
-    { type: 'separator' },
-    {
-      label: 'Quit',
-      click: () => {
-        isQuitting = true;
-        stopProcesses();
-        app.quit();
-      },
-    },
-  ]);
-  tray.setContextMenu(contextMenu);
+  // Initial menu from live backend state (Tailscale-style). Falls back to a
+  // minimal menu if the backend isn't up yet, then self-corrects on refresh.
+  refreshTrayMenu();
+  tray.setContextMenu(
+    Menu.buildFromTemplate([
+      { label: 'WatchTower · Starting…', enabled: false },
+      { type: 'separator' },
+      { label: 'Open WatchTower', click: () => bringWindowToFront(mainWindow) },
+      { label: 'Quit WatchTower', click: () => { isQuitting = true; stopProcesses(); app.quit(); } },
+    ]),
+  );
+
+  // Keep the menu live. macOS fires 'mouse-enter' before the menu opens, so
+  // the dropdown reflects current status the moment it appears; a slow 30s
+  // interval covers platforms without that event and background state drift.
+  tray.on('mouse-enter', () => { refreshTrayMenu(); });
+  const trayRefreshTimer = setInterval(() => { refreshTrayMenu(); }, 30000);
+  app.on('before-quit', () => { try { clearInterval(trayRefreshTimer); } catch { /* noop */ } });
+
   tray.on('click', () => {
     // Same Windows focus-stealing-prevention dance as second-instance.
     // Without bringWindowToFront's alwaysOnTop toggle, single-clicking

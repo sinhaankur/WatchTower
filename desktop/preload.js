@@ -23,6 +23,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('wt:maximizeChange', listener);
     return () => ipcRenderer.off('wt:maximizeChange', listener);
   },
+  // Menu-bar (tray) navigation: the main process sends a route hash when the
+  // user picks Projects / Deployments / Settings from the tray menu so the
+  // SPA navigates there instead of just surfacing the window.
+  onNavigate: (cb) => {
+    const listener = (_e, hash) => cb(hash);
+    ipcRenderer.on('wt:navigate', listener);
+    return () => ipcRenderer.off('wt:navigate', listener);
+  },
   // Open the GitHub OAuth URL in a popup BrowserWindow (shared session).
   openOAuth: (url) => ipcRenderer.send('wt:openOAuth', url),
   // Signal main process that OAuth completed — close popup, reload main window.

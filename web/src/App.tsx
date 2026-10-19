@@ -1,6 +1,6 @@
 import { Suspense, useEffect, useLayoutEffect, type ReactElement } from 'react';
 import { lazyWithRetry } from '@/lib/lazyWithRetry';
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { trackPageView } from '@/lib/analytics';
 import { QueryClientProvider, QueryClient, MutationCache, QueryCache } from '@tanstack/react-query';
 import { toast } from './lib/toast';
@@ -105,6 +105,22 @@ function RouteTracker() {
   return null;
 }
 
+// Desktop menu-bar (tray) → SPA navigation. When the user picks an item from
+// the macOS/Windows tray menu, the main process sends a route via IPC and we
+// navigate there — so the tray is a real control surface, not just a way to
+// surface the window.
+function TrayNav() {
+  const navigate = useNavigate();
+  useEffect(() => {
+    const api = (window as unknown as { electronAPI?: { onNavigate?: (cb: (hash: string) => void) => (() => void) } }).electronAPI;
+    if (!api?.onNavigate) return;
+    return api.onNavigate((hash: string) => {
+      if (typeof hash === 'string' && hash.startsWith('/')) navigate(hash);
+    });
+  }, [navigate]);
+  return null;
+}
+
 function RequireAuth({ children }: { children: ReactElement }) {
   const location = useLocation();
   const envToken = (import.meta as any).env?.VITE_API_TOKEN;
@@ -173,6 +189,7 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
         <RouteTracker />
+        <TrayNav />
         <Suspense fallback={<RouteFallback />}>
           <Routes>
             <Route path="/login" element={<><PageTitle name="Sign in" /><Login /></>} />
