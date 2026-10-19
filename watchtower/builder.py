@@ -1651,7 +1651,8 @@ def _resolve_build_command(
         if repo_dir is not None and not _package_json_has_build_script(repo_dir):
             return ""
         install = _detect_node_install(repo_dir) if repo_dir else "npm install"
-        return f"{install} && npm run build"
+        run_build = _detect_node_run_build(repo_dir) if repo_dir else "npm run build"
+        return f"{install} && {run_build}"
 
     return ""
 
@@ -1674,24 +1675,53 @@ def _package_json_has_build_script(repo_dir: Path) -> bool:
     return bool(build and str(build).strip())
 
 
-def _detect_node_install(repo_dir: Path) -> str:
-    """Pick the install command based on whichever lockfile lives in *repo_dir*.
+def _detect_node_pm(repo_dir: Path) -> str:
+    """Detect the package manager from whichever lockfile lives in *repo_dir*.
 
-    Order matches typical project precedence: a project with both pnpm and
-    npm lockfiles is overwhelmingly a pnpm project that has a stale
-    package-lock.json from earlier in its history.
+    Precedence: a project with both pnpm and npm lockfiles is overwhelmingly a
+    pnpm project carrying a stale package-lock.json from earlier history.
     """
     if (repo_dir / "pnpm-lock.yaml").exists():
-        return "pnpm install --frozen-lockfile"
+        return "pnpm"
     if (repo_dir / "yarn.lock").exists():
-        return "yarn install --frozen-lockfile"
+        return "yarn"
     if (repo_dir / "bun.lockb").exists() or (repo_dir / "bun.lock").exists():
+        return "bun"
+    return "npm"
+
+
+def _detect_node_install(repo_dir: Path) -> str:
+    """Pick the install command based on the detected package manager."""
+    pm = _detect_node_pm(repo_dir)
+    if pm == "pnpm":
+        # --config.strict-dep-builds=false: pnpm 10+ makes "ignored build
+        # scripts" (deps with postinstall like onnxruntime-node, protobufjs,
+        # esbuild, better-sqlite3 …) a HARD non-zero exit — so the install
+        # "fails" even though every package resolved and the && npm-run-build
+        # never even runs. Downgrade that back to a warning (verified: with the
+        # flag, exit 0; without, exit 1 ERR_PNPM_IGNORED_BUILDS). We do NOT use
+        # --dangerously-allow-all-builds — that would execute arbitrary
+        # postinstall scripts, a real supply-chain risk.
+        return "pnpm install --frozen-lockfile --config.strict-dep-builds=false"
+    if pm == "yarn":
+        return "yarn install --frozen-lockfile"
+    if pm == "bun":
         return "bun install --frozen-lockfile"
     if (repo_dir / "package-lock.json").exists():
         return "npm ci"
     # No lockfile: `npm ci` would fail with a help-text dump. Fall back to
     # plain `npm install` which works without a lockfile and generates one.
     return "npm install"
+
+
+def _detect_node_run_build(repo_dir: Path) -> str:
+    """The build-script invocation matching the detected package manager.
+
+    Mixing managers (``pnpm install && npm run build``) works by luck when npm
+    happens to be present, but is fragile — use the same tool for both.
+    """
+    pm = _detect_node_pm(repo_dir)
+    return "npm run build" if pm == "npm" else f"{pm} run build"
 
 
 # Build-failure patterns we know how to translate into a one-line nudge.
@@ -1788,13 +1818,28 @@ def _resolve_output_path(db: Session, project: Project, repo_dir: Path) -> Path:
         # error message names the dir the user expected.
         return candidate
     if project.use_case == UseCaseType.VERCEL_LIKE:
-        # SSR/Next: prefer the build dir, but a Next.js `output: "export"`
-        # project emits a static `out/` (no `.next` server) — detect that too.
-        for cand_name in (".next", "out", "build", "dist"):
-            if (repo_dir / cand_name).is_dir():
-                return repo_dir / cand_name
+        # Prefer a STATIC-SERVABLE output over a raw server build. A Next.js
+        # `output: "export"` project emits a static `out/` with an index.html —
+        # that's what WatchTower's static-file deploy can actually serve. The
+        # raw `.next/` is a server build (BUILD_ID, server/, manifests) with NO
+        # index.html; rsyncing it and pointing a static server at it yields a
+        # 404 — a hollow "LIVE" with no viewable site (the portfolio-2026 bug).
+        #
+        # So: first pick whichever build dir contains an index.html…
+        for cand_name in ("out", "dist", "build", ".next"):
+            cand = repo_dir / cand_name
+            if (cand / "index.html").is_file():
+                return cand
+        # …then a repo-root index.html (pre-built / no build step)…
         if (repo_dir / "index.html").is_file():
             return repo_dir
+        # …then any build dir that exists (true SSR with no static export —
+        # this still won't serve as static files, but it's the best we have
+        # until run-as-container/`next start` support lands; at least it names
+        # a real artifact rather than a guaranteed-missing path).
+        for cand_name in ("out", "dist", "build", ".next"):
+            if (repo_dir / cand_name).is_dir():
+                return repo_dir / cand_name
         return repo_dir / ".next"
     # Docker: deploy whole repo
     return repo_dir
