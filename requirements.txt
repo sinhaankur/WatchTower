@@ -13,7 +13,7 @@
 # stay here so the dev clone and CI always exercise every code path.
 
 # Core
-fastapi==0.143.0
+fastapi==0.143.3
 # Pin starlette explicitly: left transitive it resolved to 0.38.6, which has
 # known CVEs (PYSEC-2026-161/248/249/1941/1943/2280/2281). The CVE fix versions
 # are on the 1.x line; fastapi 0.142.x only needs >=0.46 (no upper bound) and
@@ -32,7 +32,7 @@ python-multipart>=0.0.32
 # pip evaluates the marker against the build host (Linux) instead of
 # the target, tries to install uvloop, and fails. The perf gain isn't
 # worth blocking Windows installer releases.
-pydantic==2.14.0
+pydantic==2.14.1
 pydantic-settings==2.15.0
 python-dotenv==1.2.4
 
