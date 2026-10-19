@@ -1775,6 +1775,57 @@ _FAILURE_HINTS: list[tuple[str, Callable[[str, str], bool], str]] = [
             "Project Settings → Dockerfile path."
         ),
     ),
+    (
+        # Git says "Repository not found" for BOTH a missing repo and a private
+        # repo you can't read — GitHub deliberately doesn't distinguish them.
+        # This is the #1 first-deploy failure, so name both possibilities and
+        # the exact fix rather than leaving the raw `fatal:` line.
+        "repo-not-found",
+        lambda out, cmd: (
+            "repository not found" in out.lower()
+            or ("fatal:" in out.lower() and "not found" in out.lower() and "repository" in out.lower())
+        ),
+        (
+            "The repository couldn't be cloned — GitHub reports it as not found. "
+            "Two common causes: (1) the repo URL has a typo, or (2) it's private "
+            "and WatchTower doesn't have access. For a private repo, connect "
+            "GitHub under Settings → Integrations (or add a deploy token), then "
+            "re-deploy. For a typo, fix the repo URL in Project Settings."
+        ),
+    ),
+    (
+        # Git authentication explicitly failed (as opposed to the ambiguous
+        # "not found"): bad/expired token, or https asking for a password.
+        "git-auth-failed",
+        lambda out, cmd: (
+            "authentication failed" in out.lower()
+            or "could not read username" in out.lower()
+            or "terminal prompts disabled" in out.lower()
+            or "invalid username or password" in out.lower()
+        ),
+        (
+            "Git authentication failed cloning the repository. If it's private, "
+            "reconnect GitHub under Settings → Integrations so WatchTower has a "
+            "valid token; a revoked or expired token produces this error."
+        ),
+    ),
+    (
+        # The build "succeeded" but the output directory it was supposed to
+        # produce doesn't exist, so rsync has nothing to deploy. Usually a
+        # wrong output-dir setting or a build that didn't emit static files.
+        "missing-output-dir",
+        lambda out, cmd: (
+            ("rsync" in out.lower() or "no such file or directory" in out.lower())
+            and ("(l)stat" in out.lower() or "/repo/dist/" in out or "/repo/out/" in out or "/repo/build/" in out)
+        ),
+        (
+            "The build finished but its output folder wasn't found, so there "
+            "was nothing to deploy. Check the output directory under Project "
+            "Settings (common values: `dist`, `build`, `out`) matches what your "
+            "build actually produces. For a plain static site with no build "
+            "step, no output directory is needed."
+        ),
+    ),
 ]
 
 
