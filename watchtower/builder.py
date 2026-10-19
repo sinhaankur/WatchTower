@@ -419,6 +419,29 @@ async def _run_build(deployment_id) -> None:
 
         # ── Step 4: Deploy to nodes (in parallel) ──────────────────────────
         output_path = _resolve_output_path(db, project, repo_dir)
+
+        # Honesty guard: a true SSR build (e.g. Next.js WITHOUT output:"export")
+        # emits only `.next/` — a server bundle with no index.html. WatchTower's
+        # static-file deploy can't serve that; rsyncing it and marking LIVE
+        # would be a 404 site reported as success. Fail with an actionable
+        # message instead of a hollow LIVE. (Skipped for run_as_container
+        # projects — a container runs the server itself.)
+        if (
+            not project.run_as_container
+            and output_path.name == ".next"
+            and output_path.is_dir()
+            and not (output_path / "index.html").is_file()
+        ):
+            raise RuntimeError(
+                "This looks like a server-rendered Next.js app (it built a "
+                "`.next/` server bundle, not static files), which WatchTower's "
+                "static hosting can't serve directly. To deploy it as a static "
+                "site, add `output: 'export'` to next.config and re-deploy — "
+                "that emits a servable `out/` folder. For a true server app, "
+                "enable container mode in Project Settings so the Next server "
+                "runs on this machine."
+            )
+
         nodes = _get_deployment_nodes(db, deployment)
 
         # Eager-load the project's custom domains as plain strings once
