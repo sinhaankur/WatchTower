@@ -82,16 +82,33 @@ def enc_value(plaintext: str) -> str:
 
 
 def dec_value(stored: str) -> str:
-    """Decrypt a stored env-var value; tolerate legacy plaintext rows."""
+    """Decrypt a stored env-var value; tolerate legacy plaintext rows.
+
+    Distinguishes two failure modes so a broken secret doesn't fail silently:
+      - a value with no Fernet prefix is genuine legacy plaintext → return as-is,
+        no noise (expected for pre-encryption installs).
+      - a value that LOOKS like a Fernet token (``gAAAAA`` base64 prefix) but
+        won't decrypt means the key rotated or was lost. Returning the raw
+        ciphertext would inject ``gAAAAABq…`` into the build as the env value,
+        so the app breaks with no clue why. We still return (availability over
+        503) but WARN loudly so the operator can see the cause in the logs.
+    """
     if stored is None:
         return ""
     try:
         return util.decrypt_secret(stored)
     except Exception:
-        # Not valid ciphertext → a legacy plaintext row (or the key rotated).
-        # Return as-is so the deploy/injection path still gets *a* value
-        # rather than 503-ing the whole deploy. A rotated key is surfaced
-        # elsewhere; here, availability of the deploy path wins.
+        if stored.startswith("gAAAAA"):
+            logger.warning(
+                "env var value looks encrypted (Fernet) but could not be "
+                "decrypted — the secret key likely rotated or is missing. The "
+                "deploy will receive the UNDECRYPTED value; set a stable "
+                "WATCHTOWER_SECRET_KEY (or restore %s/secret.key) and re-save "
+                "the variable.",
+                "$WATCHTOWER_DATA_DIR",
+            )
+        # Legacy plaintext (or best-effort on a rotated key): return as-is so
+        # the deploy still gets *a* value rather than 503-ing the whole deploy.
         return stored
 
 
