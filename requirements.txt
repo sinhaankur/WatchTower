@@ -13,7 +13,7 @@
 # stay here so the dev clone and CI always exercise every code path.
 
 # Core
-fastapi==0.143.0
+fastapi==0.161.1
 # Pin starlette explicitly: left transitive it resolved to 0.38.6, which has
 # known CVEs (PYSEC-2026-161/248/249/1941/1943/2280/2281). The CVE fix versions
 # are on the 1.x line; fastapi 0.142.x only needs >=0.46 (no upper bound) and
@@ -32,19 +32,19 @@ python-multipart>=0.0.32
 # pip evaluates the marker against the build host (Linux) instead of
 # the target, tries to install uvloop, and fails. The perf gain isn't
 # worth blocking Windows installer releases.
-pydantic==2.14.0
+pydantic==2.14.1
 pydantic-settings==2.15.0
 python-dotenv==1.2.4
 
 # Database
-sqlalchemy==2.0.54
+sqlalchemy==2.0.55
 # Pin a floor, not an exact version: psycopg2-binary 2.9.13 only ships aarch64
 # wheels for manylinux_2_27+, but the linux-arm64 cross-build targets an older
 # glibc baseline (manylinux2014) whose newest published wheel is 2.9.11 — so
 # ==2.9.13 broke the arm64 desktop build. A range lets each platform grab its
 # newest compatible wheel (x86_64 gets 2.9.13, arm64-cross gets 2.9.11).
 psycopg2-binary>=2.9.9,<2.10
-alembic==1.20.0
+alembic==1.20.1
 
 # Utilities
 pyyaml>=6.0
