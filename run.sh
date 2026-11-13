@@ -53,6 +53,26 @@ is_listening() {
   fi
 }
 
+# Is the listener on this port ACTUALLY WatchTower's backend (vs. a foreign
+# process squatting on the port)? A port being in use does NOT mean WatchTower
+# is running — any other dev server (e.g. a `python -m http.server 8000` from
+# another project) can hold :8000 and otherwise get silently mistaken for our
+# API, leaving WatchTower "running" but wired to a stranger's static server.
+# Probe /health and require our own service signature. curl/wget optional →
+# if neither exists we can't verify, so we return false (treat as NOT ours and
+# reclaim the port, which is the safe default for a monitoring tool).
+is_watchtower_backend() {
+  local port="$1" body=""
+  if command -v curl >/dev/null 2>&1; then
+    body=$(curl -fsS --max-time 2 "http://127.0.0.1:${port}/health" 2>/dev/null || true)
+  elif command -v wget >/dev/null 2>&1; then
+    body=$(wget -qO- --timeout=2 "http://127.0.0.1:${port}/health" 2>/dev/null || true)
+  else
+    return 1
+  fi
+  printf '%s' "$body" | grep -q 'watchtower-api'
+}
+
 # Kill PIDs holding a port — portable across Linux, macOS, Pi OS Lite.
 # Priority: fuser (Linux full) → lsof (macOS) → ss+kill (Pi OS Lite / no fuser)
 # Uses only POSIX grep (no -P/lookbehind) so it works on BSD grep (macOS).
@@ -390,30 +410,43 @@ fi
 # ── Step 4: Start backend ────────────────────────────────────────────────────
 # In desktop mode, Electron manages the backend itself (with its own API token
 # for auto-login). Skip here so Electron can own the process from the start.
-if [[ "$MODE" != "desktop" ]] && ! is_listening "$API_PORT"; then
-  free_port "$API_PORT"
-  info "Starting backend on 127.0.0.1:$API_PORT..."
-  WATCHTOWER_ALLOW_INSECURE_DEV_AUTH="${WATCHTOWER_ALLOW_INSECURE_DEV_AUTH:-true}" \
-    "$VENV/bin/python" -m uvicorn watchtower.api:app \
-      --app-dir "$ROOT" --host 127.0.0.1 --port "$API_PORT" \
-      --no-access-log --timeout-keep-alive 5 \
-      >"$LOG_API" 2>&1 &
-  # Wait up to 15 s for it to be ready
-  for i in $(seq 1 30); do
-    is_listening "$API_PORT" && break
-    sleep 0.5
-  done
-  is_listening "$API_PORT" || { error "Backend failed to start. Check: $LOG_API"; exit 1; }
-  success "Backend ready."
-elif [[ "$MODE" == "desktop" ]]; then
+#
+# ROBUSTNESS: a port being OCCUPIED is NOT the same as "WatchTower is already
+# running". Any foreign process (e.g. another project's `python -m http.server
+# 8000`) can hold :8000; the old code treated that as "backend already running"
+# and silently wired WatchTower to the stranger's server — a monitoring tool
+# should never be fooled like that. So we verify the listener is genuinely OUR
+# backend (/health → watchtower-api); if it's a foreigner, we reclaim the port.
+if [[ "$MODE" != "desktop" ]]; then
+  if is_listening "$API_PORT" && is_watchtower_backend "$API_PORT"; then
+    success "Backend already running on port $API_PORT."
+  else
+    if is_listening "$API_PORT"; then
+      warn "Port $API_PORT is held by another process (not WatchTower) — reclaiming it."
+    fi
+    free_port "$API_PORT"
+    info "Starting backend on 127.0.0.1:$API_PORT..."
+    WATCHTOWER_ALLOW_INSECURE_DEV_AUTH="${WATCHTOWER_ALLOW_INSECURE_DEV_AUTH:-true}" \
+      "$VENV/bin/python" -m uvicorn watchtower.api:app \
+        --app-dir "$ROOT" --host 127.0.0.1 --port "$API_PORT" \
+        --no-access-log --timeout-keep-alive 5 \
+        >"$LOG_API" 2>&1 &
+    # Wait up to 15 s for OUR backend to answer /health (not just for the port
+    # to be bound — a port bound by a foreign process we just killed could race).
+    for i in $(seq 1 30); do
+      is_watchtower_backend "$API_PORT" && break
+      sleep 0.5
+    done
+    is_watchtower_backend "$API_PORT" || { error "Backend failed to start. Check: $LOG_API"; exit 1; }
+    success "Backend ready."
+  fi
+else
   # Desktop mode: Electron will start (and own) the backend with its own API token.
   # Killing any stale backend now so Electron gets a clean port.
   if is_listening "$API_PORT"; then
-    info "Stopping existing backend so Electron can own it..."
+    info "Freeing port $API_PORT so Electron can own the backend..."
     free_port "$API_PORT"
   fi
-else
-  success "Backend already running on port $API_PORT."
 fi
 
 # ── Step 5: Launch UI ────────────────────────────────────────────────────────
