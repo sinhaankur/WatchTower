@@ -83,6 +83,24 @@ async def start_machine(
     return result
 
 
+@router.post("/machine/setup")
+async def setup_machine(
+    request: Request,
+    current_user: dict = Depends(util.get_current_user),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Detect-and-fix: create the Podman machine if it doesn't exist yet, then
+    start it (or just start a stopped one). The one-click "Set up" action for a
+    fresh macOS/Windows install where Podman is present but never initialized.
+    `init` downloads a VM image, so this can take a few minutes."""
+    result = await _call(rt.ensure_machine)
+    audit_log.record_for_user(
+        db, current_user, action="podman.machine_setup", entity_type="podman", request=request
+    )
+    db.commit()
+    return result
+
+
 # ── Containers ───────────────────────────────────────────────────────────────
 
 

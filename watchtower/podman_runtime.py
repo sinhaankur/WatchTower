@@ -25,6 +25,7 @@ import json
 import logging
 import re
 import subprocess
+import sys
 import time
 from typing import Any, Dict, Iterator, List, Optional
 
@@ -144,13 +145,22 @@ def runtime_status() -> Dict[str, Any]:
 
     # `podman machine` only exists where podman runs in a VM (mac/Win).
     # On Linux the subcommand errors — that's fine, machine stays None.
+    #
+    # Three distinct states we must tell apart (the fourth row below):
+    #   - Linux native        → needs_machine False, machine None  (no VM concept)
+    #   - mac/Win, no machine  → needs_machine True,  machine None  (never `init`ed)
+    #   - mac/Win, stopped     → machine.running False              (just `start` it)
+    #   - mac/Win, running     → machine.running True
     machine: Optional[Dict[str, Any]] = None
+    is_vm_platform = "podman" in bin_ and sys.platform in ("darwin", "win32")
+    machine_exists = False
     if "podman" in bin_:
         rc, out, _err = _run([bin_, "machine", "list", "--format", "json"], timeout=15.0)
         if rc == 0 and out.strip():
             try:
                 machines = json.loads(out)
                 if machines:
+                    machine_exists = True
                     m = next((x for x in machines if x.get("Default")), machines[0])
                     machine = {
                         "name": m.get("Name"),
@@ -160,6 +170,11 @@ def runtime_status() -> Dict[str, Any]:
                     }
             except json.JSONDecodeError:
                 machine = None
+
+    # On a VM platform with no machine yet, Podman can't run anything until a
+    # machine is initialized — detect this so the UI offers "Set up" (init),
+    # not a useless "Start" on a machine that doesn't exist.
+    needs_machine = is_vm_platform and not machine_exists
 
     # `info --format {{.Host.Arch}}` is a Podman template; Docker's info tree
     # differs. Probe with a runtime-appropriate format so a healthy Docker
@@ -171,7 +186,9 @@ def runtime_status() -> Dict[str, Any]:
 
     hint = None
     if not connected:
-        if machine and not machine["running"]:
+        if needs_machine:
+            hint = "Podman is installed but not set up yet — click Set up to create and start its machine (one time)."
+        elif machine and not machine["running"]:
             hint = "The Podman machine is stopped — click Start to bring it up."
         elif runtime == "docker":
             hint = (err or "Docker is installed but the daemon isn't responding — is Docker running?").strip()[:300]
@@ -184,9 +201,42 @@ def runtime_status() -> Dict[str, Any]:
         "runtime": runtime,
         "version": version,
         "machine": machine,
+        # True only on mac/Win when Podman has no machine yet → UI shows "Set up".
+        "needs_machine": needs_machine,
         "connected": connected,
         "hint": hint,
     }
+
+
+def machine_init() -> Dict[str, Any]:
+    """Create the Podman machine (first-run on macOS/Windows) and start it.
+
+    `podman machine init` downloads a VM image the first time, so this can take a
+    few minutes — hence the generous timeout. Idempotent: if a machine already
+    exists we skip init and just ensure it's started. No-op on Linux (no VM).
+    """
+    bin_ = _require_bin()
+    if "podman" not in bin_ or sys.platform not in ("darwin", "win32"):
+        # Linux native: nothing to init — just report status.
+        return runtime_status()
+
+    # Only init if there's no machine yet (avoid "already exists" errors).
+    rc, out, _err = _run([bin_, "machine", "list", "--format", "json"], timeout=15.0)
+    has_machine = False
+    if rc == 0 and out.strip():
+        try:
+            has_machine = bool(json.loads(out))
+        except json.JSONDecodeError:
+            has_machine = False
+
+    if not has_machine:
+        rc, _out, err = _run([bin_, "machine", "init"], timeout=600.0)
+        if rc != 0 and "already exists" not in (err or "").lower():
+            raise PodmanError(
+                f"Could not create the Podman machine: {(err or 'unknown error').strip()[:300]}"
+            )
+
+    return machine_start()
 
 
 def machine_start() -> Dict[str, Any]:
@@ -195,6 +245,28 @@ def machine_start() -> Dict[str, Any]:
     if rc != 0 and "already running" not in (err or "").lower():
         raise PodmanError(f"Could not start the Podman machine: {(err or 'unknown error').strip()[:300]}")
     return runtime_status()
+
+
+def ensure_machine() -> Dict[str, Any]:
+    """Detect-and-fix in one call: if Podman isn't connected because its machine
+    is missing (init) or stopped (start), bring it up. This is the "detect if
+    Podman is already set up, and if not do it" entry point.
+
+    Returns the resulting ``runtime_status()``. Raises ``PodmanError`` only if a
+    required step genuinely fails; a healthy/already-connected runtime is a no-op.
+    """
+    status = runtime_status()
+    if not status.get("available"):
+        raise PodmanError(status.get("hint") or "No container runtime found.")
+    if status.get("connected"):
+        return status  # already good
+    if status.get("needs_machine"):
+        return machine_init()
+    machine = status.get("machine")
+    if machine and not machine.get("running"):
+        return machine_start()
+    # Installed but not responding for some other reason — surface the hint.
+    raise PodmanError(status.get("hint") or "Container runtime is not responding.")
 
 
 # ── Containers ───────────────────────────────────────────────────────────────

@@ -7,6 +7,7 @@ import {
   usePodmanContainers,
   usePodmanPods,
   useStartPodmanMachine,
+  useSetupPodmanMachine,
   useCreatePodmanContainer,
   usePodmanContainerAction,
   useCreatePodmanPod,
@@ -108,6 +109,7 @@ function useContainerLogStream(name: string, active: boolean) {
 function ConnectionCard() {
   const { data: status, isLoading } = usePodmanStatus();
   const startMachine = useStartPodmanMachine();
+  const setupMachine = useSetupPodmanMachine();
 
   if (isLoading) {
     return <div className="rounded-xl border border-border bg-card p-4 text-xs text-muted-foreground">Checking Podman…</div>;
@@ -138,7 +140,26 @@ function ConnectionCard() {
           <p className="text-xs text-accent mt-0.5">{status.hint}</p>
         )}
       </div>
-      {status.available && !status.connected && status.machine && !status.machine.running && (
+      {/* Fresh install: Podman present but no machine yet → one-click Set up
+          (init + start). This is the "detect if Podman is set up, if not do it"
+          path — init downloads a VM image so it's slower than Start. */}
+      {status.available && !status.connected && status.needs_machine && (
+        <button
+          onClick={() => {
+            setupMachine.mutate(undefined, {
+              onSuccess: (s) => s.connected
+                ? toast.success('Podman is set up and running')
+                : toast.warning('Set up finished but Podman is still not responding'),
+              onError: (e) => toast.error(extractDetail(e, 'Could not set up the Podman machine')),
+            });
+          }}
+          disabled={setupMachine.isPending}
+          className="text-xs px-4 py-2 rounded-lg border border-border bg-primary hover:bg-primary/90 text-primary-foreground font-semibold shadow-retro disabled:opacity-50"
+        >
+          {setupMachine.isPending ? 'Setting up… (downloads a VM image, a few minutes)' : 'Set up Podman'}
+        </button>
+      )}
+      {status.available && !status.connected && !status.needs_machine && status.machine && !status.machine.running && (
         <button
           onClick={() => {
             startMachine.mutate(undefined, {

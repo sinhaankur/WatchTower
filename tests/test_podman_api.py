@@ -252,3 +252,111 @@ def test_logs_stream_endpoint_surfaces_error_frame(client, monkeypatch):
         body = "".join(r.iter_text())
     assert "event: error" in body
     assert "not installed" in body
+
+
+# ── Machine init / detect-and-fix (the "is Podman set up?" logic) ─────────────
+
+
+def _status_with(monkeypatch, *, platform, machine_list_json, info_rc):
+    """Drive runtime_status() with a fake platform + `machine list` + `info` rc."""
+    monkeypatch.setattr(rt, "_podman_path", lambda: "/usr/bin/podman")
+    monkeypatch.setattr(rt.sys, "platform", platform)
+    # detect_runtime is imported inside runtime_status; patch at its source.
+    from watchtower import managed_db_runtime as mdr
+    monkeypatch.setattr(mdr, "detect_runtime", lambda: "podman")
+
+    def fake_run(args, *, timeout=60.0):
+        sub = args[1] if len(args) > 1 else ""
+        if sub == "--version":
+            return (0, "podman version 5.8.3", "")
+        if sub == "machine" and len(args) > 2 and args[2] == "list":
+            return (0, machine_list_json, "")
+        if sub == "info":
+            return (info_rc, "{}" if info_rc == 0 else "", "" if info_rc == 0 else "cannot connect")
+        return (0, "", "")
+
+    monkeypatch.setattr(rt, "_run", fake_run)
+    return rt.runtime_status()
+
+
+def test_needs_machine_true_when_mac_has_no_machine(monkeypatch):
+    s = _status_with(monkeypatch, platform="darwin", machine_list_json="[]", info_rc=1)
+    assert s["available"] is True
+    assert s["needs_machine"] is True
+    assert s["connected"] is False
+    assert "set up" in s["hint"].lower()
+
+
+def test_needs_machine_false_when_machine_exists_but_stopped(monkeypatch):
+    machines = '[{"Name":"podman-machine-default","Default":true,"Running":false}]'
+    s = _status_with(monkeypatch, platform="darwin", machine_list_json=machines, info_rc=1)
+    assert s["needs_machine"] is False
+    assert "stopped" in s["hint"].lower()
+
+
+def test_needs_machine_false_on_linux_native(monkeypatch):
+    # Linux has no VM machine concept → never needs_machine, even if info fails.
+    s = _status_with(monkeypatch, platform="linux", machine_list_json="", info_rc=0)
+    assert s["needs_machine"] is False
+
+
+def test_ensure_machine_inits_when_missing(monkeypatch):
+    """ensure_machine() on a fresh mac (no machine) should call init then start."""
+    monkeypatch.setattr(rt, "_podman_path", lambda: "/usr/bin/podman")
+    monkeypatch.setattr(rt, "_require_bin", lambda: "/usr/bin/podman")
+    monkeypatch.setattr(rt.sys, "platform", "darwin")
+    from watchtower import managed_db_runtime as mdr
+    monkeypatch.setattr(mdr, "detect_runtime", lambda: "podman")
+
+    calls = []
+    state = {"has_machine": False, "connected": False}
+
+    def fake_run(args, *, timeout=60.0):
+        calls.append(list(args))
+        sub = args[1] if len(args) > 1 else ""
+        if sub == "--version":
+            return (0, "podman version 5.8.3", "")
+        if sub == "machine" and len(args) > 2 and args[2] == "list":
+            return (0, '[{"Name":"m","Default":true,"Running":true}]' if state["has_machine"] else "[]", "")
+        if sub == "machine" and len(args) > 2 and args[2] == "init":
+            state["has_machine"] = True
+            return (0, "", "")
+        if sub == "machine" and len(args) > 2 and args[2] == "start":
+            state["connected"] = True
+            return (0, "", "")
+        if sub == "info":
+            return (0 if state["connected"] else 1, "{}", "")
+        return (0, "", "")
+
+    monkeypatch.setattr(rt, "_run", fake_run)
+    result = rt.ensure_machine()
+    subs = [" ".join(c[1:3]) for c in calls if len(c) > 2 and c[1] == "machine"]
+    assert "machine init" in subs
+    assert "machine start" in subs
+    assert result["connected"] is True
+
+
+def test_ensure_machine_noop_when_connected(monkeypatch):
+    """Already-connected runtime → ensure_machine does not init or start."""
+    monkeypatch.setattr(rt, "_podman_path", lambda: "/usr/bin/podman")
+    monkeypatch.setattr(rt, "_require_bin", lambda: "/usr/bin/podman")
+    monkeypatch.setattr(rt.sys, "platform", "darwin")
+    from watchtower import managed_db_runtime as mdr
+    monkeypatch.setattr(mdr, "detect_runtime", lambda: "podman")
+
+    calls = []
+
+    def fake_run(args, *, timeout=60.0):
+        calls.append(list(args))
+        sub = args[1] if len(args) > 1 else ""
+        if sub == "--version":
+            return (0, "podman version 5.8.3", "")
+        if sub == "machine" and len(args) > 2 and args[2] == "list":
+            return (0, '[{"Name":"m","Default":true,"Running":true}]', "")
+        if sub == "info":
+            return (0, "{}", "")
+        return (0, "", "")
+
+    monkeypatch.setattr(rt, "_run", fake_run)
+    rt.ensure_machine()
+    assert not any(len(c) > 2 and c[2] in ("init", "start") for c in calls)
