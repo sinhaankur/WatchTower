@@ -20,14 +20,22 @@ type SwapStats = {
   percent_used: number;
 };
 
+type CpuStats = {
+  count: number;
+  system_percent: number;
+  process_percent: number;
+};
+
 type ProcessStats = {
   rss_mb: number;
+  cpu_percent?: number;
   label: string;
 };
 
 type SystemMetrics = {
   ram: RamStats;
   swap: SwapStats;
+  cpu?: CpuStats;
   process: ProcessStats;
 };
 
@@ -161,6 +169,7 @@ export default function SystemResourceMonitor() {
 
   const ram = metrics?.ram;
   const swap = metrics?.swap;
+  const cpu = metrics?.cpu;
   const proc = metrics?.process;
   const status = ram ? statusLabel(ram.percent_used) : null;
 
@@ -169,9 +178,9 @@ export default function SystemResourceMonitor() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-sm font-semibold text-foreground">System Memory</h2>
+          <h2 className="text-sm font-semibold text-foreground">System Resources</h2>
           <p className="text-xs text-muted-foreground mt-0.5">
-            How your PC&apos;s RAM is being used right now
+            How your PC&apos;s CPU and RAM are being used right now
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -198,7 +207,28 @@ export default function SystemResourceMonitor() {
 
       {error && (
         <div className="rounded-lg bg-destructive/10 border border-destructive/30 p-3 text-sm text-destructive">
-          {error} — metrics require Linux /proc access
+          {error}
+        </div>
+      )}
+
+      {/* CPU — the other half of "how much does it use". System load + this
+          app's share, so the appliance's footprint is legible at a glance. */}
+      {cpu && (
+        <div className="space-y-3">
+          <div className="grid grid-cols-3 gap-3">
+            {[
+              { label: 'CPU cores',  value: String(cpu.count),                 sub: 'on this PC',     color: 'text-foreground/90' },
+              { label: 'System CPU', value: `${cpu.system_percent.toFixed(0)}%`, sub: 'all apps',      color: cpu.system_percent > 80 ? 'text-destructive' : cpu.system_percent > 60 ? 'text-accent' : 'text-emerald-600' },
+              { label: 'WatchTower', value: `${cpu.process_percent.toFixed(1)}%`, sub: 'this app',     color: 'text-blue-600' },
+            ].map(({ label, value, sub, color }) => (
+              <div key={label} className="rounded-lg bg-muted/40 p-3 text-center">
+                <p className={`text-base font-bold ${color}`}>{value}</p>
+                <p className="text-xs font-medium text-foreground/90 mt-0.5">{label}</p>
+                <p className="text-xs text-muted-foreground">{sub}</p>
+              </div>
+            ))}
+          </div>
+          <UsageBar pct={cpu.system_percent} label="Overall CPU usage" />
         </div>
       )}
 
@@ -257,9 +287,12 @@ export default function SystemResourceMonitor() {
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-xs font-semibold text-blue-800">{proc.label}</p>
-            <p className="text-xs text-blue-600">This app is using {fmtMb(proc.rss_mb)} of RAM</p>
+            <p className="text-xs text-blue-600">
+              This app is using {fmtMb(proc.rss_mb)} of RAM
+              {proc.cpu_percent != null && ` · ${proc.cpu_percent.toFixed(1)}% CPU`}
+            </p>
           </div>
-          {ram && (
+          {ram && ram.total_mb > 0 && (
             <span className="text-xs font-medium text-blue-500 dark:text-blue-400 shrink-0">
               {((proc.rss_mb / ram.total_mb) * 100).toFixed(1)}% of total
             </span>

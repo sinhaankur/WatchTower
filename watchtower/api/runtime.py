@@ -2885,6 +2885,68 @@ def _read_proc_meminfo() -> dict[str, int]:
     return result
 
 
+def _read_macos_meminfo() -> dict[str, int]:
+    """Approximate the /proc/meminfo keys we use, in kB, on macOS.
+
+    Zero-dependency: hw.memsize via sysctl + page counts via vm_stat. We only
+    populate the keys the endpoint actually reads (MemTotal / MemAvailable /
+    MemFree / Cached), so the shared endpoint logic stays platform-agnostic.
+    """
+    result: dict[str, int] = {}
+    try:
+        total_bytes = int(
+            subprocess.run(
+                ["sysctl", "-n", "hw.memsize"],
+                capture_output=True, text=True, timeout=2,
+            ).stdout.strip()
+        )
+    except (OSError, ValueError, subprocess.SubprocessError):
+        return result
+
+    page_size = 4096
+    pages: dict[str, int] = {}
+    try:
+        out = subprocess.run(
+            ["vm_stat"], capture_output=True, text=True, timeout=2
+        ).stdout
+        for line in out.splitlines():
+            m = re.match(r"Mach Virtual Memory Statistics: \(page size of (\d+) bytes\)", line)
+            if m:
+                page_size = int(m.group(1))
+                continue
+            km = re.match(r"(.+?):\s+(\d+)\.", line)
+            if km:
+                pages[km.group(1).strip()] = int(km.group(2))
+    except (OSError, subprocess.SubprocessError):
+        pass
+
+    def pg_kb(key: str) -> int:
+        return pages.get(key, 0) * page_size // 1024
+
+    total_kb = total_bytes // 1024
+    free_kb = pg_kb("Pages free")
+    # "available" on macOS ≈ free + inactive + speculative (reclaimable without swap).
+    available_kb = free_kb + pg_kb("Pages inactive") + pg_kb("Pages speculative")
+    # File-backed pages behave like Linux cache (freed on demand).
+    cached_kb = pg_kb("File-backed pages")
+
+    result["MemTotal"] = total_kb
+    result["MemFree"] = free_kb
+    result["MemAvailable"] = min(available_kb, total_kb)
+    result["Cached"] = cached_kb
+    return result
+
+
+def _read_meminfo() -> dict[str, int]:
+    """System memory as a kB dict, cross-platform (Linux /proc, macOS sysctl)."""
+    mi = _read_proc_meminfo()
+    if mi.get("MemTotal"):
+        return mi
+    if sys.platform == "darwin":
+        return _read_macos_meminfo()
+    return mi
+
+
 def _process_rss_kb() -> int:
     """Return this process's RSS in kB via /proc/self/status (Linux) or 0."""
     try:
@@ -2894,24 +2956,78 @@ def _process_rss_kb() -> int:
                     return int(line.split()[1])
     except OSError:
         pass
-    # macOS / Windows fallback via resource module (returns bytes)
+    # macOS: ps reports RSS in kB for our own PID — accurate, zero-dep.
+    if sys.platform == "darwin":
+        try:
+            out = subprocess.run(
+                ["ps", "-o", "rss=", "-p", str(os.getpid())],
+                capture_output=True, text=True, timeout=2,
+            ).stdout.strip()
+            if out:
+                return int(out)
+        except (OSError, ValueError, subprocess.SubprocessError):
+            pass
+    # Last-resort fallback via resource module (ru_maxrss: bytes on macOS, kB on Linux).
     try:
         import resource as _resource
-        usage = _resource.getrusage(_resource.RUSAGE_SELF)
-        rss = usage.ru_maxrss
-        # macOS reports bytes; Linux reports kB (but we're in the fallback here)
-        import platform
-        if platform.system() == "Darwin":
-            return rss // 1024
-        return rss
+        rss = _resource.getrusage(_resource.RUSAGE_SELF).ru_maxrss
+        return rss // 1024 if sys.platform == "darwin" else rss
     except Exception:
         return 0
 
 
+# Cumulative CPU snapshot from the previous metrics call, so we can compute a
+# non-blocking process-CPU% over the gap between polls (like psutil's stateful
+# mode). The UI polls every few seconds; that gap IS the measurement window.
+_cpu_sample_lock = threading.Lock()
+_last_cpu_sample: tuple[float, float] | None = None  # (cpu_seconds, monotonic_wall)
+
+
+def _cpu_percent() -> tuple[float, float]:
+    """(process_cpu_percent, system_cpu_percent), non-blocking.
+
+    Dependency-free. Process CPU is the os.times() CPU-second delta since the
+    previous call divided by the wall-clock gap and the core count, so one fully
+    busy core on an N-core box reads 100/N — the "share of the whole machine"
+    model the UI shows. The first call after startup has no prior sample and
+    returns 0.0 for the process (correct: no interval to measure yet). System
+    CPU comes from the 1-minute load average, portable across macOS/Linux.
+    """
+    global _last_cpu_sample
+    ncpu = os.cpu_count() or 1
+
+    proc_pct = 0.0
+    try:
+        t = os.times()
+        cpu_seconds = t.user + t.system
+        now = time.monotonic()
+        with _cpu_sample_lock:
+            prev = _last_cpu_sample
+            _last_cpu_sample = (cpu_seconds, now)
+        if prev is not None:
+            busy = cpu_seconds - prev[0]
+            wall = max(now - prev[1], 1e-6)
+            proc_pct = round(min(max(busy, 0.0) / wall / ncpu * 100.0, 100.0), 1)
+    except Exception:
+        proc_pct = 0.0
+
+    try:
+        load1 = os.getloadavg()[0]
+        sys_pct = round(min(load1 / ncpu * 100.0, 100.0), 1)
+    except (OSError, AttributeError):
+        sys_pct = 0.0
+
+    return proc_pct, sys_pct
+
+
 @router.get("/metrics/system")
 async def system_metrics(_current_user: dict = Depends(util.get_current_user)):
-    """Live RAM and process memory usage for the host running the API."""
-    mi = _read_proc_meminfo()
+    """Live RAM + CPU usage for the host and the WatchTower process.
+
+    Cross-platform and dependency-free: Linux reads /proc, macOS falls back to
+    sysctl/vm_stat/ps. CPU is sampled over a short interval (see _cpu_percent).
+    """
+    mi = _read_meminfo()
 
     total_kb = mi.get("MemTotal", 0)
     available_kb = mi.get("MemAvailable", 0)
@@ -2924,6 +3040,8 @@ async def system_metrics(_current_user: dict = Depends(util.get_current_user)):
     swap_used_kb = swap_total_kb - swap_free_kb
 
     process_rss_kb = _process_rss_kb()
+    proc_cpu_pct, sys_cpu_pct = _cpu_percent()
+    ncpu = os.cpu_count() or 1
 
     def kb_to_mb(kb: int) -> float:
         return round(kb / 1024, 1)
@@ -2944,8 +3062,14 @@ async def system_metrics(_current_user: dict = Depends(util.get_current_user)):
             "free_mb": kb_to_mb(swap_free_kb),
             "percent_used": round(swap_used_kb / swap_total_kb * 100, 1) if swap_total_kb else 0,
         },
+        "cpu": {
+            "count": ncpu,
+            "system_percent": sys_cpu_pct,
+            "process_percent": proc_cpu_pct,
+        },
         "process": {
             "rss_mb": kb_to_mb(process_rss_kb),
+            "cpu_percent": proc_cpu_pct,
             "label": "WatchTower API",
         },
     }
