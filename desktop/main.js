@@ -3414,7 +3414,11 @@ async function buildTrayMenu() {
   const template = [];
 
   // ── Header: app + status ──
-  const statusLabel = !running ? 'Starting…' : signedIn ? 'Connected' : 'Not signed in';
+  // GitHub is OPTIONAL — WatchTower works locally without it (deploy, containers,
+  // databases). So we DON'T shame a local-only user with "Not signed in". The
+  // app is "Ready" locally; "Connected" once GitHub is linked. "Connect GitHub"
+  // is an optional ACTION, never a status warning.
+  const statusLabel = !running ? 'Starting…' : signedIn ? 'Connected' : 'Ready';
   template.push({ label: 'WatchTower', enabled: false });
   template.push({ label: statusLabel, enabled: false });
   template.push({ type: 'separator' });
@@ -3431,32 +3435,16 @@ async function buildTrayMenu() {
     return Menu.buildFromTemplate(template);
   }
 
-  if (!signedIn) {
-    // ── Zero state: backend up but not signed in. Primary action = Sign in.
-    // Keep it minimal (no device/network/sites rows that need an account).
-    template.push({ label: 'Sign in…', click: openTo('/login') });
-    template.push({ type: 'separator' });
-    template.push({ label: `This Device: ${thisDevice}`, enabled: false });
-    template.push({ type: 'separator' });
-    template.push({ label: 'Open WatchTower', click: () => bringWindowToFront(mainWindow) });
-    template.push({ label: 'Settings…', accelerator: 'CmdOrCtrl+,', click: openTo('/settings') });
-    template.push({ type: 'separator' });
-    if (version) template.push({ label: `Version ${version}`, enabled: false });
-    template.push({
-      label: 'Quit WatchTower',
-      accelerator: 'CmdOrCtrl+Q',
-      click: () => { isQuitting = true; stopProcesses(); app.quit(); },
-    });
-    return Menu.buildFromTemplate(template);
-  }
-
-  // ── State: signed in — the full menu ──
-
-  // ── Identity ──
+  // ── Identity / GitHub ──
+  // Signed in → the account row. Local-only → an optional "Connect GitHub"
+  // action (adds deploy-from-repo + team features). Either way the FULL menu
+  // below shows — everything else works locally.
   if (identity) {
     template.push({ label: identity, click: openTo('/account') });
-    template.push({ type: 'separator' });
+  } else {
+    template.push({ label: 'Connect GitHub…', click: openTo('/login') });
   }
+  template.push({ type: 'separator' });
 
   // ── This device ──
   template.push({ label: `This Device: ${thisDevice}`, enabled: false });

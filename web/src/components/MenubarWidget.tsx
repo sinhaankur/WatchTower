@@ -296,8 +296,10 @@ function SharingUrl({ url }: { url: string }) {
 
 function Identity({ onClose }: { onClose?: () => void }) {
   const { data: me } = useMe();
-  // The real "signed in" signal is GitHub auth — the app may auto-auth with a
-  // local token, so `me` existing isn't enough. Zero state → a "Sign in" row.
+  // GitHub is OPTIONAL (the app works locally). The real "GitHub-linked" signal
+  // is is_github_authenticated — the app auto-auths with a local token, so a
+  // non-null `me` isn't "signed in". When not linked, offer "Connect GitHub" as
+  // an optional ACTION, not a "you're logged out" warning.
   const signedIn = !!me?.is_github_authenticated;
 
   if (!signedIn) {
@@ -311,8 +313,8 @@ function Identity({ onClose }: { onClose?: () => void }) {
           <LogIn size={14} />
         </span>
         <div className="min-w-0 flex-1">
-          <p className="text-xs font-medium text-foreground truncate">Sign in</p>
-          <p className="text-[11px] text-muted-foreground truncate">Connect GitHub to deploy</p>
+          <p className="text-xs font-medium text-foreground truncate">Connect GitHub</p>
+          <p className="text-[11px] text-muted-foreground truncate">Optional — adds deploy from repos</p>
         </div>
         <ChevronRight size={14} className="text-muted-foreground shrink-0" />
       </NavTo>

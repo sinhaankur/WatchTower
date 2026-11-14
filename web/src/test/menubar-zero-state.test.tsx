@@ -45,16 +45,18 @@ function mount() {
   );
 }
 
-describe('MenubarWidget zero state (signed out)', () => {
-  it('shows a Sign in row, not an account identity', async () => {
+describe('MenubarWidget local state (GitHub not linked)', () => {
+  it('offers Connect GitHub as an optional action, not a logged-out warning', async () => {
     mount();
-    expect(await screen.findByText('Sign in')).toBeTruthy();
-    expect(await screen.findByText(/Connect GitHub/)).toBeTruthy();
+    expect(await screen.findByText('Connect GitHub')).toBeTruthy();
+    expect(await screen.findByText(/Optional/)).toBeTruthy();
+    // NOT framed as "signed out" / "not signed in"
+    expect(screen.queryByText(/Not signed in/i)).toBeNull();
   });
 
-  it('the Sign in row links to /login', async () => {
+  it('the Connect GitHub row links to /login', async () => {
     mount();
-    const link = (await screen.findByText('Sign in')).closest('a');
+    const link = (await screen.findByText('Connect GitHub')).closest('a');
     expect(link?.getAttribute('href')).toBe('/login');
   });
 });
