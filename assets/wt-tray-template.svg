@@ -1,3 +1,8 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 22 22" fill="none" stroke="#000" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-  <path d="M4 5 L8 17 L11 10 L14 17 L18 5"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 22 22" fill="none" stroke="#000" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round">
+  <!-- Bold "W" for the macOS/Win/Linux menu-bar tray. Pure black = template
+       image (the OS auto-inverts for light/dark). Heavier stroke + deeper
+       central vee + fuller width than the old 2.5-stroke zig-zag, which
+       smudged into a blob at 22px. Baseline ~17, apexes ~5, mid-peak at 11
+       so the two V's read clearly. -->
+  <path d="M3.5 5 L7 17 L11 9 L15 17 L18.5 5"/>
 </svg>
