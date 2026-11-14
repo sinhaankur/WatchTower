@@ -3490,36 +3490,148 @@ function createTray() {
 
   tray.setToolTip('WatchTower');
 
-  // Initial menu from live backend state (Tailscale-style). Falls back to a
-  // minimal menu if the backend isn't up yet, then self-corrects on refresh.
+  // Build the native right-click menu once so it's ready as the reliable
+  // fallback (and the only menu on platforms where the popover window misbehaves).
+  // We do NOT setContextMenu() — that would bind it to LEFT-click on macOS and
+  // steal the click we want for the rich popover. Instead we pop it up manually
+  // on 'right-click'. Tailscale behaves the same: left = rich menu, right = native.
   refreshTrayMenu();
-  tray.setContextMenu(
-    Menu.buildFromTemplate([
-      { label: 'WatchTower · Starting…', enabled: false },
-      { type: 'separator' },
-      { label: 'Open WatchTower', click: () => bringWindowToFront(mainWindow) },
-      { label: 'Quit WatchTower', click: () => { isQuitting = true; stopProcesses(); app.quit(); } },
-    ]),
-  );
 
-  // Keep the menu live. macOS fires 'mouse-enter' before the menu opens, so
-  // the dropdown reflects current status the moment it appears; a slow 30s
-  // interval covers platforms without that event and background state drift.
-  tray.on('mouse-enter', () => { refreshTrayMenu(); });
+  // Keep the native menu live. A slow 30s interval covers background state drift;
+  // we also refresh right before showing either surface.
   const trayRefreshTimer = setInterval(() => { refreshTrayMenu(); }, 30000);
   app.on('before-quit', () => { try { clearInterval(trayRefreshTimer); } catch { /* noop */ } });
 
-  tray.on('click', () => {
-    // Same Windows focus-stealing-prevention dance as second-instance.
-    // Without bringWindowToFront's alwaysOnTop toggle, single-clicking
-    // the tray icon to bring back a hidden window does nothing on
-    // recent Windows builds — the window is shown but stays behind the
-    // user's current foreground app.
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      bringWindowToFront(mainWindow);
+  // LEFT-click → the rich React popover (the Tailscale-grade menu). This is the
+  // primary interaction. Toggles: click again (or click away) to dismiss.
+  tray.on('click', (_event, bounds) => {
+    toggleTrayPopover(bounds);
+  });
+
+  // RIGHT-click → native context menu (reliable fallback: Open / Settings / Quit).
+  tray.on('right-click', async () => {
+    try {
+      const menu = await buildTrayMenu();
+      tray.popUpContextMenu(menu);
+    } catch {
+      tray.popUpContextMenu(
+        Menu.buildFromTemplate([
+          { label: 'Open WatchTower', click: () => bringWindowToFront(mainWindow) },
+          { label: 'Quit WatchTower', click: () => { isQuitting = true; stopProcesses(); app.quit(); } },
+        ]),
+      );
     }
   });
 }
+
+// ── Tray popover window (the rich, Tailscale-grade status menu) ───────────────
+// A frameless, transparent, always-on-top BrowserWindow that loads the SPA's
+// /tray-popover route (renders <MenubarWidget/>). Positioned at the tray icon's
+// bounds; hidden on blur so it behaves like a native menu-bar popover.
+
+let trayPopover = null;
+
+const TRAY_POPOVER_WIDTH = 340;
+const TRAY_POPOVER_HEIGHT = 560; // generous; the page is transparent so slack is invisible
+
+function createTrayPopover() {
+  if (trayPopover && !trayPopover.isDestroyed()) return trayPopover;
+  trayPopover = new BrowserWindow({
+    width: TRAY_POPOVER_WIDTH,
+    height: TRAY_POPOVER_HEIGHT,
+    show: false,
+    frame: false,
+    resizable: false,
+    movable: false,
+    minimizable: false,
+    maximizable: false,
+    fullscreenable: false,
+    skipTaskbar: true,
+    transparent: true,
+    backgroundColor: '#00000000',
+    hasShadow: true,
+    alwaysOnTop: true,
+    webPreferences: {
+      contextIsolation: true,
+      nodeIntegration: false,
+      preload: path.join(__dirname, 'preload.js'),
+    },
+  });
+
+  const useLegacyFrontend = process.env.WATCHTOWER_DESKTOP_LEGACY_FRONTEND === '1';
+  const base = useLegacyFrontend
+    ? `http://${HOST}:${FRONTEND_PORT}`
+    : `http://${HOST}:${BACKEND_PORT}`;
+  trayPopover.loadURL(`${base}/tray-popover`).catch(() => { /* backend not up yet */ });
+
+  // Hide (not destroy) on blur so reopening is instant and state persists.
+  trayPopover.on('blur', () => {
+    if (trayPopover && !trayPopover.isDestroyed()) trayPopover.hide();
+  });
+  trayPopover.on('closed', () => { trayPopover = null; });
+  return trayPopover;
+}
+
+// Position the popover under (Win/Linux: above) the tray icon, clamped to the
+// work area so it never spills off-screen on any platform.
+function positionTrayPopover(bounds) {
+  if (!trayPopover || trayPopover.isDestroyed()) return;
+  const { screen } = require('electron');
+  const display = screen.getDisplayNearestPoint(
+    bounds && bounds.x ? { x: bounds.x, y: bounds.y } : screen.getCursorScreenPoint(),
+  );
+  const wa = display.workArea;
+  const [w, h] = trayPopover.getSize();
+
+  let x;
+  let y;
+  if (process.platform === 'darwin' && bounds && bounds.width) {
+    // macOS menu bar is at the top: center under the icon, hang down.
+    x = Math.round(bounds.x + bounds.width / 2 - w / 2);
+    y = Math.round(bounds.y + bounds.height + 4);
+  } else if (bounds && bounds.width) {
+    // Windows/Linux tray is usually bottom-right: anchor above the icon.
+    x = Math.round(bounds.x + bounds.width / 2 - w / 2);
+    y = Math.round(bounds.y - h - 4);
+    if (y < wa.y) y = Math.round(bounds.y + bounds.height + 4); // tray on top → hang down
+  } else {
+    // No bounds (some Linux DEs): top-right corner of the work area.
+    x = wa.x + wa.width - w - 8;
+    y = wa.y + 8;
+  }
+
+  // Clamp to the work area.
+  x = Math.max(wa.x + 8, Math.min(x, wa.x + wa.width - w - 8));
+  y = Math.max(wa.y + 8, Math.min(y, wa.y + wa.height - h - 8));
+  trayPopover.setPosition(x, y, false);
+}
+
+function toggleTrayPopover(bounds) {
+  const win = createTrayPopover();
+  if (win.isVisible()) {
+    win.hide();
+    return;
+  }
+  positionTrayPopover(bounds);
+  win.show();
+  win.focus();
+}
+
+// IPC: the popover's React code can dismiss its own window and drive main-window
+// navigation (clicking Settings/Network Devices opens the real app, like
+// Tailscale's dropdown items).
+ipcMain.on('wt:closeTrayPopover', () => {
+  if (trayPopover && !trayPopover.isDestroyed()) trayPopover.hide();
+});
+ipcMain.on('wt:trayNavigate', (_event, hash) => {
+  if (trayPopover && !trayPopover.isDestroyed()) trayPopover.hide();
+  bringWindowToFront(mainWindow);
+  try {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('wt:navigate', hash || '/');
+    }
+  } catch { /* navigation is best-effort */ }
+});
 
 app.whenReady().then(async () => {
   try {

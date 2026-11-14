@@ -432,6 +432,30 @@ export function useSelfUpdate() {
   });
 }
 
+// ── System resources (CPU + RAM) ──────────────────────────────────────────────
+// Cross-platform (Linux /proc, macOS sysctl/vm_stat), dependency-free on the
+// backend. Used by SystemResourceMonitor and the menubar status widget to show
+// the appliance's footprint.
+
+export type SystemMetrics = {
+  ram: { total_mb: number; used_mb: number; available_mb: number; percent_used: number };
+  cpu?: { count: number; system_percent: number; process_percent: number };
+  process: { rss_mb: number; cpu_percent?: number; label: string };
+};
+
+export function useSystemMetrics(opts?: { enabled?: boolean }) {
+  return useQuery<SystemMetrics>({
+    queryKey: ['runtime', 'metrics', 'system'],
+    queryFn: async () =>
+      (await apiClient.get<SystemMetrics>('/runtime/metrics/system')).data,
+    enabled: opts?.enabled ?? true,
+    // CPU is sampled between polls — refetch on an interval so the delta is live.
+    refetchInterval: 5000,
+    staleTime: 2000,
+    retry: false,
+  });
+}
+
 // ── Remote Access ────────────────────────────────────────────────────────────
 // Each provider (Tailscale today; Cloudflare Tunnel / SSH later) reports
 // installed / ready / sharing state independently. Detection is cheap
@@ -457,6 +481,20 @@ export function useRemoteAccessProviders() {
     staleTime: 10_000,
     refetchOnWindowFocus: false,
   });
+}
+
+/** Collapse the Tailscale provider into the single "reachable from outside?"
+ *  state the menubar widget + top-bar chip reflect. */
+export function useRemoteAccessState() {
+  const { data: providers } = useRemoteAccessProviders();
+  const tailscale = providers?.find((p) => p.id === 'tailscale');
+  return {
+    tailscale,
+    installed: !!tailscale?.installed,
+    ready: !!tailscale?.ready,
+    sharing: !!tailscale?.sharing,
+    url: tailscale?.url ?? null,
+  };
 }
 
 export function useRemoteAccessDefaultPort() {
@@ -1627,6 +1665,9 @@ export type PodmanStatus = {
   binary: string | null;
   version: string | null;
   machine: { name: string; running: boolean; cpus?: number; memory?: string } | null;
+  // True on macOS/Windows when Podman is installed but has NO machine yet
+  // (never initialized) — the UI offers "Set up" (init+start), not "Start".
+  needs_machine?: boolean;
   connected: boolean;
   hint: string | null;
 };
@@ -1706,6 +1747,17 @@ export function useStartPodmanMachine() {
   const qc = useQueryClient();
   return useMutation<PodmanStatus, unknown, void>({
     mutationFn: async () => (await apiClient.post<PodmanStatus>('/podman/machine/start')).data,
+    onSuccess: () => invalidatePodman(qc),
+  });
+}
+
+/** One-click "Set up": create the Podman machine if missing, then start it.
+ *  For a fresh macOS/Windows install where Podman exists but was never init'd.
+ *  Can take a few minutes (init downloads a VM image). */
+export function useSetupPodmanMachine() {
+  const qc = useQueryClient();
+  return useMutation<PodmanStatus, unknown, void>({
+    mutationFn: async () => (await apiClient.post<PodmanStatus>('/podman/machine/setup')).data,
     onSuccess: () => invalidatePodman(qc),
   });
 }

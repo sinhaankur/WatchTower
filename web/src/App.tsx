@@ -49,6 +49,7 @@ const HostConnect          = lazyWithRetry(() => import('./pages/HostConnect'), 
 const RemoteAccess         = lazyWithRetry(() => import('./pages/RemoteAccess'), 'RemoteAccess');
 const ManagedDatabases     = lazyWithRetry(() => import('./pages/ManagedDatabases'), 'ManagedDatabases');
 const ReportBug            = lazyWithRetry(() => import('./pages/ReportBug'), 'ReportBug');
+const TrayPopover          = lazyWithRetry(() => import('./pages/TrayPopover'), 'TrayPopover');
 const GitHubOAuthCallback  = lazyWithRetry(() => import('./pages/GitHubOAuthCallback'), 'GitHubOAuthCallback');
 const GitHubLoginCallback  = lazyWithRetry(() => import('./pages/GitHubLoginCallback'), 'GitHubLoginCallback');
 const OidcLoginCallback    = lazyWithRetry(() => import('./pages/OidcLoginCallback'), 'OidcLoginCallback');
@@ -195,6 +196,10 @@ function App() {
             <Route path="/login" element={<><PageTitle name="Sign in" /><Login /></>} />
             <Route path="/oauth/github/login/callback" element={<GitHubLoginCallback />} />
             <Route path="/oauth/oidc/login/callback" element={<OidcLoginCallback />} />
+            {/* Electron tray popover — bare, no chrome, no RequireAuth redirect.
+                The desktop build injects the API token before React boots, so the
+                widget's data hooks authenticate without a login round-trip. */}
+            <Route path="/tray-popover" element={<TrayPopover />} />
 
             {/* Pages with shared sidebar layout */}
             <Route path="/"                  element={withChrome('Dashboard',        <Dashboard />)} />

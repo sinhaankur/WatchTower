@@ -12,6 +12,7 @@ import { useUpdateCheck, useActiveDeploymentCount, useHealingConfig, useSelfUpda
 import { CommandPalette, openCommandPalette } from './CommandPalette';
 import { UserMenu } from './UserMenu';
 import { ConnectionStatus } from './ConnectionStatus';
+import { TopBarStatus } from './TopBarStatus';
 
 const UPDATE_BANNER_DISMISSED_KEY = 'watchtower:updateBannerDismissed';
 const MORE_NAV_OPEN_KEY = 'watchtower:moreNavOpen';
@@ -647,7 +648,7 @@ export default function Layout({ children }: { children: ReactNode }) {
         </button>
 
         {/* Main content */}
-        <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        <div className="relative flex-1 flex flex-col min-w-0 overflow-hidden">
           {/* Mobile top bar */}
           <div
             className="lg:hidden flex items-center gap-3 px-4 py-3 border-b shrink-0"
@@ -665,13 +666,30 @@ export default function Layout({ children }: { children: ReactNode }) {
               </svg>
             </button>
             <BrandLogo withLabel size="sm" />
-            <Link
-              to="/setup"
-              className="ml-auto px-3 py-1.5 rounded-md bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold shadow-retro"
-            >
-              + New
-            </Link>
+            <div className="ml-auto flex items-center gap-2">
+              <TopBarStatus />
+              <Link
+                to="/setup"
+                className="px-3 py-1.5 rounded-md bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold shadow-retro"
+              >
+                + New
+              </Link>
+            </div>
           </div>
+
+          {/* Desktop status bar — browser mode only. In the Electron build the
+              native OS tray (menu bar / system tray) owns status, exactly like
+              Tailscale, so we DON'T render an in-app chip there (it overlapped
+              page headers and duplicated the tray). A clean, slim full-width bar
+              keeps content below it — no floating, no overlap. */}
+          {!isElectron && (
+            <div
+              className="hidden lg:flex items-center justify-end gap-2 px-4 h-11 border-b shrink-0"
+              style={{ background: 'hsl(var(--surface-soft) / 0.85)', borderColor: 'hsl(var(--border-soft))' }}
+            >
+              <TopBarStatus />
+            </div>
+          )}
 
           <UpdateBanner />
           {/* No PageTransition here — withChrome() in App.tsx already wraps

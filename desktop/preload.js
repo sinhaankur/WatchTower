@@ -60,5 +60,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   openTerminal: () => ipcRenderer.invoke('wt:openTerminal'),
   copyText: (text) => ipcRenderer.invoke('wt:copyText', text ?? ''),
   openExternal: (url) => ipcRenderer.invoke('wt:openExternal', url ?? ''),
+  // Tray popover: let the rich status menu dismiss its own window (e.g. after a
+  // nav action) in addition to the main process's blur-to-hide handling.
+  closeTrayPopover: () => ipcRenderer.send('wt:closeTrayPopover'),
+  // Main-window nav from the tray popover (e.g. clicking "Settings" opens the
+  // real app, like Tailscale's dropdown items do).
+  trayNavigate: (hash) => ipcRenderer.send('wt:trayNavigate', hash ?? '/'),
   platform: process.platform,
 });
