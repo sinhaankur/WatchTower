@@ -9,6 +9,12 @@ Curated, human-friendly history of WatchTower releases. Auto-generated GitHub Re
 
 ---
 
+## 2.2.1 — Ship the macOS build + security hardening (completes 2.2.0)
+
+- **macOS installers are back.** 2.2.0 shipped everywhere except Mac — GitHub retired the `macos-14` CI runner image, so both Mac DMGs failed to build ("configuration not supported") and only Linux/Windows + PyPI/container went out. Apple-Silicon builds now run on `macos-15`, Intel on `macos-13`. Mac users on 2.2.0 get this update.
+- **Resolved all HIGH-severity frontend/desktop npm advisories.** Non-breaking dependency fixes plus an Electron 43→44 reconcile (closing the eMudhra certificate-mitigation advisory). The only advisories left are build-time-only (app-icon generation on CI), not reachable at runtime.
+- Everything from 2.2.0 below ships here too.
+
 ## 2.2.0 — Tailscale-grade tray, resource monitoring, one-click Podman setup
 
 - **Native status menu in the system tray.** Left-click the tray icon (macOS menu bar / Windows & Linux tray) for a rich popover — connection toggle, your identity, this device, live Tailscale + container-runtime status, Network Devices, and the app's own CPU/RAM footprint. Right-click still gives the native menu. Modeled on Tailscale's menu-bar app.
