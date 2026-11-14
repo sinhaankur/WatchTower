@@ -3369,6 +3369,17 @@ function fetchBackendJson(pathname) {
   });
 }
 
+// Friendlier device name: drop the ".local" mDNS suffix and the trailing
+// "-1234" counter macOS appends to disambiguate duplicate hostnames.
+// "AnkurSinhas-MacBook-Pro-8766.local" → "AnkurSinhas-MacBook-Pro".
+function cleanDeviceName(name) {
+  if (!name) return 'This device';
+  return String(name)
+    .replace(/\.local$/i, '')
+    .replace(/-\d{3,}$/, '')
+    .trim() || 'This device';
+}
+
 // Build the tray menu from live backend state, in the shape of the Tailscale
 // menu-bar dropdown: running status + identity at the top, this machine's
 // node, the few actions that matter, then Settings / Open / Quit. Re-run on
@@ -3393,10 +3404,15 @@ async function buildTrayMenu() {
   //     signal is is_github_authenticated, not the mere presence of `me`.
   const signedIn = !!(me && me.is_github_authenticated);
   const identity = signedIn ? (me.email || me.name) : null;
+  // Personal headline — the user's name if we have one (user-settable, works
+  // without GitHub), else the app name. Keeps the menu personal + light.
+  const displayName = (me && (me.name || me.email)) || null;
+  const headerLabel = displayName || 'WatchTower';
 
-  // "This Device" line — Tailscale-style: hostname + IP inline, e.g.
-  // "ankursinhas-macbook-pro-1 (100.91.27.70)".
-  const host = (pc && pc.hostname) || 'This device';
+  // "This Device" line — Tailscale-style: a CLEAN hostname + IP inline. Strip
+  // the noisy ".local" suffix and trailing "-1234" counter macOS appends, e.g.
+  // "AnkurSinhas-MacBook-Pro-8766.local" → "AnkurSinhas-MacBook-Pro".
+  const host = cleanDeviceName((pc && pc.hostname) || 'This device');
   const ip = (pc && (pc.tailscale_ip || pc.ip)) || null;
   const thisDevice = ip ? `${host} (${ip})` : host;
 
@@ -3419,7 +3435,7 @@ async function buildTrayMenu() {
   // app is "Ready" locally; "Connected" once GitHub is linked. "Connect GitHub"
   // is an optional ACTION, never a status warning.
   const statusLabel = !running ? 'Starting…' : signedIn ? 'Connected' : 'Ready';
-  template.push({ label: 'WatchTower', enabled: false });
+  template.push({ label: headerLabel, enabled: false });
   template.push({ label: statusLabel, enabled: false });
   template.push({ type: 'separator' });
 

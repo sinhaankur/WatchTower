@@ -53,11 +53,11 @@ function mount() {
 describe('MenubarWidget', () => {
   it('renders the hero, identity and dependency structure', async () => {
     mount();
-    // Hero + connected state
-    expect(await screen.findByText('WatchTower')).toBeTruthy();
+    // Hero is PERSONALISED: it leads with the user's name (mock name 'You'),
+    // not the generic app name. Both the hero headline and the identity row show
+    // it, so assert at least one and the connected state.
+    expect((await screen.findAllByText('You')).length).toBeGreaterThanOrEqual(1);
     expect(await screen.findByText('Connected')).toBeTruthy();
-    // Identity
-    expect(await screen.findByText('You')).toBeTruthy();
     // This device shows the friendly device NAME (from the tailnet URL
     // https://box.tailnet.ts.net → "box"), not the raw IP. Scope to the
     // "This device" row so we don't match the sharing URL in the hero.

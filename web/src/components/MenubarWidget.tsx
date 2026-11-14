@@ -165,11 +165,19 @@ function fmtMb(mb: number): string {
   return `${Math.round(mb)} MB`;
 }
 
+/** "ankur@example.com" → "ankur" — a friendly name when we only have an email. */
+function firstName(email?: string | null): string | null {
+  if (!email) return null;
+  const local = email.split('@')[0];
+  return local ? local.charAt(0).toUpperCase() + local.slice(1) : null;
+}
+
 /* ----------------------------------------------------------------- hero */
 
 function Hero() {
   const { tailscale, installed, ready, sharing } = useRemoteAccessState();
   const { data: portInfo } = useRemoteAccessDefaultPort();
+  const { data: me } = useMe();
   const enable = useEnableRemoteAccess('tailscale');
   const disable = useDisableRemoteAccess('tailscale');
   const busy = enable.isPending || disable.isPending;
@@ -178,13 +186,10 @@ function Hero() {
   const canToggle = installed && ready && !!tailscale;
   const on = sharing;
 
-  const state = sharing
-    ? 'Connected'
-    : !installed
-      ? 'Tailscale not installed'
-      : !ready
-        ? 'Tailscale not connected'
-        : 'Off';
+  // Personal, light headline — lead with the person's name (the tailnet-style
+  // anchor), falling back to the app name. Status is one quiet word.
+  const headline = me?.name || firstName(me?.email) || 'WatchTower';
+  const state = sharing ? 'Connected' : canToggle ? 'Off' : 'Local';
 
   const toggle = () => {
     if (!canToggle || busy) return;
@@ -196,8 +201,8 @@ function Hero() {
     <div className="px-4 pt-4 pb-3">
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
-          {/* Headline whispers (light weight) per the spec. */}
-          <p className="text-base font-normal text-foreground leading-tight">WatchTower</p>
+          {/* Light-weight personal headline per the design spec. */}
+          <p className="text-base font-light text-foreground leading-tight truncate">{headline}</p>
           <p
             className={`text-xs mt-0.5 flex items-center gap-1.5 ${
               sharing ? 'text-emerald-500 dark:text-emerald-400' : 'text-muted-foreground'
@@ -217,12 +222,12 @@ function Hero() {
 
       {sharing && tailscale?.url && <SharingUrl url={tailscale.url} />}
 
-      {!canToggle && (
+      {!canToggle && !installed && (
         <NavTo
           to="/remote-access"
           className="mt-2.5 inline-flex items-center gap-1 text-xs font-medium text-accent hover:underline"
         >
-          {installed ? 'Finish Tailscale setup' : 'Set up remote access'}
+          Set up remote access
           <ChevronRight size={12} />
         </NavTo>
       )}
