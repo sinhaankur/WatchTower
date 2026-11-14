@@ -360,6 +360,51 @@ async function applyMacUpdate(targetVersion, parentWindow, onProgress) {
 }
 
 /**
+ * Install the already-downloaded update and restart — the one click behind the
+ * tray's "Restart to update" row (Tailscale's model). The download finished in
+ * the background (pendingUpdate is set); this just applies it.
+ *
+ * macOS: the bundle is unsigned, so electron-updater's quitAndInstall silently
+ * fails to atomically swap the .app on quit — we use our own DMG self-replace
+ * helper (applyMacUpdate) with a dock progress bar so the ~150 MB fetch doesn't
+ * look frozen. Other platforms: quitAndInstall (signed NSIS on Windows, etc.).
+ */
+async function restartToUpdate() {
+  const version = pendingUpdate && pendingUpdate.version;
+  if (!version) return;
+  const isMac = process.platform === 'darwin';
+  const releaseUrl = `https://github.com/sinhaankur/WatchTower/releases/tag/v${version}`;
+
+  if (isMac) {
+    const progWin = mainWindow && !mainWindow.isDestroyed() ? mainWindow : null;
+    const onProgress = (frac) => {
+      if (progWin) progWin.setProgressBar(frac > 0 && frac < 1 ? frac : -1);
+      try {
+        if (tray && !tray.isDestroyed?.()) {
+          tray.setToolTip(`WatchTower — installing update ${Math.round(frac * 100)}%`);
+        }
+      } catch { /* tray optional */ }
+    };
+    try {
+      await applyMacUpdate(version, mainWindow, onProgress);
+    } catch (err) {
+      console.warn('[WatchTower] restartToUpdate (mac) failed:', err.message);
+      if (progWin) progWin.setProgressBar(-1);
+      shell.openExternal(releaseUrl);
+    }
+    return;
+  }
+
+  try {
+    isQuitting = true;
+    autoUpdater.quitAndInstall(false, true);
+  } catch (err) {
+    console.warn('[WatchTower] restartToUpdate quitAndInstall threw:', err.message);
+    shell.openExternal(releaseUrl);
+  }
+}
+
+/**
  * Fire-and-forget update check called once after the main window is shown.
  * Shows a non-blocking notification dialog; never interrupts the user mid-task.
  *
@@ -410,76 +455,25 @@ async function checkForAppUpdates(win) {
     });
 
     autoUpdater.on('update-downloaded', (info) => {
-      console.log(`[WatchTower] Update ${info.version} downloaded — prompting user to restart`);
-      // 1.10 change: stop relying on the silent autoInstallOnAppQuit
-      // path. Two reasons:
-      //   1. On macOS the .app is unsigned (no Apple Developer ID), so
-      //      electron-updater silently fails to atomically replace the
-      //      bundle on quit. The user sees "update ready" and then the
-      //      app comes back as the old version — looks broken.
-      //   2. Even on Linux, the silent-on-quit path is invisible —
-      //      users don't know an update was applied until they read
-      //      the splash version.
-      // Prompt explicitly with a Restart Now / Later choice. On Mac
-      // we also offer "Download Manually" so the user has an escape
-      // hatch when the in-place install fails. The release URL is the
-      // landing page; the bundled DMG link is one click away.
-      const isMac = process.platform === 'darwin';
-      const buttons = isMac
-        ? ['Restart and Install', 'Download Manually', 'Later']
-        : ['Restart and Install', 'Later'];
-      const releaseUrl = `https://github.com/sinhaankur/WatchTower/releases/tag/v${info.version}`;
-      dialog.showMessageBox(mainWindow || win, {
-        type: 'info',
-        title: 'WatchTower update ready',
-        message: `Version ${info.version} is ready to install.`,
-        detail: isMac
-          ? 'Click Restart and Install — WatchTower will download the update, replace itself, and reopen automatically. (If anything goes wrong, Download Manually grabs the installer from GitHub.)'
-          : 'Click Restart and Install to apply the update now.',
-        buttons,
-        defaultId: 0,
-        cancelId: buttons.length - 1,
-      }).then(async ({ response }) => {
-        if (response === 0) {
-          // Mac: bypass electron-updater's quitAndInstall (silently broken on
-          // unsigned bundles) and use our own DMG self-replace helper.
-          // Other platforms: trust electron-updater since they're either
-          // signed (Windows NSIS) or use a different install model (Linux).
-          if (isMac) {
-            // Show download progress so the ~140 MB DMG fetch doesn't look
-            // like the app froze. Drives the native dock progress bar (no
-            // extra window) and a lightweight tray tooltip — then clears it
-            // when the self-replace script takes over and the app quits.
-            const progWin = mainWindow && !mainWindow.isDestroyed() ? mainWindow : null;
-            const onProgress = (frac) => {
-              if (progWin) progWin.setProgressBar(frac > 0 && frac < 1 ? frac : -1);
-              try {
-                if (tray && !tray.isDestroyed?.()) {
-                  tray.setToolTip(`WatchTower — downloading update ${Math.round(frac * 100)}%`);
-                }
-              } catch { /* tray optional */ }
-            };
-            try {
-              await applyMacUpdate(info.version, mainWindow, onProgress);
-            } catch (err) {
-              console.warn('[WatchTower] applyMacUpdate failed:', err.message);
-              if (progWin) progWin.setProgressBar(-1);
-              shell.openExternal(releaseUrl);
-            }
-            return;
-          }
-          try {
-            autoUpdater.quitAndInstall(false, true);
-          } catch (err) {
-            console.warn('[WatchTower] quitAndInstall threw:', err.message);
-            shell.openExternal(releaseUrl);
-          }
-        } else if (isMac && response === 1) {
-          shell.openExternal(releaseUrl);
+      // Tailscale-style: the download already happened silently in the
+      // background. DON'T interrupt with a modal. Just record that an update is
+      // ready and refresh the tray — the menu now shows "Restart to update ·
+      // Version X ready", and the user installs on their own schedule with one
+      // click. (restartToUpdate() does the actual install.)
+      console.log(`[WatchTower] Update ${info.version} downloaded — ready to install on user's command`);
+      pendingUpdate = { version: info.version };
+      try { refreshTrayMenu(); } catch { /* tray optional */ }
+      // A quiet, non-blocking OS notification (not a dialog) so the user knows
+      // even if the menu is closed — matches the "ambient, not interrupting" bar.
+      try {
+        if (Notification.isSupported()) {
+          new Notification({
+            title: 'WatchTower update ready',
+            body: `Version ${info.version} is ready. Click the menu-bar icon → Restart to update.`,
+            silent: true,
+          }).show();
         }
-      }).catch((err) => {
-        console.warn('[WatchTower] Update prompt failed:', err.message);
-      });
+      } catch { /* notifications optional */ }
     });
 
     autoUpdater.on('error', (err) => {
@@ -1295,6 +1289,10 @@ let tray = null;
 // Only then is runtimeApiToken guaranteed to match the running server.
 let electronSpawnedBackend = false;
 let isQuitting = false;
+// Set when electron-updater has downloaded an update in the background. The tray
+// menu reads this to show Tailscale's "Restart to update · Version X ready" row
+// instead of nagging with a dialog. { version } or null.
+let pendingUpdate = null;
 
 // MIME types for the built-in static file server
 const MIME_TYPES = {
@@ -3430,19 +3428,33 @@ async function buildTrayMenu() {
   template.push({ type: 'separator' });
 
   // ── Update (its own group, like Tailscale) ──
-  template.push({
-    label: 'Check for Updates…',
-    click: () => {
-      if (mainWindow && !mainWindow.isDestroyed()) {
-        if (autoUpdater && app.isPackaged) {
-          autoUpdater.checkForUpdates().catch(() => checkForUpdatesViaGitHubAPI(mainWindow, true));
-        } else {
-          checkForUpdatesViaGitHubAPI(mainWindow, true);
+  if (pendingUpdate && pendingUpdate.version) {
+    // An update was downloaded in the background → the Tailscale row:
+    // "Restart to update" (the action) + "Version X ready" (the status).
+    // One click installs it. No dialog, no manual download.
+    template.push({ label: 'Restart to update', click: () => { void restartToUpdate(); } });
+    template.push({ label: `Version ${pendingUpdate.version} ready`, enabled: false });
+    template.push({
+      label: 'Release Notes',
+      click: () => shell.openExternal(
+        `https://github.com/sinhaankur/WatchTower/releases/tag/v${pendingUpdate.version}`,
+      ),
+    });
+  } else {
+    template.push({
+      label: 'Check for Updates…',
+      click: () => {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          if (autoUpdater && app.isPackaged) {
+            autoUpdater.checkForUpdates().catch(() => checkForUpdatesViaGitHubAPI(mainWindow, true));
+          } else {
+            checkForUpdatesViaGitHubAPI(mainWindow, true);
+          }
         }
-      }
-    },
-  });
-  if (version) template.push({ label: `Version ${version}`, enabled: false });
+      },
+    });
+    if (version) template.push({ label: `Version ${version}`, enabled: false });
+  }
   template.push({ type: 'separator' });
 
   // ── App controls (with native accelerators, Tailscale-style) ──
@@ -3503,148 +3515,20 @@ function createTray() {
 
   tray.setToolTip('WatchTower');
 
-  // Build the native right-click menu once so it's ready as the reliable
-  // fallback (and the only menu on platforms where the popover window misbehaves).
-  // We do NOT setContextMenu() — that would bind it to LEFT-click on macOS and
-  // steal the click we want for the rich popover. Instead we pop it up manually
-  // on 'right-click'. Tailscale behaves the same: left = rich menu, right = native.
+  // ONE surface, exactly like Tailscale's menu-bar app: a single clean NATIVE
+  // menu that opens on click (left OR right). setContextMenu binds it to both,
+  // and the OS renders + positions it natively on macOS/Windows/Linux — nothing
+  // custom to drift or double-open. (We deliberately do NOT also open a popover
+  // window; having both fire on one click was the "two menus open at once" bug.)
   refreshTrayMenu();
 
-  // Keep the native menu live. A slow 30s interval covers background state drift;
-  // we also refresh right before showing either surface.
+  // macOS fires 'mouse-enter' right before the menu opens — refresh live state
+  // then so the menu is current the instant it appears. A slow interval covers
+  // platforms without that event + background drift.
+  tray.on('mouse-enter', () => { refreshTrayMenu(); });
   const trayRefreshTimer = setInterval(() => { refreshTrayMenu(); }, 30000);
   app.on('before-quit', () => { try { clearInterval(trayRefreshTimer); } catch { /* noop */ } });
-
-  // LEFT-click → the rich React popover (the Tailscale-grade menu). This is the
-  // primary interaction. Toggles: click again (or click away) to dismiss.
-  tray.on('click', (_event, bounds) => {
-    toggleTrayPopover(bounds);
-  });
-
-  // RIGHT-click → native context menu (reliable fallback: Open / Settings / Quit).
-  tray.on('right-click', async () => {
-    try {
-      const menu = await buildTrayMenu();
-      tray.popUpContextMenu(menu);
-    } catch {
-      tray.popUpContextMenu(
-        Menu.buildFromTemplate([
-          { label: 'Open WatchTower', click: () => bringWindowToFront(mainWindow) },
-          { label: 'Quit WatchTower', click: () => { isQuitting = true; stopProcesses(); app.quit(); } },
-        ]),
-      );
-    }
-  });
 }
-
-// ── Tray popover window (the rich, Tailscale-grade status menu) ───────────────
-// A frameless, transparent, always-on-top BrowserWindow that loads the SPA's
-// /tray-popover route (renders <MenubarWidget/>). Positioned at the tray icon's
-// bounds; hidden on blur so it behaves like a native menu-bar popover.
-
-let trayPopover = null;
-
-const TRAY_POPOVER_WIDTH = 340;
-const TRAY_POPOVER_HEIGHT = 560; // generous; the page is transparent so slack is invisible
-
-function createTrayPopover() {
-  if (trayPopover && !trayPopover.isDestroyed()) return trayPopover;
-  trayPopover = new BrowserWindow({
-    width: TRAY_POPOVER_WIDTH,
-    height: TRAY_POPOVER_HEIGHT,
-    show: false,
-    frame: false,
-    resizable: false,
-    movable: false,
-    minimizable: false,
-    maximizable: false,
-    fullscreenable: false,
-    skipTaskbar: true,
-    transparent: true,
-    backgroundColor: '#00000000',
-    hasShadow: true,
-    alwaysOnTop: true,
-    webPreferences: {
-      contextIsolation: true,
-      nodeIntegration: false,
-      preload: path.join(__dirname, 'preload.js'),
-    },
-  });
-
-  const useLegacyFrontend = process.env.WATCHTOWER_DESKTOP_LEGACY_FRONTEND === '1';
-  const base = useLegacyFrontend
-    ? `http://${HOST}:${FRONTEND_PORT}`
-    : `http://${HOST}:${BACKEND_PORT}`;
-  trayPopover.loadURL(`${base}/tray-popover`).catch(() => { /* backend not up yet */ });
-
-  // Hide (not destroy) on blur so reopening is instant and state persists.
-  trayPopover.on('blur', () => {
-    if (trayPopover && !trayPopover.isDestroyed()) trayPopover.hide();
-  });
-  trayPopover.on('closed', () => { trayPopover = null; });
-  return trayPopover;
-}
-
-// Position the popover under (Win/Linux: above) the tray icon, clamped to the
-// work area so it never spills off-screen on any platform.
-function positionTrayPopover(bounds) {
-  if (!trayPopover || trayPopover.isDestroyed()) return;
-  const { screen } = require('electron');
-  const display = screen.getDisplayNearestPoint(
-    bounds && bounds.x ? { x: bounds.x, y: bounds.y } : screen.getCursorScreenPoint(),
-  );
-  const wa = display.workArea;
-  const [w, h] = trayPopover.getSize();
-
-  let x;
-  let y;
-  if (process.platform === 'darwin' && bounds && bounds.width) {
-    // macOS menu bar is at the top: center under the icon, hang down.
-    x = Math.round(bounds.x + bounds.width / 2 - w / 2);
-    y = Math.round(bounds.y + bounds.height + 4);
-  } else if (bounds && bounds.width) {
-    // Windows/Linux tray is usually bottom-right: anchor above the icon.
-    x = Math.round(bounds.x + bounds.width / 2 - w / 2);
-    y = Math.round(bounds.y - h - 4);
-    if (y < wa.y) y = Math.round(bounds.y + bounds.height + 4); // tray on top → hang down
-  } else {
-    // No bounds (some Linux DEs): top-right corner of the work area.
-    x = wa.x + wa.width - w - 8;
-    y = wa.y + 8;
-  }
-
-  // Clamp to the work area.
-  x = Math.max(wa.x + 8, Math.min(x, wa.x + wa.width - w - 8));
-  y = Math.max(wa.y + 8, Math.min(y, wa.y + wa.height - h - 8));
-  trayPopover.setPosition(x, y, false);
-}
-
-function toggleTrayPopover(bounds) {
-  const win = createTrayPopover();
-  if (win.isVisible()) {
-    win.hide();
-    return;
-  }
-  positionTrayPopover(bounds);
-  win.show();
-  win.focus();
-}
-
-// IPC: the popover's React code can dismiss its own window and drive main-window
-// navigation (clicking Settings/Network Devices opens the real app, like
-// Tailscale's dropdown items).
-ipcMain.on('wt:closeTrayPopover', () => {
-  if (trayPopover && !trayPopover.isDestroyed()) trayPopover.hide();
-});
-ipcMain.on('wt:trayNavigate', (_event, hash) => {
-  if (trayPopover && !trayPopover.isDestroyed()) trayPopover.hide();
-  bringWindowToFront(mainWindow);
-  try {
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('wt:navigate', hash || '/');
-    }
-  } catch { /* navigation is best-effort */ }
-});
 
 app.whenReady().then(async () => {
   try {
