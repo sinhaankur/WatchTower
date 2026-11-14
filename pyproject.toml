@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "watchtower-podman"
-description = "Podman update and multi-node website deployment automation"
+description = "Self-hosted deploy platform that heals failed deployments — push from GitHub to a computer you already own, with managed databases, private over Tailscale. Podman or Docker."
 readme = "README.md"
 requires-python = ">=3.8"
 license = "Apache-2.0"
@@ -12,10 +12,18 @@ dynamic = ["version"]
 authors = [
   { name = "WatchTower Contributors" }
 ]
+keywords = [
+  "self-hosted", "paas", "deployment", "deploy", "self-healing",
+  "podman", "docker", "tailscale", "coolify-alternative",
+  "homelab", "devops", "github", "personal-cloud", "ci-cd",
+]
 classifiers = [
-  "Development Status :: 4 - Beta",
+  "Development Status :: 5 - Production/Stable",
   "Intended Audience :: System Administrators",
+  "Intended Audience :: Developers",
   "Topic :: System :: Systems Administration",
+  "Topic :: Software Development :: Build Tools",
+  "Topic :: Internet :: WWW/HTTP :: Site Management",
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3.8",
   "Programming Language :: Python :: 3.9",

@@ -49,6 +49,16 @@ jobs:
   publish:
     needs: build
     runs-on: ubuntu-latest
+    # Dedicated publishing environment — PyPI Trusted Publishing strongly
+    # recommends it so a publish only runs through a protected environment
+    # (configure required reviewers / allowed branches in repo Settings →
+    # Environments → "pypi"). It's also the scope the Trusted Publisher binds to.
+    environment:
+      name: pypi
+      url: https://pypi.org/p/watchtower-podman
+    # OIDC must be requested at the JOB level for Trusted Publishing to work.
+    permissions:
+      id-token: write
     steps:
       - name: Download build artifacts
         uses: actions/download-artifact@v8
@@ -56,11 +66,15 @@ jobs:
           name: python-dist
           path: dist/
 
+      # Trusted Publishing (OIDC): no API token. GitHub presents a short-lived
+      # OIDC identity that PyPI verifies against the Trusted Publisher registered
+      # for watchtower-podman (owner: sinhaankur, repo: WatchTower, workflow:
+      # publish-pypi.yml, environment: pypi). Register that on PyPI BEFORE the
+      # first run after this change, or the publish step will fail with no token
+      # to fall back on. Docs: https://docs.pypi.org/trusted-publishers/
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
-          user: __token__
-          password: ${{ secrets.PYPI_API_TOKEN }}
           # A moved/re-pushed tag re-triggers this workflow, and PyPI rejects
           # re-uploading an existing version ("400 File already exists") —
           # that's a no-op, not a failure (bit v1.21.0 when the tag moved to
