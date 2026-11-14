@@ -254,13 +254,21 @@ jobs:
           # won't re-add armv7l. 32-bit ARM users run WatchTower via PyPI
           # (pip/pipx), the container image, or browser mode — only the Electron
           # desktop .app can't target armv7l anymore.
-          - os: macos-14
+          # macOS runner labels: GitHub retired the `macos-14` image after
+          # v2.1.3 (Oct 2026) — v2.2.0 failed with "configuration
+          # 'macos-14-arm64-us-default' is not supported". Apple-Silicon builds
+          # move to macos-15 (arm64). Intel (x64) builds MUST stay on macos-13 —
+          # it's the last Intel runner; macos-14/15 are arm64-only and can't
+          # produce an x86_64 DMG. (Intel Mac support is already fragile — see
+          # the cryptography-wheel saga in docs; keep this leg until GitHub
+          # removes macos-13 entirely, then Intel Mac drops to pip/browser.)
+          - os: macos-15
             bundle_target: "darwin-arm64"
             bundle_source: "inline"
             eb_args: --mac --arm64
             artifact_glob: "desktop/dist/*arm64*"
             extra_apt: ""
-          - os: macos-14
+          - os: macos-13
             bundle_target: "darwin-x64"
             bundle_source: "inline"
             eb_args: --mac --x64
@@ -632,7 +640,11 @@ jobs:
       # broke Mac auto-update through >=1.16.3). Upload each arch's manifest as
       # an artifact so the merge-mac-manifest job can combine them.
       - name: Upload mac manifest artifact (for merge)
-        if: matrix.os == 'macos-14'
+        # Both Mac legs now run on different labels (macos-15 arm64, macos-13
+        # x64), so match any macOS runner — not a single hardcoded label that
+        # silently skips a leg (and breaks the two-arch manifest merge) the next
+        # time GitHub retires an image.
+        if: startsWith(matrix.os, 'macos')
         uses: actions/upload-artifact@v7
         with:
           name: mac-manifest-${{ contains(matrix.eb_args, 'arm64') && 'arm64' || 'x64' }}
