@@ -59,20 +59,8 @@ import {
   useSystemMetrics,
 } from '@/hooks/queries';
 
-/**
- * Inside the Electron tray popover, in-app links must open the MAIN window and
- * dismiss the popover (like Tailscale's dropdown items) — navigating inside the
- * tiny popover window would be wrong. `trayNavigate` is exposed by preload only
- * in that window. Everywhere else (browser chip), fall back to react-router.
- */
-type TrayAPI = { trayNavigate?: (hash: string) => void };
-function trayApi(): TrayAPI | undefined {
-  if (typeof window === 'undefined') return undefined;
-  const api = (window as unknown as { electronAPI?: TrayAPI }).electronAPI;
-  return api && typeof api.trayNavigate === 'function' ? api : undefined;
-}
-
-/** A link that routes correctly whether it's in the tray popover or the SPA. */
+/** An in-widget link. Used by the browser-mode top-bar status chip (the desktop
+ *  app uses a native tray menu, not this widget). */
 function NavTo({
   to,
   onClose,
@@ -86,19 +74,6 @@ function NavTo({
   title?: string;
   children: React.ReactNode;
 }) {
-  const api = trayApi();
-  if (api) {
-    return (
-      <button
-        type="button"
-        title={title}
-        onClick={() => api.trayNavigate!(to)}
-        className={`w-full text-left ${className ?? ''}`}
-      >
-        {children}
-      </button>
-    );
-  }
   return (
     <Link to={to} title={title} onClick={onClose} className={className}>
       {children}
