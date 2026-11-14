@@ -1,6 +1,10 @@
 """
 Database configuration and ORM setup for WatchTower
 """
+# PEP 563: make annotations lazy strings so `X | None` syntax is safe on
+# Python 3.8/3.9 (we advertise requires-python >=3.8). Without this, the
+# `-> str | None` helpers below raise TypeError at import time on <3.10.
+from __future__ import annotations
 
 import os
 import logging

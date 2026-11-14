@@ -1,6 +1,11 @@
 """
 Pydantic schemas for API request/response validation
 """
+# PEP 563: lazy annotations so `X | None` syntax is safe on Python 3.8/3.9
+# (requires-python >=3.8). NOTE: Pydantic v2 still resolves these annotations at
+# model-build time via typing.get_type_hints, which handles the stringized form
+# correctly — so BaseModel fields keep working on 3.8+.
+from __future__ import annotations
 
 from pydantic import BaseModel, Field
 from typing import Optional, List
