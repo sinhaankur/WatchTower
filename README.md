@@ -156,15 +156,17 @@ Automation is only useful if you hold the steering wheel:
 | Rootless (no root Docker daemon)  |   ✅ (Podman)  | ❌ (root Docker) | ❌ | ❌ (Docker) |
 | Private by default (Tailscale)    |    ✅ built-in |  add-on |  add-on |     add-on      |
 | Desktop app                       |       ✅       |    ❌    |    ❌    |       ❌        |
+| Control-plane footprint           | **~35 MB** idle | ~2 GB before your apps | ~2 GB before your apps | full OS image |
 
-The differentiator is the third row. Every tool in this table lets you self-host applications; **only WatchTower diagnoses and repairs a failed deployment on its own**. It is built to run unattended on the machine you already own — rootless, and without exposing anything to the internet.
+Two rows do the work. **Only WatchTower diagnoses and repairs a failed deployment on its own** — every other tool just deploys. And it does it in a *fraction* of the memory: the self-hosted PaaS dashboards want around 2 GB of RAM before your apps get any, while WatchTower's control plane sits at roughly 35 MB idle on the machine you already own — rootless, and without exposing anything to the internet.
 
-*Comparison reflects public feature sets as of mid-2026. WatchTower is a younger project than Coolify — its strengths are self-healing and rootless operation on your own hardware, not breadth or years of hardening.*
+*Comparison reflects public feature sets as of late 2026. WatchTower is a younger project than Coolify — its strengths are self-healing and rootless operation on your own hardware, not breadth or years of hardening. Footprint figures: WatchTower measured idle RSS; ~2 GB is the commonly-cited minimum for the self-hosted PaaS dashboards before your apps are scheduled.*
 
 ## Docs & guides
 
 | Topic | Where |
 |---|---|
+| **Roadmap** (deploy · fleet · files & photos · Pi/IoT) | [docs/ROADMAP.md](docs/ROADMAP.md) |
 | What's new | [CHANGELOG](CHANGELOG.md) · [Releases](https://github.com/sinhaankur/WatchTower/releases) |
 | Quick reference | [docs/QUICK_REFERENCE.md](docs/QUICK_REFERENCE.md) |
 | Container auto-update service (config + troubleshooting) | [docs/CONTAINER_UPDATE_SERVICE.md](docs/CONTAINER_UPDATE_SERVICE.md) |
