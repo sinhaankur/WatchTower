@@ -3384,18 +3384,13 @@ async function buildTrayMenu() {
 
   const running = !!health && health.status === 'healthy';
   const identity = (me && (me.email || me.name)) || null;
-  const version = (health && health.version) ? `v${health.version}` : (app.getVersion ? `v${app.getVersion()}` : '');
+  const version = (health && health.version) ? health.version : (app.getVersion ? app.getVersion() : '');
 
-  // "This PC" line: registered + serving, registered, or not yet a server.
-  let thisPc;
-  if (pc && pc.registered) {
-    const node = (pc.node_status === 'healthy') ? 'Serving' : (pc.node_status || 'Registered');
-    thisPc = `${pc.hostname || 'This PC'} · ${node}`;
-  } else if (pc && pc.hostname) {
-    thisPc = `${pc.hostname} · Not a server yet`;
-  } else {
-    thisPc = 'This PC';
-  }
+  // "This Device" line — Tailscale-style: hostname + IP inline, e.g.
+  // "ankursinhas-macbook-pro-1 (100.91.27.70)".
+  const host = (pc && pc.hostname) || 'This device';
+  const ip = (pc && (pc.tailscale_ip || pc.ip)) || null;
+  const thisDevice = ip ? `${host} (${ip})` : host;
 
   const openTo = (hash) => () => {
     bringWindowToFront(mainWindow);
@@ -3406,22 +3401,35 @@ async function buildTrayMenu() {
     } catch { /* navigation is best-effort */ }
   };
 
-  const template = [
-    { label: running ? 'WatchTower · Running' : 'WatchTower · Starting…', enabled: false },
-  ];
-  if (identity) template.push({ label: identity, enabled: false });
+  // Clean, native, Tailscale-shaped layout. Native Menu renders identically on
+  // macOS / Windows / Linux — no custom chrome to drift per-OS.
+  const template = [];
+
+  // ── Header: app + status ──
+  template.push({ label: 'WatchTower', enabled: false });
+  template.push({ label: running ? 'Connected' : 'Starting…', enabled: false });
   template.push({ type: 'separator' });
-  template.push({ label: thisPc, enabled: false });
+
+  // ── Identity ──
+  if (identity) {
+    template.push({ label: identity, click: openTo('/account') });
+    template.push({ type: 'separator' });
+  }
+
+  // ── This device ──
+  template.push({ label: `This Device: ${thisDevice}`, enabled: false });
   if (pc && !pc.registered && pc.ready) {
     template.push({ label: 'Use this PC as a server', click: openTo('/start') });
   }
+  template.push({ label: 'Network Devices', click: openTo('/remote-access') });
   template.push({ type: 'separator' });
-  // Real SPA routes: the Sites page lists projects; the Dashboard surfaces
-  // recent deployments. (There is no standalone /deployments list route.)
+
+  // ── Primary nav ──
   template.push({ label: 'Sites', click: openTo('/applications') });
   template.push({ label: 'Dashboard', click: openTo('/') });
   template.push({ type: 'separator' });
-  template.push({ label: 'Open WatchTower', click: () => bringWindowToFront(mainWindow) });
+
+  // ── Update (its own group, like Tailscale) ──
   template.push({
     label: 'Check for Updates…',
     click: () => {
@@ -3434,11 +3442,16 @@ async function buildTrayMenu() {
       }
     },
   });
-  template.push({ label: 'Settings', click: openTo('/settings') });
+  if (version) template.push({ label: `Version ${version}`, enabled: false });
   template.push({ type: 'separator' });
-  if (version) template.push({ label: version, enabled: false });
+
+  // ── App controls (with native accelerators, Tailscale-style) ──
+  template.push({ label: 'Open WatchTower', click: () => bringWindowToFront(mainWindow) });
+  template.push({ label: 'Settings…', accelerator: 'CmdOrCtrl+,', click: openTo('/settings') });
+  template.push({ type: 'separator' });
   template.push({
     label: 'Quit WatchTower',
+    accelerator: 'CmdOrCtrl+Q',
     click: () => { isQuitting = true; stopProcesses(); app.quit(); },
   });
 

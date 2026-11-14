@@ -120,10 +120,19 @@ async def this_pc_status(
     # needs at least the binary present.
     ready = runtime["available"]
 
+    # This machine's own Tailscale IP, if on a tailnet — so the tray menu can
+    # show "hostname (100.x.y.z)" like Tailscale's own menu. Best-effort/None.
+    try:
+        from watchtower import tailscale as _ts
+        tailscale_ip = _ts.local_ip()
+    except Exception:
+        tailscale_ip = None
+
     return {
         "hostname": _local_hostname(),
         "os": platform.system(),
         "arch": platform.machine(),
+        "tailscale_ip": tailscale_ip,
         "registered": existing is not None,
         "node_id": str(existing.id) if existing else None,
         "node_status": existing.status.value if existing else None,
