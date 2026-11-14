@@ -258,6 +258,25 @@ fi
 echo "==> Stripping __pycache__ directories"
 find "$OUT_DIR/python" -type d -name '__pycache__' -exec rm -rf {} + 2>/dev/null || true
 
+# Further safe strip — removes only things never needed at runtime. Zero
+# feature risk (no imported module is touched):
+#   - vendored test suites inside site-packages (e.g. numpy/*/tests)
+#   - *.dist-info/RECORD + metadata we don't read at runtime (keep the dir
+#     shells minimal but don't delete whole dist-info — some libs read their
+#     own version via importlib.metadata; just drop the heavy bits)
+#   - .pyi type stubs (editor-only), .pyc strays, and *.c/*.h build leftovers
+echo "==> Stripping tests / stubs / build leftovers from site-packages"
+SP="$OUT_DIR/python/lib/python3.12/site-packages"
+if [ -d "$SP" ]; then
+  find "$SP" -type d \( -name tests -o -name test -o -name testing \) -prune -exec rm -rf {} + 2>/dev/null || true
+  find "$SP" -type f \( -name '*.pyi' -o -name '*.pyc' -o -name '*.c' -o -name '*.h' -o -name '*.pxd' -o -name '*.pyx' \) -delete 2>/dev/null || true
+  # dist-info: keep METADATA (importlib.metadata.version reads it) but drop the
+  # bulky RECORD/licenses/wheel files that are never read at runtime.
+  find "$SP" -type d -name '*.dist-info' -prune -exec sh -c '
+    for d; do rm -f "$d/RECORD" "$d/WHEEL" "$d/LICENSE"* "$d/license"* "$d/AUTHORS"* 2>/dev/null; done
+  ' sh {} + 2>/dev/null || true
+fi
+
 # Drop pip itself — the user can't pip install into the bundle anyway
 # (no write perms on the .app bundle), and shipping it adds ~10 MB.
 # Cross-install case: skip (pip never ran in the bundle Python; nothing
