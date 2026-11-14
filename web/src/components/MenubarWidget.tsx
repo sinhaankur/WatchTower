@@ -45,6 +45,7 @@ import {
   Loader2,
   Cpu,
   MemoryStick,
+  LogIn,
 } from 'lucide-react';
 import {
   useMe,
@@ -295,9 +296,32 @@ function SharingUrl({ url }: { url: string }) {
 
 function Identity({ onClose }: { onClose?: () => void }) {
   const { data: me } = useMe();
+  // The real "signed in" signal is GitHub auth — the app may auto-auth with a
+  // local token, so `me` existing isn't enough. Zero state → a "Sign in" row.
+  const signedIn = !!me?.is_github_authenticated;
+
+  if (!signedIn) {
+    return (
+      <NavTo
+        to="/login"
+        onClose={onClose}
+        className="flex items-center gap-2.5 px-4 py-2.5 hover:bg-muted/60 transition-colors"
+      >
+        <span className="w-7 h-7 rounded-full bg-muted text-muted-foreground flex items-center justify-center shrink-0">
+          <LogIn size={14} />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-xs font-medium text-foreground truncate">Sign in</p>
+          <p className="text-[11px] text-muted-foreground truncate">Connect GitHub to deploy</p>
+        </div>
+        <ChevronRight size={14} className="text-muted-foreground shrink-0" />
+      </NavTo>
+    );
+  }
+
   const initial = (me?.name ?? me?.email ?? '?').slice(0, 1).toUpperCase();
-  const label = me?.name ?? me?.email ?? 'Not signed in';
-  const sub = me?.org_name ?? (me?.is_github_authenticated ? 'GitHub' : 'Local admin');
+  const label = me?.name ?? me?.email ?? 'Account';
+  const sub = me?.org_name ?? 'GitHub';
 
   return (
     <NavTo

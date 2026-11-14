@@ -3381,8 +3381,18 @@ async function buildTrayMenu() {
   ]);
 
   const running = !!health && health.status === 'healthy';
-  const identity = (me && (me.email || me.name)) || null;
   const version = (health && health.version) ? health.version : (app.getVersion ? app.getVersion() : '');
+
+  // Three distinct states the menu must tell apart (the "zero state" is the one
+  // that was missing — logged-out looked almost identical to logged-in):
+  //   - starting:  backend not up yet
+  //   - signed-in: GitHub-authenticated (real identity) → full menu
+  //   - signed-out ("zero state"): backend up but no GitHub login → a minimal
+  //     menu whose primary action is "Sign in…". The desktop auto-auths with a
+  //     LOCAL token, so `me` is usually non-null even when logged out — the real
+  //     signal is is_github_authenticated, not the mere presence of `me`.
+  const signedIn = !!(me && me.is_github_authenticated);
+  const identity = signedIn ? (me.email || me.name) : null;
 
   // "This Device" line — Tailscale-style: hostname + IP inline, e.g.
   // "ankursinhas-macbook-pro-1 (100.91.27.70)".
@@ -3404,9 +3414,43 @@ async function buildTrayMenu() {
   const template = [];
 
   // ── Header: app + status ──
+  const statusLabel = !running ? 'Starting…' : signedIn ? 'Connected' : 'Not signed in';
   template.push({ label: 'WatchTower', enabled: false });
-  template.push({ label: running ? 'Connected' : 'Starting…', enabled: false });
+  template.push({ label: statusLabel, enabled: false });
   template.push({ type: 'separator' });
+
+  if (!running) {
+    // ── State: starting — minimal, just let them open/quit while it boots ──
+    template.push({ label: 'Open WatchTower', click: () => bringWindowToFront(mainWindow) });
+    template.push({ type: 'separator' });
+    template.push({
+      label: 'Quit WatchTower',
+      accelerator: 'CmdOrCtrl+Q',
+      click: () => { isQuitting = true; stopProcesses(); app.quit(); },
+    });
+    return Menu.buildFromTemplate(template);
+  }
+
+  if (!signedIn) {
+    // ── Zero state: backend up but not signed in. Primary action = Sign in.
+    // Keep it minimal (no device/network/sites rows that need an account).
+    template.push({ label: 'Sign in…', click: openTo('/login') });
+    template.push({ type: 'separator' });
+    template.push({ label: `This Device: ${thisDevice}`, enabled: false });
+    template.push({ type: 'separator' });
+    template.push({ label: 'Open WatchTower', click: () => bringWindowToFront(mainWindow) });
+    template.push({ label: 'Settings…', accelerator: 'CmdOrCtrl+,', click: openTo('/settings') });
+    template.push({ type: 'separator' });
+    if (version) template.push({ label: `Version ${version}`, enabled: false });
+    template.push({
+      label: 'Quit WatchTower',
+      accelerator: 'CmdOrCtrl+Q',
+      click: () => { isQuitting = true; stopProcesses(); app.quit(); },
+    });
+    return Menu.buildFromTemplate(template);
+  }
+
+  // ── State: signed in — the full menu ──
 
   // ── Identity ──
   if (identity) {
