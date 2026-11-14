@@ -9,6 +9,15 @@ Curated, human-friendly history of WatchTower releases. Auto-generated GitHub Re
 
 ---
 
+## 2.2.0 — Tailscale-grade tray, resource monitoring, one-click Podman setup
+
+- **Native status menu in the system tray.** Left-click the tray icon (macOS menu bar / Windows & Linux tray) for a rich popover — connection toggle, your identity, this device, live Tailscale + container-runtime status, Network Devices, and the app's own CPU/RAM footprint. Right-click still gives the native menu. Modeled on Tailscale's menu-bar app.
+- **CPU + RAM monitoring that works everywhere.** The System Resources card now shows real figures on macOS (previously RAM read zero — it was Linux-only) and adds CPU: overall system load plus WatchTower's own share. Dependency-free; the control plane sits around 35 MB idle.
+- **One-click Podman setup.** On a fresh macOS/Windows install, WatchTower now detects when Podman has never been initialized (not just stopped) and offers **Set up** — it creates and starts the machine for you, instead of a dead-end "Start" on a machine that doesn't exist.
+- **Runs on Python 3.8/3.9 again.** Two core modules used `X | None` syntax without the compatibility import, which crashed `pip install` on the older Python versions the package advertises support for. Fixed.
+- **Security + supply chain.** Patched a HIGH `follow-redirects` advisory (credential leak on cross-origin redirect) and a PostCSS ReDoS in the frontend; added a `SECURITY.md` disclosure policy and CodeQL code scanning; switched PyPI publishing to credential-free OIDC Trusted Publishing.
+- **Deploy reliability.** Honest failures and actionable hints for the most common first-deploy problems; pnpm + Next.js apps deploy and serve correctly; true SSR Next.js now fails clearly instead of reporting a hollow "LIVE".
+
 ## 2.1.3 — Complete the release (supersedes 2.1.1 / 2.1.2)
 
 - **Fixes the remaining release-build failures** so every supported platform ships again:
