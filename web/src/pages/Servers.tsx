@@ -480,7 +480,7 @@ const Servers = () => {
             <div className="border border-dashed border-border rounded-xl px-6">
               <EmptyState
                 title="No servers yet"
-                description="Add your first server to start deploying applications. Use this Mac as a server, or connect a remote one over SSH."
+                description="Use this Mac, or connect a remote one over SSH."
                 action={
                   <>
                     {!isGuest && (

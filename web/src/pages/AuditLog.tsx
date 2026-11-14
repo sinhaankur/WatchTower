@@ -266,7 +266,7 @@ export default function AuditLog() {
             <EmptyState
               compact
               title="Nothing in the log yet"
-              description="As people create projects, trigger deploys, or change env vars, those actions land here. Adjust the filters above if you expected something specific."
+              description="Project changes, deploys, and env-var edits land here."
             />
           )}
           {filtered.map((e) => {

@@ -143,7 +143,7 @@ function AppFootprint({ onClose }: { onClose?: () => void }) {
       to="/settings"
       onClose={onClose}
       className="flex items-center gap-3 px-4 py-2 hover:bg-muted/60 transition-colors"
-      title="View full system resource usage in Settings"
+      title="System resources"
     >
       <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
         <MemoryStick size={12} />
@@ -438,7 +438,7 @@ function Dependencies({ onClose }: { onClose?: () => void }) {
       />
       <DepRow
         icon={<Boxes size={14} />}
-        label="Container runtime"
+        label="Containers"
         value={runtimeText}
         ok={runtimeOk}
         to="/local-containers"

@@ -66,7 +66,7 @@ describe('MenubarWidget', () => {
     expect(deviceRow.textContent).not.toContain('100.91.27.70');
     // Dependency rows exist
     expect(await screen.findByText('Tailscale')).toBeTruthy();
-    expect(await screen.findByText('Container runtime')).toBeTruthy();
+    expect(await screen.findByText('Containers')).toBeTruthy();
   });
 
   it('names the detected runtime (Docker), not a hardcoded Podman', async () => {
