@@ -39,15 +39,15 @@
 
 ## Why WatchTower
 
-Coolify, Dokploy, Umbrel, and CasaOS all let you self-host applications. **None of them repair a broken deployment for you.** WatchTower does.
+Coolify, Dokploy, Umbrel, and CasaOS all let you self-host. **None repair a broken deployment for you.** WatchTower does.
 
-- **Self-healing deployments** — when a deployment fails (port conflict, registry flake, out-of-memory, build error), WatchTower classifies the cause, applies a safe fix, and retries automatically. Anything it cannot fix safely is queued for your review with an AI-generated root-cause analysis.
-- **Your hardware, not a rented VPS** — designed to run on the machine you already own. No monthly server bill, no usage-based surprises.
-- **Rootless and private by default** — Podman-first (no root Docker daemon), reachable over your own Tailscale tailnet. Nothing is exposed to the public internet until you decide to go public.
-- **Batteries included** — one-click managed databases (Postgres, MySQL, MariaDB, MongoDB, Redis) with auto-wired connection strings, scheduled backups, and off-host backup copies to another of your devices, plus GitHub push-to-deploy and an app catalog.
-- **Open-core, no lock-in** — Apache 2.0 + ELv2. Self-host it forever; your projects and data remain yours.
+- **Self-healing deployments** — on a failed deploy (port conflict, registry flake, OOM, build error) it classifies the cause, applies a safe fix, and retries. What it can't fix safely is queued with an AI root-cause analysis.
+- **Your hardware, not a rented VPS** — runs on the machine you already own. No monthly bill, no usage surprises.
+- **Rootless and private** — Podman-first (no root Docker daemon), reachable over your own Tailscale tailnet. Nothing is public until you say so.
+- **Batteries included** — one-click databases (Postgres, MySQL, MariaDB, MongoDB, Redis) with auto-wired connection strings, scheduled + off-host backups, GitHub push-to-deploy, and an app catalog.
+- **Open-core, no lock-in** — Apache 2.0 + ELv2. Your projects and data stay yours.
 
-> Different from [`containrrr/watchtower`](https://github.com/containrrr/watchtower) (a Docker image auto-updater). This WatchTower is a full self-hosted deploy + database + self-heal control plane for Podman.
+> Not [`containrrr/watchtower`](https://github.com/containrrr/watchtower) (a Docker image auto-updater). This is a self-hosted deploy + database + self-heal control plane.
 
 ## What it looks like
 

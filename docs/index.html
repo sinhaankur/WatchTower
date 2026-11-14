@@ -558,7 +558,15 @@
       border: 1px solid var(--line);
       border-radius: var(--radius);
       padding: 36px 40px;
+      /* Same calm hover-lift as the feature cards — house ease, GPU transform. */
+      transition: transform 240ms var(--ease-out), box-shadow 240ms var(--ease-out), border-color 240ms;
     }
+    .step:hover {
+      transform: translateY(-3px);
+      border-color: rgba(185, 28, 28, 0.22);
+      box-shadow: 0 2px 4px rgba(15, 23, 42, 0.04), 0 18px 40px -16px rgba(15, 23, 42, 0.14);
+    }
+    @media (prefers-reduced-motion: reduce) { .step { transition: none; } .step:hover { transform: none; } }
     .step-num {
       font-family: "Space Mono", monospace;
       font-size: clamp(2.6rem, 5vw, 4rem);
@@ -857,10 +865,9 @@
         <p class="eyebrow reveal" style="--d:30ms;">Open source · Runs on computers you already own</p>
         <h1 class="reveal" style="--d:60ms;">Turn the computers you already own into <span class="mark">your personal cloud.</span></h1>
         <p class="sub reveal" style="--d:120ms;">
-          Got a laptop or mini-PC gathering dust? Give it a job. Point WatchTower at
-          your GitHub repo and your website is live — database, backups, and a private
-          URL included, for $0/month. <strong>And when a deploy breaks, WatchTower fixes
-          it by itself.</strong>
+          Point WatchTower at your GitHub repo and your site is live — database,
+          backups, and a private URL included, for $0/month. <strong>When a deploy
+          breaks, it fixes itself.</strong>
         </p>
         <div class="hero-actions reveal" style="--d:180ms;">
           <a class="btn btn-primary btn-download js-download" href="https://github.com/sinhaankur/WatchTower/releases/latest" target="_blank" rel="noopener" aria-label="Download WatchTower">
@@ -917,8 +924,8 @@
         <p class="kicker reveal">How it works</p>
         <h2 class="headline reveal" style="--d:60ms;">Live in three steps.</h2>
         <p class="lede reveal" style="--d:120ms;">
-          No YAML, no reverse-proxy homework, no cloud account. The desktop app
-          sets up everything it needs — including Podman — with guided one-click installs.
+          No YAML, no reverse-proxy homework, no cloud account. The app sets up
+          everything it needs — including Podman — in one click.
         </p>
 
         <div class="steps">
