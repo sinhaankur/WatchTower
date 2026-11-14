@@ -142,11 +142,15 @@ else
       try{const m=JSON.parse(s).metadata.vulnerabilities||{};
         process.stdout.write(String((m.high||0)+(m.critical||0)));
       }catch{process.stdout.write("0");}});' 2>/dev/null || echo 0; }
+  # Default to 0 at assignment: under `set -u`, an empty pipeline result would
+  # otherwise leave these unset and trip "unbound variable" in the FAIL message.
   BEFORE_HC="$( (cd "$REPO_ROOT/web" && npm audit --omit=dev --json 2>/dev/null) | _count_hc )"
+  BEFORE_HC="${BEFORE_HC:-0}"
   AUDIT_TMP=$(mktemp -d)
   cp "$REPO_ROOT/web/package.json" "$REPO_ROOT/web/package-lock.json" "$AUDIT_TMP/" 2>/dev/null
   ( cd "$AUDIT_TMP" && npm audit fix --omit=dev --package-lock-only >/dev/null 2>&1 || true )
   AFTER_HC="$( (cd "$AUDIT_TMP" && npm audit --omit=dev --json 2>/dev/null) | _count_hc )"
+  AFTER_HC="${AFTER_HC:-0}"
   rm -rf "$AUDIT_TMP"
   FIXABLE=$(( ${BEFORE_HC:-0} - ${AFTER_HC:-0} ))
   [ "$FIXABLE" -lt 0 ] && FIXABLE=0
