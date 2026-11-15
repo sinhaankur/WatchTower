@@ -3452,13 +3452,34 @@ async function buildTrayMenu() {
   }
 
   // ── Identity / GitHub ──
-  // Signed in → the account row. Local-only → an optional "Connect GitHub"
-  // action (adds deploy-from-repo + team features). Either way the FULL menu
-  // below shows — everything else works locally.
+  // Like Tailscale's account row: a SUBMENU that expands to account actions.
+  // Signed in → Account Settings / Switch account / Sign out. Local-only → the
+  // sign-in options. Either way the FULL menu below shows (everything works
+  // locally; GitHub is optional).
   if (identity) {
-    template.push({ label: identity, click: openTo('/account') });
+    template.push({
+      label: identity,
+      submenu: [
+        { label: me && me.org_name ? me.org_name : (me && me.email) || 'Signed in', enabled: false },
+        { type: 'separator' },
+        { label: 'Account Settings…', click: openTo('/account') },
+        { label: 'Switch account…', click: openTo('/login') },
+        { type: 'separator' },
+        // Sign-out is a client-side action (clears the token) — the Account page
+        // has the button + confirmation, so route there rather than a dead path.
+        { label: 'Sign out…', click: openTo('/account') },
+      ],
+    });
   } else {
-    template.push({ label: 'Connect GitHub…', click: openTo('/login') });
+    template.push({
+      label: 'Connect GitHub…',
+      submenu: [
+        { label: 'GitHub is optional — the app works locally', enabled: false },
+        { type: 'separator' },
+        { label: 'Sign in with GitHub…', click: openTo('/login') },
+        { label: 'Account Settings…', click: openTo('/account') },
+      ],
+    });
   }
   template.push({ type: 'separator' });
 
