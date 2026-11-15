@@ -9,6 +9,12 @@ Curated, human-friendly history of WatchTower releases. Auto-generated GitHub Re
 
 ---
 
+## 2.2.3 — Calmer, more polished UI
+
+- **Account menu you can expand.** The menu-bar identity row is now a submenu — Account Settings, Switch account, Sign out — just like Tailscale's account menu.
+- **Calmer status.** Deployment status reads as a quiet colored dot + label instead of a loud boxed badge, across your Sites and project pages. Dense but calm.
+- **Warmer, lighter look.** Light mode now sits on a warm off-white "paper" canvas with hairline borders and softer elevation — the restful, premium feel of a well-made native app. Your amber brand accent stays.
+
 ## 2.2.2 — A clean, Tailscale-grade menu bar + working auto-update
 
 - **One clean menu-bar menu.** Clicking the tray icon now opens a single, native, Tailscale-shaped menu — no more two menus opening at once. Legible bold "W" icon. Personalised: it leads with your name, shows a cleaned-up device name, and your live RAM/CPU footprint.
