@@ -73,7 +73,7 @@ Grab the installer for your platform from [**Releases**](https://github.com/sinh
 
 | Platform | Install |
 |---|---|
-| **macOS** (12+) | Download the `.dmg` (`arm64` for Apple Silicon, `x64` for Intel), drag into Applications |
+| **macOS** (12+) | Download the `arm64` `.dmg` (Apple Silicon), drag into Applications. *Intel Macs:* the `x64` DMG is best-effort (GitHub's Intel runners are scarce) — if it's missing for a release, use `pipx install watchtower-podman` or browser mode. |
 | **Linux** | Download the `.AppImage`, then `chmod +x WatchTower-*.AppImage && ./WatchTower-*.AppImage` — or use the `.deb` |
 | **Windows** | Download and run the `.exe` installer |
 

@@ -213,6 +213,14 @@ jobs:
     name: Desktop — ${{ matrix.os }}
     needs: [create-release, build-windows-bundle]
     runs-on: ${{ matrix.os }}
+    # Cap each leg so a runner that never provisions (the Intel macos-13 leg
+    # hits this — GitHub's Intel Mac runners are scarce and often queue out)
+    # fails fast at 45 min instead of hanging to the 360-min default.
+    timeout-minutes: 45
+    # Best-effort legs (currently only the Intel Mac x64 build) don't fail the
+    # whole release when their runner is unavailable — the arm64 Mac + Linux +
+    # Windows installers always ship; Intel Mac is a bonus when a runner frees up.
+    continue-on-error: ${{ matrix.best_effort || false }}
     strategy:
       fail-fast: false
       matrix:
@@ -274,6 +282,11 @@ jobs:
             eb_args: --mac --x64
             artifact_glob: "desktop/dist/*x64*"
             extra_apt: ""
+            # Intel Mac runners are scarce and frequently queue out. Mark this
+            # leg best-effort so an unavailable runner doesn't fail the release;
+            # the arm64 Mac / Linux / Windows installers ship regardless. Intel
+            # Mac users can also use pip/pipx or browser mode (documented).
+            best_effort: true
           # windows-x64: bundle is built on a Linux runner (build-windows-bundle
           # job above) and downloaded here as an artifact. Restores the
           # bundled-Python install experience that 1.12.3 had to defer.
