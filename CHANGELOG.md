@@ -9,6 +9,14 @@ Curated, human-friendly history of WatchTower releases. Auto-generated GitHub Re
 
 ---
 
+## 2.2.2 — A clean, Tailscale-grade menu bar + working auto-update
+
+- **One clean menu-bar menu.** Clicking the tray icon now opens a single, native, Tailscale-shaped menu — no more two menus opening at once. Legible bold "W" icon. Personalised: it leads with your name, shows a cleaned-up device name, and your live RAM/CPU footprint.
+- **Update like Tailscale.** New versions download quietly in the background; the menu then shows **"Restart to update — Version X ready"**. One click installs and reopens — no interrupting dialog, on your schedule.
+- **Auto-update actually applies the fast way now.** Fixed a bug (since 1.21.0) where the update payload was fingerprinted against the wrong requirements file, so every "fast" update silently fell back to the full installer. Fast ~0.7 MB updates now apply as intended.
+- **Honest status when GitHub isn't connected.** The menu no longer says "Not signed in" — GitHub is optional, so it shows **"Ready"** (works locally) with an optional "Connect GitHub" action instead of a warning.
+- **Lighter copy + landing-page polish.** Tightened wordy UI text and the website copy; added a subtle hover-lift to the "how it works" cards.
+
 ## 2.2.1 — Ship the macOS build + security hardening (completes 2.2.0)
 
 - **macOS installers are back.** 2.2.0 shipped everywhere except Mac — GitHub retired the `macos-14` CI runner image, so both Mac DMGs failed to build ("configuration not supported") and only Linux/Windows + PyPI/container went out. Apple-Silicon builds now run on `macos-15`, Intel on `macos-13`. Mac users on 2.2.0 get this update.
