@@ -91,13 +91,16 @@ const USE_CASE_META: Record<Project['use_case'], { icon: string; label: string; 
   docker_platform: { icon: '🐳', label: 'Docker App',    color: 'bg-cyan-50 text-cyan-500 dark:text-cyan-400 border-cyan-500/30' },
 };
 
-const STATUS_COLOR: Record<string, string> = {
-  live:        'bg-emerald-100 text-emerald-500 dark:text-emerald-400 border-emerald-200',
-  building:    'bg-blue-100 text-blue-500 dark:text-blue-400 border-blue-200',
-  deploying:   'bg-indigo-500/15 text-indigo-500 dark:text-indigo-400 border-indigo-500/30',
-  pending:     'bg-amber-100 text-accent border-accent/25',
-  failed:      'bg-red-100 text-destructive border-destructive/30',
-  rolled_back: 'bg-muted text-muted-foreground border-border',
+// Calm, Tailscale-style status: a small colored DOT carries the meaning, the
+// label stays quiet (muted/foreground) — no loud boxed badge. One dot color
+// per state; text is never shouted.
+const STATUS_DOT: Record<string, string> = {
+  live:        'bg-emerald-500',
+  building:    'bg-blue-500 anim-pulse-soft',
+  deploying:   'bg-indigo-500 anim-pulse-soft',
+  pending:     'bg-amber-500',
+  failed:      'bg-red-500',
+  rolled_back: 'bg-muted-foreground/40',
 };
 
 /**
@@ -122,9 +125,10 @@ function deduplicateProjects<T extends Project>(projects: T[]): T[] {
 }
 
 function Badge({ status }: { status: string }) {
-  const cls = STATUS_COLOR[status.toLowerCase()] ?? 'bg-muted text-muted-foreground border-border';
+  const dot = STATUS_DOT[status.toLowerCase()] ?? 'bg-muted-foreground/40';
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${cls}`}>
+    <span className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+      <span className={`inline-block w-1.5 h-1.5 rounded-full shrink-0 ${dot}`} />
       {status.replace(/_/g, ' ')}
     </span>
   );
@@ -419,7 +423,8 @@ const Applications = () => {
                           </Link>
                         )}
                         {!p.lastDeployment && (
-                          <span className="text-xs px-2 py-0.5 rounded-full border border-border bg-muted text-muted-foreground font-medium">
+                          <span className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                            <span className="inline-block w-1.5 h-1.5 rounded-full shrink-0 bg-muted-foreground/40" />
                             never deployed
                           </span>
                         )}
