@@ -102,7 +102,14 @@ if [ "$STAGED_VERSION" != "$VERSION" ]; then
   exit 1
 fi
 
-REQ_SHA=$("$PY" "$REPO_ROOT/scripts/payload_tools.py" fingerprint "$REPO_ROOT/requirements.txt")
+# Fingerprint the SAME file the desktop bundle installs from, or the payload's
+# requirementsSha256 never matches the shell's runtime-fingerprint.json and every
+# fast-update silently falls back to the full installer (bug since v1.21.0). The
+# bundle (scripts/build-python-bundle.sh) installs from requirements-bundle.txt,
+# falling back to requirements.txt if absent — mirror that exactly here.
+PAYLOAD_REQUIREMENTS="$REPO_ROOT/requirements-bundle.txt"
+[ -f "$PAYLOAD_REQUIREMENTS" ] || PAYLOAD_REQUIREMENTS="$REPO_ROOT/requirements.txt"
+REQ_SHA=$("$PY" "$REPO_ROOT/scripts/payload_tools.py" fingerprint "$PAYLOAD_REQUIREMENTS")
 
 # payload.json — the identity half of the manifest, embedded so an
 # extracted payload dir is self-describing. It can't contain its own
