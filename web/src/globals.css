@@ -12,33 +12,39 @@
    * This matches the native, understated feel of apps like Tailscale.
    */
   :root {
-    /* ── LIGHT ── clean, neutral, calm (the default) ── */
-    --background: 210 20% 98%;        /* near-white, a hair cool */
-    --foreground: 222 28% 14%;        /* near-black slate text */
-    --card: 0 0% 100%;                /* cards are pure white, lifted by shadow */
-    --card-foreground: 222 28% 14%;
+    /* ── LIGHT ── Tailscale-calm STRUCTURE, WatchTower amber brand ──
+     * Research (Tailscale design system): warm paper-grounded canvas, white
+     * cards lifted off it, hairline borders, near-invisible elevation, soft
+     * radius. The accent stays AMBER — Tailscale's "restraint discipline" is
+     * hue-agnostic (one accent, used sparingly), so the calm comes from the
+     * structure, not from switching to green. */
+    --background: 36 30% 99%;         /* warm off-white "paper", not cool/stark */
+    --foreground: 222 24% 13%;        /* near-black ink */
+    --card: 0 0% 100%;                /* pure-white cards, lifted off the warm canvas */
+    --card-foreground: 222 24% 13%;
     --popover: 0 0% 100%;
-    --popover-foreground: 222 28% 14%;
-    --muted: 210 18% 95%;             /* subtle fills / hovers */
-    --muted-foreground: 215 16% 42%;  /* secondary text */
-    --accent: 38 92% 50%;             /* AMBER — a touch deeper for light-bg contrast */
+    --popover-foreground: 222 24% 13%;
+    --muted: 36 16% 95%;              /* warm subtle fills / hovers */
+    --muted-foreground: 220 10% 40%;  /* secondary text */
+    --accent: 38 92% 50%;             /* AMBER — the single accent, used sparingly */
     --accent-foreground: 26 60% 10%;
     --destructive: 0 72% 50%;
     --destructive-foreground: 0 0% 100%;
-    --border: 214 18% 89%;            /* soft neutral divider */
-    --input: 214 18% 86%;
+    --border: 36 12% 90%;             /* hairline divider, faintly warm */
+    --input: 36 12% 87%;
     --primary: 38 92% 50%;
     --primary-foreground: 26 60% 10%;
     --ring: 38 92% 50%;
-    --secondary: 210 18% 94%;
-    --secondary-foreground: 222 24% 20%;
-    --sidebar: 210 22% 97%;
-    --sidebar-border: 214 18% 90%;
-    --border-soft:  214 18% 92%;
-    --surface-soft: 210 20% 99%;
-    --radius: 0.625rem;
-    --shadow: 0 1px 2px 0 hsl(222 24% 16% / 0.05), 0 1px 3px 0 hsl(222 24% 16% / 0.08);
-    --shadow-hover: 0 4px 10px -2px hsl(222 24% 16% / 0.10), 0 2px 5px -2px hsl(222 24% 16% / 0.07);
+    --secondary: 36 16% 94%;
+    --secondary-foreground: 222 20% 20%;
+    --sidebar: 36 24% 98%;
+    --sidebar-border: 36 12% 91%;
+    --border-soft:  36 12% 93%;
+    --surface-soft: 36 24% 99%;
+    --radius: 0.75rem;               /* softer, Tailscale's 12–16px dominant */
+    /* Near-invisible elevation — hierarchy via color + spacing, not shadow. */
+    --shadow: 0 1px 2px 0 hsl(36 20% 16% / 0.03), 0 1px 3px 0 hsl(36 20% 16% / 0.04);
+    --shadow-hover: 0 2px 8px 0 hsl(36 20% 16% / 0.06);
     --ease-spring: cubic-bezier(0.34, 1.3, 0.64, 1);
     --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
     --dur-instant: 70ms;
